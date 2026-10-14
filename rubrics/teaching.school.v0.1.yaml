@@ -1,0 +1,136 @@
+# DRAFT v0.1 for review with an academic head. Not final. Weights and anchors are proposals.
+#
+# Plan task P0.8. Once the academic head agrees the anchors, save the agreed file as
+# teaching.school.v0.2.yaml (this file stays as the record of the first draft).
+#
+# Rules for this draft:
+# - Anchors describe only what the teacher says or does that a rater can point to in the
+#   transcript or audio. No guesses about intentions or feelings, and no student outcomes.
+# - Students are never scored (CLAUDE.md golden rule 10). Student talk appears only as
+#   evidence of what the teacher did.
+# - Example utterances are illustrative Hinglish. All names, page numbers and other details
+#   in them are fictional.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: teaching.school.v0.1
+segment: school
+version: "0.1"
+roles: [teacher, students]  # teacher is the person analysed; students are context only
+
+dimensions:
+  - key: concept_clarity
+    name: Concept clarity
+    weight: 0.25
+    definition: "The teacher states the main idea of the lesson, defines its key terms and explains it in a logical order of steps."
+    min_quotes: 2
+    anchors:
+      1: "The teacher never states the main idea, and the explanation contradicts itself or contains a clear factual error that is not corrected."
+      2: "The teacher names the topic but uses key terms without defining them, and the explanation skips steps or jumps back and forth."
+      3: "The teacher states the main idea and defines most key terms, but at least one step is skipped or explained out of order."
+      4: "The teacher states the main idea, defines each key term when first used, and explains it step by step in order."
+      5: "The teacher states the main idea at the start, defines each key term when first used, explains it step by step, and re-explains it in a different way (simpler words, the other language or a board diagram) when a student asks a question or gives a wrong answer."
+    examples:
+      # The level-1 example deliberately contains a factual error and mixes up two ideas.
+      1: "Toh photosynthesis mein plant oxygen leta hai aur CO2 chhodta hai... haan, respiration bhi yahi hai, same cheez. Chalo next."
+      5: "Aaj ka main idea: photosynthesis matlab plant sunlight, paani aur CO2 se apna khana banata hai. 'Chlorophyll' yaani leaf ka green pigment, jo sunlight absorb karta hai. Pehle yeh samjho, phir steps dekhenge."
+
+  - key: use_of_examples
+    name: Use of examples
+    weight: 0.15
+    definition: "The teacher uses examples, analogies, demonstrations or worked problems that match the concept being taught and links them back to it."
+    min_quotes: 1
+    anchors:
+      1: "The teacher gives no example, analogy, demonstration or worked problem at any point in the explanation."
+      2: "The teacher mentions an example only in passing or gives one that does not match the concept being taught."
+      3: "The teacher gives at least one relevant example or worked problem but does not say how it connects to the concept."
+      4: "The teacher gives two or more relevant examples or worked problems and says how each connects to the concept."
+      5: "The teacher gives two or more relevant examples, including one from an everyday setting such as home, the market or sports, works at least one through step by step, and links each back to the concept."
+    examples:
+      1: "Fractions add karne ka rule board pe likh diya hai, bas yaad kar lo, exam mein aayega."
+      5: "Socho ek pizza ke 8 slices hain aur Aman ne 3 kha liye, toh usne pizza ka 3/8 khaaya. Ab yahi 3/8 number line pe dikhaate hain, dekho same cheez hai."
+
+  - key: checks_for_understanding
+    name: Checks for understanding
+    weight: 0.20
+    definition: "The teacher checks at points during the lesson whether students can explain or use the idea, and acts on what the answers show."
+    min_quotes: 2
+    anchors:
+      1: "The teacher does not check understanding at any point, or asks 'samajh aaya?' and moves on without waiting for a reply."
+      2: "The teacher asks only yes/no checks such as 'clear hai?' and accepts a chorus 'yes' without asking anyone to explain or show working."
+      3: "The teacher asks at least one check that needs students to explain, answer or show working, but moves on without responding to wrong or missing answers."
+      4: "The teacher asks checks that need an answer or explanation at more than one point in the lesson and responds to wrong answers by correcting or re-explaining."
+      5: "The teacher checks at several points with tasks that need students to explain or apply the idea, invites answers from more than one student, and re-explains or changes the next step based on the answers given."
+    examples:
+      1: "Sab samajh aa gaya na? Good. Chalo next topic."
+      5: "Ek kaam karo, copy mein 2/5 + 1/5 solve karke dikhao. ... Kuch logon ne 3/10 likha hai. Ruko, ek baar phir dekhte hain denominator ke saath kya hota hai."
+
+  - key: questioning_quality
+    name: Questioning quality
+    weight: 0.15
+    definition: "The teacher asks a mix of questions, including open questions that ask students to explain, compare or predict, gives time to answer and follows up on answers."
+    min_quotes: 2
+    anchors:
+      1: "The teacher asks no questions, or answers their own questions straight away without pausing for students."
+      2: "The teacher asks only recall questions with one-word answers and moves on after the first answer."
+      3: "The teacher asks mostly recall questions with at least one open question (why, how, what if), but answers it themselves or takes the first reply without a pause."
+      4: "The teacher asks several open questions, pauses for answers, and follows up on some answers with prompts such as 'kyun?' or 'kaise pata?'."
+      5: "The teacher regularly asks open questions, pauses before taking answers, and follows up by asking for reasons or by asking another student to agree, disagree or build on an answer."
+    examples:
+      1: "Plants ko khana banane ke liye kya chahiye? Sunlight. Theek hai, aage badhte hain."
+      5: "Agar ek plant ko ek hafta andhere mein rakh dein toh kya hoga, aur kyun? ... Sana keh rahi hai leaves peeli ho jaayengi. Kaun agree karta hai, kaun nahi? Reason ke saath batao."
+
+  # Pacing is judged from what the teacher says and does. words_per_minute and
+  # longest_monologue_s are shown next to the score but are not turned into a score.
+  - key: pacing
+    name: Pacing
+    weight: 0.10
+    definition: "The teacher moves through the parts of the lesson at a speed that leaves time for explanation, questions and practice, and changes speed in response to student questions or answers."
+    min_quotes: 1
+    anchors:
+      1: "The teacher talks through the material without pausing for questions or practice, or leaves long stretches with no instruction, and rushes or skips content at the end ('baaki ghar pe padh lena')."
+      2: "The teacher spends most of the lesson on one part and rushes through the rest, with few pauses for questions or practice."
+      3: "The teacher gives time to each part of the lesson with some pauses for questions, but keeps the same speed after student questions or wrong answers."
+      4: "The teacher gives time to each part of the lesson, including practice, pauses for questions, and slows down at least once to re-explain after a student question or wrong answer."
+      5: "The teacher announces the move from one part of the lesson to the next, pauses for questions and practice in each part, slows down to re-explain after wrong answers, and moves on once students answer correctly."
+    examples:
+      1: "Time kam hai bachcho, baaki chapter fatafat khatam karte hain, jo samajh na aaye ghar pe padh lena."
+      5: "Is sawaal pe kaafi answers galat aaye, toh thoda ruk ke ek baar phir karte hain. Phir paanch minute practice, uske baad next topic."
+
+  # Open question for the reviewer: how to score a recording that stops before the
+  # lesson ends (no closing captured).
+  - key: recap_and_closure
+    name: Recap and closure
+    weight: 0.15
+    definition: "The teacher ends the lesson by restating the key points, connecting them to the lesson's aim and saying what comes next."
+    min_quotes: 1
+    anchors:
+      1: "The lesson ends without any summary, for example stopping mid-explanation at the bell or ending with only 'chalo, bas'."
+      2: "The teacher ends with only a homework instruction or 'revise kar lena' without restating any key point."
+      3: "The teacher lists what was covered ('aaj humne X aur Y kiya') but does not restate the key points themselves."
+      4: "The teacher restates the key points of the lesson at the end and says what comes next or what the homework practises."
+      5: "The teacher asks students to state the key points, adds or corrects what is missing, connects them to the lesson's aim, and says what comes next or what the homework practises."
+    examples:
+      1: "Bell baj gayi, chalo bas, kal milte hain."
+      5: "Bell se pehle, Ritu, aaj ke do main points batao? ... Haan, aur ek cheez add karo: denominator same ho tabhi seedha add karte hain. Kal unlike fractions karenge, isliye homework mein page 42 ke pehle paanch sawaal."
+
+# Numbers computed in code from the transcript (CLAUDE.md golden rule 5), shown next to the
+# scores and never produced by the LLM. No targets or thresholds are set in this draft.
+computed_metrics:
+  - teacher_talk_share      # share of speech time spoken by the teacher
+  - teacher_question_count  # number of questions the teacher asks
+  - open_question_ratio     # share of the teacher's questions classed as open (why, how, explain)
+  - words_per_minute        # the teacher's speaking pace
+  - silence_share           # share of the recording with no speech
+  - longest_silence_s       # longest stretch with no speech, in seconds
+  - longest_monologue_s     # longest uninterrupted teacher turn, in seconds
+
+output:
+  - summary
+  - strengths
+  - gaps
+  - suggestions
+
+# Scores from this rubric stay hidden from users until agreement between the model and human
+# raters, measured by eval/kappa.py on real annotated recordings, reaches this value.
+# No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}
