@@ -10,3 +10,12 @@ dist/
 *.webm
 *.mp4
 eval/goldset/audio/
+
+# Annotation (P4.1): gold transcripts and Label Studio exports of pilot recordings are real data.
+# Label Studio's own data lives in a named Docker volume, not in this repository.
+eval/goldset/gold/*.json
+eval/goldset/exports/
+infra/annotation/.env
+# Other audio formats import_tasks.py accepts.
+*.ogg
+*.flac

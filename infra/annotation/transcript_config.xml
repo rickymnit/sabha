@@ -1,0 +1,46 @@
+<View>
+  <!--
+    Sabha gold transcripts: speaker turns + verbatim text (plan task P4.1).
+    Paste into Label Studio: Project > Settings > Labeling Interface > Code.
+
+    Names used by eval/goldset/export_gold.py (keep in sync with eval/goldset/goldset_common.py):
+      Audio "audio" reads task field $audio, Labels "speaker", TextArea "transcript".
+    Label values map to speaker_role: Teacher=teacher, Student(s)=students, Receptionist=receptionist,
+      Caller=caller, Other=other, Silence=silence.
+
+    Tags and attributes checked against the Label Studio 1.23.2 tag reference
+    (docs/source/includes/tags/{audio,labels,label,textarea,header,view}.md in HumanSignal/label-studio):
+      Audio: name, value, height.  Labels: name, toName, choice.  Label: value, hotkey, background, hint.
+      TextArea: name, toName, perRegion, editable, transcription, maxSubmissions, rows, placeholder.
+      Header: value (static text or $field), size.  View: style.
+    The TextArea is NOT required="true": Silence regions must stay empty, and Label Studio's
+    required check for perRegion TextAreas cannot exempt one label among several. export_gold.py
+    refuses any non-Silence region without text and any Silence region with text instead.
+  -->
+  <View style="padding: 8px 12px; margin-bottom: 8px; border-left: 4px solid #2563eb; background: #f1f5f9;">
+    <Header value="How to annotate (full rules: docs/annotation-guidelines.md)" size="5"/>
+    <Header value="1. Choose who is speaking (keys 1-6), then drag on the waveform over one turn. Overlapping speakers get separate regions." size="6"/>
+    <Header value="2. Click the region and type exactly what was said, fillers included. Hindi words in Devanagari, English words in Roman: आज हम photosynthesis पढ़ेंगे, umm, हाँ, अच्छा." size="6"/>
+    <Header value="3. Numbers as spoken, in words. Can't make it out after two listens: [inaudible]." size="6"/>
+    <Header value="4. Never type a student's name: write [student]. Other private people: [name]. Phone, ID numbers, email, address: [phone] [id] [email] [address]." size="6"/>
+    <Header value="5. Silence: mark gaps of 2 seconds or more where nobody speaks. Leave its text empty." size="6"/>
+  </View>
+  <View style="display: flex; gap: 16px;">
+    <Header value="Recording type:" size="6"/>
+    <Header value="$type" size="6"/>
+    <Header value="Language mix:" size="6"/>
+    <Header value="$language_mix" size="6"/>
+  </View>
+  <Labels name="speaker" toName="audio" choice="single">
+    <Label value="Teacher" hotkey="1" background="#2563eb" hint="The staff member leading the lesson"/>
+    <Label value="Student(s)" hotkey="2" background="#16a34a" hint="Any student or group of students; never tell students apart"/>
+    <Label value="Receptionist" hotkey="3" background="#9333ea" hint="Front-desk staff member handling the call or visit"/>
+    <Label value="Caller" hotkey="4" background="#ea580c" hint="The person the receptionist is serving, on the phone or in person"/>
+    <Label value="Other" hotkey="5" background="#64748b" hint="Anyone else: another adult, an announcement, a recorded message"/>
+    <Label value="Silence" hotkey="6" background="#cbd5e1" hint="2 seconds or more with nobody speaking; leave text empty"/>
+  </Labels>
+  <Audio name="audio" value="$audio" height="120"/>
+  <TextArea name="transcript" toName="audio" perRegion="true" editable="true" transcription="true"
+            maxSubmissions="1" rows="3"
+            placeholder="Exactly what was said in this region. Leave empty for Silence."/>
+</View>

@@ -1,0 +1,100 @@
+# Label Studio for Sabha gold-set annotation (plan task P4.1). How to use it: README.md next to this file.
+#
+#   cp .env.example .env && chmod 600 .env    # fill in the values
+#   docker compose up -d
+#
+# Settings are read from .env in this folder (Compose loads it for ${...} interpolation). Only the
+# variables listed under `environment:` reach the container.
+#
+# Every Label Studio variable below was checked against the source of the pinned release
+# (github.com/HumanSignal/label-studio, tag 1.23.2) and, where one exists, the official docs.
+# Label Studio reads its settings with core/utils/params.py:get_env(NAME), which tries
+# LABEL_STUDIO_<NAME>, then HEARTEX_<NAME>, then <NAME>; booleans accept true/false.
+# Paths: "base.py" = label_studio/core/settings/base.py, "label_studio.py" = .../settings/label_studio.py
+# (the settings module the Docker image uses), "server.py" = label_studio/server.py.
+
+name: sabha-annotation
+
+services:
+  label-studio:
+    # 1.23.2 = latest stable release on 2026-10-14, published 2026-09-29 (GitHub release and Docker Hub
+    # tag), a security patch on top of 1.23.0 that also fixes access checks for local-files storage.
+    # Pinned by tag AND multi-arch index digest so a re-pushed tag cannot change what we run.
+    image: heartexlabs/label-studio:1.23.2@sha256:afcc516a22775a39d0d66f4c2ddc95d01be3e3d3862b21fcf4f9de34b4ad4e12
+    # The image's default command is `label-studio` (start); --no-browser skips a pointless browser launch.
+    command: ["label-studio", "start", "--no-browser"]
+    restart: unless-stopped
+    ports:
+      # Localhost only by default. ANNOTATION_BIND_ADDR / ANNOTATION_PORT in .env override it; read the
+      # README before binding anything other than 127.0.0.1 (Label Studio itself serves plain HTTP).
+      - "${ANNOTATION_BIND_ADDR:-127.0.0.1}:${ANNOTATION_PORT:-8080}:8080"
+    environment:
+      # Initial admin account, created on start if it does not exist yet. Must be an email address.
+      # Source: server.py:131-132 (_create_user reads get_env('USERNAME') / get_env('PASSWORD')) and
+      # server.py:411 (called on `start` when both are set). Docs: guide/start.md (table of start
+      # options: LABEL_STUDIO_USERNAME, LABEL_STUDIO_PASSWORD) and guide/signup.md ("Restrict signup
+      # for cloud deployments"). No default here: Compose refuses to start if either is empty.
+      LABEL_STUDIO_USERNAME: ${LABEL_STUDIO_USERNAME:?set LABEL_STUDIO_USERNAME (admin email) in infra/annotation/.env}
+      LABEL_STUDIO_PASSWORD: ${LABEL_STUDIO_PASSWORD:?set LABEL_STUDIO_PASSWORD in infra/annotation/.env}
+
+      # Sign-up page only works with the organisation's invite link.
+      # Source: base.py:317 DISABLE_SIGNUP_WITHOUT_LINK = get_bool_env('DISABLE_SIGNUP_WITHOUT_LINK', False).
+      # Docs: guide/signup.md, "Require invites for new users".
+      LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
+
+      # Serve recordings from the read-only audio mount at /data/local-files/?d=audio/<file>.
+      # Source: base.py:563-564 LOCAL_FILES_SERVING_ENABLED / LOCAL_FILES_DOCUMENT_ROOT;
+      # io_storages/localfiles/views.py (serves only files under a project's Local Files storage path).
+      # Docs: guide/storage_local.md ("Prerequisites") and guide/start.md ("Run Label Studio on Docker
+      # and use Local Storage", which uses this same /label-studio/files root).
+      LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED: "true"
+      LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT: /label-studio/files
+
+      # Usage analytics off: no Google Analytics tag in pages, no usage events to tele.labelstud.io.
+      # Source: base.py:731 COLLECT_ANALYTICS = get_bool_env('COLLECT_ANALYTICS', ...); used by
+      # core/utils/contextlog.py (dont_send) and users/templates/users/{,new-ui/}user_base.html (gtag).
+      # Docs: guide/security.md, "Information collected by Label Studio".
+      COLLECT_ANALYTICS: "false"
+
+      # Error reporting off. label_studio.py:31 and :34 default SENTRY_DSN and FRONTEND_SENTRY_DSN to
+      # HumanSignal's Sentry project (servers outside India; events can carry request data). An empty
+      # value is falsy, so core/utils/sentry.py:65 skips sentry_sdk.init and templates/base.html:51
+      # skips the browser Sentry script. Source only; not covered in the docs.
+      SENTRY_DSN: ""
+      FRONTEND_SENTRY_DSN: ""
+
+      # No "is there a newer version?" call to PyPI.
+      # Source: base.py:602 LATEST_VERSION_CHECK = get_bool_env('LATEST_VERSION_CHECK', True), checked
+      # in core/utils/common.py:394. Source only; not covered in the docs.
+      LATEST_VERSION_CHECK: "false"
+    volumes:
+      # Label Studio's SQLite database, generated SECRET_KEY, exports and media. A named volume, not a
+      # ./data bind mount: the image runs as UID 1001 and Docker gives a new named volume the image
+      # directory's ownership, while a bind-mounted host folder needs a manual chown first (guide/start.md:
+      # "the mounted files and directories must have the proper permissions for the UID 1001"). It also
+      # keeps real annotations out of the repository working tree.
+      - type: volume
+        source: label-studio-data
+        target: /label-studio/data
+      # Recordings, read-only. Must be an existing folder; it is never created for you.
+      - type: bind
+        source: ${ANNOTATION_AUDIO_DIR:?set ANNOTATION_AUDIO_DIR (folder with the recordings) in infra/annotation/.env}
+        target: /label-studio/files/audio
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      # /health/ returns {"status": "UP"} (label_studio/core/views.py:health); curl is in the image.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  label-studio-data:
+    name: sabha-annotation-label-studio-data

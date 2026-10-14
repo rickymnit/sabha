@@ -1,0 +1,414 @@
+[
+  {
+    "id": 101,
+    "annotations": [
+      {
+        "id": 501,
+        "completed_by": 4,
+        "result": [],
+        "was_cancelled": true,
+        "ground_truth": false,
+        "created_at": "2026-10-10T09:00:00.000000Z",
+        "updated_at": "2026-10-10T09:00:00.000000Z",
+        "lead_time": 12.0,
+        "task": 101,
+        "project": 1
+      },
+      {
+        "id": 502,
+        "completed_by": 3,
+        "result": [
+          {
+            "original_length": 30.0,
+            "value": { "start": 8.0, "end": 12.3456, "channel": 0, "labels": ["Teacher"] },
+            "id": "r-teacher-2",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 8.0, "end": 12.3456, "channel": 0, "text": ["हाँ, बिल्कुल. [student], तुम बताओ chlorophyll क्या करता है?"] },
+            "id": "r-teacher-2",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 0.512, "end": 6.0, "channel": 0, "labels": ["Teacher"] },
+            "id": "r-teacher-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 0.512, "end": 6.0, "channel": 0, "text": ["अच्छा, so आज हम photosynthesis पढ़ेंगे. umm, कौन बताएगा plants खाना कैसे बनाते हैं?"] },
+            "id": "r-teacher-1",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 12.5, "end": 15.0005, "channel": 0, "labels": ["Silence"] },
+            "id": "r-silence-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 6.8, "end": 8.25, "channel": 0, "labels": ["Student(s)"] },
+            "id": "r-students-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 6.8, "end": 8.25, "channel": 0, "text": ["sunlight से ma'am"] },
+            "id": "r-students-1",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 15.2, "end": 17.0, "channel": 0, "labels": ["Student(s)"] },
+            "id": "r-students-2",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 15.2, "end": 17.0, "channel": 0, "text": ["[inaudible] green colour देता है"] },
+            "id": "r-students-2",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 17.4, "end": 21.0004, "channel": 0, "labels": ["Teacher"] },
+            "id": "r-teacher-3",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 30.0,
+            "value": { "start": 17.4, "end": 21.0004, "channel": 0, "text": ["  very good.\n  Chapter  seven खोलो  "] },
+            "id": "r-teacher-3",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          }
+        ],
+        "was_cancelled": false,
+        "ground_truth": false,
+        "created_at": "2026-10-11T10:00:00.000000Z",
+        "updated_at": "2026-10-11T10:30:00.000000Z",
+        "lead_time": 1800.5,
+        "task": 101,
+        "project": 1
+      }
+    ],
+    "drafts": [],
+    "predictions": [],
+    "data": {
+      "audio": "/data/local-files/?d=audio/demo-school/demo-teaching-001.wav",
+      "tenant": "demo-school",
+      "type": "teaching",
+      "language_mix": "hinglish",
+      "room_type": "classroom",
+      "consent_ref": "CONSENT-DEMO-0001"
+    },
+    "meta": {},
+    "created_at": "2026-10-09T08:00:00.000000Z",
+    "updated_at": "2026-10-11T10:30:00.000000Z",
+    "inner_id": 1,
+    "total_annotations": 1,
+    "cancelled_annotations": 1,
+    "total_predictions": 0,
+    "project": 1,
+    "updated_by": 3,
+    "file_upload": null
+  },
+  {
+    "id": 102,
+    "annotations": [
+      {
+        "id": 503,
+        "completed_by": 3,
+        "result": [
+          {
+            "original_length": 20.0,
+            "value": { "start": 3.6, "end": 6.2, "channel": 0, "labels": ["Receptionist"] },
+            "id": "x-rec-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 20.0,
+            "value": { "start": 3.6, "end": 6.2, "channel": 0, "text": ["NOT THE GROUND TRUTH"] },
+            "id": "x-rec-1",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          }
+        ],
+        "was_cancelled": false,
+        "ground_truth": false,
+        "created_at": "2026-10-12T10:00:00.000000Z",
+        "updated_at": "2026-10-12T10:10:00.000000Z",
+        "lead_time": 600.0,
+        "task": 102,
+        "project": 1
+      },
+      {
+        "id": 504,
+        "completed_by": { "id": 2, "email": "annotator.two@example.com", "first_name": "", "last_name": "" },
+        "result": [
+          {
+            "original_length": 20.0,
+            "value": { "start": 0.0, "end": 3.5, "channel": 0, "labels": ["Other"] },
+            "id": "g-notice",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 20.0,
+            "value": { "start": 0.0, "end": 3.5, "channel": 0, "text": ["this call may be recorded for training and quality purposes"] },
+            "id": "g-notice",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          },
+          {
+            "original_length": 20.0,
+            "value": { "start": 3.6, "end": 6.2, "channel": 0, "labels": ["Receptionist"] },
+            "id": "g-rec-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 20.0,
+            "value": { "start": 3.6, "end": 6.2, "channel": 0, "text": ["good morning, Sunrise Public School, Pooja speaking"] },
+            "id": "g-rec-1",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          },
+          {
+            "original_length": 20.0,
+            "value": { "start": 6.4, "end": 11.0, "channel": 0, "labels": ["Caller"] },
+            "id": "g-caller-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 20.0,
+            "value": { "start": 6.4, "end": 11.0, "channel": 0, "text": ["hi, umm, I'm calling about admission for my daughter [student], she is in class four now. my number is [phone]"] },
+            "id": "g-caller-1",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          }
+        ],
+        "was_cancelled": false,
+        "ground_truth": true,
+        "created_at": "2026-10-12T11:00:00.000000Z",
+        "updated_at": "2026-10-12T11:20:00.000000Z",
+        "lead_time": 1200.0,
+        "task": 102,
+        "project": 1
+      }
+    ],
+    "drafts": [],
+    "predictions": [],
+    "data": {
+      "audio": "/data/local-files/?d=audio/demo-school/demo-reception-001.mp3",
+      "tenant": "demo-school",
+      "type": "reception",
+      "language_mix": "english",
+      "room_type": "front_desk",
+      "consent_ref": "CONSENT-DEMO-0002"
+    },
+    "meta": {},
+    "created_at": "2026-10-09T08:00:00.000000Z",
+    "updated_at": "2026-10-12T11:20:00.000000Z",
+    "inner_id": 2,
+    "total_annotations": 2,
+    "cancelled_annotations": 0,
+    "total_predictions": 0,
+    "project": 1,
+    "updated_by": 2,
+    "file_upload": null
+  },
+  {
+    "id": 103,
+    "annotations": [],
+    "drafts": [],
+    "predictions": [],
+    "data": {
+      "audio": "/data/local-files/?d=audio/demo-school/demo-teaching-002.wav",
+      "tenant": "demo-school",
+      "type": "teaching",
+      "language_mix": "hindi",
+      "room_type": "classroom",
+      "consent_ref": "CONSENT-DEMO-0003"
+    },
+    "meta": {},
+    "created_at": "2026-10-09T08:00:00.000000Z",
+    "updated_at": "2026-10-09T08:00:00.000000Z",
+    "inner_id": 3,
+    "total_annotations": 0,
+    "cancelled_annotations": 0,
+    "total_predictions": 0,
+    "project": 1,
+    "updated_by": null,
+    "file_upload": null
+  },
+  {
+    "id": 104,
+    "annotations": [
+      {
+        "id": 505,
+        "completed_by": 3,
+        "result": [],
+        "was_cancelled": true,
+        "ground_truth": false,
+        "created_at": "2026-10-12T12:00:00.000000Z",
+        "updated_at": "2026-10-12T12:00:00.000000Z",
+        "lead_time": 5.0,
+        "task": 104,
+        "project": 1
+      }
+    ],
+    "drafts": [],
+    "predictions": [],
+    "data": {
+      "audio": "/data/local-files/?d=audio/demo-school/demo-teaching-003.wav",
+      "tenant": "demo-school",
+      "type": "teaching",
+      "language_mix": "english",
+      "room_type": "lab",
+      "consent_ref": "CONSENT-DEMO-0004"
+    },
+    "meta": {},
+    "created_at": "2026-10-09T08:00:00.000000Z",
+    "updated_at": "2026-10-12T12:00:00.000000Z",
+    "inner_id": 4,
+    "total_annotations": 0,
+    "cancelled_annotations": 1,
+    "total_predictions": 0,
+    "project": 1,
+    "updated_by": 3,
+    "file_upload": null
+  },
+  {
+    "id": 105,
+    "annotations": [
+      {
+        "id": 506,
+        "completed_by": 3,
+        "result": [
+          {
+            "original_length": 10.0,
+            "value": { "start": 1.0, "end": 4.0, "channel": 0, "labels": ["Teacher"] },
+            "id": "n-teacher-1",
+            "from_name": "speaker",
+            "to_name": "audio",
+            "type": "labels",
+            "origin": "manual"
+          },
+          {
+            "original_length": 10.0,
+            "value": { "start": 1.0, "end": 4.0, "channel": 0, "text": ["good morning class"] },
+            "id": "n-teacher-1",
+            "from_name": "transcript",
+            "to_name": "audio",
+            "type": "textarea",
+            "origin": "manual"
+          }
+        ],
+        "was_cancelled": false,
+        "ground_truth": false,
+        "created_at": "2026-10-12T13:00:00.000000Z",
+        "updated_at": "2026-10-12T13:05:00.000000Z",
+        "lead_time": 300.0,
+        "task": 105,
+        "project": 1
+      }
+    ],
+    "drafts": [],
+    "predictions": [],
+    "data": {
+      "audio": "/data/local-files/?d=audio/demo-school/demo-teaching-004.wav",
+      "tenant": "demo-school",
+      "type": "teaching",
+      "language_mix": "english",
+      "room_type": "classroom",
+      "consent_ref": "  "
+    },
+    "meta": {},
+    "created_at": "2026-10-09T08:00:00.000000Z",
+    "updated_at": "2026-10-12T13:05:00.000000Z",
+    "inner_id": 5,
+    "total_annotations": 1,
+    "cancelled_annotations": 0,
+    "total_predictions": 0,
+    "project": 1,
+    "updated_by": 3,
+    "file_upload": null
+  },
+  {
+    "id": 106,
+    "annotations": [],
+    "drafts": [],
+    "predictions": [],
+    "data": {
+      "audio": "/data/local-files/?d=audio/demo-school/demo-reception-002.wav",
+      "tenant": "demo-school",
+      "type": "reception",
+      "language_mix": "hinglish",
+      "room_type": "front_desk"
+    },
+    "meta": {},
+    "created_at": "2026-10-09T08:00:00.000000Z",
+    "updated_at": "2026-10-09T08:00:00.000000Z",
+    "inner_id": 6,
+    "total_annotations": 0,
+    "cancelled_annotations": 0,
+    "total_predictions": 0,
+    "project": 1,
+    "updated_by": null,
+    "file_upload": null
+  }
+]
