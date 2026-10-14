@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Recording analysis</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F5F4}
+a{color:#2546B8}a:hover{color:#1A3490}
+button:focus-visible,a:focus-visible{outline:2px solid #2546B8;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #F3F5F4; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; color: #17211D; font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums">
+
+  <nav aria-label="Main" style="flex: 1 1 232px; max-width: 100%; box-sizing: border-box; background: #FFFFFF; border-right: 1px solid #DDE2E0; padding: 20px 14px; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px">
+      <div aria-hidden="true" style="width: 30px; height: 30px; border-radius: 8px; background: #2546B8; display: flex; align-items: center; justify-content: center; gap: 2px">
+        <div style="width: 3px; height: 8px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 16px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 11px; border-radius: 2px; background: #F2B35B"></div>
+        <div style="width: 3px; height: 6px; border-radius: 2px; background: #FFFFFF"></div>
+      </div>
+      <div style="font-weight: 700; font-size: 17px; letter-spacing: -0.01em">Sabha</div>
+    </div>
+    <button type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #DDE2E0; border-radius: 8px; background: #F8F9F8; font: inherit; color: #17211D; text-align: left; cursor: pointer">
+      <span style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 13px">Greenfield Public School</span>
+        <span style="font-size: 12px; color: #5C6863">3 campuses</span>
+      </span>
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C6863" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"/></svg>
+    </button>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Overview
+      </a>
+      <a href="Analysis.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: #E8EDFB; color: #1A3490; font-weight: 600; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h1M7 8v8M11 5v14M15 9v6M19 11v2"/></svg>
+        Recordings
+      </a>
+      <a href="Main.dc.html" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <span style="display: flex; align-items: center; gap: 10px">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5l2 2 4-4"/></svg>
+          Reviews
+        </span>
+        <span style="min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #FDEBD3; color: #7A4300; font-size: 12px; font-weight: 600; text-align: center">7</span>
+      </a>
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.8.7 3 2.4 3.5 5.2"/></svg>
+        People
+      </a>
+      <a href="Rubrics.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+        Rubrics
+      </a>
+    </div>
+    <a href="Plans.dc.html" style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #E6EAE8; border-radius: 10px; color: #17211D; text-decoration: none">
+      <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span style="font-weight: 600">Starter plan</span><span style="color: #2546B8; font-weight: 600">Manage</span></span>
+      <span aria-hidden="true" style="display: block; height: 6px; border-radius: 999px; background: #EEF1F0; overflow: hidden"><span style="display: block; width: 38.4%; height: 6px; background: #2546B8; border-radius: 999px"></span></span>
+      <span style="font-size: 12px; color: #4A5752">38 of 100 audio hours used</span>
+    </a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-top: 1px solid #E6EAE8">
+      <div aria-hidden="true" style="width: 32px; height: 32px; border-radius: 999px; background: #DCE3F7; color: #1A3490; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">PK</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 13px">Priya Kapoor</span>
+        <span style="font-size: 12px; color: #5C6863">Academic head</span>
+      </div>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px clamp(16px, 3vw, 40px) 48px; display: flex; flex-direction: column; gap: 20px">
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <nav aria-label="Breadcrumb" style="font-size: 13px; color: #4A5752; display: flex; gap: 8px; flex-wrap: wrap">
+        <a href="Main.dc.html" style="text-decoration: none">Recordings</a><span aria-hidden="true">/</span><span>Teaching</span>
+      </nav>
+      <header style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <h1 style="margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em">Class 8 Science: Photosynthesis</h1>
+          <dl style="margin: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px">
+            <div style="display: flex; gap: 6px"><dt style="color: #5C6863">Teacher</dt><dd style="margin: 0; font-weight: 500">Anjali Sharma, Main campus</dd></div>
+            <div style="display: flex; gap: 6px"><dt style="color: #5C6863">Recorded</dt><dd style="margin: 0; font-weight: 500">13 Oct 2026, 52:14</dd></div>
+            <div style="display: flex; gap: 6px"><dt style="color: #5C6863">Speech</dt><dd style="margin: 0; font-weight: 500">38 min, Hindi and English</dd></div>
+            <div style="display: flex; gap: 6px"><dt style="color: #5C6863">Rubric</dt><dd style="margin: 0; font-weight: 500"><a href="Rubrics.dc.html">Teaching v1.3</a></dd></div>
+          </dl>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" style="min-height: 44px; padding: 0 14px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; color: #17211D; cursor: pointer">Export PDF</button>
+          <button type="button" style="min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: #2546B8; font: inherit; font-weight: 600; color: #FFFFFF; cursor: pointer">Share with teacher</button>
+        </div>
+      </header>
+    </div>
+
+    <section aria-labelledby="sum-h" style="display: flex; flex-wrap: wrap; background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; overflow: hidden">
+      <div style="flex: 1 1 220px; padding: 22px 24px; border-right: 1px solid #E6EAE8; display: flex; flex-direction: column; gap: 6px; background: #FBFCFB">
+        <span style="font-size: 13px; color: #4A5752">Overall score</span>
+        <span style="font-size: 44px; line-height: 1; font-weight: 600; letter-spacing: -0.03em">3.0<span style="font-size: 18px; color: #5C6863; font-weight: 500; letter-spacing: 0"> / 5</span></span>
+        <span style="font-size: 13px; color: #8A5200; font-weight: 500">Below the school median of 3.5</span>
+        <span style="font-size: 12.5px; color: #4A5752">Anjali’s last 5 lessons: 2.8 to 3.4</span>
+      </div>
+      <div style="flex: 999 1 420px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+        <h2 id="sum-h" style="margin: 0; font-size: 16px; font-weight: 600">Summary</h2>
+        <p style="margin: 0; max-width: 72ch; color: #33403B">A clearly structured lesson with strong analogies for the light and dark reactions. Students spoke for only 16% of the time, understanding was checked once before practice, and the lesson ended without a recap, so it is unclear how much of the class followed the second stage.</p>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">Suggestions for the next lesson</span>
+          <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: #33403B; max-width: 76ch">
+            <li><button type="button" style="border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: #2546B8; cursor: pointer">21:05</button> Replace “Sab samajh aaya?” with a question to three students before starting the worksheet.</li>
+            <li><button type="button" style="border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: #2546B8; cursor: pointer">11:20</button> Break the 7-minute explanation with a 2-minute pair task after the light reaction.</li>
+            <li><button type="button" style="border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: #2546B8; cursor: pointer">49:30</button> Keep the last 4 minutes for two students to explain both stages in one sentence each.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="tl-h" style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 14px">
+          <button type="button" aria-label="Play from 21:05" style="width: 44px; height: 44px; border-radius: 999px; border: 0; background: #17211D; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>
+          </button>
+          <div style="display: flex; flex-direction: column">
+            <h2 id="tl-h" style="margin: 0; font-size: 16px; font-weight: 600">Lesson timeline</h2>
+            <span style="font-size: 13px; color: #4A5752"><strong style="color: #17211D; font-weight: 600">21:05</strong> of 52:14</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: #33403B">
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #3A57C4"></span>Teacher, 84% of speech</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #E39A3B"></span>Students, 16%</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #CBD2CF"></span>Silence removed, 14 min</span>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto">
+        <div style="min-width: 680px; display: flex; flex-direction: column; gap: 6px">
+          <div style="display: flex; gap: 2px; font-size: 12px">
+            <div style="width: 11.5%; padding: 5px 8px; box-sizing: border-box; background: #F1F3F2; border-radius: 6px 0 0 6px; color: #33403B; white-space: nowrap; overflow: hidden">Introduction</div>
+            <div style="width: 34.5%; padding: 5px 8px; box-sizing: border-box; background: #E9ECEB; color: #33403B">Explanation</div>
+            <div style="width: 32.5%; padding: 5px 8px; box-sizing: border-box; background: #F1F3F2; color: #33403B">Guided practice</div>
+            <div style="flex: 1; padding: 5px 8px; box-sizing: border-box; background: #E9ECEB; border-radius: 0 6px 6px 0; color: #33403B">Closing</div>
+          </div>
+          <div style="position: relative; padding-top: 26px">
+            <sc-for list="{{pins}}" as="p" hint-placeholder-count="2">
+              <div style="position: absolute; top: 0; left: {{p.left}}; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center">
+                <span style="width: 20px; height: 20px; border-radius: 999px; background: #17211D; color: #FFFFFF; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{p.n}}</span>
+                <span style="width: 1px; height: 6px; background: #17211D"></span>
+              </div>
+            </sc-for>
+            <div aria-hidden="true" style="position: absolute; top: 26px; bottom: 0; left: 40.4%; width: 2px; background: #17211D; border-radius: 2px"></div>
+            <div role="img" aria-label="Waveform coloured by speaker, with removed silences in grey" style="height: 64px; display: flex; align-items: center; gap: 1px; background: #FAFBFA; border-radius: 6px">
+              <sc-for list="{{bars}}" as="b" hint-placeholder-count="60">
+                <div style="flex: 1; height: {{b.h}}; background: {{b.c}}; border-radius: 1px"></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="position: relative; height: 16px; font-size: 11.5px; color: #5C6863">
+            <span style="position: absolute; left: 0">0:00</span>
+            <span style="position: absolute; left: 19.1%; transform: translateX(-50%)">10:00</span>
+            <span style="position: absolute; left: 38.3%; transform: translateX(-50%)">20:00</span>
+            <span style="position: absolute; left: 57.4%; transform: translateX(-50%)">30:00</span>
+            <span style="position: absolute; left: 76.6%; transform: translateX(-50%)">40:00</span>
+            <span style="position: absolute; right: 0">52:14</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; color: #4A5752">Numbered markers show the evidence for <strong style="color: #17211D; font-weight: 600">{{current.name}}</strong>. Times refer to the original recording.</p>
+    </section>
+
+    <section aria-labelledby="met-h" style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; overflow: hidden">
+      <div style="padding: 14px 20px; border-bottom: 1px solid #E6EAE8; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline">
+        <h2 id="met-h" style="margin: 0; font-size: 16px; font-weight: 600">Measured from the transcript</h2>
+        <span style="font-size: 12.5px; color: #4A5752">Counted directly, not judged by AI</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr))">
+        <div style="padding: 14px 20px; border-right: 1px solid #EEF1F0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12.5px; color: #4A5752">Student talk time</span><span style="font-size: 20px; font-weight: 600">16%</span><span style="font-size: 12px; color: #4A5752">School median 24%</span></div>
+        <div style="padding: 14px 20px; border-right: 1px solid #EEF1F0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12.5px; color: #4A5752">Questions asked by teacher</span><span style="font-size: 20px; font-weight: 600">11</span><span style="font-size: 12px; color: #4A5752">2 open, 9 recall</span></div>
+        <div style="padding: 14px 20px; border-right: 1px solid #EEF1F0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12.5px; color: #4A5752">Questions from students</span><span style="font-size: 20px; font-weight: 600">3</span><span style="font-size: 12px; color: #4A5752">All during practice</span></div>
+        <div style="padding: 14px 20px; border-right: 1px solid #EEF1F0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12.5px; color: #4A5752">Speaking pace</span><span style="font-size: 20px; font-weight: 600">138 wpm</span><span style="font-size: 12px; color: #4A5752">Within the 110 to 150 range</span></div>
+        <div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12.5px; color: #4A5752">Longest uninterrupted talk</span><span style="font-size: 20px; font-weight: 600">7 min 20 s</span><span style="font-size: 12px; color: #4A5752">11:20 to 18:40</span></div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section aria-labelledby="dim-h" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+        <h2 id="dim-h" style="margin: 0 4px 6px; font-size: 16px; font-weight: 600">Rubric scores</h2>
+        <sc-for list="{{dims}}" as="d" hint-placeholder-count="6">
+          <button type="button" onClick="{{d.pick}}" aria-pressed="{{d.pressed}}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 8px 12px; border-radius: 9px; border: 1px solid {{d.border}}; background: {{d.bg}}; font: inherit; color: #17211D; text-align: left; cursor: pointer">
+            <span style="display: flex; flex-direction: column">
+              <span style="font-weight: {{d.weight}}">{{d.name}}</span>
+              <span style="font-size: 12px; color: #4A5752">Weight {{d.wt}}</span>
+            </span>
+            <span style="min-width: 34px; padding: 3px 0; border-radius: 7px; text-align: center; font-weight: 700; background: {{d.chipBg}}; color: {{d.chipFg}}">{{d.score}}</span>
+          </button>
+        </sc-for>
+      </section>
+
+      <section aria-labelledby="det-h" style="flex: 999 1 480px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <h2 id="det-h" style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em">{{current.name}}</h2>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <div aria-hidden="true" style="display: flex; gap: 3px">
+                <sc-for list="{{current.scale}}" as="s" hint-placeholder-count="5">
+                  <span style="width: 26px; height: 8px; border-radius: 3px; background: {{s.c}}"></span>
+                </sc-for>
+              </div>
+              <span style="font-weight: 600">{{current.score}} of 5</span>
+            </div>
+          </div>
+          <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #E3F2EA; color: #1E6B4B; font-size: 12.5px; font-weight: 600">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+            Quotes verified in transcript
+          </span>
+        </div>
+        <p style="margin: 0; max-width: 72ch; color: #33403B">{{current.rationale}}</p>
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h3 style="margin: 0; font-size: 13.5px; font-weight: 600">Evidence</h3>
+          <sc-for list="{{current.evidence}}" as="e" hint-placeholder-count="2">
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: #F8F9F8; border: 1px solid #EEF1F0">
+              <span style="flex: none; width: 22px; height: 22px; border-radius: 999px; background: #17211D; color: #FFFFFF; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{e.n}}</span>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                <q style="color: #17211D; quotes: none">{{e.q}}</q>
+                <span style="font-size: 12.5px; color: #4A5752">{{e.who}}, {{e.t}}</span>
+              </div>
+              <button type="button" aria-label="Play evidence from {{e.t}}" style="flex: none; display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 13px; color: #17211D; cursor: pointer">
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>
+                {{e.t}}
+              </button>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 10px; background: #F3F6FD; border: 1px solid #DCE3F7">
+          <h3 style="margin: 0; font-size: 13.5px; font-weight: 600; color: #1A3490">Try next time</h3>
+          <p style="margin: 0; color: #17211D; max-width: 72ch">{{current.suggestion}}</p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; border-top: 1px solid #EEF1F0">
+          <button type="button" style="min-height: 44px; padding: 0 14px; margin-top: 12px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; color: #17211D; cursor: pointer">Dispute this score</button>
+          <button type="button" style="min-height: 44px; padding: 0 14px; margin-top: 12px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; color: #17211D; cursor: pointer">Add a coaching note</button>
+          <span style="margin-top: 12px; align-self: center; font-size: 12.5px; color: #4A5752">Scored by model v2026.09, rubric Teaching v1.3</span>
+        </div>
+      </section>
+    </div>
+
+    <section aria-labelledby="tr-h" style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; overflow: hidden">
+      <div style="padding: 14px 20px; border-bottom: 1px solid #E6EAE8; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+        <h2 id="tr-h" style="margin: 0; font-size: 16px; font-weight: 600">Transcript</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button type="button" style="min-height: 36px; padding: 0 12px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 13px; color: #17211D; cursor: pointer">Show original language</button>
+          <button type="button" style="min-height: 36px; padding: 0 12px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 13px; color: #17211D; cursor: pointer">Download transcript</button>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{lines}}" as="l" hint-placeholder-count="5">
+          <div style="display: flex; gap: 16px; padding: 10px 20px; background: {{l.bg}}; border-left: 3px solid {{l.mark}}">
+            <span style="flex: none; width: 44px; font-size: 12.5px; color: #4A5752; padding-top: 1px">{{l.t}}</span>
+            <span style="flex: none; width: 72px; font-size: 13px; font-weight: 600; color: {{l.whoFg}}">{{l.who}}</span>
+            <span style="flex: 1; min-width: 0; color: #17211D; max-width: 80ch">{{l.text}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var sel = (this.state && this.state.sel) || "checks";
+    var chip = function (s) {
+      if (s >= 4) return { bg: "#E3F2EA", fg: "#1E6B4B", bar: "#2E8B62" };
+      if (s >= 3) return { bg: "#FDF1DE", fg: "#8A5200", bar: "#D9831F" };
+      return { bg: "#FBE9E7", fg: "#B42318", bar: "#C8372B" };
+    };
+    var T = "Teacher", S = "Student";
+    var raw = [
+      { id: "clarity", name: "Concept clarity", wt: "25%", score: 4,
+        rationale: "Explains both stages in order and corrects a common misconception, that the dark reaction happens at night, before it can form.",
+        evidence: [
+          { t: "08:42", pct: "16.7%", who: T, q: "Think of the chloroplast as a small kitchen. Sunlight is the gas, carbon dioxide and water are the ingredients, and glucose is the food we finally make." },
+          { t: "15:10", pct: "29.0%", who: T, q: "Light reaction pehle hota hai, dark reaction baad mein. Dark ka matlab raat nahi hai, it just does not need light directly." }
+        ],
+        suggestion: "Return to the kitchen analogy in the closing minutes so students have one image to retrieve the whole process from." },
+      { id: "examples", name: "Use of examples", wt: "15%", score: 4,
+        rationale: "Two concrete, age-appropriate examples tied directly to the concept; the second one invites students to predict.",
+        evidence: [
+          { t: "08:42", pct: "16.7%", who: T, q: "Think of the chloroplast as a small kitchen. Sunlight is the gas, carbon dioxide and water are the ingredients." },
+          { t: "31:20", pct: "60.0%", who: T, q: "Why are leaves green? Because chlorophyll reflects green light. Agar sab absorb karta, leaf black dikhti." }
+        ],
+        suggestion: "Add one example the students produce themselves, such as predicting what happens to a plant kept in a dark cupboard for a week." },
+      { id: "checks", name: "Checks for understanding", wt: "20%", score: 2,
+        rationale: "Understanding was checked twice in 52 minutes. The first check was a yes or no question answered in chorus; the second went to a single student. The class moved to practice without evidence that most students had followed the light reaction.",
+        evidence: [
+          { t: "21:05", pct: "40.4%", who: T, q: "Sab samajh aaya? Okay, good, let us move to the worksheet." },
+          { t: "23:48", pct: "45.6%", who: T, q: "Aarav, what comes out of the light reaction? Oxygen, right. Good." }
+        ],
+        suggestion: "At 21:05, replace the yes or no check with a question to three different students, or a quick show-of-fingers confidence poll, before starting the worksheet." },
+      { id: "questioning", name: "Questioning quality", wt: "15%", score: 3,
+        rationale: "Most questions are recall. One open question at 27:15 drew three different student answers and was the strongest exchange in the lesson.",
+        evidence: [
+          { t: "12:30", pct: "23.9%", who: T, q: "What do plants need to make food? Anyone? Sunlight, water, and?" },
+          { t: "27:15", pct: "52.2%", who: T, q: "Can someone tell me why the worksheet says glucose and not just sugar?" }
+        ],
+        suggestion: "Plan two more why-questions like the one at 27:15 and place them in the explanation phase, where questions were all recall." },
+      { id: "pacing", name: "Pacing", wt: "10%", score: 3,
+        rationale: "A 7 minute 20 second explanation without student input, then a rushed final practice section where the teacher solved five items herself.",
+        evidence: [
+          { t: "18:40", pct: "35.7%", who: T, q: "And then the Calvin cycle uses that ATP, so ATP and NADPH both go into the stroma, where the carbon is fixed." },
+          { t: "44:05", pct: "84.4%", who: T, q: "We are running late, so I will quickly do numbers 6 to 10 myself." }
+        ],
+        suggestion: "Pause after the light reaction for a 2-minute pair task, and trim the worksheet to five items so students finish it themselves." },
+      { id: "recap", name: "Recap and closure", wt: "15%", score: 2,
+        rationale: "The lesson ends with homework and a test announcement. There is no summary of the two stages and no exit question.",
+        evidence: [
+          { t: "49:30", pct: "94.8%", who: T, q: "Okay, so that is all for today. Homework is page 46, questions 1 to 5." },
+          { t: "51:10", pct: "98.0%", who: T, q: "Kal test hai, sab padh ke aana." }
+        ],
+        suggestion: "Keep the last 4 minutes for two students to explain the light and dark reactions in one sentence each, then one exit question." }
+    ];
+    var dims = raw.map(function (d) {
+      var on = d.id === sel, c = chip(d.score);
+      return {
+        id: d.id, name: d.name, wt: d.wt, score: d.score,
+        pressed: on ? "true" : "false",
+        bg: on ? "#F3F6FD" : "#FFFFFF",
+        border: on ? "#2546B8" : "#E6EAE8",
+        weight: on ? 600 : 500,
+        chipBg: c.bg, chipFg: c.fg,
+        pick: function () { self.setState({ sel: d.id }); }
+      };
+    });
+    var cur = raw.filter(function (d) { return d.id === sel; })[0];
+    var cc = chip(cur.score);
+    var current = {
+      name: cur.name, score: cur.score, rationale: cur.rationale, suggestion: cur.suggestion,
+      scale: [1, 2, 3, 4, 5].map(function (i) { return { c: i <= cur.score ? cc.bar : "#E6EAE8" }; }),
+      evidence: cur.evidence.map(function (e, i) { return { n: i + 1, t: e.t, q: e.q, who: e.who }; })
+    };
+    var pins = cur.evidence.map(function (e, i) { return { n: i + 1, left: e.pct }; });
+
+    var students = [[60, 63], [72, 74], [86, 92], [98, 101], [110, 118], [126, 130], [150, 152]];
+    var silence = [[22, 23], [45, 45], [83, 84], [95, 96], [120, 123], [140, 141], [165, 168]];
+    var inside = function (i, ranges) { return ranges.some(function (r) { return i >= r[0] && i <= r[1]; }); };
+    var bars = [];
+    for (var i = 0; i < 180; i++) {
+      if (inside(i, silence)) { bars.push({ h: "4px", c: "#CBD2CF" }); continue; }
+      var h = 10 + Math.round(Math.abs(Math.sin(i * 0.61) * Math.cos(i * 0.23)) * 34 + ((i * 7) % 11));
+      bars.push({ h: h + "px", c: inside(i, students) ? "#E39A3B" : "#3A57C4" });
+    }
+
+    var line = function (t, who, text, hit) {
+      var isT = who === "Teacher";
+      return { t: t, who: who, text: text, whoFg: isT ? "#2546B8" : "#9A5A0E", bg: hit ? "#FEF6EC" : "#FFFFFF", mark: hit ? "#D9831F" : "transparent" };
+    };
+    var lines = [
+      line("20:31", "Teacher", "So the light reaction gives us two things, ATP and NADPH, and oxygen goes out through the stomata.", false),
+      line("20:52", "Teacher", "This oxygen is what we breathe. Isliye plants itne important hain.", false),
+      line("21:05", "Teacher", "Sab samajh aaya? Okay, good, let us move to the worksheet.", sel === "checks"),
+      line("21:09", "Students", "Yes ma’am.", false),
+      line("21:14", "Teacher", "Take out page 44. Do questions 1 to 10 in your notebook, you have fifteen minutes.", false)
+    ];
+    return { dims: dims, current: current, pins: pins, bars: bars, lines: lines };
+  }
+}
+</script>
+</body>
+</html>

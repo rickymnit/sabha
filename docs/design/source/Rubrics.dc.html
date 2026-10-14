@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rubric editor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F5F4}
+a{color:#2546B8}a:hover{color:#1A3490}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #2546B8;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #F3F5F4; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; color: #17211D; font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums">
+
+  <nav aria-label="Main" style="flex: 1 1 232px; max-width: 100%; box-sizing: border-box; background: #FFFFFF; border-right: 1px solid #DDE2E0; padding: 20px 14px; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px">
+      <div aria-hidden="true" style="width: 30px; height: 30px; border-radius: 8px; background: #2546B8; display: flex; align-items: center; justify-content: center; gap: 2px">
+        <div style="width: 3px; height: 8px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 16px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 11px; border-radius: 2px; background: #F2B35B"></div>
+        <div style="width: 3px; height: 6px; border-radius: 2px; background: #FFFFFF"></div>
+      </div>
+      <div style="font-weight: 700; font-size: 17px; letter-spacing: -0.01em">Sabha</div>
+    </div>
+    <button type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #DDE2E0; border-radius: 8px; background: #F8F9F8; font: inherit; color: #17211D; text-align: left; cursor: pointer">
+      <span style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 13px">Greenfield Public School</span>
+        <span style="font-size: 12px; color: #5C6863">3 campuses</span>
+      </span>
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C6863" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"/></svg>
+    </button>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Overview
+      </a>
+      <a href="Analysis.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h1M7 8v8M11 5v14M15 9v6M19 11v2"/></svg>
+        Recordings
+      </a>
+      <a href="Main.dc.html" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <span style="display: flex; align-items: center; gap: 10px">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5l2 2 4-4"/></svg>
+          Reviews
+        </span>
+        <span style="min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #FDEBD3; color: #7A4300; font-size: 12px; font-weight: 600; text-align: center">7</span>
+      </a>
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.8.7 3 2.4 3.5 5.2"/></svg>
+        People
+      </a>
+      <a href="Rubrics.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: #E8EDFB; color: #1A3490; font-weight: 600; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+        Rubrics
+      </a>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <div style="padding: 0 10px 6px; font-size: 12px; font-weight: 600; color: #5C6863">All rubrics</div>
+      <sc-for list="{{rubrics}}" as="r" hint-placeholder-count="5">
+        <a href="Rubrics.dc.html" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: {{r.bg}}; color: #17211D; text-decoration: none">
+          <span style="display: flex; flex-direction: column; line-height: 1.25">
+            <span style="font-weight: {{r.weight}}; font-size: 13.5px">{{r.name}}</span>
+            <span style="font-size: 12px; color: #4A5752">{{r.version}}</span>
+          </span>
+          <span style="padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: {{r.stBg}}; color: {{r.stFg}}">{{r.status}}</span>
+        </a>
+      </sc-for>
+    </div>
+    <a href="Plans.dc.html" style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #E6EAE8; border-radius: 10px; color: #17211D; text-decoration: none">
+      <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span style="font-weight: 600">Starter plan</span><span style="color: #2546B8; font-weight: 600">Manage</span></span>
+      <span aria-hidden="true" style="display: block; height: 6px; border-radius: 999px; background: #EEF1F0; overflow: hidden"><span style="display: block; width: 38.4%; height: 6px; background: #2546B8; border-radius: 999px"></span></span>
+      <span style="font-size: 12px; color: #4A5752">38 of 100 audio hours used</span>
+    </a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-top: 1px solid #E6EAE8">
+      <div aria-hidden="true" style="width: 32px; height: 32px; border-radius: 999px; background: #DCE3F7; color: #1A3490; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">PK</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 13px">Priya Kapoor</span>
+        <span style="font-size: 12px; color: #5C6863">Academic head</span>
+      </div>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px clamp(16px, 3vw, 40px) 48px; display: flex; flex-direction: column; gap: 20px">
+
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <nav aria-label="Breadcrumb" style="font-size: 13px; color: #4A5752; display: flex; gap: 8px"><a href="Rubrics.dc.html" style="text-decoration: none">Rubrics</a><span aria-hidden="true">/</span><span>Teaching</span></nav>
+        <h1 style="margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em">Teaching rubric</h1>
+        <p style="margin: 0; color: #4A5752">Editing draft v1.4. Teachers keep seeing scores from v1.3 until you publish.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button type="button" style="min-height: 44px; padding: 0 14px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; color: #17211D; cursor: pointer">Test on 40 sample lessons</button>
+        <button type="button" disabled style="min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: #C9D2EE; font: inherit; font-weight: 600; color: #33407A; cursor: not-allowed">Publish v1.4</button>
+      </div>
+    </header>
+
+    <div role="status" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 10px; background: #FEF6EC; border: 1px solid #F7DDB8">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5200" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 1px"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></svg>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-weight: 600; color: #6B3F00">Run the sample test before publishing</span>
+        <span style="color: #33403B">You changed the scale for Checks for understanding. Publishing is enabled once the 40 human-scored sample lessons are re-scored and no dimension falls below the 0.60 agreement threshold.</span>
+      </div>
+    </div>
+
+    <section aria-labelledby="dims-h" style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; overflow: hidden">
+      <div style="padding: 16px 20px; border-bottom: 1px solid #E6EAE8; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+        <div style="display: flex; flex-direction: column">
+          <h2 id="dims-h" style="margin: 0; font-size: 16px; font-weight: 600">Dimensions</h2>
+          <span style="font-size: 12.5px; color: #4A5752">Weights add up to 100%. Agreement is measured against 3 human raters.</span>
+        </div>
+        <button type="button" style="min-height: 40px; padding: 0 14px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 13px; color: #17211D; cursor: pointer">Add dimension</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13.5px">
+          <thead>
+            <tr style="text-align: left; color: #4A5752; font-size: 12.5px">
+              <th scope="col" style="padding: 10px 20px; font-weight: 500; border-bottom: 1px solid #E6EAE8">Dimension</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #E6EAE8; text-align: right">Weight</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #E6EAE8; text-align: right">Quotes required</th>
+              <th scope="col" style="padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #E6EAE8">Agreement with raters</th>
+              <th scope="col" style="padding: 10px 20px 10px 12px; font-weight: 500; border-bottom: 1px solid #E6EAE8">Visible to</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{dims}}" as="d" hint-placeholder-count="6">
+              <tr style="background: {{d.bg}}">
+                <td style="padding: 12px 20px; border-bottom: 1px solid #EEF1F0; font-weight: {{d.weight}}">{{d.name}}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #EEF1F0; text-align: right">{{d.wt}}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #EEF1F0; text-align: right">{{d.quotes}}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #EEF1F0">
+                  <span style="display: flex; align-items: center; gap: 10px">
+                    <span aria-hidden="true" style="position: relative; width: 120px; height: 6px; border-radius: 999px; background: #EEF1F0">
+                      <span style="position: absolute; left: 0; top: 0; height: 6px; width: {{d.pct}}; border-radius: 999px; background: {{d.barC}}"></span>
+                      <span style="position: absolute; left: 60%; top: -4px; width: 2px; height: 14px; background: #17211D"></span>
+                    </span>
+                    <span style="font-weight: 600; color: {{d.kFg}}">{{d.kappa}}</span>
+                  </span>
+                </td>
+                <td style="padding: 12px 20px 12px 12px; border-bottom: 1px solid #EEF1F0; color: {{d.visFg}}; font-weight: 500">{{d.visible}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin: 0; padding: 12px 20px; font-size: 12.5px; color: #4A5752">The black tick marks the 0.60 threshold. Dimensions below it are scored but shown only to admins until agreement improves.</p>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section aria-labelledby="edit-h" style="flex: 999 1 520px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: baseline">
+          <h2 id="edit-h" style="margin: 0; font-size: 18px; font-weight: 600">Checks for understanding</h2>
+          <span style="font-size: 12.5px; color: #8A5200; font-weight: 600">Changed in draft</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">
+            Weight
+            <input type="text" value="20%" style="min-height: 40px; padding: 0 12px; border: 1px solid #CFD6D3; border-radius: 8px; font: inherit; font-weight: 400; color: #17211D">
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">
+            Quotes required per score
+            <input type="text" value="2" style="min-height: 40px; padding: 0 12px; border: 1px solid #CFD6D3; border-radius: 8px; font: inherit; font-weight: 400; color: #17211D">
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; padding-top: 22px">
+            <input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #2546B8">
+            Show to teachers
+          </label>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">
+          What this measures
+          <textarea rows="3" style="padding: 10px 12px; border: 1px solid #CFD6D3; border-radius: 8px; font: inherit; font-weight: 400; color: #17211D; resize: vertical">How often and how well the teacher confirms that most of the class has understood before moving on, and whether the lesson changes in response to what students say.</textarea>
+        </label>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">Scale, with an example of each level</span>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{anchors}}" as="a" hint-placeholder-count="5">
+              <li style="display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid {{a.border}}; border-radius: 9px; background: {{a.bg}}">
+                <span style="flex: none; width: 26px; height: 26px; border-radius: 7px; background: {{a.chipBg}}; color: {{a.chipFg}}; font-weight: 700; display: flex; align-items: center; justify-content: center">{{a.n}}</span>
+                <span style="color: #17211D; max-width: 72ch">{{a.text}}</span>
+              </li>
+            </sc-for>
+          </ol>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 600">Measured numbers shown next to this score</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span style="padding: 6px 12px; border-radius: 999px; border: 1px solid #CFD6D3; font-size: 13px">Questions asked by teacher</span>
+            <span style="padding: 6px 12px; border-radius: 999px; border: 1px solid #CFD6D3; font-size: 13px">Student talk time</span>
+            <span style="padding: 6px 12px; border-radius: 999px; border: 1px solid #CFD6D3; font-size: 13px">Distinct students who spoke</span>
+            <button type="button" style="min-height: 32px; padding: 0 12px; border: 1px dashed #A9B4AF; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; color: #33403B; cursor: pointer">Add metric</button>
+          </div>
+        </div>
+      </section>
+
+      <aside aria-labelledby="hist-h" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+        <section style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 600">Calibration set</h2>
+          <p style="margin: 0; color: #33403B">40 lessons, each scored independently by 3 trained raters from your school.</p>
+          <dl style="margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13px">
+            <dt style="color: #4A5752">Hindi-medium lessons</dt><dd style="margin: 0; font-weight: 600">14</dd>
+            <dt style="color: #4A5752">English-medium lessons</dt><dd style="margin: 0; font-weight: 600">26</dd>
+            <dt style="color: #4A5752">Disputed scores added</dt><dd style="margin: 0; font-weight: 600">9</dd>
+          </dl>
+          <a href="Rubrics.dc.html" style="font-size: 13px; font-weight: 600">Add lessons to the set</a>
+        </section>
+        <section style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="hist-h" style="margin: 0; font-size: 16px; font-weight: 600">Version history</h2>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px">
+            <sc-for list="{{history}}" as="h" hint-placeholder-count="4">
+              <li style="display: flex; gap: 12px">
+                <span style="flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 999px; border: 2px solid {{h.dot}}; background: {{h.fill}}"></span>
+                <span style="display: flex; flex-direction: column; gap: 2px">
+                  <span style="font-weight: 600">{{h.v}}<span style="font-weight: 400; color: #4A5752">, {{h.when}}</span></span>
+                  <span style="font-size: 13px; color: #33403B">{{h.note}}</span>
+                </span>
+              </li>
+            </sc-for>
+          </ol>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var st = {
+      "Live": { bg: "#E3F2EA", fg: "#1E6B4B" },
+      "Calibrating": { bg: "#FDEBD3", fg: "#7A4300" }
+    };
+    var rubrics = [
+      { name: "Teaching", version: "v1.3, draft v1.4", status: "Live", on: true },
+      { name: "Reception", version: "v1.1", status: "Live" },
+      { name: "Meetings", version: "v1.0", status: "Live" },
+      { name: "Counselling", version: "v0.4", status: "Calibrating" },
+      { name: "Sales calls", version: "v0.9", status: "Calibrating" }
+    ].map(function (r) {
+      return Object.assign({}, r, { bg: r.on ? "#F3F6FD" : "transparent", weight: r.on ? 600 : 500, stBg: st[r.status].bg, stFg: st[r.status].fg });
+    });
+    var dims = [
+      { name: "Concept clarity", wt: "25%", quotes: "1", kappa: 0.71 },
+      { name: "Use of examples", wt: "15%", quotes: "1", kappa: 0.66 },
+      { name: "Checks for understanding", wt: "20%", quotes: "2", kappa: 0.64, on: true },
+      { name: "Questioning quality", wt: "15%", quotes: "2", kappa: 0.62 },
+      { name: "Pacing", wt: "10%", quotes: "1", kappa: 0.54 },
+      { name: "Recap and closure", wt: "15%", quotes: "1", kappa: 0.69 }
+    ].map(function (d) {
+      var ok = d.kappa >= 0.6;
+      return Object.assign({}, d, {
+        kappa: d.kappa.toFixed(2),
+        pct: Math.round(d.kappa * 100) + "%",
+        barC: ok ? "#2E8B62" : "#D9831F",
+        kFg: ok ? "#1E6B4B" : "#8A5200",
+        visible: ok ? "Teachers and admins" : "Admins only",
+        visFg: ok ? "#33403B" : "#8A5200",
+        bg: d.on ? "#F3F6FD" : "#FFFFFF",
+        weight: d.on ? 600 : 400
+      });
+    });
+    var chip = [
+      { bg: "#FBE9E7", fg: "#B42318" }, { bg: "#FBE9E7", fg: "#B42318" },
+      { bg: "#FDF1DE", fg: "#8A5200" }, { bg: "#E3F2EA", fg: "#1E6B4B" }, { bg: "#E3F2EA", fg: "#1E6B4B" }
+    ];
+    var anchors = [
+      "No real checks, only rhetorical prompts such as “Okay?” or “Clear?”",
+      "One or two yes or no checks, answered in chorus or by a single student.",
+      "Several targeted questions, but the lesson moves on whatever the answers are.",
+      "Regular checks across different students, and the pace changes in response.",
+      "Frequent, varied checks such as cold-calls, quick polls and an exit question, which visibly reshape the lesson."
+    ].map(function (t, i) {
+      var changed = i === 1;
+      return { n: i + 1, text: t, chipBg: chip[i].bg, chipFg: chip[i].fg, bg: changed ? "#FEF6EC" : "#FFFFFF", border: changed ? "#F7DDB8" : "#E6EAE8" };
+    });
+    var history = [
+      { v: "v1.4 draft", when: "edited today", note: "Clearer level 2 for Checks for understanding.", dot: "#D9831F", fill: "#FFFFFF" },
+      { v: "v1.3", when: "2 Sep 2026", note: "Split Pacing out of Concept clarity. Live for all campuses.", dot: "#2546B8", fill: "#2546B8" },
+      { v: "v1.2", when: "4 Aug 2026", note: "Added Hindi examples to every scale level.", dot: "#A9B4AF", fill: "#FFFFFF" },
+      { v: "v1.1", when: "10 Jul 2026", note: "First version shown to teachers.", dot: "#A9B4AF", fill: "#FFFFFF" }
+    ];
+    return { rubrics: rubrics, dims: dims, anchors: anchors, history: history };
+  }
+}
+</script>
+</body>
+</html>

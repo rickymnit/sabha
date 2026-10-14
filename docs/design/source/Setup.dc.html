@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workspace setup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F5F4}
+a{color:#2546B8}a:hover{color:#1A3490}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #2546B8;outline-offset:2px}
+label:has(input[type=radio]:focus-visible){outline:2px solid #2546B8;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F3F5F4; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; color: #17211D; font-size: 14px; line-height: 1.45">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px clamp(16px, 3vw, 40px); background: #FFFFFF; border-bottom: 1px solid #DDE2E0">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div aria-hidden="true" style="width: 30px; height: 30px; border-radius: 8px; background: #2546B8; display: flex; align-items: center; justify-content: center; gap: 2px">
+        <div style="width: 3px; height: 8px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 16px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 11px; border-radius: 2px; background: #F2B35B"></div>
+        <div style="width: 3px; height: 6px; border-radius: 2px; background: #FFFFFF"></div>
+      </div>
+      <span style="font-weight: 700; font-size: 17px; letter-spacing: -0.01em">Sabha</span>
+    </div>
+    <ol aria-label="Setup steps" style="list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px">
+      <li aria-current="step" style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #1A3490"><span style="width: 22px; height: 22px; border-radius: 999px; background: #2546B8; color: #FFFFFF; font-size: 12px; display: flex; align-items: center; justify-content: center">1</span>Your organisation</li>
+      <li style="display: flex; align-items: center; gap: 8px; color: #4A5752"><span style="width: 22px; height: 22px; border-radius: 999px; border: 1px solid #B7C1BD; font-size: 12px; display: flex; align-items: center; justify-content: center">2</span>Invite your team</li>
+      <li style="display: flex; align-items: center; gap: 8px; color: #4A5752"><span style="width: 22px; height: 22px; border-radius: 999px; border: 1px solid #B7C1BD; font-size: 12px; display: flex; align-items: center; justify-content: center">3</span>First upload</li>
+    </ol>
+  </header>
+
+  <main style="max-width: 1180px; margin: 0 auto; box-sizing: border-box; padding: 32px clamp(16px, 3vw, 40px) 56px; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+    <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 28px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <h1 style="margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em">Set up your workspace</h1>
+        <p style="margin: 0; color: #4A5752; max-width: 62ch">Tell us what kind of organisation this is. It sets sensible defaults for wording, rubrics and reports. Every conversation type stays available, and you can change all of this later.</p>
+      </div>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 10px">
+        <legend style="padding: 0; margin-bottom: 10px; font-size: 16px; font-weight: 600">What kind of organisation is this?</legend>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px">
+          <sc-for list="{{profiles}}" as="p" hint-placeholder-count="3">
+            <label style="position: relative; display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; border: {{p.border}}; background: {{p.bg}}; cursor: pointer">
+              <input type="radio" name="profile" value="{{p.id}}" checked="{{p.on}}" onChange="{{p.pick}}" style="position: absolute; top: 16px; right: 16px; width: 18px; height: 18px; margin: 0; accent-color: #2546B8">
+              <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 9px; background: {{p.iconBg}}; color: {{p.iconFg}}; display: flex; align-items: center; justify-content: center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{p.icon}}"/></svg>
+              </span>
+              <span style="font-weight: 600; font-size: 15px">{{p.label}}</span>
+              <span style="font-size: 13px; color: #4A5752">{{p.desc}}</span>
+            </label>
+          </sc-for>
+        </div>
+      </fieldset>
+
+      <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; max-width: 520px">
+        {{nameLabel}}
+        <input type="text" placeholder="{{namePlaceholder}}" style="min-height: 44px; padding: 0 12px; border: 1px solid #CFD6D3; border-radius: 8px; font: inherit; font-weight: 400; color: #17211D; background: #FFFFFF">
+      </label>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 10px">
+        <legend style="padding: 0; margin-bottom: 4px; font-size: 16px; font-weight: 600">Which conversations will you analyse?</legend>
+        <p style="margin: 0 0 6px; font-size: 13px; color: #4A5752">We have ticked the usual ones for {{profilePlural}}. Your free pilot covers all five.</p>
+        <sc-for list="{{types}}" as="t" hint-placeholder-count="5">
+          <label style="display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; border: 1px solid {{t.border}}; background: {{t.bg}}; cursor: pointer">
+            <input type="checkbox" checked="{{t.on}}" onChange="{{t.toggle}}" style="flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: #2546B8">
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="font-weight: 600">{{t.label}}</span><sc-if value="{{t.isDefault}}" hint-placeholder-val="{{ true }}"><span style="padding: 1px 8px; border-radius: 999px; background: #F1F3F2; color: #33403B; font-size: 11.5px; font-weight: 600">Usual for {{profilePlural}}</span></sc-if></span>
+              <span style="font-size: 13px; color: #4A5752">{{t.desc}}</span>
+            </span>
+          </label>
+        </sc-for>
+      </fieldset>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid #DDE2E0">
+        <button type="button" disabled="{{noTypes}}" style="margin-top: 12px; min-height: 46px; padding: 0 20px; border: 0; border-radius: 8px; background: {{ctaBg}}; color: {{ctaFg}}; font: inherit; font-weight: 600; cursor: {{ctaCursor}}">Continue to invite your team</button>
+        <span style="margin-top: 12px; font-size: 13px; color: #4A5752">{{ctaHint}}</span>
+      </div>
+    </div>
+
+    <aside aria-labelledby="prev-h" style="flex: 1 1 340px; min-width: 0; position: sticky; top: 24px; display: flex; flex-direction: column; gap: 14px">
+      <h2 id="prev-h" style="margin: 0; font-size: 13px; font-weight: 600; color: #4A5752">How your team will see it</h2>
+
+      <div style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; overflow: hidden; display: flex">
+        <div style="flex: none; width: 150px; padding: 14px 10px; border-right: 1px solid #EEF1F0; display: flex; flex-direction: column; gap: 2px; font-size: 13px">
+          <sc-for list="{{navItems}}" as="n" hint-placeholder-count="5">
+            <span style="padding: 7px 8px; border-radius: 7px; background: {{n.bg}}; color: {{n.fg}}; font-weight: {{n.weight}}">{{n.label}}</span>
+          </sc-for>
+          <span style="padding: 12px 8px 4px; font-size: 11.5px; font-weight: 600; color: #5C6863">Conversation types</span>
+          <sc-for list="{{onTypes}}" as="o" hint-placeholder-count="3">
+            <span style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; color: #33403B"><span style="width: 7px; height: 7px; border-radius: 2px; background: {{o.color}}"></span>{{o.label}}</span>
+          </sc-for>
+        </div>
+        <div style="flex: 1; min-width: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 12px; color: #4A5752">{{terms.recordingPlural}}, this week</span>
+          <sc-for list="{{sampleRows}}" as="s" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 1px; padding-bottom: 8px; border-bottom: 1px solid #EEF1F0">
+              <span style="font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.title}}</span>
+              <span style="font-size: 12px; color: #4A5752">{{s.who}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <h3 style="margin: 0; font-size: 14px; font-weight: 600">Words used across the product</h3>
+        <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px">
+          <dt style="color: #4A5752">Person analysed</dt><dd style="margin: 0; font-weight: 600">{{terms.person}}</dd>
+          <dt style="color: #4A5752">A recording</dt><dd style="margin: 0; font-weight: 600">{{terms.recording}}</dd>
+          <dt style="color: #4A5752">Group</dt><dd style="margin: 0; font-weight: 600">{{terms.unit}}</dd>
+          <dt style="color: #4A5752">Manager</dt><dd style="margin: 0; font-weight: 600">{{terms.manager}}</dd>
+        </dl>
+        <span style="font-size: 12.5px; color: #4A5752">Admins can rename any of these in Settings.</span>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 14px; font-weight: 600">Starting rubrics</h3>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #33403B">
+          <sc-for list="{{rubrics}}" as="r" hint-placeholder-count="3">
+            <li>{{r.label}}</li>
+          </sc-for>
+        </ul>
+        <p style="margin: 4px 0 0; padding: 10px 12px; border-radius: 8px; background: {{consentBg}}; border: 1px solid {{consentBorder}}; font-size: 12.5px; color: #33403B">{{consent}}</p>
+      </div>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this, st = this.state || {};
+    var P = {
+      school: {
+        label: "School", plural: "schools", desc: "Teachers, counsellors and the front desk",
+        icon: "M3 10l9-6 9 6M5 9.5V20h14V9.5M10 20v-5h4v5",
+        defaults: ["teaching", "counselling", "reception"],
+        terms: { person: "Teacher", recording: "Lesson", recordingPlural: "Lessons", unit: "Campus and section", manager: "Principal or coordinator", people: "Teachers" },
+        nameLabel: "School name", namePlaceholder: "For example, Greenfield Public School",
+        rubrics: { teaching: "Teaching, school edition", counselling: "Counselling, students under 18", reception: "Reception, parent enquiries", meeting: "Staff meetings", sales: "Admissions calls" },
+        samples: { teaching: ["Class 8 Science: Photosynthesis", "Anjali Sharma, Main campus"], counselling: ["Parent meeting about attendance", "Neha Joshi, Counsellor"], reception: ["Admission enquiry for Grade 3", "Front desk, Main campus"], meeting: ["Weekly academic council", "6 participants"], sales: ["Admissions follow-up call", "Admissions office"] },
+        consent: "Recordings that include students under 18 need parental consent. We will ask for your consent records before the first upload.", strict: true
+      },
+      college: {
+        label: "College or university", plural: "colleges", desc: "Faculty, counsellors and the admissions desk",
+        icon: "M2 9l10-5 10 5-10 5zM6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5M22 9v6",
+        defaults: ["teaching", "counselling", "reception"],
+        terms: { person: "Faculty member", recording: "Lecture", recordingPlural: "Lectures", unit: "Department", manager: "Head of department", people: "Faculty" },
+        nameLabel: "College or university name", namePlaceholder: "For example, Aravalli Institute of Technology",
+        rubrics: { teaching: "Teaching, lecture edition", counselling: "Counselling, adult students", reception: "Admissions enquiries", meeting: "Department meetings", sales: "Outreach and admissions calls" },
+        samples: { teaching: ["Thermodynamics, Lecture 14", "Dr. Vikram Rathore, Mechanical"], counselling: ["Career guidance session", "Student counselling cell"], reception: ["B.Tech admission enquiry", "Admissions desk"], meeting: ["Board of studies review", "9 participants"], sales: ["Corporate training proposal", "Outreach office"] },
+        consent: "Participants are told they are being recorded. Parental consent is needed only for students under 18.", strict: false
+      },
+      company: {
+        label: "Company", plural: "companies", desc: "Sales teams, meetings and the front desk",
+        icon: "M4 21V7l8-4 8 4v14M9 21v-4h6v4M8 10h1M15 10h1M8 14h1M15 14h1",
+        defaults: ["sales", "meeting", "reception"],
+        terms: { person: "Sales rep", recording: "Call", recordingPlural: "Calls", unit: "Team or branch", manager: "Sales manager", people: "Team" },
+        nameLabel: "Company name", namePlaceholder: "For example, Northwind Learning Pvt Ltd",
+        rubrics: { teaching: "Training sessions", counselling: "HR and wellbeing conversations", reception: "Customer enquiries", meeting: "Meeting minutes and actions", sales: "Sales calls, discovery and SOP" },
+        samples: { teaching: ["Onboarding training, week 2", "L&D team"], counselling: ["Quarterly check-in", "HR partner"], reception: ["Pricing enquiry", "Front desk, Jaipur office"], meeting: ["Pipeline review", "5 participants"], sales: ["ERP demo for a partner school", "Karan Singh, West team"] },
+        consent: "Customers hear a recording notice at the start of each call. Staff are covered by your recording policy.", strict: false
+      }
+    };
+    var TYPES = [
+      { id: "teaching", label: "Teaching", desc: "Lessons, lectures and training: clarity, questioning, pacing", color: "#2546B8" },
+      { id: "counselling", label: "Counselling", desc: "One-to-one sessions: empathy, cause, agreed plan", color: "#1E7A55" },
+      { id: "reception", label: "Reception", desc: "Front-desk calls and visits: intent, accuracy, resolution", color: "#D9831F" },
+      { id: "meeting", label: "Meetings", desc: "Internal meetings: decisions, owners, open issues", color: "#7A4DB8" },
+      { id: "sales", label: "Sales calls", desc: "Calls and demos: discovery, objections, next step", color: "#0F7C8C" }
+    ];
+    var pid = st.profile || "school";
+    var prof = P[pid];
+    var on = st.types || prof.defaults;
+    var profiles = ["school", "college", "company"].map(function (id) {
+      var p = P[id], sel = id === pid;
+      return { id: id, label: p.label, desc: p.desc, icon: p.icon, on: sel,
+        border: sel ? "2px solid #2546B8" : "1px solid #DDE2E0", bg: sel ? "#F3F6FD" : "#FFFFFF",
+        iconBg: sel ? "#2546B8" : "#F1F3F2", iconFg: sel ? "#FFFFFF" : "#33403B",
+        pick: function () { self.setState({ profile: id, types: null }); } };
+    });
+    var types = TYPES.map(function (t) {
+      var isOn = on.indexOf(t.id) >= 0;
+      return { label: t.label, desc: t.desc, on: isOn, isDefault: prof.defaults.indexOf(t.id) >= 0,
+        border: isOn ? "#B9C6EE" : "#E6EAE8", bg: isOn ? "#FFFFFF" : "#FAFBFA",
+        toggle: function () {
+          var next = isOn ? on.filter(function (x) { return x !== t.id; }) : on.concat([t.id]);
+          self.setState({ types: next });
+        } };
+    });
+    var picked = TYPES.filter(function (t) { return on.indexOf(t.id) >= 0; });
+    var navItems = [
+      { label: "Overview", on: true }, { label: prof.terms.recordingPlural }, { label: "Reviews" }, { label: prof.terms.people }, { label: "Rubrics" }
+    ].map(function (n) { return { label: n.label, bg: n.on ? "#E8EDFB" : "transparent", fg: n.on ? "#1A3490" : "#33403B", weight: n.on ? 600 : 500 }; });
+    var noTypes = picked.length === 0;
+    return {
+      profiles: profiles, types: types, profilePlural: prof.plural,
+      nameLabel: prof.nameLabel, namePlaceholder: prof.namePlaceholder,
+      terms: prof.terms, navItems: navItems,
+      onTypes: picked.map(function (t) { return { label: t.label, color: t.color }; }),
+      sampleRows: picked.slice(0, 3).map(function (t) { return { title: prof.samples[t.id][0], who: prof.samples[t.id][1] }; }),
+      rubrics: picked.map(function (t) { return { label: prof.rubrics[t.id] }; }),
+      consent: prof.consent,
+      consentBg: prof.strict ? "#FEF6EC" : "#F8F9F8", consentBorder: prof.strict ? "#F7DDB8" : "#EEF1F0",
+      noTypes: noTypes,
+      ctaBg: noTypes ? "#C9D2EE" : "#2546B8", ctaFg: noTypes ? "#33407A" : "#FFFFFF", ctaCursor: noTypes ? "not-allowed" : "pointer",
+      ctaHint: noTypes ? "Choose at least one conversation type." : picked.length + " of 5 conversation types on. Starter covers any two; Growth covers all five."
+    };
+  }
+}
+</script>
+</body>
+</html>

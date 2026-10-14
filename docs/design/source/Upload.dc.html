@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Upload recordings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F5F4}
+a{color:#2546B8}a:hover{color:#1A3490}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,label:focus-within{outline:2px solid #2546B8;outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #F3F5F4; font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif; color: #17211D; font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums">
+
+  <nav aria-label="Main" style="flex: 1 1 232px; max-width: 100%; box-sizing: border-box; background: #FFFFFF; border-right: 1px solid #DDE2E0; padding: 20px 14px; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px">
+      <div aria-hidden="true" style="width: 30px; height: 30px; border-radius: 8px; background: #2546B8; display: flex; align-items: center; justify-content: center; gap: 2px">
+        <div style="width: 3px; height: 8px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 16px; border-radius: 2px; background: #FFFFFF"></div>
+        <div style="width: 3px; height: 11px; border-radius: 2px; background: #F2B35B"></div>
+        <div style="width: 3px; height: 6px; border-radius: 2px; background: #FFFFFF"></div>
+      </div>
+      <div style="font-weight: 700; font-size: 17px; letter-spacing: -0.01em">Sabha</div>
+    </div>
+    <button type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #DDE2E0; border-radius: 8px; background: #F8F9F8; font: inherit; color: #17211D; text-align: left; cursor: pointer">
+      <span style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 13px">Greenfield Public School</span>
+        <span style="font-size: 12px; color: #5C6863">3 campuses</span>
+      </span>
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C6863" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"/></svg>
+    </button>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Overview
+      </a>
+      <a href="Analysis.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: #E8EDFB; color: #1A3490; font-weight: 600; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h1M7 8v8M11 5v14M15 9v6M19 11v2"/></svg>
+        Recordings
+      </a>
+      <a href="Main.dc.html" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <span style="display: flex; align-items: center; gap: 10px">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5l2 2 4-4"/></svg>
+          Reviews
+        </span>
+        <span style="min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #FDEBD3; color: #7A4300; font-size: 12px; font-weight: 600; text-align: center">7</span>
+      </a>
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.8.7 3 2.4 3.5 5.2"/></svg>
+        People
+      </a>
+      <a href="Rubrics.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #33403B; text-decoration: none">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+        Rubrics
+      </a>
+    </div>
+    <a href="Plans.dc.html" style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #E6EAE8; border-radius: 10px; color: #17211D; text-decoration: none">
+      <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span style="font-weight: 600">Starter plan</span><span style="color: #2546B8; font-weight: 600">Manage</span></span>
+      <span aria-hidden="true" style="display: block; height: 6px; border-radius: 999px; background: #EEF1F0; overflow: hidden"><span style="display: block; width: 38.4%; height: 6px; background: #2546B8; border-radius: 999px"></span></span>
+      <span style="font-size: 12px; color: #4A5752">38 of 100 audio hours used</span>
+    </a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-top: 1px solid #E6EAE8">
+      <div aria-hidden="true" style="width: 32px; height: 32px; border-radius: 999px; background: #DCE3F7; color: #1A3490; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">PK</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 13px">Priya Kapoor</span>
+        <span style="font-size: 12px; color: #5C6863">Academic head</span>
+      </div>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px clamp(16px, 3vw, 40px) 48px; display: flex; flex-direction: column; gap: 20px">
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <nav aria-label="Breadcrumb" style="font-size: 13px; color: #4A5752; display: flex; gap: 8px"><a href="Main.dc.html" style="text-decoration: none">Recordings</a><span aria-hidden="true">/</span><span>Upload</span></nav>
+      <h1 style="margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em">Upload recordings</h1>
+      <p style="margin: 0; color: #4A5752; max-width: 70ch">Files go straight to encrypted storage in India. Interrupted uploads resume where they stopped, and you can leave this page once every file says ready.</p>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+      <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+        <section aria-labelledby="drop-h" onDragOver="{{onDragOver}}" onDragLeave="{{onDragLeave}}" onDrop="{{onDrop}}" style="position: relative; border: 2px dashed {{zoneBorder}}; background: {{zoneBg}}; border-radius: 14px; padding: 44px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center">
+          <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 14px; background: #E8EDFB; color: #2546B8; display: flex; align-items: center; justify-content: center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <h2 id="drop-h" style="margin: 0; font-size: 18px; font-weight: 600">{{zoneTitle}}</h2>
+            <p style="margin: 0; color: #4A5752">MP3, M4A, WAV, OGG, WEBM or MP4. Up to 3 hours and 1 GB per file.</p>
+          </div>
+          <input id="file-input" type="file" multiple accept=".mp3,.m4a,.wav,.ogg,.webm,.mp4,audio/*,video/mp4" onChange="{{onPick}}" style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden">
+          <label for="file-input" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 8px; background: #2546B8; color: #FFFFFF; font-weight: 600; cursor: pointer">Choose files</label>
+          <span style="font-size: 12.5px; color: #4A5752">Or drag a whole folder of lessons; each file becomes one recording.</span>
+        </section>
+
+        <section aria-labelledby="q-h" style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; overflow: hidden">
+          <div style="padding: 14px 20px; border-bottom: 1px solid #E6EAE8; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px">
+            <h2 id="q-h" style="margin: 0; font-size: 16px; font-weight: 600">Files</h2>
+            <span style="font-size: 13px; color: #4A5752" aria-live="polite">{{summary}}</span>
+          </div>
+          <ul style="list-style: none; margin: 0; padding: 0">
+            <sc-for list="{{files}}" as="f" hint-placeholder-count="3">
+              <li style="display: flex; gap: 14px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #EEF1F0">
+                <div aria-hidden="true" style="flex: none; width: 40px; height: 40px; border-radius: 10px; background: {{f.iconBg}}; color: {{f.iconFg}}; display: flex; align-items: center; justify-content: center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 12h1M8 8v8M12 5v14M16 9v6M20 11v2"/></svg>
+                </div>
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+                  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px">
+                    <span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%">{{f.name}}</span>
+                    <span style="font-size: 12.5px; color: #4A5752">{{f.meta}}</span>
+                  </div>
+                  <sc-if value="{{f.showBar}}" hint-placeholder-val="{{ true }}">
+                    <div aria-hidden="true" style="height: 6px; border-radius: 999px; background: #EEF1F0; overflow: hidden"><div style="height: 6px; width: {{f.barW}}; background: {{f.barC}}; border-radius: 999px"></div></div>
+                  </sc-if>
+                  <span style="font-size: 12.5px; font-weight: 500; color: {{f.statusFg}}">{{f.statusText}}</span>
+                </div>
+                <button type="button" onClick="{{f.remove}}" aria-label="Remove {{f.name}}" style="flex: none; width: 40px; height: 40px; border: 1px solid #DDE2E0; border-radius: 8px; background: #FFFFFF; color: #4A5752; display: flex; align-items: center; justify-content: center; cursor: pointer">
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+              </li>
+            </sc-for>
+          </ul>
+          <sc-if value="{{empty}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; padding: 20px; color: #4A5752">No files yet. Drop recordings above, or choose them from this device.</p>
+          </sc-if>
+        </section>
+
+        <section aria-labelledby="other-h" style="background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="other-h" style="margin: 0; font-size: 16px; font-weight: 600">Other ways to send recordings</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <span style="font-weight: 600">Recorder app</span>
+              <span style="font-size: 13px; color: #4A5752">For classrooms and front desks. Records, compresses and uploads on its own, even on weak Wi-Fi.</span>
+              <a href="Upload.dc.html" style="font-size: 13px; font-weight: 600">Get the app link</a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <span style="font-weight: 600">Phone call recordings</span>
+              <span style="font-size: 13px; color: #4A5752">Connect your call system so reception and sales calls arrive automatically.</span>
+              <a href="Upload.dc.html" style="font-size: 13px; font-weight: 600">Set up call import</a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <span style="font-weight: 600">API and webhooks</span>
+              <span style="font-size: 13px; color: #4A5752">Send recordings from your ERP or LMS and get results back when scoring finishes.</span>
+              <a href="Upload.dc.html" style="font-size: 13px; font-weight: 600">Read the API guide</a>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside aria-labelledby="set-h" style="flex: 1 1 320px; min-width: 0; background: #FFFFFF; border: 1px solid #DDE2E0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <h2 id="set-h" style="margin: 0; font-size: 16px; font-weight: 600">Analysis settings</h2>
+          <span style="font-size: 13px; color: #4A5752">Applied to every file in this batch</span>
+        </div>
+
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+          <legend style="padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 600">Conversation type</legend>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+            <sc-for list="{{types}}" as="t" hint-placeholder-count="6">
+              <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.pressed}}" style="min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid {{t.border}}; background: {{t.bg}}; font: inherit; font-size: 13.5px; font-weight: {{t.weight}}; color: {{t.fg}}; cursor: pointer; text-align: left">{{t.label}}</button>
+            </sc-for>
+          </div>
+          <span style="font-size: 12.5px; color: #4A5752">{{typeHint}}</span>
+        </fieldset>
+
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">
+          Campus
+          <select style="min-height: 44px; padding: 0 10px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-weight: 400; color: #17211D">
+            <option>Main campus</option>
+            <option>Vaishali Nagar</option>
+            <option>Mansarovar</option>
+          </select>
+        </label>
+
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">
+          Teacher or staff member
+          <select style="min-height: 44px; padding: 0 10px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-weight: 400; color: #17211D">
+            <option>Match from file name</option>
+            <option>Anjali Sharma</option>
+            <option>Rohit Meena</option>
+            <option>Neha Joshi</option>
+          </select>
+        </label>
+
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">
+          Main language spoken
+          <select style="min-height: 44px; padding: 0 10px; border: 1px solid #CFD6D3; border-radius: 8px; background: #FFFFFF; font: inherit; font-weight: 400; color: #17211D">
+            <option>Detect automatically</option>
+            <option>Mostly English</option>
+            <option>Mostly Hindi</option>
+            <option>Hindi and English mixed</option>
+          </select>
+        </label>
+
+        <label style="display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; background: {{consentBg}}; border: 1px solid {{consentBorder}}; cursor: pointer">
+          <input type="checkbox" checked="{{consent}}" onChange="{{toggleConsent}}" style="flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: #2546B8">
+          <span style="display: flex; flex-direction: column; gap: 2px">
+            <span style="font-weight: 600; font-size: 13.5px">Consent is on file for these recordings</span>
+            <span style="font-size: 12.5px; color: #4A5752">Required. For classroom lessons this means parental consent under the school’s recording policy.</span>
+          </span>
+        </label>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #EEF1F0">
+          <div style="display: flex; justify-content: space-between; font-size: 13px">
+            <span style="color: #4A5752">Plan hours used this month</span>
+            <span style="font-weight: 600">38.4 of 100</span>
+          </div>
+          <div aria-hidden="true" style="height: 6px; border-radius: 999px; background: #EEF1F0; overflow: hidden"><div style="height: 6px; width: 38.4%; background: #2546B8; border-radius: 999px"></div></div>
+          <button type="button" disabled="{{startDisabled}}" style="min-height: 48px; border: 0; border-radius: 8px; background: {{startBg}}; color: {{startFg}}; font: inherit; font-weight: 600; cursor: {{startCursor}}">{{startLabel}}</button>
+          <span style="font-size: 12.5px; color: #4A5752; text-align: center">{{startHint}}</span>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1200}}'>
+class Component extends DCLogic {
+  initial() {
+    return [
+      { id: "a", name: "Class 9 English, Poetry, 13 Oct.m4a", bytes: 50540000, dur: "51:06", status: "ready", progress: 100 },
+      { id: "b", name: "Front desk, morning shift.mp3", bytes: 13210000, dur: "14:22", status: "uploading", progress: 62 },
+      { id: "c", name: "Annual day, full programme.wav", bytes: 1503000000, dur: "3:12:40", status: "error", progress: 0, error: "Larger than 1 GB and longer than 3 hours. Split it, or export it as MP3." }
+    ];
+  }
+  files() { return (this.state && this.state.files) || this.initial(); }
+  componentDidMount() {
+    var self = this;
+    this.timer = setInterval(function () {
+      var fs = self.files(), changed = false;
+      var next = fs.map(function (f) {
+        if (f.status === "uploading") { changed = true; var p = f.progress + 9; return p >= 100 ? Object.assign({}, f, { progress: 100, status: "checking" }) : Object.assign({}, f, { progress: p }); }
+        if (f.status === "checking") { changed = true; return Object.assign({}, f, { status: "ready" }); }
+        return f;
+      });
+      if (changed) self.setState({ files: next });
+    }, 500);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  addFiles(list) {
+    var ok = ["mp3", "m4a", "wav", "ogg", "webm", "mp4"];
+    var added = Array.prototype.slice.call(list || []).map(function (f, i) {
+      var ext = (f.name.split(".").pop() || "").toLowerCase();
+      var base = { id: f.name + "-" + Date.now() + "-" + i, name: f.name, bytes: f.size, dur: "", progress: 0 };
+      if (ok.indexOf(ext) < 0) return Object.assign(base, { status: "error", error: "Not an audio or video file. Use MP3, M4A, WAV, OGG, WEBM or MP4." });
+      if (f.size > 1073741824) return Object.assign(base, { status: "error", error: "Larger than 1 GB. Export it as MP3, or split it into parts." });
+      return Object.assign(base, { status: "uploading" });
+    });
+    this.setState({ files: this.files().concat(added), dragging: false });
+  }
+  renderVals() {
+    var self = this, s = this.state || {};
+    var fs = this.files();
+    var size = function (b) { return b >= 1e9 ? (b / 1e9).toFixed(2) + " GB" : (b / 1e6).toFixed(1) + " MB"; };
+    var look = {
+      uploading: { fg: "#1A3490", bar: "#2546B8", iconBg: "#E8EDFB", iconFg: "#2546B8" },
+      checking: { fg: "#1A3490", bar: "#2546B8", iconBg: "#E8EDFB", iconFg: "#2546B8" },
+      ready: { fg: "#1E6B4B", bar: "#2E8B62", iconBg: "#E3F2EA", iconFg: "#1E6B4B" },
+      error: { fg: "#B42318", bar: "#C8372B", iconBg: "#FBE9E7", iconFg: "#B42318" }
+    };
+    var files = fs.map(function (f) {
+      var l = look[f.status];
+      var text = f.status === "uploading" ? "Uploading, " + f.progress + "%" : f.status === "checking" ? "Checking audio quality" : f.status === "ready" ? "Ready to analyse" : f.error;
+      return {
+        name: f.name, meta: f.dur ? size(f.bytes) + ", " + f.dur : size(f.bytes),
+        showBar: f.status !== "error", barW: f.progress + "%", barC: l.bar,
+        statusText: text, statusFg: l.fg, iconBg: l.iconBg, iconFg: l.iconFg,
+        remove: function () { self.setState({ files: self.files().filter(function (x) { return x.id !== f.id; }) }); }
+      };
+    });
+    var ready = fs.filter(function (f) { return f.status === "ready"; }).length;
+    var busy = fs.filter(function (f) { return f.status === "uploading" || f.status === "checking"; }).length;
+    var errs = fs.filter(function (f) { return f.status === "error"; }).length;
+    var parts = [];
+    if (ready) parts.push(ready + " ready");
+    if (busy) parts.push(busy + " uploading");
+    if (errs) parts.push(errs + " need attention");
+    var type = s.type || "Teaching";
+    var hints = {
+      "Detect": "We will pick the type from the opening minutes and flag any we are unsure about.",
+      "Teaching": "Scored with the Teaching rubric v1.3.",
+      "Reception": "Scored with the Reception rubric v1.1.",
+      "Counselling": "Visible only to the counsellor and their supervisor.",
+      "Meeting": "Produces minutes, decisions and action items.",
+      "Sales": "Scored with the Sales calls rubric v0.9, admins only while calibrating."
+    };
+    var types = ["Teaching", "Reception", "Counselling", "Meeting", "Sales", "Detect"].map(function (t) {
+      var on = t === type;
+      return { label: t === "Detect" ? "Detect automatically" : t, pressed: on ? "true" : "false", bg: on ? "#F3F6FD" : "#FFFFFF", border: on ? "#2546B8" : "#CFD6D3", fg: on ? "#1A3490" : "#17211D", weight: on ? 600 : 400, pick: function () { self.setState({ type: t }); } };
+    });
+    var consent = !!s.consent;
+    var canStart = consent && ready > 0;
+    return {
+      files: files, empty: fs.length === 0,
+      summary: parts.length ? parts.join(", ") : "No files",
+      zoneTitle: s.dragging ? "Drop to upload" : "Drag recordings here",
+      zoneBorder: s.dragging ? "#2546B8" : "#A9B4AF",
+      zoneBg: s.dragging ? "#F3F6FD" : "#FFFFFF",
+      onDragOver: function (e) { e.preventDefault(); if (!self.state || !self.state.dragging) self.setState({ dragging: true }); },
+      onDragLeave: function () { self.setState({ dragging: false }); },
+      onDrop: function (e) { e.preventDefault(); self.addFiles(e.dataTransfer && e.dataTransfer.files); },
+      onPick: function (e) { self.addFiles(e.target.files); e.target.value = ""; },
+      types: types, typeHint: hints[type],
+      consent: consent,
+      toggleConsent: function () { self.setState({ consent: !consent }); },
+      consentBg: consent ? "#F8F9F8" : "#FEF6EC",
+      consentBorder: consent ? "#E6EAE8" : "#F7DDB8",
+      startDisabled: !canStart,
+      startBg: canStart ? "#2546B8" : "#C9D2EE",
+      startFg: canStart ? "#FFFFFF" : "#33407A",
+      startCursor: canStart ? "pointer" : "not-allowed",
+      startLabel: ready === 1 ? "Analyse 1 recording" : "Analyse " + ready + " recordings",
+      startHint: !consent ? "Confirm consent to continue." : ready === 0 ? "Waiting for at least one file to finish uploading." : "Results usually arrive within 20 minutes for an hour of audio."
+    };
+  }
+}
+</script>
+</body>
+</html>
