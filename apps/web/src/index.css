@@ -9,12 +9,13 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* :where() keeps specificity at zero so utility classes on a link always win. */
-  :where(a) {
+  /* Element-level specificity: beats Tailwind's preflight `a` reset (same specificity, later in the file) but
+     loses to utility classes, so links like the sidebar's text-ink-2 keep their own colour on hover. */
+  a {
     @apply text-primary underline;
   }
 
-  :where(a):hover {
+  a:where(:hover) {
     @apply text-primary-hover;
   }
 
