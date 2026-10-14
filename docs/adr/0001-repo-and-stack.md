@@ -33,7 +33,7 @@ Stack:
 | API | FastAPI, Pydantic v2, Uvicorn; async MongoDB via `pymongo.AsyncMongoClient` (PyMongo 4.9+, not Motor) |
 | Workers | Celery 5 on Redis 7; sync `pymongo.MongoClient` inside tasks |
 | Database | MongoDB 7 replica set (transactions and change streams required, also in tests) |
-| Storage | S3 (`ap-south-1`) in staging and prod, MinIO locally; boto3 |
+| Storage | S3 (`ap-south-1`) in staging and prod, RustFS locally (ADR 0003; originally MinIO); boto3 |
 | Audio | ffmpeg/ffprobe, Silero VAD, pyannote or NeMo Sortformer, ASR via `packages/asr` |
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
 | Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |

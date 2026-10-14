@@ -1,0 +1,15 @@
+[project]
+name = "sabha-api"
+version = "0.0.0"
+description = "Sabha HTTP API (FastAPI)."
+requires-python = ">=3.12,<3.13"
+dependencies = ["sabha-core"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Flat layout (apps/api/sabha_api), as CLAUDE.md names the paths.
+module-name = "sabha_api"
+module-root = ""

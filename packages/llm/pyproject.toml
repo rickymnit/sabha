@@ -1,0 +1,15 @@
+[project]
+name = "sabha-llm"
+version = "0.0.0"
+description = "LLM gateway: providers, routing, budgets, redaction, caching, cost accounting."
+requires-python = ">=3.12,<3.13"
+dependencies = ["sabha-core"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Flat layout (packages/llm/sabha_llm), as CLAUDE.md names the paths.
+module-name = "sabha_llm"
+module-root = ""

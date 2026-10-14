@@ -1,0 +1,15 @@
+[project]
+name = "sabha-analytics"
+version = "0.0.0"
+description = "Rubric loading, computed metrics, scoring, grounding and synthesis."
+requires-python = ">=3.12,<3.13"
+dependencies = ["sabha-core", "sabha-llm"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Flat layout (packages/analytics/sabha_analytics), as CLAUDE.md names the paths.
+module-name = "sabha_analytics"
+module-root = ""

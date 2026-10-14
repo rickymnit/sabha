@@ -61,8 +61,10 @@ class Settings(BaseSettings):
     # Redis (Celery broker and cache)
     redis_url: SecretStr
 
-    # Object storage: S3 on AWS, MinIO locally
-    s3_bucket: str
+    # Object storage: S3 on AWS, RustFS locally. Three buckets so each gets its own lifecycle and access rules.
+    s3_bucket_audio: str  # uploaded originals, short retention
+    s3_bucket_artefacts: str  # pipeline outputs: {tenant_id}/{recording_id}/{stage}@{version}/
+    s3_bucket_backups: str
     s3_region: str = INDIA_REGION
     s3_endpoint_url: str | None = None
     s3_access_key_id: SecretStr | None = None
@@ -165,7 +167,7 @@ class Settings(BaseSettings):
             if self.s3_region != INDIA_REGION or self.ses_region != INDIA_REGION:
                 raise ValueError(f"S3_REGION and SES_REGION must be {INDIA_REGION} in {self.app_env}")
             if self.s3_endpoint_url is not None:
-                raise ValueError(f"S3_ENDPOINT_URL is for MinIO only; leave it unset in {self.app_env}")
+                raise ValueError(f"S3_ENDPOINT_URL is for local RustFS only; leave it unset in {self.app_env}")
             if not self.oidc_issuer.startswith("https://"):
                 raise ValueError(f"OIDC_ISSUER must use https in {self.app_env}")
         return self

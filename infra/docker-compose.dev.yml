@@ -1,0 +1,67 @@
+# Local development services (plan task P1.1). Start with `make dev`, stop with `make down`.
+#
+# Run from the repo root so ${...} values come from the root .env (`make env` creates it):
+#   docker compose --env-file .env -f infra/docker-compose.dev.yml -p sabha-dev up -d --wait
+#
+# Every port is bound to 127.0.0.1: nothing here is reachable from other machines.
+
+name: sabha-dev
+
+services:
+  mongo:
+    image: mongo:7.0.43
+    # Single-node replica set: Sabha needs transactions and change streams (CLAUDE.md), also in development.
+    # The cache is capped because the dev VM may have only a few GB of RAM.
+    command: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiates the replica set on first start, then reports healthy only once this node is PRIMARY.
+      # The member host is localhost:27017 so clients on this machine can use ?replicaSet=rs0 (.env.example).
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - >-
+          try { rs.status() } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}) }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  redis:
+    image: redis:7.4.11-alpine
+    # 6380 on the host: a system Redis may already own 6379 on developer machines.
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible storage for local development (docs/adr/0003-local-object-storage.md). Staging and production
+  # use AWS S3. Buckets and CORS are created by scripts/dev_storage.py, which `make dev` runs after start-up.
+  rustfs:
+    image: rustfs/rustfs:1.0.0
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:?run `make env` to create .env with local RustFS credentials}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:?run `make env` to create .env with local RustFS credentials}
+    ports:
+      - "127.0.0.1:9000:9000"  # S3 API
+      - "127.0.0.1:9001:9001"  # web console
+    volumes:
+      - rustfs-data:/data
+
+  # Placeholders, filled in by later plan tasks:
+  # api:      FastAPI app (P1.4), built from apps/api/Dockerfile (P1.2)
+  # workers:  Celery workers and beat (P2.4), built from apps/workers/Dockerfile.cpu (P1.2)
+  # web:      Vite dev server for apps/web; until then run `pnpm -C apps/web dev` on the host
+
+volumes:
+  mongo-data:
+  rustfs-data:

@@ -1,29 +1,93 @@
-# Root of the uv workspace. P0.5 adds only packages/core; P1.1 adds the other packages and apps.
+# Root of the uv workspace. `uv sync` installs every member plus the dev tools.
 [project]
 name = "sabha"
 version = "0.0.0"
 requires-python = ">=3.12,<3.13"
-# Root-level dependencies are for scripts/ only (scripts/check_env.py talks to every backing service).
 dependencies = [
   "sabha-core",
+  "sabha-asr",
+  "sabha-llm",
+  "sabha-analytics",
+  "sabha-api",
+  "sabha-workers",
+  # scripts/check_env.py talks to every backing service directly.
   "boto3>=1.35",
   "pymongo>=4.9",
+  "python-dotenv>=1.0",  # scripts/dev_storage.py reads .env before full settings exist
   "redis>=5.0",
 ]
 
 [dependency-groups]
 dev = [
+  "detect-secrets>=1.5.0",
+  "hypothesis>=6.168",
+  "jsonschema>=4.26",  # eval/goldset tests validate gold transcripts against their schema
+  "mypy==2.3.1",
+  "pre-commit>=4.6",
   "pytest>=8.3",
+  "pytest-cov>=7.1",
+  "ruff==0.16.9",
+  "testcontainers>=4.15",  # MongoDB replica set, Redis and S3 in integration tests (CLAUDE.md)
+  "types-jsonschema>=4.26",
 ]
 
 [tool.uv]
 package = false
 
 [tool.uv.workspace]
-members = ["packages/core"]
+members = [
+  "packages/core",
+  "packages/asr",
+  "packages/llm",
+  "packages/analytics",
+  "apps/api",
+  "apps/workers",
+]
 
 [tool.uv.sources]
 sabha-core = { workspace = true }
+sabha-asr = { workspace = true }
+sabha-llm = { workspace = true }
+sabha-analytics = { workspace = true }
+sabha-api = { workspace = true }
+sabha-workers = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["packages/core/tests"]
+testpaths = [
+  "packages/core/tests",
+  "packages/asr/tests",
+  "packages/llm/tests",
+  "packages/analytics/tests",
+  "apps/api/tests",
+  "apps/workers/tests",
+  "eval/goldset/tests",
+]
+# importlib mode: test files in different packages may share a name without colliding.
+addopts = ["--import-mode=importlib", "--strict-markers"]
+markers = [
+  "integration: needs Docker (testcontainers); deselect with -m 'not integration'",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["apps/web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106"]  # asserts and fake credentials are expected in tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["sabha_core", "sabha_asr", "sabha_llm", "sabha_analytics", "sabha_api", "sabha_workers"]
+
+# mypy runs once per package (see Makefile): strict for packages/*, default for apps/* and scripts/.
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# boto3 ships no type information; only scripts/ and storage helpers touch it.
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true

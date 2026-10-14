@@ -104,7 +104,8 @@ def _check_file(raw: str, audio_dir: Path) -> tuple[str, list[str]]:
         reasons.append(f"file extension {rel.suffix or '(none)'!r} is not one of {', '.join(AUDIO_EXTENSIONS)}")
     if not RECORDING_ID_RE.match(rel.stem):
         reasons.append(
-            f"file name {rel.stem!r} cannot be a recording id (letters, digits, '.', '_', '-'; start with a letter or digit)"
+            f"file name {rel.stem!r} cannot be a recording id "
+            "(letters, digits, '.', '_', '-'; start with a letter or digit)"
         )
     host_path = audio_dir / Path(*rel.parts)
     if not host_path.is_file():

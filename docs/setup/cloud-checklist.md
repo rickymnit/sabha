@@ -17,8 +17,8 @@ Record as you go (no secrets):
 | --- | --- |
 | AWS account ID (staging) | |
 | AWS account ID (production) | |
-| S3 bucket (staging) | |
-| S3 bucket (production) | |
+| S3 buckets (staging): audio / artefacts / backups | |
+| S3 buckets (production): audio / artefacts / backups | |
 | App IAM role ARN (staging / production) | |
 | Atlas organisation / project | |
 | Atlas cluster name (staging / production) | |
@@ -52,20 +52,30 @@ Set the amounts from the approved pilot budget; this checklist deliberately does
 
 ## 3. S3 buckets
 
-One bucket per environment, in `ap-south-1`. Local development uses MinIO instead (`S3_ENDPOINT_URL`).
+Three buckets per environment, in `ap-south-1`, so each kind of data gets its own lifecycle and access rules.
+Local development uses RustFS instead (`S3_ENDPOINT_URL`, ADR 0003). Terraform (plan task 1.3) will codify this
+section.
 
-- [ ] Create `sabha-staging-<suffix>` and `sabha-prod-<suffix>` in `ap-south-1` (bucket names are global, so add
-      a suffix).
+| Bucket | Setting | Holds |
+| --- | --- | --- |
+| `sabha-<env>-audio-<suffix>` | `S3_BUCKET_AUDIO` | Uploaded originals |
+| `sabha-<env>-artefacts-<suffix>` | `S3_BUCKET_ARTEFACTS` | Pipeline outputs: derived audio, transcripts, analyses |
+| `sabha-<env>-backups-<suffix>` | `S3_BUCKET_BACKUPS` | Database backups (plan task 7.3) |
+
+- [ ] Create the three buckets for staging and for production in `ap-south-1` (bucket names are global, so add a
+      suffix).
 - [ ] **Block Public Access:** turn on all four settings at the **account** level and on each bucket.
 - [ ] **Object Ownership:** "Bucket owner enforced" (ACLs disabled).
 - [ ] **Default encryption:** SSE-S3 (or SSE-KMS with a key in `ap-south-1` if you want key-level audit).
 - [ ] **TLS only:** add a bucket policy that denies requests where `aws:SecureTransport` is `false`.
 - [ ] **Lifecycle rules:**
-  - [ ] *Expire audio after 90 days:* rule filtered by object tag `data-class=audio`, expiring current versions
-        after 90 days (the default audio retention). The upload and preprocessing code must set this tag on
-        every audio object; note this for plan tasks 2.1 and 3.2.
-  - [ ] *Abort incomplete multipart uploads after 7 days* (whole bucket). Browser uploads are multipart; abandoned
+  - [ ] *Audio bucket:* expire objects after 90 days (the default audio retention). Plan task 1.3 also moves them to
+        Infrequent Access after 30 days.
+  - [ ] *Artefacts bucket:* expire derived audio (normalised, compact and playback copies) after 90 days with a rule
+        filtered by object tag `data-class=audio`; the preprocessing code (plan task 3.2) must set that tag.
+  - [ ] *Audio bucket:* abort incomplete multipart uploads after 7 days. Browser uploads are multipart; abandoned
         ones otherwise keep costing storage.
+  - [ ] *Backups bucket:* turn on versioning (plan task 1.3); retention is decided in plan task 7.3.
   - [ ] If you turn on versioning, also expire noncurrent versions after the same number of days, or deleted audio
         survives as old versions.
   - [ ] Retention for transcripts and reports: wait for the lawyer's answer (`docs/legal/drafts/`); do not add a
@@ -100,7 +110,11 @@ access keys: leave `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` empty and the A
       "Sid": "ListOwnBucket",
       "Effect": "Allow",
       "Action": ["s3:ListBucket", "s3:ListBucketMultipartUploads"],
-      "Resource": "arn:aws:s3:::<bucket>"
+      "Resource": [
+        "arn:aws:s3:::<audio-bucket>",
+        "arn:aws:s3:::<artefacts-bucket>",
+        "arn:aws:s3:::<backups-bucket>"
+      ]
     },
     {
       "Sid": "ReadWriteOwnObjects",
@@ -114,7 +128,11 @@ access keys: leave `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` empty and the A
         "s3:AbortMultipartUpload",
         "s3:ListMultipartUploadParts"
       ],
-      "Resource": "arn:aws:s3:::<bucket>/*"
+      "Resource": [
+        "arn:aws:s3:::<audio-bucket>/*",
+        "arn:aws:s3:::<artefacts-bucket>/*",
+        "arn:aws:s3:::<backups-bucket>/*"
+      ]
     },
     {
       "Sid": "SendFromOurDomainInMumbai",

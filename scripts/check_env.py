@@ -5,7 +5,8 @@ Usage (from the repo root):
     uv run python scripts/check_env.py
 
 Reads settings exactly as the app does (environment variables, then `.env`), then checks MongoDB (must be a
-replica set), Redis, S3/MinIO (put, get and delete one object under `healthcheck/`) and the OIDC discovery
+replica set), Redis, S3/RustFS (put, get and delete one object under `healthcheck/` in each of the three
+buckets) and the OIDC discovery
 document. Prints PASS or FAIL per service and exits 1 if anything failed, 2 if the settings themselves are
 invalid. Secret values are never printed.
 """
@@ -67,22 +68,26 @@ def check_storage(settings: Settings) -> str:
         config=Config(connect_timeout=TIMEOUT_S, read_timeout=TIMEOUT_S, retries={"max_attempts": 2}),
         **credentials,
     )
-    key = f"healthcheck/{uuid.uuid4()}.txt"
+    buckets = (settings.s3_bucket_audio, settings.s3_bucket_artefacts, settings.s3_bucket_backups)
     body = b"sabha healthcheck"
-    s3.put_object(Bucket=settings.s3_bucket, Key=key, Body=body)
-    try:
-        stored = s3.get_object(Bucket=settings.s3_bucket, Key=key)["Body"].read()
-        if stored != body:
-            raise RuntimeError("object read back did not match what was written")
-    finally:
-        s3.delete_object(Bucket=settings.s3_bucket, Key=key)
+    for bucket in buckets:
+        key = f"healthcheck/{uuid.uuid4()}.txt"
+        try:
+            s3.put_object(Bucket=bucket, Key=key, Body=body)
+        except Exception as exc:
+            raise RuntimeError(f"cannot write to bucket {bucket!r}: {exc}") from exc
+        try:
+            if s3.get_object(Bucket=bucket, Key=key)["Body"].read() != body:
+                raise RuntimeError(f"object read back from {bucket!r} did not match what was written")
+        finally:
+            s3.delete_object(Bucket=bucket, Key=key)
     where = settings.s3_endpoint_url or settings.s3_region
-    return f"put/get/delete in bucket {settings.s3_bucket!r} ({where})"
+    return f"put/get/delete in {', '.join(repr(b) for b in buckets)} ({where})"
 
 
 def check_oidc(settings: Settings) -> str:
     url = f"{settings.oidc_issuer}/.well-known/openid-configuration"
-    with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response:  # scheme is http(s), checked in settings
+    with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response:  # noqa: S310  # http(s) only, checked in settings
         document = json.load(response)
     if str(document.get("issuer", "")).rstrip("/") != settings.oidc_issuer:
         raise RuntimeError("discovery document 'issuer' does not match OIDC_ISSUER")

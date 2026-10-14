@@ -215,9 +215,7 @@ def segments_from_result(result: list[Any]) -> list[dict[str, Any]]:
 def choose_annotation(task: dict[str, Any]) -> dict[str, Any] | None:
     """The completed annotation to use, or None if there is none. Refuses ambiguous choices."""
     annotations = task.get("annotations") or []
-    completed = [
-        a for a in annotations if isinstance(a, dict) and not a.get("was_cancelled") and a.get("result")
-    ]
+    completed = [a for a in annotations if isinstance(a, dict) and not a.get("was_cancelled") and a.get("result")]
     if not completed:
         return None
     ground_truth = [a for a in completed if a.get("ground_truth")]
@@ -396,9 +394,7 @@ def _write_json(path: Path, doc: dict[str, Any]) -> None:
         raise
 
 
-def export_tasks(
-    tasks: list[Any], out_dir: Path, exported_at: str, overwrite: bool = False
-) -> ExportReport:
+def export_tasks(tasks: list[Any], out_dir: Path, exported_at: str, overwrite: bool = False) -> ExportReport:
     report = ExportReport()
     converted: list[tuple[str, dict[str, Any]]] = []
     for task in tasks:

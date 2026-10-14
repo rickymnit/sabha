@@ -17,7 +17,7 @@ CONFIG = Path(__file__).resolve().parents[3] / "infra" / "annotation" / "transcr
 
 
 def _root() -> ET.Element:
-    return ET.parse(CONFIG).getroot()
+    return ET.parse(CONFIG).getroot()  # noqa: S314  # our own committed config file, not untrusted input
 
 
 def test_config_parses_with_view_root() -> None:

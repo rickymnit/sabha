@@ -1,0 +1,49 @@
+# Git hooks (plan task P1.1). Installed by `make setup`; run on everything with `uv run pre-commit run -a`.
+# Python and web tools run from the project's own pinned installs (uv / pnpm), so hooks and `make lint` agree.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-yaml
+        exclude: ^infra/annotation/docker-compose\.yml$  # uses Compose-only YAML features
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      - id: mypy
+        name: mypy (changed files)
+        entry: uv run mypy --config-file pyproject.toml --follow-imports=silent
+        language: system
+        types: [python]
+        exclude: (^|/)tests/  # test folders share the module name `tests`; `make lint` checks them per package
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd apps/web && pnpm exec eslint --max-warnings=0 "${@#apps/web/}"' --
+        language: system
+        files: ^apps/web/.*\.(ts|tsx|js)$
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd apps/web && pnpm exec prettier --write --ignore-unknown "${@#apps/web/}"' --
+        language: system
+        files: ^apps/web/
+      - id: detect-secrets
+        name: detect-secrets
+        entry: uv run detect-secrets-hook --baseline .secrets.baseline
+        language: system
+        exclude: (^|/)(uv\.lock|pnpm-lock\.yaml)$

@@ -204,10 +204,10 @@ def test_dry_run_prints_tasks(tmp_path: Path, audio_dir: Path, capsys: pytest.Ca
     assert "2 task(s) would be imported" in err
 
 
-def test_one_refused_row_aborts_everything(
-    tmp_path: Path, audio_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    manifest = write_manifest(tmp_path, GOOD_ROWS[0], "demo-3.wav,demo-school,teaching,english,classroom,", GOOD_ROWS[1])
+def test_one_refused_row_aborts_everything(tmp_path: Path, audio_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    manifest = write_manifest(
+        tmp_path, GOOD_ROWS[0], "demo-3.wav,demo-school,teaching,english,classroom,", GOOD_ROWS[1]
+    )
     code = import_tasks.main(["--manifest", str(manifest), "--audio-dir", str(audio_dir), "--dry-run"])
     out, err = capsys.readouterr()
     assert code == import_tasks.EXIT_REFUSED

@@ -18,9 +18,11 @@ VALID_ENV = {
     "APP_ENV": "local",
     "MONGO_URI": f"mongodb://sabha:{MONGO_PASSWORD}@localhost:27017/?replicaSet=rs0",
     "REDIS_URL": f"redis://:{REDIS_PASSWORD}@localhost:6379/0",
-    "S3_BUCKET": "sabha-local",
+    "S3_BUCKET_AUDIO": "sabha-audio",
+    "S3_BUCKET_ARTEFACTS": "sabha-artefacts",
+    "S3_BUCKET_BACKUPS": "sabha-backups",
     "S3_ENDPOINT_URL": "http://localhost:9000",
-    "S3_ACCESS_KEY_ID": "minio",
+    "S3_ACCESS_KEY_ID": "rustfs",
     "S3_SECRET_ACCESS_KEY": S3_SECRET,
     "OIDC_ISSUER": "https://auth.example.com/",
     "OIDC_AUDIENCE": "https://api.sabha.example.com",
@@ -62,7 +64,19 @@ def test_valid_environment_loads(env: pytest.MonkeyPatch) -> None:
     assert settings.mongo_uri.get_secret_value() == VALID_ENV["MONGO_URI"]
 
 
-@pytest.mark.parametrize("name", ["APP_ENV", "MONGO_URI", "REDIS_URL", "S3_BUCKET", "OIDC_ISSUER", "OIDC_AUDIENCE"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "APP_ENV",
+        "MONGO_URI",
+        "REDIS_URL",
+        "S3_BUCKET_AUDIO",
+        "S3_BUCKET_ARTEFACTS",
+        "S3_BUCKET_BACKUPS",
+        "OIDC_ISSUER",
+        "OIDC_AUDIENCE",
+    ],
+)
 def test_missing_required_value_fails_fast_and_names_it(env: pytest.MonkeyPatch, name: str) -> None:
     env.delenv(name)
 
@@ -157,7 +171,7 @@ def test_deployed_environments_must_stay_in_india(env: pytest.MonkeyPatch, app_e
         load()
 
 
-def test_minio_endpoint_is_refused_in_production(env: pytest.MonkeyPatch) -> None:
+def test_local_s3_endpoint_is_refused_in_production(env: pytest.MonkeyPatch) -> None:
     env.setenv("APP_ENV", "production")
 
     with pytest.raises(SettingsError, match="S3_ENDPOINT_URL"):

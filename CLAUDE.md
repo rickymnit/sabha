@@ -42,7 +42,7 @@ Read this file fully before any task. If a request conflicts with a rule below, 
 | API | FastAPI, Pydantic v2, Uvicorn; async MongoDB via `pymongo.AsyncMongoClient` (PyMongo 4.9+, not Motor) |
 | Workers | Celery 5 on Redis 7; sync `pymongo.MongoClient` inside tasks |
 | Database | MongoDB 7 replica set (transactions + change streams required, also in tests) |
-| Storage | S3 (`ap-south-1`) in staging/prod, MinIO locally; boto3 |
+| Storage | S3 (`ap-south-1`) in staging/prod, RustFS locally (see `docs/adr/0003-local-object-storage.md`); boto3 |
 | Audio | ffmpeg/ffprobe, Silero VAD, pyannote or NeMo Sortformer, ASR via `packages/asr` |
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
 | Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |
@@ -92,7 +92,7 @@ dictionary (`person`, `recording`, `unit`, ...). Never hard-code "Teacher" or "L
 ## Commands
 
 ```
-make dev          # docker compose up: mongo (replica set), redis, minio, api, workers, web
+make dev          # docker compose up: mongo (replica set), redis, rustfs, api, workers, web
 make test         # all Python tests (testcontainers) + web unit tests
 make lint         # ruff, mypy, eslint, tsc
 make e2e          # Playwright against the dev stack

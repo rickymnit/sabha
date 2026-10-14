@@ -99,7 +99,7 @@ def recording_id_from_audio(url_or_path: str) -> str:
 # ---------------------------------------------------------------------------------------------
 
 ENV_URL = "LABEL_STUDIO_URL"
-ENV_TOKEN = "LABEL_STUDIO_API_KEY"  # same name the official Label Studio SDK reads
+ENV_TOKEN = "LABEL_STUDIO_API_KEY"  # noqa: S105  # env var name, not a secret; the official SDK reads it too
 DEFAULT_URL = "http://localhost:8080"
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
@@ -151,6 +151,8 @@ class LabelStudioClient:
     """
 
     def __init__(self, base_url: str, token: str, timeout: float = 120.0) -> None:
+        if urllib.parse.urlsplit(base_url).scheme not in ("http", "https"):
+            raise LabelStudioError(f"Label Studio URL must use http or https, got {base_url!r}")
         self.base_url = base_url.rstrip("/")
         self._token = token
         self._timeout = timeout
@@ -173,15 +175,15 @@ class LabelStudioClient:
     def _raw(self, method: str, path: str, payload: Any = None, auth: str | None = None) -> Any:
         url = self.base_url + path
         data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(url, data=data, method=method)
+        request = urllib.request.Request(url, data=data, method=method)  # noqa: S310  # scheme checked in __init__
         request.add_header("Accept", "application/json")
         if data is not None:
             request.add_header("Content-Type", "application/json")
         if auth is not None:
             request.add_header("Authorization", auth)
         try:
-            # base_url was checked by check_base_url(): http(s) only, plain http only to this machine.
-            with urllib.request.urlopen(request, timeout=self._timeout) as response:
+            # http(s) only (checked in __init__); callers also run check_base_url() for the plain-http rule.
+            with urllib.request.urlopen(request, timeout=self._timeout) as response:  # noqa: S310
                 raw = response.read()
         except urllib.error.HTTPError as exc:
             detail = exc.read(500).decode("utf-8", "replace").strip()

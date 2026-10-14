@@ -91,13 +91,69 @@ const recordings: {
   score: number | null;
   uploaded: string;
 }[] = [
-  { title: "Class 8 Science: Photosynthesis", person: "Anjali Sharma, Main campus", type: "teaching", length: "52:14", status: "Analysed", score: 3.0, uploaded: "Today, 11:20" },
-  { title: "Admission enquiry for Grade 3", person: "Front desk, Main campus", type: "reception", length: "06:48", status: "Analysed", score: 4.2, uploaded: "Today, 10:05" },
-  { title: "Class 10 Maths: Quadratic equations", person: "Rohit Meena, Vaishali Nagar", type: "teaching", length: "47:02", status: "Transcribing", score: null, uploaded: "Today, 09:40" },
-  { title: "Fee concession follow-up", person: "Front desk, Mansarovar", type: "reception", length: "04:12", status: "Needs review", score: null, uploaded: "Today, 09:12" },
-  { title: "Parent meeting about attendance", person: "Neha Joshi, Counsellor", type: "counselling", length: "28:30", status: "Analysed", score: 3.9, uploaded: "Yesterday" },
-  { title: "Weekly academic council", person: "6 participants", type: "meeting", length: "41:55", status: "Analysing", score: null, uploaded: "Yesterday" },
-  { title: "ERP demo for a partner school", person: "Karan Singh, Sales", type: "sales", length: "33:10", status: "Analysed", score: 2.8, uploaded: "10 Oct" },
+  {
+    title: "Class 8 Science: Photosynthesis",
+    person: "Anjali Sharma, Main campus",
+    type: "teaching",
+    length: "52:14",
+    status: "Analysed",
+    score: 3.0,
+    uploaded: "Today, 11:20",
+  },
+  {
+    title: "Admission enquiry for Grade 3",
+    person: "Front desk, Main campus",
+    type: "reception",
+    length: "06:48",
+    status: "Analysed",
+    score: 4.2,
+    uploaded: "Today, 10:05",
+  },
+  {
+    title: "Class 10 Maths: Quadratic equations",
+    person: "Rohit Meena, Vaishali Nagar",
+    type: "teaching",
+    length: "47:02",
+    status: "Transcribing",
+    score: null,
+    uploaded: "Today, 09:40",
+  },
+  {
+    title: "Fee concession follow-up",
+    person: "Front desk, Mansarovar",
+    type: "reception",
+    length: "04:12",
+    status: "Needs review",
+    score: null,
+    uploaded: "Today, 09:12",
+  },
+  {
+    title: "Parent meeting about attendance",
+    person: "Neha Joshi, Counsellor",
+    type: "counselling",
+    length: "28:30",
+    status: "Analysed",
+    score: 3.9,
+    uploaded: "Yesterday",
+  },
+  {
+    title: "Weekly academic council",
+    person: "6 participants",
+    type: "meeting",
+    length: "41:55",
+    status: "Analysing",
+    score: null,
+    uploaded: "Yesterday",
+  },
+  {
+    title: "ERP demo for a partner school",
+    person: "Karan Singh, Sales",
+    type: "sales",
+    length: "33:10",
+    status: "Analysed",
+    score: 2.8,
+    uploaded: "10 Oct",
+  },
 ];
 const totalRecordings = 214;
 
@@ -108,7 +164,17 @@ const weakest: { name: string; score: number; note: string; tone: "danger" | "wa
   { name: "Resolution confirmed", score: 3.2, note: "Reception, 46 calls", tone: "warning" },
 ];
 
-function Icon({ children, size = 18, stroke = 1.7, className }: { children: ReactNode; size?: number; stroke?: number; className?: string }) {
+function Icon({
+  children,
+  size = 18,
+  stroke = 1.7,
+  className,
+}: {
+  children: ReactNode;
+  size?: number;
+  stroke?: number;
+  className?: string;
+}) {
   return (
     <svg
       aria-hidden="true"
@@ -176,9 +242,15 @@ const navItems: { label: string; icon: ReactNode; badge?: number; current?: bool
 
 function Sidebar() {
   return (
-    <nav aria-label="Main" className="flex max-w-full flex-[1_1_232px] flex-col gap-6 border-r border-line bg-surface px-3.5 py-5">
+    <nav
+      aria-label="Main"
+      className="flex max-w-full flex-[1_1_232px] flex-col gap-6 border-r border-line bg-surface px-3.5 py-5"
+    >
       <div className="flex items-center gap-2.5 px-2">
-        <div aria-hidden="true" className="flex h-[30px] w-[30px] items-center justify-center gap-0.5 rounded bg-primary">
+        <div
+          aria-hidden="true"
+          className="flex h-[30px] w-[30px] items-center justify-center gap-0.5 rounded bg-primary"
+        >
           <div className="h-2 w-[3px] rounded-xs bg-surface" />
           <div className="h-4 w-[3px] rounded-xs bg-surface" />
           <div className="h-[11px] w-[3px] rounded-xs bg-brand-accent" />
@@ -187,7 +259,10 @@ function Sidebar() {
         <div className="text-brand font-bold">Sabha</div>
       </div>
 
-      <button type="button" className="flex min-h-touch w-full items-center justify-between gap-2 rounded border border-line bg-surface-subtle px-2.5 py-2 text-left text-ink">
+      <button
+        type="button"
+        className="flex min-h-touch w-full items-center justify-between gap-2 rounded border border-line bg-surface-subtle px-2.5 py-2 text-left text-ink"
+      >
         <span className="flex flex-col">
           <span className="text-sm font-semibold">Greenfield Public School</span>
           <span className="text-caption text-muted-2">3 {labels.units}</span>
@@ -224,7 +299,11 @@ function Sidebar() {
       <div className="flex flex-col gap-0.5">
         <div className="px-2.5 pb-1.5 text-caption font-semibold text-muted-2">Conversation types</div>
         {conversationTypes.map((t) => (
-          <a key={t.key} href="#" className="flex min-h-9 items-center justify-between rounded px-2.5 text-ink-2 no-underline">
+          <a
+            key={t.key}
+            href="#"
+            className="flex min-h-9 items-center justify-between rounded px-2.5 text-ink-2 no-underline"
+          >
             <span className="flex items-center gap-2.5">
               <span className={`h-2 w-2 rounded-xs ${typeSwatch[t.key]}`} />
               {t.label}
@@ -234,7 +313,10 @@ function Sidebar() {
         ))}
       </div>
 
-      <a href="#" className="mt-auto flex flex-col gap-2 rounded-card border border-line-subtle p-3 text-ink no-underline">
+      <a
+        href="#"
+        className="mt-auto flex flex-col gap-2 rounded-card border border-line-subtle p-3 text-ink no-underline"
+      >
         <span className="flex justify-between gap-2 text-sm">
           <span className="font-semibold">Starter plan</span>
           <span className="font-semibold text-primary">Manage</span>
@@ -246,7 +328,10 @@ function Sidebar() {
       </a>
 
       <div className="flex items-center gap-2.5 border-t border-line-subtle p-2.5">
-        <div aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-tint-strong text-sm font-bold text-primary-hover">
+        <div
+          aria-hidden="true"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-tint-strong text-sm font-bold text-primary-hover"
+        >
           PK
         </div>
         <div className="flex flex-col">
@@ -279,14 +364,20 @@ function Header() {
             className="w-[220px] max-w-[46vw] border-0 bg-transparent text-ink placeholder:text-muted-2 focus-visible:outline-none"
           />
         </label>
-        <button type="button" className="flex min-h-touch items-center gap-2 rounded border border-line-input bg-surface px-3.5 text-ink">
+        <button
+          type="button"
+          className="flex min-h-touch items-center gap-2 rounded border border-line-input bg-surface px-3.5 text-ink"
+        >
           <Icon size={16} stroke={1.8}>
             <rect x="3" y="5" width="18" height="16" rx="2" />
             <path d="M3 10h18M8 3v4M16 3v4" />
           </Icon>
           Last 7 days
         </button>
-        <a href="#" className="flex min-h-touch items-center gap-2 rounded bg-primary px-4 font-semibold text-surface no-underline hover:bg-primary-hover">
+        <a
+          href="#"
+          className="flex min-h-touch items-center gap-2 rounded bg-primary px-4 font-semibold text-surface no-underline hover:bg-primary-hover"
+        >
           <Icon size={16} stroke={2}>
             <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />
           </Icon>
@@ -299,9 +390,15 @@ function Header() {
 
 function MetricStrip() {
   return (
-    <section aria-label="This week" className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] overflow-hidden rounded-panel border border-line bg-surface">
+    <section
+      aria-label="This week"
+      className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] overflow-hidden rounded-panel border border-line bg-surface"
+    >
       {metrics.map((m, i) => (
-        <div key={m.label} className={`flex flex-col gap-1.5 px-5 py-4.5 ${i < metrics.length - 1 ? "border-r border-line-subtle" : ""}`}>
+        <div
+          key={m.label}
+          className={`flex flex-col gap-1.5 px-5 py-4.5 ${i < metrics.length - 1 ? "border-r border-line-subtle" : ""}`}
+        >
           <span className="text-sm text-muted">{m.label}</span>
           <span className="text-metric font-semibold">{m.value}</span>
           <span className="text-small">{m.foot}</span>
@@ -313,7 +410,10 @@ function MetricStrip() {
 
 function ProcessingNow() {
   return (
-    <section aria-labelledby="queue-h" className="flex flex-col gap-3.5 rounded-panel border border-line bg-surface px-5 py-4.5">
+    <section
+      aria-labelledby="queue-h"
+      className="flex flex-col gap-3.5 rounded-panel border border-line bg-surface px-5 py-4.5"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="queue-h" className="text-lg font-semibold">
           Processing now
@@ -345,12 +445,19 @@ function RecentRecordings() {
   const th = "border-b border-line-subtle py-2.5 text-left font-medium";
 
   return (
-    <section aria-labelledby="rec-h" className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-panel border border-line bg-surface">
+    <section
+      aria-labelledby="rec-h"
+      className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-panel border border-line bg-surface"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-subtle px-5 py-4">
         <h2 id="rec-h" className="text-lg font-semibold">
           Recent {labels.recordings}
         </h2>
-        <div role="group" aria-label="Filter by type" className="flex flex-wrap gap-1 rounded-seg-outer bg-fill p-[3px]">
+        <div
+          role="group"
+          aria-label="Filter by type"
+          className="flex flex-wrap gap-1 rounded-seg-outer bg-fill p-[3px]"
+        >
           {filters.map((f) => {
             const pressed = filter === f.key;
             return (
@@ -372,12 +479,24 @@ function RecentRecordings() {
         <table className="w-full min-w-[820px] text-table">
           <thead>
             <tr className="text-small text-muted">
-              <th scope="col" className={`${th} px-5`}>Recording</th>
-              <th scope="col" className={`${th} px-3`}>Type</th>
-              <th scope="col" className={`${th} px-3`}>Length</th>
-              <th scope="col" className={`${th} px-3`}>Status</th>
-              <th scope="col" className={`${th} px-3 text-right`}>Score</th>
-              <th scope="col" className={`${th} pl-3 pr-5 text-right`}>Uploaded</th>
+              <th scope="col" className={`${th} px-5`}>
+                Recording
+              </th>
+              <th scope="col" className={`${th} px-3`}>
+                Type
+              </th>
+              <th scope="col" className={`${th} px-3`}>
+                Length
+              </th>
+              <th scope="col" className={`${th} px-3`}>
+                Status
+              </th>
+              <th scope="col" className={`${th} px-3 text-right`}>
+                Score
+              </th>
+              <th scope="col" className={`${th} pl-3 pr-5 text-right`}>
+                Uploaded
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -397,7 +516,9 @@ function RecentRecordings() {
                 </td>
                 <td className="border-b border-track p-3 text-ink-2">{r.length}</td>
                 <td className="border-b border-track p-3">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-[9px] py-[3px] text-small font-semibold ${statusChip[r.status]}`}>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-[9px] py-[3px] text-small font-semibold ${statusChip[r.status]}`}
+                  >
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
                     {r.status}
                   </span>
@@ -425,7 +546,10 @@ function RecentRecordings() {
 // Basis 340px matches 01-overview.png; Main.dc.html:202 says 300px but the screenshot renders about 341px wide.
 function CoachingFocus() {
   return (
-    <aside aria-labelledby="weak-h" className="flex min-w-0 flex-[1_1_340px] flex-col gap-4 rounded-panel border border-line bg-surface px-5 py-4.5">
+    <aside
+      aria-labelledby="weak-h"
+      className="flex min-w-0 flex-[1_1_340px] flex-col gap-4 rounded-panel border border-line bg-surface px-5 py-4.5"
+    >
       <div className="flex flex-col gap-1">
         <h2 id="weak-h" className="text-lg font-semibold">
           Where coaching helps most
@@ -439,7 +563,10 @@ function CoachingFocus() {
             <span className={w.tone === "danger" ? "text-danger" : "text-warning"}>{w.score.toFixed(1)}</span>
           </div>
           <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-track">
-            <div className={`h-1.5 rounded-full ${w.tone === "danger" ? "bg-danger" : "bg-warning"}`} style={{ width: `${(w.score / 5) * 100}%` }} />
+            <div
+              className={`h-1.5 rounded-full ${w.tone === "danger" ? "bg-danger" : "bg-warning"}`}
+              style={{ width: `${(w.score / 5) * 100}%` }}
+            />
           </div>
           <span className="text-small text-muted">{w.note}</span>
         </div>
