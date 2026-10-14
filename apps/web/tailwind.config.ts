@@ -100,6 +100,22 @@ export default {
       boxShadow: {
         seg: "0 0 0 1px #DDE2E0",
       },
+      // Motion is not in the designs; these are ours. Components apply them only under `motion-safe:`, so
+      // people who ask for reduced motion get none.
+      keyframes: {
+        shimmer: {
+          "0%": { backgroundPosition: "100% 0" },
+          "100%": { backgroundPosition: "-100% 0" },
+        },
+        "toast-in": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.6s ease-in-out infinite",
+        "toast-in": "toast-in 160ms ease-out",
+      },
     },
   },
   plugins: [],
