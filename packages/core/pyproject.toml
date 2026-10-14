@@ -1,0 +1,18 @@
+[project]
+name = "sabha-core"
+version = "0.0.0"
+description = "Shared foundation for Sabha: settings, tenant-scoped repository, models, state machine, storage."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "pydantic>=2.11",
+  "pydantic-settings>=2.10",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Flat layout (packages/core/sabha_core), as CLAUDE.md names the paths.
+module-name = "sabha_core"
+module-root = ""

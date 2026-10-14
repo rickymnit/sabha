@@ -1,0 +1,29 @@
+# Root of the uv workspace. P0.5 adds only packages/core; P1.1 adds the other packages and apps.
+[project]
+name = "sabha"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+# Root-level dependencies are for scripts/ only (scripts/check_env.py talks to every backing service).
+dependencies = [
+  "sabha-core",
+  "boto3>=1.35",
+  "pymongo>=4.9",
+  "redis>=5.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/core"]
+
+[tool.uv.sources]
+sabha-core = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["packages/core/tests"]

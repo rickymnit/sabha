@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Page defaults and focus ring from docs/design/tokens.md. */
+@layer base {
+  body {
+    @apply m-0 bg-page font-sans text-base text-ink;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* :where() keeps specificity at zero so utility classes on a link always win. */
+  :where(a) {
+    @apply text-primary underline;
+  }
+
+  :where(a):hover {
+    @apply text-primary-hover;
+  }
+
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-primary;
+  }
+}

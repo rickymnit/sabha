@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sabha gold transcript",
+  "description": "One human-annotated recording, written by eval/goldset/export_gold.py to eval/goldset/gold/<recording_id>.json. Two rules JSON Schema cannot express are enforced by export_gold.check_transcript: every segment has start_ms < end_ms, and segments are sorted by (start_ms, end_ms, speaker_role). Segments of different speakers may overlap in time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recording_id", "tenant", "type", "language_mix", "consent_ref", "source", "segments"],
+  "properties": {
+    "recording_id": {
+      "description": "Audio file name without its extension.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$"
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"
+    },
+    "type": {
+      "enum": ["teaching", "reception"]
+    },
+    "language_mix": {
+      "enum": ["english", "hindi", "hinglish"]
+    },
+    "consent_ref": {
+      "description": "Reference to the consent record for this recording. Never empty.",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annotator", "annotation_id", "exported_at"],
+      "properties": {
+        "annotator": {
+          "description": "Label Studio user id of the annotator as 'ls-user-<id>' (no names or emails).",
+          "type": "string",
+          "pattern": "^ls-user-[0-9]+$"
+        },
+        "annotation_id": {
+          "description": "Label Studio annotation id the segments came from.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "exported_at": {
+          "description": "When export_gold.py wrote this file, UTC, ISO 8601.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+        }
+      }
+    },
+    "segments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/segment" }
+    }
+  },
+  "$defs": {
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speaker_role", "start_ms", "end_ms", "text"],
+      "properties": {
+        "speaker_role": {
+          "enum": ["teacher", "students", "receptionist", "caller", "other", "silence"]
+        },
+        "start_ms": {
+          "description": "Start on the original recording timeline, integer milliseconds.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_ms": {
+          "description": "End on the original recording timeline, integer milliseconds; greater than start_ms.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "text": {
+          "description": "Verbatim transcript (docs/annotation-guidelines.md). Empty for silence and only for silence.",
+          "type": "string"
+        }
+      },
+      "if": {
+        "properties": { "speaker_role": { "const": "silence" } }
+      },
+      "then": {
+        "properties": { "text": { "const": "" } }
+      },
+      "else": {
+        "properties": { "text": { "pattern": "\\S" } }
+      }
+    }
+  }
+}

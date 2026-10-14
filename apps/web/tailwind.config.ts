@@ -1,0 +1,106 @@
+import type { Config } from "tailwindcss";
+
+// Every value here comes from docs/design/tokens.md. Colours, font sizes and radii replace Tailwind's
+// defaults (not extend them) so only design tokens are available.
+export default {
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  theme: {
+    colors: {
+      transparent: "transparent",
+      current: "currentColor",
+      inherit: "inherit",
+      ink: { DEFAULT: "#17211D", 2: "#33403B" },
+      muted: { DEFAULT: "#4A5752", 2: "#5C6863" },
+      subtle: "#6B7772",
+      line: {
+        DEFAULT: "#DDE2E0",
+        strong: "#A9B4AF",
+        input: "#CFD6D3",
+        subtle: "#E6EAE8",
+      },
+      track: "#EEF1F0",
+      fill: { DEFAULT: "#F1F3F2", 2: "#E9ECEB" },
+      surface: { DEFAULT: "#FFFFFF", subtle: "#F8F9F8", faint: "#FAFBFA" },
+      page: "#F3F5F4",
+      primary: {
+        DEFAULT: "#2546B8",
+        hover: "#1A3490",
+        tint: "#E8EDFB",
+        "tint-subtle": "#F3F6FD",
+        "tint-strong": "#DCE3F7",
+        border: "#B9C6EE",
+        disabled: "#C9D2EE",
+        "disabled-ink": "#33407A",
+        chart: "#3A57C4",
+      },
+      "brand-accent": "#F2B35B",
+      success: { DEFAULT: "#1E6B4B", bar: "#2E8B62", tint: "#E3F2EA" },
+      warning: {
+        DEFAULT: "#8A5200",
+        ink: "#7A4300",
+        tint: "#FDEBD3",
+        "tint-subtle": "#FDF1DE",
+        surface: "#FEF6EC",
+        border: "#F7DDB8",
+      },
+      danger: { DEFAULT: "#B42318", bar: "#C8372B", tint: "#FBE9E7" },
+      type: {
+        teaching: "#2546B8",
+        reception: "#D9831F",
+        counselling: "#1E7A55",
+        meeting: "#7A4DB8",
+        sales: "#0F7C8C",
+      },
+      speaker: { students: "#E39A3B" },
+    },
+    fontFamily: {
+      sans: ["'Instrument Sans'", "'Segoe UI'", "system-ui", "sans-serif"],
+    },
+    fontSize: {
+      "2xs": "11px",
+      xs: "11.5px",
+      caption: "12px",
+      small: "12.5px",
+      sm: "13px",
+      table: "13.5px",
+      base: ["14px", { lineHeight: "1.45" }],
+      md: "15px",
+      lg: "16px",
+      brand: ["17px", { letterSpacing: "-0.01em" }],
+      xl: "18px",
+      "2xl": "20px",
+      "3xl": ["24px", { letterSpacing: "-0.015em" }],
+      title: ["26px", { lineHeight: "1.2", letterSpacing: "-0.015em" }],
+      metric: ["28px", { letterSpacing: "-0.02em" }],
+      hero: ["44px", { lineHeight: "1", letterSpacing: "-0.03em" }],
+    },
+    borderRadius: {
+      none: "0",
+      xs: "2px",
+      sm: "3px",
+      md: "6px",
+      seg: "7px",
+      DEFAULT: "8px",
+      "seg-outer": "9px",
+      card: "10px",
+      panel: "12px",
+      full: "999px",
+    },
+    extend: {
+      spacing: {
+        "4.5": "18px",
+        sidebar: "232px",
+      },
+      minHeight: {
+        touch: "44px",
+      },
+      minWidth: {
+        touch: "44px",
+      },
+      boxShadow: {
+        seg: "0 0 0 1px #DDE2E0",
+      },
+    },
+  },
+  plugins: [],
+} satisfies Config;
