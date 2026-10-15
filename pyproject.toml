@@ -26,9 +26,11 @@ dev = [
   "pre-commit>=4.6",
   "pytest>=8.3",
   "pytest-cov>=7.1",
+  "pyyaml>=6.0",  # eval/ reads targets.yaml (was only present via pre-commit)
   "ruff==0.16.9",
   "testcontainers>=4.15",  # MongoDB replica set, Redis and S3 in integration tests (CLAUDE.md)
   "types-jsonschema>=4.26",
+  "types-pyyaml>=6.0",
 ]
 
 [tool.uv]
@@ -60,6 +62,7 @@ testpaths = [
   "packages/analytics/tests",
   "apps/api/tests",
   "apps/workers/tests",
+  "eval/tests",
   "eval/goldset/tests",
 ]
 # importlib mode: test files in different packages may share a name without colliding.
@@ -78,6 +81,8 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "S105", "S106"]  # asserts and fake credentials are expected in tests
+# Lists Devanagari signs and apostrophe variants on purpose: it exists to normalise them.
+"eval/textnorm.py" = ["RUF001", "RUF002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["sabha_core", "sabha_asr", "sabha_llm", "sabha_analytics", "sabha_api", "sabha_workers"]

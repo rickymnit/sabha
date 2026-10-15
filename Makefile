@@ -58,6 +58,7 @@ lint-py: ## ruff and mypy
 	$(UV) run ruff format --check
 	@set -e; for p in $(PY_STRICT); do echo "mypy --strict $$p"; (cd $$p && $(MYPY) --strict .); done
 	@set -e; for p in $(PY_APPS); do echo "mypy $$p"; (cd $$p && $(MYPY) .); done
+	@echo "mypy --strict eval"; cd eval && MYPYPATH=goldset $(MYPY) --strict *.py tests
 
 lint-web: ## eslint, prettier and tsc
 	$(PNPM) -C apps/web lint
@@ -72,8 +73,11 @@ fmt: ## Fix formatting and autofixable lint
 e2e: ## Playwright against the dev stack
 	@echo "e2e: not implemented yet (P6.2)"
 
-eval-wer: ## eval/wer.py on the frozen gold set
-	@echo "eval-wer: not implemented yet (P4.3)"
+eval-wer: ## WER and role accuracy on the hold-out set: make eval-wer HYP_DIR=<dir of transcript@v1 files>
+	@test -n "$(HYP_DIR)" || { echo "set HYP_DIR to a folder of system transcripts (<recording_id>.json)"; exit 2; }
+	$(UV) run python eval/wer.py --hyp-dir $(HYP_DIR); wer=$$?; \
+	$(UV) run python eval/roles.py --hyp-dir $(HYP_DIR); roles=$$?; \
+	exit $$(( wer > roles ? wer : roles ))
 
 eval-kappa: ## eval/kappa.py on the calibration hold-out split
 	@echo "eval-kappa: not implemented yet (P4.6)"

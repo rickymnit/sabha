@@ -1,0 +1,25 @@
+# Gate targets. Every value is left null on purpose: a person sets them from measured evidence
+# (eval/baselines/lis-baselines.md, plan task P0.7) — never estimate or copy a number from elsewhere (golden rule 6).
+# A null target is reported as "target not set" and can never show as met.
+
+gate1:
+  # Maximum word error rate on the frozen hold-out, as a fraction (0.25 = 25%), per language mix and overall.
+  wer_raw_max:
+    overall: null
+    english: null
+    hindi: null
+    hinglish: null
+  # Same, after the documented transliteration in eval/textnorm.py.
+  wer_transliterated_max:
+    overall: null
+    english: null
+    hindi: null
+    hinglish: null
+  # Minimum share of reference speech time attributed to the correct role (eval/roles.py).
+  role_accuracy_min: null
+  # Maximum role-level diarization error rate (eval/roles.py).
+  der_max: null
+
+goldset:
+  # Minimum hold-out hours before eval/goldset/freeze.py will freeze (plan: 15-20 hours).
+  holdout_hours_min: null
