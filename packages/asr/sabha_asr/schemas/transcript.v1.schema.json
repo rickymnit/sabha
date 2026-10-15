@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sabha transcript@v1",
+  "description": "The canonical transcript of one recording, saved by the transcribe stage (P3.7) as transcript@v1.json. Every time is on the ORIGINAL recording timeline (golden rule 4). Rules JSON Schema cannot express are enforced by sabha_asr.assembly.validate_transcript: every utterance has start_ms < end_ms; utterances are sorted by start_ms; each low-confidence span has start < end <= len(text) and spans are sorted and do not overlap.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "timeline", "asr_model", "word_count", "utterances"],
+  "properties": {
+    "version": {
+      "const": "transcript@v1"
+    },
+    "timeline": {
+      "description": "Which timeline the times are on. Always the original recording, never compact audio.",
+      "const": "original"
+    },
+    "asr_model": {
+      "description": "Model id and version of the ASR that produced the words, as recorded in asr@v1.json.",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "word_count": {
+      "description": "Number of ASR words in the transcript.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "utterances": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/utterance" }
+    }
+  },
+  "$defs": {
+    "utterance": {
+      "description": "Consecutive words of one speaker, not spanning a removed silence of split_silence_ms or more.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "speaker_label",
+        "start_ms",
+        "end_ms",
+        "text",
+        "avg_confidence",
+        "low_confidence_spans"
+      ],
+      "properties": {
+        "role": {
+          "description": "Role from roles@v1.json, named by the rubric (for example teacher, students, receptionist, caller). Students are a group role.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "speaker_label": {
+          "description": "The diarizer's anonymous cluster id. Not a person's identity.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "start_ms": {
+          "description": "Start of the first word, original timeline, integer milliseconds.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_ms": {
+          "description": "End of the last word, original timeline, integer milliseconds; after start_ms.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "text": {
+          "description": "The words joined by single spaces.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "avg_confidence": {
+          "description": "Mean ASR word confidence, rounded to 4 decimals.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "low_confidence_spans": {
+          "description": "Half-open [start, end) character ranges of text covering runs of consecutive words whose confidence is below the threshold. Indices count Unicode code points.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}
