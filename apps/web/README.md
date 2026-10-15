@@ -1,6 +1,6 @@
 # apps/web
 
-The React 18 + TypeScript + Vite single-page app used by school staff and admins. Design tokens and shared components live in `src/design/`; Tailwind is configured from `docs/design/tokens.md`. UI words come from the tenant's `labels` dictionary, never hard-coded, and times are shown in Asia/Kolkata. The overview design spike is in `src/spike/`, and the component demo is at `/dev/components` (dev server only). Run it with `pnpm -C apps/web dev`.
+The React 18 + TypeScript + Vite single-page app used by school staff and admins. Design tokens and shared components live in `src/design/`; Tailwind is configured from `docs/design/tokens.md`. UI words come from the tenant's `labels` dictionary, never hard-coded, and times are shown in Asia/Kolkata. The overview design spike is in `src/spike/`, the component demo is at `/dev/components` and the transcript player demo (P6.5, mock data and synthesised audio) at `/dev/transcript` (dev server only). The transcript view lives in `src/features/transcript/`; its types mirror `packages/asr/sabha_asr/schemas/transcript.v1.schema.json`. Run it with `pnpm -C apps/web dev`.
 
 ## Audit exceptions
 

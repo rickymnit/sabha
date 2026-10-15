@@ -14,10 +14,13 @@ if (!container) throw new Error("#root element missing from index.html");
 const root = createRoot(container);
 const render = (page: ReactNode) => root.render(<StrictMode>{page}</StrictMode>);
 
-// The component demo is dev only. In production builds `import.meta.env.DEV` is the constant false, so this
-// branch and its dynamic import are removed and the demo is never bundled. React Router replaces this in P6.2.
+// The demos (/dev/components, /dev/transcript) are dev only. In production builds `import.meta.env.DEV` is the
+// constant false, so these branches and their dynamic imports are removed and the demos are never bundled.
+// React Router replaces this in P6.2.
 if (import.meta.env.DEV && location.pathname === "/dev/components") {
   void import("./dev/ComponentsDemo").then(({ default: ComponentsDemo }) => render(<ComponentsDemo />));
+} else if (import.meta.env.DEV && location.pathname === "/dev/transcript") {
+  void import("./dev/TranscriptDemo").then(({ default: TranscriptDemo }) => render(<TranscriptDemo />));
 } else {
   render(<OverviewSpike />);
 }
