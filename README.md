@@ -115,7 +115,7 @@ Stop the services with `make down`. Data volumes are kept.
 
 Python 3.12 (uv workspaces, ruff, mypy), FastAPI with Pydantic v2, Celery 5 on Redis 7, MongoDB 7 (PyMongo's async
 client in the API, the sync client in workers), S3 via boto3, ffmpeg, Silero VAD, pyannote or NeMo Sortformer,
-Presidio, Langfuse, React 18 with Vite, Tailwind and TanStack Query, and OIDC for identity. Infrastructure uses Docker
+PII redaction in `packages/llm` (regular expressions; Presidio was considered, see P5.2), Langfuse, React 18 with Vite, Tailwind and TanStack Query, and OIDC for identity. Infrastructure uses Docker
 Compose, Terraform and GitHub Actions. Reasons for each choice are in
 [ADR 0001](docs/adr/0001-repo-and-stack.md).
 
