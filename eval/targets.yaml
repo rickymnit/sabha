@@ -23,3 +23,8 @@ gate1:
 goldset:
   # Minimum hold-out hours before eval/goldset/freeze.py will freeze (plan: 15-20 hours).
   holdout_hours_min: null
+
+raters:
+  # Minimum mean quadratic-weighted kappa per dimension among human raters on the practice set before they start
+  # the calibration set (eval/raters/practice_agreement.py). Set by the person running calibration.
+  practice_kappa_min: null

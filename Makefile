@@ -6,7 +6,7 @@ SHELL := /bin/bash
 UV ?= $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
 PNPM ?= pnpm
 COMPOSE := docker compose --env-file .env -f infra/docker-compose.dev.yml -p sabha-dev
-PY_STRICT := packages/core packages/asr packages/llm packages/analytics eval/goldset
+PY_STRICT := packages/core packages/asr packages/llm packages/analytics eval/goldset eval/raters
 PY_APPS := apps/api apps/workers scripts
 MYPY := $(UV) run mypy --config-file $(CURDIR)/pyproject.toml
 

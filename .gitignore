@@ -25,3 +25,7 @@ infra/annotation/.env
 coverage.xml
 htmlcov/
 requirements-audit.txt
+
+# Rater kit (P4.4): filled sheets and imported scores are about real staff.
+eval/raters/sheets/
+eval/raters/scores/
