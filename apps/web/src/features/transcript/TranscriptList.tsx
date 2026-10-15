@@ -30,6 +30,11 @@ export interface TranscriptListProps {
   onSeek: (ms: number) => void;
   /** Accessible name of the list of lines. */
   label?: string;
+  /**
+   * Lines to mark as evidence (the report's selected dimension), as line index → 1-based evidence numbers. Marked
+   * lines get the design's evidence highlight and a numbered badge matching the timeline pins.
+   */
+  highlights?: ReadonlyMap<number, readonly number[]>;
   /** Height of the scrolling area (any CSS length). Default min(70vh, 640px). */
   height?: string;
   className?: string;
@@ -59,6 +64,7 @@ export function TranscriptList({
   currentMs,
   onSeek,
   label = "Transcript lines",
+  highlights,
   height = "min(70vh, 640px)",
   className,
 }: TranscriptListProps) {
@@ -314,6 +320,7 @@ export function TranscriptList({
                   utterance={utterance}
                   roleInfo={roles[utterance.role]}
                   current={item.index === currentIndex}
+                  evidence={highlights?.get(item.index)}
                   tabbable={item.index === tabLine}
                   wideTime={hasHours}
                   matches={matchesByLine.get(item.index)}
@@ -335,6 +342,8 @@ interface LineProps {
   utterance: Utterance;
   roleInfo: RoleLabels[string] | undefined;
   current: boolean;
+  /** Evidence numbers when the line is quoted as evidence. */
+  evidence: readonly number[] | undefined;
   tabbable: boolean;
   wideTime: boolean;
   matches: LineMatch[] | undefined;
@@ -348,6 +357,7 @@ const Line = memo(function Line({
   utterance,
   roleInfo,
   current,
+  evidence,
   tabbable,
   wideTime,
   matches,
@@ -365,13 +375,16 @@ const Line = memo(function Line({
       tabIndex={tabbable ? 0 : -1}
       aria-current={current ? "true" : undefined}
       data-line={index}
+      data-evidence={evidence ? evidence.join(" ") : undefined}
       onClick={() => onActivate(index)}
       onKeyDown={(e) => onKeyDown(index, e)}
       className={cx(
         // Current line: Analysis.dc.html:255 (warning-surface background, 3px reception-amber bar).
         // On narrow screens the text wraps under the time and role instead of squeezing beside them.
         "flex cursor-pointer flex-wrap gap-x-4 gap-y-0.5 border-l-[3px] px-5 py-2.5 focus-visible:outline-offset-[-2px] sm:flex-nowrap",
-        current ? "border-type-reception bg-warning-surface" : "border-transparent hover:bg-surface-subtle",
+        // Evidence lines take the same highlight as the design's evidence line, plus a numbered badge.
+        current ? "border-type-reception bg-warning-surface" : "border-transparent",
+        evidence ? "bg-warning-surface" : !current && "hover:bg-surface-subtle",
       )}
     >
       <span className={cx("shrink-0 pt-px text-small text-muted", wideTime ? "w-14" : "w-11")}>
@@ -382,6 +395,19 @@ const Line = memo(function Line({
         {roleInfo?.label ?? utterance.speaker_label}
       </span>
       <span className="min-w-0 max-w-[80ch] basis-full text-ink sm:flex-1 sm:basis-0">
+        {evidence && (
+          <span className="mr-2 inline-flex gap-1 align-[1px]">
+            {evidence.map((n) => (
+              <span
+                key={n}
+                className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-2xs font-bold text-surface"
+              >
+                <span className="sr-only">Evidence </span>
+                {n}
+              </span>
+            ))}
+          </span>
+        )}
         {segments.map((segment, i) => {
           let node: ReactNode = segment.text;
           if (segment.lowConfidence) {

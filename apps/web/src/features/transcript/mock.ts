@@ -10,6 +10,11 @@ export interface MockTranscriptOptions {
   /** Generate exactly this many lines (wins over durationMs). */
   lines?: number;
   seed?: number;
+  /**
+   * Keep to one subject for the whole recording: 0 photosynthesis, 1 fractions, 2 water cycle, 3 tenses. By default
+   * the subject is picked from the seed and changes every 40 minutes.
+   */
+  topic?: number;
 }
 
 /** Small, fast, seedable PRNG (mulberry32). */
@@ -128,8 +133,10 @@ export function generateMockTranscript(options: MockTranscriptOptions = {}): Tra
 
   const utterances: Utterance[] = [];
   let clock = 2_000 + Math.floor(rand() * 4_000);
-  let topicIndex = Math.floor(rand() * TOPICS.length);
-  let topicChangeAt = 40 * 60_000;
+  // Always draw the random subject, so the rest of the sequence (and the default output for a seed) is unchanged.
+  const randomTopic = Math.floor(rand() * TOPICS.length);
+  let topicIndex = options.topic === undefined ? randomTopic : options.topic % TOPICS.length;
+  let topicChangeAt = options.topic === undefined ? 40 * 60_000 : Infinity;
 
   const push = (role: "teacher" | "students", text: string) => {
     const words = text.split(/\s+/).length;
