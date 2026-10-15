@@ -3,7 +3,16 @@ name = "sabha-analytics"
 version = "0.0.0"
 description = "Rubric loading, computed metrics, scoring, grounding and synthesis."
 requires-python = ">=3.12,<3.13"
-dependencies = ["sabha-core", "sabha-llm"]
+dependencies = [
+  "sabha-core",
+  "sabha-asr",  # transcript@v1 types (P3.7) that metrics and grounding read
+  "sabha-llm",
+  "pyyaml>=6.0",  # rubric files (P5.4)
+  "rapidfuzz>=3.14.6",  # fuzzy quote matching in the grounding verifier (P5.6); C++ speed for long transcripts
+]
+
+[project.scripts]
+sabha-rubric = "sabha_analytics.cli:main"  # validate | diff | publish (P5.4)
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]

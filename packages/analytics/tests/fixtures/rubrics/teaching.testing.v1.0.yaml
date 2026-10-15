@@ -1,0 +1,42 @@
+# Test fixture only: a small, valid rubric used by test_rubric.py. Not a real rubric; the wording is fictional.
+id: teaching.testing.v1.0
+segment: testing
+version: "1.0"
+roles: [teacher, students]
+
+dimensions:
+  - key: concept_clarity
+    name: Concept clarity
+    weight: 0.6
+    definition: "The teacher states the main idea and defines key terms."
+    min_quotes: 2
+    anchors:
+      1: "No main idea is stated."
+      2: "The topic is named but terms are not defined."
+      3: "The main idea is stated and most terms are defined."
+      4: "The main idea is stated and every key term is defined."
+      5: "The main idea is stated first, every term is defined and it is re-explained when asked."
+    examples:
+      1: "Chalo next."
+      5: "Aaj ka main idea yeh hai, pehle term samjho."
+
+  - key: recap_and_closure
+    name: Recap and closure
+    weight: 0.4
+    definition: "The teacher restates the key points at the end."
+    min_quotes: 1
+    anchors:
+      1: "The lesson stops without a summary."
+      2: "Only homework is given."
+      3: "The teacher lists what was covered."
+      4: "The teacher restates the key points."
+      5: "Students state the key points and the teacher completes them."
+    examples:
+      1: "Bell baj gayi, bas."
+      5: "Aaj ke do main points batao."
+
+computed_metrics: [teacher_talk_share, teacher_question_count, open_question_ratio]
+
+output: [summary, strengths, gaps, suggestions]
+
+visibility_gate: {metric: cohens_kappa, min: 0.60}

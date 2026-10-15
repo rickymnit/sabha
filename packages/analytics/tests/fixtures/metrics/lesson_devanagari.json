@@ -1,0 +1,87 @@
+{
+  "description": "Fictional test content: every name, school, amount and line is made up. A fractions lesson in Devanagari and Hinglish; questions with and without a question mark.",
+  "primary_role": "teacher",
+  "roles": [
+    "teacher",
+    "students"
+  ],
+  "total_ms": 50000,
+  "segments": [
+    {
+      "orig_start_ms": 0,
+      "orig_end_ms": 45300,
+      "compact_start_ms": 0
+    }
+  ],
+  "transcript": {
+    "version": "transcript@v1",
+    "timeline": "original",
+    "asr_model": "fixture/none",
+    "word_count": 67,
+    "utterances": [
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 0,
+        "end_ms": 8000,
+        "text": "आज हम fractions पढ़ेंगे। एक pizza के 8 slices हैं, तो एक slice कितना हुआ?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 8500,
+        "end_ms": 10000,
+        "text": "one by eight",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 10500,
+        "end_ms": 20000,
+        "text": "सही। अब बताओ यह क्यों one by eight है। समझ आया",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 20500,
+        "end_ms": 23000,
+        "text": "क्योंकि आठ बराबर टुकड़े हैं",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 23500,
+        "end_ms": 33000,
+        "text": "बहुत अच्छा। Fractions को number line पर कैसे दिखाएंगे? कौन board पर आएगा",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_02",
+        "start_ms": 33500,
+        "end_ms": 36000,
+        "text": "क्या हम copy में लिखें?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 36500,
+        "end_ms": 45000,
+        "text": "हाँ, copy में लिखो। Kal hum unlike fractions karenge, kya hoga agar denominators alag hon",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      }
+    ]
+  }
+}

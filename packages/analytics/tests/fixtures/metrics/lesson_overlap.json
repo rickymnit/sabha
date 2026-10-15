@@ -1,0 +1,69 @@
+{
+  "description": "Fictional test content: every name, school, amount and line is made up. Students answer while the teacher is still speaking; checks how overlapping speech is counted.",
+  "primary_role": "teacher",
+  "roles": [
+    "teacher",
+    "students"
+  ],
+  "total_ms": 25000,
+  "segments": [
+    {
+      "orig_start_ms": 0,
+      "orig_end_ms": 21300,
+      "compact_start_ms": 0
+    }
+  ],
+  "transcript": {
+    "version": "transcript@v1",
+    "timeline": "original",
+    "asr_model": "fixture/none",
+    "word_count": 29,
+    "utterances": [
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 0,
+        "end_ms": 10000,
+        "text": "Today we will learn photosynthesis. Why do plants need sunlight?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 6000,
+        "end_ms": 8000,
+        "text": "haan haan",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_02",
+        "start_ms": 9000,
+        "end_ms": 12000,
+        "text": "for food ma'am",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 11000,
+        "end_ms": 20000,
+        "text": "Right, plants make food from sunlight. How many leaves does this plant have?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 19000,
+        "end_ms": 21000,
+        "text": "five",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      }
+    ]
+  }
+}

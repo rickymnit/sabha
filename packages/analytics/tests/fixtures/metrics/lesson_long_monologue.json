@@ -1,0 +1,93 @@
+{
+  "description": "Fictional test content: every name, school, amount and line is made up. A long explanation split by short pauses, then a long pause; checks the longest teacher turn.",
+  "primary_role": "teacher",
+  "roles": [
+    "teacher",
+    "students"
+  ],
+  "total_ms": 60000,
+  "segments": [
+    {
+      "orig_start_ms": 0,
+      "orig_end_ms": 12300,
+      "compact_start_ms": 0
+    },
+    {
+      "orig_start_ms": 14300,
+      "orig_end_ms": 30300,
+      "compact_start_ms": 12300
+    },
+    {
+      "orig_start_ms": 32800,
+      "orig_end_ms": 40300,
+      "compact_start_ms": 28300
+    },
+    {
+      "orig_start_ms": 47000,
+      "orig_end_ms": 55300,
+      "compact_start_ms": 35800
+    }
+  ],
+  "transcript": {
+    "version": "transcript@v1",
+    "timeline": "original",
+    "asr_model": "fixture/none",
+    "word_count": 46,
+    "utterances": [
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 0,
+        "end_ms": 12000,
+        "text": "Aaj hum water cycle padhenge. Pehle evaporation, phir condensation, phir precipitation.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 14300,
+        "end_ms": 30000,
+        "text": "Evaporation matlab paani garam hokar bhaap banta hai. Yeh samudra aur nadiyon se hota hai.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 32800,
+        "end_ms": 40000,
+        "text": "Phir bhaap upar jaakar thandi hoti hai aur baadal bante hain.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 47000,
+        "end_ms": 50000,
+        "text": "Ab ek sawaal.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "students",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 50500,
+        "end_ms": 52000,
+        "text": "ji ma'am",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 52500,
+        "end_ms": 55000,
+        "text": "Baadal kaise bante hain",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      }
+    ]
+  }
+}

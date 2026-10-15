@@ -1,0 +1,60 @@
+{
+  "description": "Fictional test content: every name, school, amount and line is made up. A dictation with no questions, words that only look like markers, and no student speech.",
+  "primary_role": "teacher",
+  "roles": [
+    "teacher",
+    "students"
+  ],
+  "total_ms": 30000,
+  "segments": [
+    {
+      "orig_start_ms": 800,
+      "orig_end_ms": 26300,
+      "compact_start_ms": 0
+    }
+  ],
+  "transcript": {
+    "version": "transcript@v1",
+    "timeline": "original",
+    "asr_model": "fixture/none",
+    "word_count": 38,
+    "utterances": [
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 1000,
+        "end_ms": 9000,
+        "text": "Aaj hum ek kahani likhenge. Kabhi kabhi kahani chhoti hoti hai.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 9500,
+        "end_ms": 17000,
+        "text": "Page ke right side mein date likho. This is how we write a letter.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 17500,
+        "end_ms": 22000,
+        "text": "Kya baat hai! Sabne kyaari wala chapter padh liya.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "teacher",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 22500,
+        "end_ms": 26000,
+        "text": "Homework bhool na jaana.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      }
+    ]
+  }
+}

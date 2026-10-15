@@ -1,0 +1,97 @@
+{
+  "description": "Fictional test content: every name, school, amount and line is made up. A front-desk admission enquiry with a hold; checks receptionist/caller metrics and long silences.",
+  "primary_role": "receptionist",
+  "roles": [
+    "receptionist",
+    "caller"
+  ],
+  "total_ms": 60000,
+  "segments": [
+    {
+      "orig_start_ms": 800,
+      "orig_end_ms": 17300,
+      "compact_start_ms": 0
+    },
+    {
+      "orig_start_ms": 26000,
+      "orig_end_ms": 40300,
+      "compact_start_ms": 16500
+    },
+    {
+      "orig_start_ms": 47000,
+      "orig_end_ms": 58300,
+      "compact_start_ms": 30800
+    }
+  ],
+  "transcript": {
+    "version": "transcript@v1",
+    "timeline": "original",
+    "asr_model": "fixture/none",
+    "word_count": 97,
+    "utterances": [
+      {
+        "role": "receptionist",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 1000,
+        "end_ms": 6000,
+        "text": "Good morning, Sabha Demo School, main Neha bol rahi hoon. Bataiye ji, main aapki kya help kar sakti hoon?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "caller",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 6500,
+        "end_ms": 11000,
+        "text": "Namaste. Mujhe Class 3 ke admission ke baare mein poochna tha. Form kab milega?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "receptionist",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 11500,
+        "end_ms": 17000,
+        "text": "Form office se kal subah 9 baje se milega. Aapka bachcha abhi kis class mein hai?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "caller",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 26000,
+        "end_ms": 29000,
+        "text": "Haan ji, Class 2 mein hai abhi.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "receptionist",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 29500,
+        "end_ms": 40000,
+        "text": "Theek hai. Class 3 ki admission fee 5,000 rupaye hai aur form ke saath birth certificate chahiye. Aur kuch poochna hai aapko?",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "caller",
+        "speaker_label": "SPEAKER_01",
+        "start_ms": 47000,
+        "end_ms": 50000,
+        "text": "Nahi, bas itna hi. Dhanyavaad.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      },
+      {
+        "role": "receptionist",
+        "speaker_label": "SPEAKER_00",
+        "start_ms": 50500,
+        "end_ms": 58000,
+        "text": "Dhanyavaad ji. Form lene aaiye toh birth certificate saath laiyega. Aapka din shubh ho.",
+        "avg_confidence": 0.9,
+        "low_confidence_spans": []
+      }
+    ]
+  }
+}
