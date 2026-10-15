@@ -1,0 +1,29 @@
+# Images build from the repo root (the apps need the workspace packages). Keep the context small and never
+# send secrets or recordings to the Docker daemon.
+.git
+.env
+.env.*
+!.env.example
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.hypothesis
+**/dist
+**/coverage
+coverage.xml
+*.wav
+*.mp3
+*.m4a
+*.ogg
+*.flac
+*.opus
+*.webm
+*.mp4
+eval/goldset/audio
+eval/goldset/gold/*.json
+eval/goldset/exports
+docs
+infra/annotation

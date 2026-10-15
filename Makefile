@@ -11,7 +11,7 @@ PY_APPS := apps/api apps/workers scripts
 MYPY := $(UV) run mypy --config-file $(CURDIR)/pyproject.toml
 
 .DEFAULT_GOAL := help
-.PHONY: help env setup dev down logs test test-fast lint fmt e2e eval-wer eval-kappa
+.PHONY: help env setup dev down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
 
 help: ## List the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -39,19 +39,27 @@ down: ## Stop local services (data volumes are kept)
 logs: ## Follow local service logs
 	$(COMPOSE) logs -f
 
-test: ## All Python tests (integration tests start containers) and web unit tests
-	$(UV) run pytest
+test: test-py test-web ## All Python tests (integration tests start containers) and web unit tests
+
+test-py: ## Python tests with a coverage report in coverage.xml
+	$(UV) run pytest --cov=packages --cov=apps --cov=scripts --cov=eval --cov-report=term --cov-report=xml
+
+test-web: ## Web unit tests
 	$(PNPM) -C apps/web test
 
 test-fast: ## Tests that need no Docker
 	$(UV) run pytest -m "not integration"
 	$(PNPM) -C apps/web test
 
-lint: ## ruff, mypy (strict on packages/), eslint, prettier and tsc
+lint: lint-py lint-web ## ruff, mypy (strict on packages/), eslint, prettier and tsc
+
+lint-py: ## ruff and mypy
 	$(UV) run ruff check
 	$(UV) run ruff format --check
 	@set -e; for p in $(PY_STRICT); do echo "mypy --strict $$p"; (cd $$p && $(MYPY) --strict .); done
 	@set -e; for p in $(PY_APPS); do echo "mypy $$p"; (cd $$p && $(MYPY) .); done
+
+lint-web: ## eslint, prettier and tsc
 	$(PNPM) -C apps/web lint
 	$(PNPM) -C apps/web format:check
 	$(PNPM) -C apps/web typecheck

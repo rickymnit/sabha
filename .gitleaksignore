@@ -1,0 +1,3 @@
+# Deliberate fake credentials in tests, ignored one by one (fingerprint = commit:file:rule:line).
+5bb774c5e07ba64890d7f4b75cc2bdf92bbdba63:eval/goldset/tests/test_import_tasks.py:jwt:290
+5bb774c5e07ba64890d7f4b75cc2bdf92bbdba63:eval/goldset/tests/test_import_tasks.py:generic-api-key:268

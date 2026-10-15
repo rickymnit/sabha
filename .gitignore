@@ -19,3 +19,9 @@ infra/annotation/.env
 # Other audio formats import_tasks.py accepts.
 *.ogg
 *.flac
+
+# Test and audit outputs (P1.2).
+.coverage
+coverage.xml
+htmlcov/
+requirements-audit.txt

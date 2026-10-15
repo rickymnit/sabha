@@ -1,0 +1,37 @@
+# GPU worker image for the gpu.speech queue (diarization and ASR) on an NVIDIA L4 (P1.2, P3.4, P3.5).
+# Build from the repo root:
+#   docker build -f apps/workers/Dockerfile.gpu -t sabha-workers-gpu .
+# Run with the NVIDIA container runtime (`--gpus all`, or `runtime: nvidia` in compose).
+#
+# CUDA 12.8 runtime: the L4 (Ada Lovelace) is supported, and PyTorch publishes cu128 wheels. The model libraries
+# themselves (torch, pyannote/NeMo, the ASR providers) are added to sabha-asr in P3.1 and P3.4.
+
+FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04 AS build
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /usr/local/bin/uv
+# The CUDA image has no Python 3.12 of its own that we control; uv installs a pinned standalone build.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_INSTALL_DIR=/opt/python UV_PROJECT_ENVIRONMENT=/app/.venv
+RUN uv python install 3.12.15
+WORKDIR /src
+COPY pyproject.toml uv.lock ./
+COPY packages/core/pyproject.toml packages/core/
+COPY packages/asr/pyproject.toml packages/asr/
+COPY packages/llm/pyproject.toml packages/llm/
+COPY packages/analytics/pyproject.toml packages/analytics/
+COPY apps/api/pyproject.toml apps/api/
+COPY apps/workers/pyproject.toml apps/workers/
+RUN uv sync --frozen --no-dev --package sabha-workers --python 3.12.15 --no-install-workspace
+COPY packages packages
+COPY apps/workers apps/workers
+RUN uv sync --frozen --no-dev --package sabha-workers --python 3.12.15 --no-editable
+
+FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
+COPY --from=build /opt/python /opt/python
+COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+USER sabha
+# One task at a time per GPU (P2.4); the Celery app arrives with plan task P2.4.
+CMD ["celery", "-A", "sabha_workers.celery_app", "worker", "--queues=gpu.speech", "--concurrency=1", "--prefetch-multiplier=1", "--loglevel=INFO"]

@@ -1,0 +1,8 @@
+# gitleaks configuration (CI security job). Extends the default rules.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets"
+# detect-secrets' baseline stores SHA-1 hashes of known test fakes, which look like keys.
+paths = ['''^\.secrets\.baseline$''']

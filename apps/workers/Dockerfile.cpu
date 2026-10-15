@@ -1,0 +1,31 @@
+# CPU worker image: cpu.preprocess, io.notify, billing.meter, llm.analyze, beat and the outbox relay (P1.2, P2.4).
+# Build from the repo root:
+#   docker build -f apps/workers/Dockerfile.cpu -t sabha-workers-cpu .
+
+FROM python:3.12.15-slim-bookworm AS build
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /usr/local/bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PROJECT_ENVIRONMENT=/app/.venv
+WORKDIR /src
+COPY pyproject.toml uv.lock ./
+COPY packages/core/pyproject.toml packages/core/
+COPY packages/asr/pyproject.toml packages/asr/
+COPY packages/llm/pyproject.toml packages/llm/
+COPY packages/analytics/pyproject.toml packages/analytics/
+COPY apps/api/pyproject.toml apps/api/
+COPY apps/workers/pyproject.toml apps/workers/
+RUN uv sync --frozen --no-dev --package sabha-workers --no-install-workspace
+COPY packages packages
+COPY apps/workers apps/workers
+RUN uv sync --frozen --no-dev --package sabha-workers --no-editable
+
+FROM python:3.12.15-slim-bookworm
+# ffmpeg/ffprobe for audio validation and normalisation (P3.2).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
+COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+USER sabha
+# The Celery app (sabha_workers.celery_app) arrives with plan task P2.4; compose sets the queues per service.
+CMD ["celery", "-A", "sabha_workers.celery_app", "worker", "--loglevel=INFO"]
