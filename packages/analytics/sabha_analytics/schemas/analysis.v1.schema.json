@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sabha.local/schemas/analysis.v1.schema.json",
+  "title": "Sabha analysis report (analysis@v1)",
+  "description": "Written by sabha_analytics.report. Rules JSON Schema cannot express are enforced in code by report.check_report: an unverified dimension has no score, rationale or evidence; every evidence quote is the transcript's own (redacted) wording at that utterance's original-timeline times; every suggestion points at a transcript utterance; no overall score means next_status NEEDS_REVIEW.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "rubric", "transcript", "overall", "dimensions", "metrics", "synthesis", "next_status",
+               "review_reasons", "model_ids", "prompts", "usage"],
+  "properties": {
+    "version": {"const": "analysis@v1"},
+    "rubric": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version"],
+      "properties": {"id": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "transcript": {
+      "type": "object", "additionalProperties": false, "required": ["sha256", "asr_model"],
+      "properties": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "asr_model": {"type": "string"}}
+    },
+    "overall": {
+      "type": "object", "additionalProperties": false,
+      "required": ["score", "verified_share", "verified_weight", "total_weight"],
+      "properties": {
+        "score": {"type": ["number", "null"], "minimum": 1, "maximum": 5},
+        "verified_share": {"type": "number", "minimum": 0, "maximum": 1},
+        "verified_weight": {"type": "number", "minimum": 0},
+        "total_weight": {"type": "number", "minimum": 0}
+      }
+    },
+    "dimensions": {"type": "array", "items": {"$ref": "#/$defs/dimension"}},
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["key", "value", "unit", "definition"],
+        "properties": {"key": {"type": "string"}, "unit": {"type": "string"}, "definition": {"type": "string"}}
+      }
+    },
+    "synthesis": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/synthesis"}]},
+    "next_status": {"enum": ["COMPLETED", "NEEDS_REVIEW"]},
+    "review_reasons": {"type": "array", "items": {"enum": ["low_verification", "synthesis_failed"]}},
+    "model_ids": {"type": "array", "items": {"type": "string"}},
+    "prompts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "required": ["version", "sha256"],
+        "properties": {"version": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+      }
+    },
+    "usage": {"type": "object", "required": ["total", "calls"]}
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["quote", "utterance_id", "start_ms", "end_ms"],
+      "properties": {
+        "quote": {"type": "string", "minLength": 1},
+        "utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},
+        "start_ms": {"type": "integer", "minimum": 0},
+        "end_ms": {"type": "integer", "minimum": 1}
+      }
+    },
+    "dimension": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "name", "weight", "verified", "attempts", "score", "rationale", "evidence", "failure_reasons"],
+      "properties": {
+        "key": {"type": "string"},
+        "name": {"type": "string"},
+        "weight": {"type": "number", "exclusiveMinimum": 0},
+        "verified": {"type": "boolean"},
+        "attempts": {"type": "integer", "minimum": 1, "maximum": 2},
+        "score": {"type": ["integer", "null"], "minimum": 1, "maximum": 5},
+        "rationale": {"type": ["string", "null"]},
+        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+        "failure_reasons": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "synthesis": {
+      "type": "object", "additionalProperties": false, "required": ["summary", "strengths", "gaps", "suggestions"],
+      "properties": {
+        "summary": {"type": "string", "minLength": 1},
+        "strengths": {"type": "array", "minItems": 2, "maxItems": 3, "items": {"type": "string"}},
+        "gaps": {"type": "array", "minItems": 2, "maxItems": 3, "items": {"type": "string"}},
+        "suggestions": {
+          "type": "array", "minItems": 3, "maxItems": 3,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["text", "utterance_id", "start_ms", "end_ms"],
+            "properties": {
+              "text": {"type": "string", "minLength": 1},
+              "utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},
+              "start_ms": {"type": "integer", "minimum": 0},
+              "end_ms": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}
