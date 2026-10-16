@@ -130,3 +130,50 @@ describe("RecordingReport", () => {
     for (const name of hidden) expect(screen.queryByText(name)).toBeNull();
   });
 });
+
+describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
+  it("keeps the dispute button disabled, with a reason, for viewers who may not dispute", async () => {
+    await renderReport(mockReport(lesson, "completed"));
+    expect(screen.getByRole("button", { name: "Dispute this score" })).toBeDisabled();
+    expect(screen.getByText(/Only the person analysed or their manager/)).toBeInTheDocument();
+  });
+
+  it("opens the dispute dialog for the person analysed", async () => {
+    const onSubmitDispute = vi.fn(async () => {});
+    render(
+      <RecordingReport
+        recording={lesson.recording}
+        analysis={mockReport(lesson, "completed")}
+        transcript={lesson.transcript}
+        labels={lesson.labels}
+        roles={lesson.roles}
+        viewerRole="staff"
+        getPlaybackUrl={getPlaybackUrl}
+        canDispute
+        onSubmitDispute={onSubmitDispute}
+      />,
+    );
+    await act(async () => {});
+    await userEvent.setup().click(screen.getByRole("button", { name: "Dispute this score" }));
+    expect(screen.getByRole("dialog", { name: "Dispute a score" })).toBeInTheDocument();
+  });
+
+  it("shows a reviewer's score with a marker and keeps the AI score as history", async () => {
+    const report = mockReport(lesson, "completed");
+    const [first] = visibleDimensions(report.dimensions);
+    const reviewed = {
+      ...first!,
+      override: {
+        score: 5,
+        reviewer_role: "academic head",
+        note: "Clear checks.",
+        resolved_at: "2026-10-16T05:00:00Z",
+      },
+    };
+    await renderReport({ ...report, dimensions: report.dimensions.map((d) => (d.key === first!.key ? reviewed : d)) });
+    const scores = screen.getByRole("region", { name: "Rubric scores" });
+    await userEvent.setup().click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
+    expect(within(scores).getByText("Reviewed")).toBeInTheDocument();
+    expect(screen.getByTestId("override-note")).toHaveTextContent(`AI score was ${first!.score}`);
+  });
+});

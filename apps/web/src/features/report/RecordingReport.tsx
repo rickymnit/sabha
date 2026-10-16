@@ -24,7 +24,17 @@ import { ReportTimeline } from "./ReportTimeline";
 import { DimensionDetail, RubricScoreList } from "./RubricPanels";
 import { evidenceLines } from "./timeline";
 import { visibleDimensions } from "./visibility";
-import type { AnalysisPayload, AnalysisReport, Labels, ReportRecording, VerifiedDimension, ViewerRole } from "./types";
+import { DisputeDialog } from "../disputes/DisputeDialog";
+import type { DisputeDraft } from "../disputes/types";
+import {
+  displayedScore,
+  type AnalysisPayload,
+  type AnalysisReport,
+  type Labels,
+  type ReportRecording,
+  type VerifiedDimension,
+  type ViewerRole,
+} from "./types";
 
 /** The lowest score first catches the eye in the design (Analysis.dc.html:273); ties keep rubric order. */
 function defaultSelection(dimensions: readonly VerifiedDimension[]): string | null {
@@ -45,6 +55,10 @@ export interface RecordingReportProps {
   /** Presigned playback URL for the audio player (P6.5). */
   getPlaybackUrl: () => Promise<PlaybackUrl>;
   rubricHref?: (rubric: AnalysisReport["rubric"]) => string;
+  /** True when the viewer is the person analysed or their manager (decided by the API, P6.7). */
+  canDispute?: boolean;
+  /** Sends a dispute; required for the dispute button to open the dialog. */
+  onSubmitDispute?: (draft: DisputeDraft) => Promise<void>;
 }
 
 export function RecordingReport({
@@ -56,6 +70,8 @@ export function RecordingReport({
   viewerRole,
   getPlaybackUrl,
   rubricHref,
+  canDispute = false,
+  onSubmitDispute,
 }: RecordingReportProps) {
   const isReport = analysis.status === "completed" || analysis.status === "partial";
   return (
@@ -79,17 +95,28 @@ export function RecordingReport({
           roles={roles}
           viewerRole={viewerRole}
           getPlaybackUrl={getPlaybackUrl}
+          onSubmitDispute={canDispute ? onSubmitDispute : undefined}
         />
       )}
     </div>
   );
 }
 
-interface ReportBodyProps extends Omit<RecordingReportProps, "analysis" | "rubricHref"> {
+interface ReportBodyProps extends Omit<RecordingReportProps, "analysis" | "rubricHref" | "canDispute"> {
   analysis: AnalysisReport;
 }
 
-function ReportBody({ recording, analysis, transcript, labels, roles, viewerRole, getPlaybackUrl }: ReportBodyProps) {
+function ReportBody({
+  recording,
+  analysis,
+  transcript,
+  labels,
+  roles,
+  viewerRole,
+  getPlaybackUrl,
+  onSubmitDispute,
+}: ReportBodyProps) {
+  const [disputeOpen, setDisputeOpen] = useState(false);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
   const hidden = analysis.dimensions.filter((d) => !dimensions.includes(d as VerifiedDimension));
   const utterances = useMemo(() => transcript?.utterances ?? [], [transcript]);
@@ -183,9 +210,19 @@ function ReportBody({ recording, analysis, transcript, labels, roles, viewerRole
             speakers={speakers}
             onSeek={seek}
             provenance={`Scored by model ${analysis.model.ids.join(", ")}, rubric ${rubricLabel}`}
+            onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
           />
         )}
       </div>
+      {onSubmitDispute && (
+        <DisputeDialog
+          open={disputeOpen}
+          dimensions={dimensions.map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
+          initialKey={selected?.key}
+          onSubmit={onSubmitDispute}
+          onClose={() => setDisputeOpen(false)}
+        />
+      )}
 
       {transcript && (
         <section

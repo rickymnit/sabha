@@ -7,7 +7,7 @@ import { Button, ScoreBar, ScoreChip, cx } from "../../design";
 import { formatClock } from "../transcript";
 import { formatPercent } from "./format";
 import { CheckIcon, SmallPlayIcon } from "./icons";
-import type { VerifiedDimension } from "./types";
+import { displayedScore, type VerifiedDimension } from "./types";
 
 export interface RubricScoreListProps {
   dimensions: readonly VerifiedDimension[];
@@ -48,7 +48,10 @@ export function RubricScoreList({ dimensions, selectedKey, onSelect }: RubricSco
                     <span className={selected ? "font-semibold" : "font-medium"}>{d.name}</span>
                     <span className="text-caption text-muted">Weight {formatPercent(d.weight)}</span>
                   </span>
-                  <ScoreChip score={d.score} />
+                  <span className="flex items-center gap-2">
+                    {d.override && <span className="text-caption font-semibold text-primary-hover">Reviewed</span>}
+                    <ScoreChip score={displayedScore(d)} />
+                  </span>
                 </button>
               </li>
             );
@@ -66,11 +69,14 @@ export interface DimensionDetailProps {
   onSeek: (ms: number) => void;
   /** "Scored by model ..., rubric ..." line. */
   provenance: string;
+  /** Opens the dispute dialog; undefined when this viewer may not dispute (P6.7). */
+  onDispute?: () => void;
 }
 
-export function DimensionDetail({ dimension, speakers, onSeek, provenance }: DimensionDetailProps) {
+export function DimensionDetail({ dimension, speakers, onSeek, provenance, onDispute }: DimensionDetailProps) {
   const headingId = useId();
   const disputeNoteId = useId();
+  const override = dimension.override;
   return (
     <section
       aria-labelledby={headingId}
@@ -82,7 +88,13 @@ export function DimensionDetail({ dimension, speakers, onSeek, provenance }: Dim
           <h2 id={headingId} className="m-0 text-2xl font-semibold tracking-[-0.01em]">
             {dimension.name}
           </h2>
-          <ScoreBar score={dimension.score} />
+          <ScoreBar score={displayedScore(dimension)} />
+          {override && (
+            <p className="m-0 text-small text-ink-2" data-testid="override-note">
+              <span className="font-semibold">Reviewed:</span> score set to {override.score} by a{" "}
+              {override.reviewer_role} (AI score was {dimension.score}). {override.note}
+            </p>
+          )}
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-success-tint px-2.5 py-[5px] text-small font-semibold text-success">
           <CheckIcon />
@@ -136,13 +148,20 @@ export function DimensionDetail({ dimension, speakers, onSeek, provenance }: Dim
       )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-track pt-4">
-        {/* Disputes are wired in P6.7. */}
-        <Button variant="secondary" disabled aria-describedby={disputeNoteId}>
-          Dispute this score
-        </Button>
-        <span id={disputeNoteId} className="text-small text-muted">
-          Disputes open in P6.7.
-        </span>
+        {onDispute ? (
+          <Button variant="secondary" onClick={onDispute}>
+            Dispute this score
+          </Button>
+        ) : (
+          <>
+            <Button variant="secondary" disabled aria-describedby={disputeNoteId}>
+              Dispute this score
+            </Button>
+            <span id={disputeNoteId} className="text-small text-muted">
+              Only the person analysed or their manager can dispute a score.
+            </span>
+          </>
+        )}
         <span className="text-small text-muted">{provenance}</span>
       </div>
     </section>

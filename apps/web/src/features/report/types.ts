@@ -44,6 +44,24 @@ export interface VerifiedDimension extends DimensionBase {
   evidence: EvidenceQuote[];
   /** "Try next time" text for this dimension. */
   suggestion?: string;
+  /** A reviewer's score after an accepted dispute (P6.7). The AI score above stays as history. */
+  override?: HumanOverride;
+}
+
+/** A person's score that replaces the AI score in the display; the AI score is kept and shown as history. */
+export interface HumanOverride {
+  /** Whole number from 1 to 5. */
+  score: number;
+  /** Role of the reviewer (never a name in the report payload). */
+  reviewer_role: string;
+  note: string;
+  /** ISO 8601 UTC. */
+  resolved_at: string;
+}
+
+/** The score to show: the reviewer's when there is one, otherwise the AI's. */
+export function displayedScore(d: VerifiedDimension): number {
+  return d.override?.score ?? d.score;
 }
 
 /**
