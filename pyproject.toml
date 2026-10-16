@@ -20,6 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "detect-secrets>=1.5.0",
+  "httpx>=0.28",
   "hypothesis>=6.168",
   "jsonschema>=4.26",  # eval/goldset tests validate gold transcripts against their schema
   "mypy==2.3.1",

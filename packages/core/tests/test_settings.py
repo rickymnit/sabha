@@ -213,3 +213,20 @@ def test_openai_base_url_must_be_https_when_deployed(env: pytest.MonkeyPatch) ->
     env.setenv("OPENAI_BASE_URL", "http://openai.example.com/v1")
     with pytest.raises(SettingsError, match="OPENAI_BASE_URL must use https"):
         load()
+
+
+@pytest.mark.parametrize("value", ["abc", "ABCDEF1", "g123456", "0" * 41])
+def test_git_sha_must_be_a_hex_commit(env: pytest.MonkeyPatch, value: str) -> None:
+    env.setenv("GIT_SHA", value)
+    with pytest.raises(SettingsError, match="GIT_SHA"):
+        load()
+
+
+def test_git_sha_and_otlp_endpoint_are_optional(env: pytest.MonkeyPatch) -> None:
+    settings = load()
+    assert settings.git_sha is None
+    assert settings.otel_exporter_otlp_endpoint is None
+    env.setenv("GIT_SHA", "0123abc")
+    env.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+    settings = load()
+    assert (settings.git_sha, settings.otel_exporter_otlp_endpoint) == ("0123abc", "http://localhost:4318")

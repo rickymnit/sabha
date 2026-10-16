@@ -11,7 +11,7 @@ PY_APPS := apps/api apps/workers scripts
 MYPY := $(UV) run mypy --config-file $(CURDIR)/pyproject.toml
 
 .DEFAULT_GOAL := help
-.PHONY: help env setup dev down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
+.PHONY: help env setup dev api down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
 
 help: ## List the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -31,7 +31,11 @@ setup: env ## Install Python and web dependencies and the git hooks
 dev: env ## Start Mongo (replica set), Redis and RustFS, then create the buckets
 	$(COMPOSE) up -d --wait
 	$(UV) run python scripts/dev_storage.py
-	@echo "Services up. Web app: pnpm -C apps/web dev (API and workers arrive in P1.4/P2.4)."
+	@echo "Services up. API: make api. Web app: pnpm -C apps/web dev (workers arrive in P2.4)."
+
+api: ## Run the API on http://localhost:8000 with reload; /docs shows the endpoints (needs `make dev` and OIDC_* in .env)
+	$(UV) run uvicorn sabha_api.main:create_app --factory --reload --reload-dir apps/api --reload-dir packages/core \
+		--host 127.0.0.1 --port 8000
 
 down: ## Stop local services (data volumes are kept)
 	$(COMPOSE) down

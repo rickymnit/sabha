@@ -1,0 +1,86 @@
+"""The API application factory.
+
+Run locally with `make api`; in the image: `uvicorn sabha_api.main:create_app --factory`.
+
+`create_app()` loads settings, configures JSON logging and tracing, and wires middleware and error handlers. The
+lifespan opens one MongoDB, one Redis and one S3 client for the life of the process (sabha_api.resources).
+OpenAPI and /docs are served only outside production.
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
+from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
+from sabha_api.resources import Resources, open_resources
+from sabha_api.routers import health
+from sabha_core.logging import configure_logging
+from sabha_core.settings import Settings, get_settings
+from sabha_core.telemetry import package_version, setup_tracing
+
+SERVICE_NAME = "sabha-api"
+
+ResourcesFactory = Callable[[Settings], AbstractAsyncContextManager[Resources]]
+
+
+def create_app(settings: Settings | None = None, *, resources: ResourcesFactory = open_resources) -> FastAPI:
+    """Build the app. Tests pass their own `settings` and, to avoid real services, a `resources` factory."""
+    settings = settings or get_settings()
+    configure_logging(settings.log_level)
+    tracer_provider = setup_tracing(SERVICE_NAME, settings)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        async with resources(settings) as opened:
+            app.state.resources = opened
+            try:
+                yield
+            finally:
+                if tracer_provider is not None:
+                    tracer_provider.shutdown()
+
+    docs = settings.app_env != "production"
+    app = FastAPI(
+        title="Sabha API",
+        version=package_version(SERVICE_NAME),
+        lifespan=lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if docs else None,
+        responses=PROBLEM_RESPONSES,
+    )
+    app.state.settings = settings
+    install_error_handlers(app)
+    app.include_router(health.router)
+
+    def openapi() -> dict[str, Any]:
+        if app.openapi_schema is None:
+            schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+            problem = Problem.model_json_schema(ref_template="#/components/schemas/{model}")
+            schema.setdefault("components", {}).setdefault("schemas", {})["Problem"] = problem
+            app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = openapi  # type: ignore[method-assign]  # FastAPI's documented way to customise the schema
+
+    # Added innermost first: the request context wraps everything, including CORS preflight answers.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", REQUEST_ID_HEADER],
+        expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
+        max_age=600,
+    )
+    app.add_middleware(RequestContextMiddleware, hsts=settings.app_env in ("staging", "production"))
+    if tracer_provider is not None:
+        FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer_provider, excluded_urls="/health,/ready")
+    return app

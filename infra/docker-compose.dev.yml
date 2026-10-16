@@ -58,7 +58,7 @@ services:
       - rustfs-data:/data
 
   # Placeholders, filled in by later plan tasks:
-  # api:      FastAPI app (P1.4), built from apps/api/Dockerfile (P1.2)
+  # api:      runs on the host with `make api` (reload on save); a container joins when P2.4 adds workers
   # workers:  Celery workers and beat (P2.4), built from apps/workers/Dockerfile.cpu (P1.2)
   # web:      Vite dev server for apps/web; until then run `pnpm -C apps/web dev` on the host
 

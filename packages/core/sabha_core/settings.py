@@ -25,6 +25,7 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 
 _DEPLOYED_ENVS: frozenset[str] = frozenset({"staging", "production"})
 _VERSION_TAG = re.compile(r"^[A-Za-z0-9._-]+$")
+_GIT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -53,6 +54,7 @@ class Settings(BaseSettings):
     app_env: AppEnv
     log_level: LogLevel = "INFO"
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    git_sha: str | None = None  # set at image build time; shown by GET /v1/meta
 
     # MongoDB (must be a replica set: transactions and change streams are required)
     mongo_uri: SecretStr
@@ -80,6 +82,7 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
 
     # Observability
+    otel_exporter_otlp_endpoint: str | None = None  # tracing is off when unset
     sentry_dsn: SecretStr | None = None
     langfuse_host: str | None = None
     langfuse_public_key: str | None = None
@@ -130,7 +133,14 @@ class Settings(BaseSettings):
         _check_url(value.get_secret_value(), ("redis", "rediss"), "REDIS_URL")
         return value
 
-    @field_validator("s3_endpoint_url", "langfuse_host", "openai_base_url")
+    @field_validator("git_sha")
+    @classmethod
+    def _check_git_sha(cls, value: str | None) -> str | None:
+        if value is not None and not _GIT_SHA.match(value):
+            raise ValueError("GIT_SHA must be 7 to 40 lowercase hex characters")
+        return value
+
+    @field_validator("s3_endpoint_url", "langfuse_host", "openai_base_url", "otel_exporter_otlp_endpoint")
     @classmethod
     def _check_http_url(cls, value: str | None) -> str | None:
         return None if value is None else _check_url(value, ("http", "https"), "value")

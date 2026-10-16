@@ -22,7 +22,9 @@ FROM python:3.12.15-slim-bookworm
 RUN groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+# The commit this image was built from (CI passes it); GET /v1/meta reports it.
+ARG GIT_SHA=
+ENV GIT_SHA=$GIT_SHA
 USER sabha
 EXPOSE 8000
-# sabha_api.main arrives with plan task P1.4.
 CMD ["uvicorn", "sabha_api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
