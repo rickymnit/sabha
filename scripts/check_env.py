@@ -113,6 +113,7 @@ def _secret_values(settings: Settings) -> list[str]:
         settings.s3_secret_access_key,
         settings.sentry_dsn,
         settings.langfuse_secret_key,
+        settings.openai_api_key,
     ):
         if field is not None and field.get_secret_value():
             values.append(field.get_secret_value())

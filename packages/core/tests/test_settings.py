@@ -11,8 +11,9 @@ REDIS_PASSWORD = "redis-pa55-do-not-leak"
 S3_SECRET = "s3-secret-do-not-leak"
 LANGFUSE_SECRET = "lf-secret-do-not-leak"
 SENTRY_DSN = "https://sentry-key-do-not-leak@sentry.example.com/1"
+OPENAI_KEY = "sk-openai-do-not-leak"
 
-SECRETS = [MONGO_PASSWORD, REDIS_PASSWORD, S3_SECRET, LANGFUSE_SECRET, SENTRY_DSN]
+SECRETS = [MONGO_PASSWORD, REDIS_PASSWORD, S3_SECRET, LANGFUSE_SECRET, SENTRY_DSN, OPENAI_KEY]
 
 VALID_ENV = {
     "APP_ENV": "local",
@@ -32,6 +33,7 @@ VALID_ENV = {
     "LANGFUSE_PUBLIC_KEY": "lf-public",
     "LANGFUSE_SECRET_KEY": LANGFUSE_SECRET,
     "CORS_ORIGINS": "http://localhost:5173, https://app.sabha.example.com/",
+    "OPENAI_API_KEY": OPENAI_KEY,
 }
 
 
@@ -191,4 +193,46 @@ def test_artefact_version_cannot_break_the_artefact_path(env: pytest.MonkeyPatch
     env.setenv("ARTEFACT_VERSION_ANALYZE", "v1/../other")
 
     with pytest.raises(SettingsError, match="ARTEFACT_VERSION_ANALYZE"):
+        load()
+
+
+def deployed(env: pytest.MonkeyPatch, app_env: str = "production") -> None:
+    env.setenv("APP_ENV", app_env)
+    env.delenv("S3_ENDPOINT_URL")
+
+
+@pytest.mark.parametrize("app_env", ["staging", "production"])
+def test_llm_key_needs_residency_sign_off_when_deployed(env: pytest.MonkeyPatch, app_env: str) -> None:
+    deployed(env, app_env)
+
+    with pytest.raises(SettingsError, match="LLM_RESIDENCY_APPROVED") as raised:
+        load()
+
+    assert_no_secrets(str(raised.value))
+
+
+def test_llm_key_is_accepted_once_residency_is_approved(env: pytest.MonkeyPatch) -> None:
+    deployed(env)
+    env.setenv("LLM_RESIDENCY_APPROVED", "true")
+
+    settings = load()
+    assert settings.openai_api_key is not None
+    assert settings.openai_api_key.get_secret_value() == OPENAI_KEY
+
+
+def test_local_development_needs_no_residency_sign_off(env: pytest.MonkeyPatch) -> None:
+    assert load().llm_residency_approved is False  # APP_ENV=local with a key set loads fine
+
+
+def test_deployed_without_any_llm_key_needs_no_sign_off(env: pytest.MonkeyPatch) -> None:
+    deployed(env)
+    env.delenv("OPENAI_API_KEY")
+    assert load().openai_api_key is None
+
+
+def test_openai_base_url_must_be_https_when_deployed(env: pytest.MonkeyPatch) -> None:
+    deployed(env)
+    env.setenv("LLM_RESIDENCY_APPROVED", "true")
+    env.setenv("OPENAI_BASE_URL", "http://openai.example.com/v1")
+    with pytest.raises(SettingsError, match="OPENAI_BASE_URL must use https"):
         load()
