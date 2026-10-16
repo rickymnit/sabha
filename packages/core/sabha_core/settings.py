@@ -75,8 +75,7 @@ class Settings(BaseSettings):
     oidc_audience: str
     oidc_client_id: str
 
-    # LLM providers (docs/llm-providers.md). Sending text abroad needs a deliberate sign-off (golden rule 12).
-    llm_residency_approved: bool = False
+    # LLM providers (docs/llm-providers.md). Data-residency approval comes first (golden rule 12).
     openai_api_key: SecretStr | None = None
     openai_base_url: str | None = None
 
@@ -175,11 +174,6 @@ class Settings(BaseSettings):
                 raise ValueError(f"S3_ENDPOINT_URL is for local RustFS only; leave it unset in {self.app_env}")
             if not self.oidc_issuer.startswith("https://"):
                 raise ValueError(f"OIDC_ISSUER must use https in {self.app_env}")
-            if self.openai_api_key is not None and not self.llm_residency_approved:
-                raise ValueError(
-                    f"OPENAI_API_KEY is set in {self.app_env} but LLM_RESIDENCY_APPROVED is not true: confirm the "
-                    "provider's data residency and the lawyer's answer first (golden rule 12)"
-                )
             if self.openai_base_url is not None and not self.openai_base_url.startswith("https://"):
                 raise ValueError(f"OPENAI_BASE_URL must use https in {self.app_env}")
         return self

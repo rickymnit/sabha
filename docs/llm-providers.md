@@ -6,16 +6,20 @@ link and the date checked. Nothing here comes from memory (golden rules 6 and 12
 
 ## Decision so far
 
-- **2026-10-16:** the product owner chose **OpenAI**. The model was named as "ChatGPT 3 mini m"; the exact API
-  model id (and, for a reasoning model, the reasoning-effort setting the "m" may refer to) is to be confirmed and
-  written in the table below.
+- **2026-10-16:** the product owner chose **OpenAI** with the model **`o3-mini`** for scoring and synthesis.
+  To confirm from OpenAI's documentation and our API dashboard, not from memory:
+  - that `o3-mini` is available to our API project and not scheduled for retirement;
+  - which reasoning-effort setting to use (the bake-off can compare them);
+  - whether it accepts a `temperature` parameter. The plan (P5.6) assumes temperature 0 for repeatable scores; if
+    a reasoning model does not take one, the bake-off (P5.3) must measure score stability across repeated runs
+    instead of assuming it.
 - ChatGPT is the consumer app. Sabha calls the **OpenAI API** with the key of a dedicated Sabha project, under the
   API's terms, not a ChatGPT account.
 - **Not yet approved for real school data.** Golden rule 12 keeps data in India. Before any real transcript is
   sent, the residency and retention answers below must be in writing and the lawyer must answer
-  `docs/legal/drafts/questions-for-lawyer.md`, group E (cross-border AI processing). Only then is
-  `LLM_RESIDENCY_APPROVED=true` set in staging and production; until then the app refuses to start there with an
-  LLM key configured.
+  `docs/legal/drafts/questions-for-lawyer.md`, group E (cross-border AI processing). Only then does an
+  `OPENAI_API_KEY` go into the staging or production configuration. This is a process rule: the code does not
+  enforce it (decided 2026-10-16), so whoever configures a deployment checks it.
 - Text sent is always redacted first (phones, Aadhaar-like and PAN-like numbers, emails, listed student names;
   `packages/llm/sabha_llm/redact.py`). That reduces what leaves, but it is not a residency answer.
 
@@ -26,8 +30,9 @@ only candidate.
 
 | Field | OpenAI | Candidate 2 | Candidate 3 |
 | --- | --- | --- | --- |
-| Models we would use: mid tier (scoring, synthesis) | TBD (stated: "ChatGPT 3 mini m"; exact API model id to confirm) | TBD | TBD |
-| Models we would use: small tier (role tie-breaker) | TBD | TBD | TBD |
+| Models we would use: mid tier (scoring, synthesis) | `o3-mini` (chosen 2026-10-16; availability TBD) | TBD | TBD |
+| Models we would use: small tier (role tie-breaker) | TBD (`o3-mini` too, or a smaller model) | TBD | TBD |
+| Reasoning effort / temperature support | TBD | TBD | TBD |
 | India region available (yes / no / how) | TBD | TBD | TBD |
 | Data retention policy (API inputs and outputs) | TBD | TBD | TBD |
 | Training on our data (default, and how to opt out) | TBD | TBD | TBD |
@@ -78,9 +83,10 @@ The choice is recorded in `docs/adr/0004-llm-choice.md` with the bake-off report
 > 4. **Data processing agreement.** Do you offer a DPA, and does it address India's Digital Personal Data
 >    Protection Act, 2023? Please send the current version.
 > 5. **Sub-processors.** Which sub-processors may handle our data, and where are they located?
-> 6. **Models and features.** For [model name], please confirm structured output with a JSON schema, prompt
+> 6. **Models and features.** For o3-mini, please confirm whether it is available to our project and for how long,
+>    whether it accepts a temperature setting, and structured output with a JSON schema, prompt
 >    caching, batch processing and the rate limits for our expected tier.
-> 7. **Pricing.** Current input, output, cached-input and batch prices per million tokens for [model name].
+> 7. **Pricing.** Current input, output, cached-input and batch prices per million tokens for o3-mini.
 >
 > Links to the current published documents are fine where they answer a question. Thank you.
 >
