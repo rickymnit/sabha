@@ -1239,6 +1239,7 @@ name = "sabha-workers"
 version = "0.0.0"
 source = { editable = "apps/workers" }
 dependencies = [
+    { name = "boto3" },
     { name = "sabha-analytics" },
     { name = "sabha-asr" },
     { name = "sabha-core" },
@@ -1247,6 +1248,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "boto3", specifier = ">=1.35" },
     { name = "sabha-analytics", editable = "packages/analytics" },
     { name = "sabha-asr", editable = "packages/asr" },
     { name = "sabha-core", editable = "packages/core" },
