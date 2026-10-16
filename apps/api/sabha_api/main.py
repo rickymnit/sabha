@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
+from sabha_api.auth import PrincipalStore, TokenVerifier
 from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
 from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
@@ -31,8 +32,15 @@ SERVICE_NAME = "sabha-api"
 ResourcesFactory = Callable[[Settings], AbstractAsyncContextManager[Resources]]
 
 
-def create_app(settings: Settings | None = None, *, resources: ResourcesFactory = open_resources) -> FastAPI:
-    """Build the app. Tests pass their own `settings` and, to avoid real services, a `resources` factory."""
+def create_app(
+    settings: Settings | None = None,
+    *,
+    resources: ResourcesFactory = open_resources,
+    token_verifier: TokenVerifier | None = None,
+    principals: PrincipalStore | None = None,
+) -> FastAPI:
+    """Build the app. Tests pass their own `settings` and, to avoid real services, a `resources` factory, a
+    `token_verifier` with a fake key fetcher and an in-memory `principals` store (sabha_api.auth)."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
     tracer_provider = setup_tracing(SERVICE_NAME, settings)
@@ -58,6 +66,8 @@ def create_app(settings: Settings | None = None, *, resources: ResourcesFactory 
         responses=PROBLEM_RESPONSES,
     )
     app.state.settings = settings
+    app.state.token_verifier = token_verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_audience)
+    app.state.principals = principals  # None until P1.5b's MongoDB-backed store; protected routes then answer 503
     install_error_handlers(app)
     app.include_router(health.router)
 
@@ -77,7 +87,7 @@ def create_app(settings: Settings | None = None, *, resources: ResourcesFactory 
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", REQUEST_ID_HEADER],
-        expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
+        expose_headers=[REQUEST_ID_HEADER, "Retry-After", "WWW-Authenticate"],
         max_age=600,
     )
     app.add_middleware(RequestContextMiddleware, hsts=settings.app_env in ("staging", "production"))

@@ -1,7 +1,7 @@
 """Shared fixtures for the API tests: settings built in code and fake dependencies (no real services needed).
 
-`make_client(checks=..., resources=..., **settings_overrides)` builds an app and returns a started TestClient;
-`client` is the default one.
+`make_client(checks=..., resources=..., token_verifier=..., principals=..., **settings_overrides)` builds an app and
+returns a started TestClient; `client` is the default one.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Any, Protocol
 import pytest
 from fastapi.testclient import TestClient
 
+from sabha_api.auth import PrincipalStore, TokenVerifier
 from sabha_api.main import ResourcesFactory, create_app
 from sabha_api.resources import Check, Resources
 from sabha_core.settings import Settings
@@ -47,7 +48,13 @@ def fake_resources(checks: dict[str, Check] | None) -> ResourcesFactory:
 
 class MakeClient(Protocol):
     def __call__(
-        self, *, checks: dict[str, Check] | None = None, resources: ResourcesFactory | None = None, **overrides: Any
+        self,
+        *,
+        checks: dict[str, Check] | None = None,
+        resources: ResourcesFactory | None = None,
+        token_verifier: TokenVerifier | None = None,
+        principals: PrincipalStore | None = None,
+        **overrides: Any,
     ) -> TestClient: ...
 
 
@@ -56,10 +63,20 @@ def make_client() -> Iterator[MakeClient]:
     with ExitStack() as stack:
 
         def make(
-            *, checks: dict[str, Check] | None = None, resources: ResourcesFactory | None = None, **overrides: Any
+            *,
+            checks: dict[str, Check] | None = None,
+            resources: ResourcesFactory | None = None,
+            token_verifier: TokenVerifier | None = None,
+            principals: PrincipalStore | None = None,
+            **overrides: Any,
         ) -> TestClient:
             settings = Settings(_env_file=None, **{**BASE_SETTINGS, **overrides})  # type: ignore[call-arg]
-            app = create_app(settings, resources=resources or fake_resources(checks))
+            app = create_app(
+                settings,
+                resources=resources or fake_resources(checks),
+                token_verifier=token_verifier,
+                principals=principals,
+            )
             # raise_server_exceptions=False: we test what a real client receives, not the exception itself.
             return stack.enter_context(TestClient(app, raise_server_exceptions=False))
 

@@ -37,7 +37,7 @@ Stack:
 | Audio | ffmpeg/ffprobe, Silero VAD, pyannote or NeMo Sortformer, ASR via `packages/asr` |
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
 | Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |
-| Auth | OIDC (Auth0 or Keycloak, decided in ADR 0002); JWT validated in the API |
+| Auth | OIDC with Auth0 (ADR 0002); JWT validated in the API |
 | Infra | Docker Compose (dev, staging, prod pilot), Terraform for AWS, GitHub Actions |
 | Observability | OpenTelemetry, Prometheus, Grafana, Sentry, structured JSON logs |
 
