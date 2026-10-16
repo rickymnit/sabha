@@ -93,6 +93,8 @@ known-first-party = ["sabha_core", "sabha_asr", "sabha_llm", "sabha_analytics", 
 # mypy runs once per package (see Makefile): strict for packages/*, default for apps/* and scripts/.
 [tool.mypy]
 python_version = "3.12"
+# eval/ scripts import each other as top-level modules (they run as plain scripts); let mypy find them everywhere.
+mypy_path = "$MYPY_CONFIG_FILE_DIR/eval:$MYPY_CONFIG_FILE_DIR/eval/goldset:$MYPY_CONFIG_FILE_DIR/eval/raters"
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]

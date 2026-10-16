@@ -567,6 +567,10 @@ class DimensionResult:
     attempts: int
     failure_reasons: tuple[str, ...] = ()
     """Problem codes of the last attempt when unverified (for review and metrics, not shown to staff)."""
+    quotes_offered: int = 0
+    """Well-formed quotes the model offered for this dimension, over all attempts (for eval/grounding.py)."""
+    quotes_verified: int = 0
+    """How many of those passed the grounding verifier."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -578,7 +582,11 @@ class ScoringOutcome:
     metrics: tuple[dict[str, Any], ...]
 
 
-def _result(dimension: DimensionSpec, judgement: Judgement, attempts: int) -> DimensionResult:
+def _result(dimension: DimensionSpec, judgement: Judgement, *all_attempts: Judgement) -> DimensionResult:
+    """The result from the last attempt `judgement`; quote counts are summed over `all_attempts` (which include it)."""
+    attempts = len(all_attempts)
+    offered = sum(len(j.evidence) for j in all_attempts)
+    verified = sum(1 for j in all_attempts for e in j.evidence if e.verified)
     if judgement.ok and judgement.score is not None and judgement.rationale is not None:  # ok implies both are set
         return DimensionResult(
             dimension.key,
@@ -589,10 +597,22 @@ def _result(dimension: DimensionSpec, judgement: Judgement, attempts: int) -> Di
             judgement.rationale,
             judgement.evidence,
             attempts,
+            quotes_offered=offered,
+            quotes_verified=verified,
         )
     codes = tuple(dict.fromkeys(problem.code for problem in judgement.problems))
     return DimensionResult(
-        dimension.key, dimension.name, float(dimension.weight), False, None, None, (), attempts, codes
+        dimension.key,
+        dimension.name,
+        float(dimension.weight),
+        False,
+        None,
+        None,
+        (),
+        attempts,
+        codes,
+        quotes_offered=offered,
+        quotes_verified=verified,
     )
 
 
@@ -700,12 +720,12 @@ def score_dimensions(
         return validate(data, group, transcript)
 
     for group in group_dimensions(dimensions):
-        for dimension, judgement in zip(group, ask(group, "", 1), strict=True):
-            if not judgement.ok:
-                (judgement,) = ask((dimension,), feedback_text(judgement.problems), 2)
-                results[dimension.key] = _result(dimension, judgement, 2)
+        for dimension, first in zip(group, ask(group, "", 1), strict=True):
+            if not first.ok:
+                (second,) = ask((dimension,), feedback_text(first.problems), 2)
+                results[dimension.key] = _result(dimension, second, first, second)
             else:
-                results[dimension.key] = _result(dimension, judgement, 1)
+                results[dimension.key] = _result(dimension, first, first)
     return ScoringOutcome(
         dimensions=tuple(results[dimension.key] for dimension in dimensions),
         calls=tuple(calls),

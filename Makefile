@@ -58,7 +58,7 @@ lint-py: ## ruff and mypy
 	$(UV) run ruff format --check
 	@set -e; for p in $(PY_STRICT); do echo "mypy --strict $$p"; (cd $$p && $(MYPY) --strict .); done
 	@set -e; for p in $(PY_APPS); do echo "mypy $$p"; (cd $$p && $(MYPY) .); done
-	@echo "mypy --strict eval"; cd eval && MYPYPATH=goldset $(MYPY) --strict *.py tests
+	@echo "mypy --strict eval"; cd eval && $(MYPY) --strict *.py tests
 
 lint-web: ## eslint, prettier and tsc
 	$(PNPM) -C apps/web lint
@@ -79,5 +79,8 @@ eval-wer: ## WER and role accuracy on the hold-out set: make eval-wer HYP_DIR=<d
 	$(UV) run python eval/roles.py --hyp-dir $(HYP_DIR); roles=$$?; \
 	exit $$(( wer > roles ? wer : roles ))
 
-eval-kappa: ## eval/kappa.py on the calibration hold-out split
-	@echo "eval-kappa: not implemented yet (P4.6)"
+eval-kappa: ## AI-human agreement and grounding: make eval-kappa RUBRIC=<yaml> AI_DIR=<reports> SCORES="<json files>"
+	@test -n "$(RUBRIC)" -a -n "$(AI_DIR)" -a -n "$(SCORES)" || { echo "set RUBRIC, AI_DIR and SCORES"; exit 2; }
+	$(UV) run python eval/kappa.py --rubric $(RUBRIC) --ai-dir $(AI_DIR) --rater-scores $(SCORES); kappa=$$?; \
+	$(UV) run python eval/grounding.py --ai-dir $(AI_DIR); grounding=$$?; \
+	exit $$(( kappa > grounding ? kappa : grounding ))

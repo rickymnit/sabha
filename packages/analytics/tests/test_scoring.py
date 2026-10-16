@@ -161,3 +161,17 @@ def test_pii_guard_refuses_a_prompt_with_a_phone_number() -> None:
 def test_dimension_grouping(rubric: Rubric, count: int, sizes: list[int]) -> None:
     dims = [rubric.dimensions[0]] * count
     assert [len(group) for group in group_dimensions(dims)] == sizes
+
+
+def test_quote_counts_cover_both_attempts(rubric: Rubric, lesson: PreparedTranscript, fake_judge: Any,
+                                          answers: Any) -> None:  # fmt: skip
+    # First answer: one real and one fake quote. Re-ask: two real quotes. 4 offered, 3 verified.
+    model = fake_judge(
+        [{"dimensions": [answers.bad_concept, answers.good_recap]}, {"dimensions": [answers.good_concept]}]
+    )
+    concept = by_key(run(rubric, lesson, model))["concept_clarity"]
+    assert (concept.quotes_offered, concept.quotes_verified) == (4, 3)
+    recap = by_key(run(rubric, lesson, fake_judge([{"dimensions": [answers.good_concept, answers.good_recap]}])))[
+        "recap_and_closure"
+    ]
+    assert (recap.quotes_offered, recap.quotes_verified) == (1, 1)

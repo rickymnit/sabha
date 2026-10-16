@@ -66,6 +66,8 @@ def _dimension_record(dimension: DimensionResult) -> dict[str, Any]:
         "weight": dimension.weight,
         "verified": dimension.verified,
         "attempts": dimension.attempts,
+        # Counts only: unverified quotes themselves are never stored (golden rule 5).
+        "grounding": {"quotes_offered": dimension.quotes_offered, "quotes_verified": dimension.quotes_verified},
     }
     if not dimension.verified:
         return {

@@ -60,13 +60,18 @@
     },
     "dimension": {
       "type": "object", "additionalProperties": false,
-      "required": ["key", "name", "weight", "verified", "attempts", "score", "rationale", "evidence", "failure_reasons"],
+      "required": ["key", "name", "weight", "verified", "attempts", "grounding", "score", "rationale", "evidence",
+                   "failure_reasons"],
       "properties": {
         "key": {"type": "string"},
         "name": {"type": "string"},
         "weight": {"type": "number", "exclusiveMinimum": 0},
         "verified": {"type": "boolean"},
         "attempts": {"type": "integer", "minimum": 1, "maximum": 2},
+        "grounding": {
+          "type": "object", "additionalProperties": false, "required": ["quotes_offered", "quotes_verified"],
+          "properties": {"quotes_offered": {"type": "integer", "minimum": 0}, "quotes_verified": {"type": "integer", "minimum": 0}}
+        },
         "score": {"type": ["integer", "null"], "minimum": 1, "maximum": 5},
         "rationale": {"type": ["string", "null"]},
         "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
