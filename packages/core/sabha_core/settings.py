@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     # Redis (Celery broker and cache)
     redis_url: SecretStr
 
+    # API rate limits (P7.2, sabha_api.ratelimit): requests per minute, and how far past that a burst may go
+    rate_limit_tenant_per_minute: int = Field(default=600, ge=1)
+    rate_limit_user_per_minute: int = Field(default=120, ge=1)
+    rate_limit_burst_factor: float = Field(default=1.5, ge=1.0, le=10.0)
+
     # Object storage: S3 on AWS, RustFS locally. Three buckets so each gets its own lifecycle and access rules.
     s3_bucket_audio: str  # uploaded originals, short retention
     s3_bucket_artefacts: str  # pipeline outputs: {tenant_id}/{recording_id}/{stage}@{version}/
