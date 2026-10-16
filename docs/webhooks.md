@@ -33,6 +33,7 @@ To verify:
 ```python
 import hashlib, hmac, time
 
+
 def verify(body: bytes, header: str, secret: str) -> bool:
     parts = dict(p.split("=", 1) for p in header.split(",") if "=" in p)
     t, signature = int(parts["t"]), parts["v1"]

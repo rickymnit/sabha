@@ -15,7 +15,7 @@ def chunks(tenant: str, recording: str, count: int, *, duration_s: float, cost_s
 
 
 def drain(scheduler: FairScheduler, limit: int = 10_000) -> list[Chunk]:
-    out = []
+    out: list[Chunk] = []
     while (chunk := scheduler.next()) is not None and len(out) < limit:
         out.append(chunk)
     return out
