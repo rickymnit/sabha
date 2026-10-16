@@ -65,6 +65,7 @@ def test_reception_call() -> None:
         "silence_share": 0.2983,
         "longest_silence_s": 8.7,  # the hold, 8700 ms
         "long_silence_count": 2,  # gaps between segments over 5 s: 8700 and 6700 (lead and tail are not gaps)
+        "hold_gap_count": 0,  # no gap between segments is over 10 s
         # receptionist 5000 + 5500 + 10500 + 7500 = 28500; caller 4500 + 3000 + 3000 = 10500; both 39000
         "receptionist_talk_share": 0.7308,  # 28500 / 39000 = 0.73077
         "receptionist_turn_count": 4,  # R C R C R C R
@@ -88,6 +89,7 @@ def test_lesson_with_devanagari_questions() -> None:
         "silence_share": 0.094,  # one segment [0, 45300): tail silence 4700 / 50000
         "longest_silence_s": 4.7,  # the tail
         "long_silence_count": 0,  # one segment, so no gaps
+        "hold_gap_count": 0,  # no gap between segments is over 10 s
         # teacher 8000 + 9500 + 9500 + 8500 = 35500; students 1500 + 2500 + 2500 = 6500; both 42000
         "teacher_talk_share": 0.8452,  # 35500 / 42000 = 0.84524
         "teacher_turn_count": 4,  # T S T S T S T
@@ -112,6 +114,7 @@ def test_lesson_with_overlapping_speech() -> None:
         "silence_share": 0.148,  # one segment [0, 21300): tail 3700 / 25000
         "longest_silence_s": 3.7,
         "long_silence_count": 0,
+        "hold_gap_count": 0,  # no gap between segments is over 10 s
         # Overlap counts in full for every role speaking. teacher [0,10000) + [11000,20000) = 19000;
         # students [6000,8000) + [9000,12000) + [19000,21000) = 7000; shares are of 19000 + 7000 = 26000
         "teacher_talk_share": 0.7308,  # 19000 / 26000 = 0.73077
@@ -136,6 +139,7 @@ def test_lesson_with_long_monologue_split_by_short_pauses() -> None:
         "silence_share": 0.265,  # 15900 / 60000
         "longest_silence_s": 6.7,
         "long_silence_count": 1,  # only 6700 is over 5 s
+        "hold_gap_count": 0,  # no gap between segments is over 10 s
         # teacher 12000 + 15700 + 7200 + 3000 + 2500 = 40400; students 1500; both 41900
         "teacher_talk_share": 0.9642,  # 40400 / 41900 = 0.96420
         # gaps 2300 and 2800 (< 3000) join the first three utterances; 7000 starts a new turn; the student ends it
@@ -159,6 +163,7 @@ def test_lesson_with_no_questions() -> None:
         "silence_share": 0.15,  # one segment [800, 26300): lead 800 + tail 3700 = 4500 / 30000
         "longest_silence_s": 3.7,
         "long_silence_count": 0,
+        "hold_gap_count": 0,  # no gap between segments is over 10 s
         "teacher_talk_share": 1.0,  # students never speak
         "teacher_turn_count": 1,  # four utterances 500 ms apart
         # "Kabhi" is not "kab", "kahani" is not "kahan", "kyaari" is not "kya", "how" is not sentence-initial,
@@ -471,3 +476,28 @@ def test_invalid_transcript_fails() -> None:
     fixture["transcript"]["timeline"] = "compact"
     with pytest.raises(ValueError, match="timeline"):
         run(fixture)
+
+
+def test_hold_gaps_count_only_gaps_longer_than_ten_seconds() -> None:
+    # Gaps of 12 s, exactly 10 s and 9.5 s between speech: only the 12 s gap is a hold.
+    segments = [
+        {"orig_start_ms": 0, "orig_end_ms": 5_000, "compact_start_ms": 0},
+        {"orig_start_ms": 17_000, "orig_end_ms": 20_000, "compact_start_ms": 5_000},
+        {"orig_start_ms": 30_000, "orig_end_ms": 35_000, "compact_start_ms": 8_000},
+        {"orig_start_ms": 44_500, "orig_end_ms": 50_000, "compact_start_ms": 13_000},
+    ]
+    utterances = [
+        {"role": "receptionist", "speaker_label": "S0", "start_ms": s["orig_start_ms"], "end_ms": s["orig_end_ms"],
+         "text": "ji haan", "avg_confidence": 0.9, "low_confidence_spans": []}
+        for s in segments
+    ]  # fmt: skip
+    transcript = {"version": "transcript@v1", "timeline": "original", "asr_model": "fake@1", "word_count": 8,
+                  "utterances": utterances}  # fmt: skip
+    segment_map = SegmentMap.from_records(segments)
+    metrics = compute_metrics(
+        transcript, primary_role="receptionist", roles=["receptionist", "caller"], segment_map=segment_map,
+        segment_stats=stats(segment_map, 50_000),
+    )  # fmt: skip
+    result = {m.key: m.value for m in metrics}
+    assert result["hold_gap_count"] == 1
+    assert result["long_silence_count"] == 3  # all three gaps are over 5 s

@@ -37,7 +37,35 @@
     },
     "synthesis": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/synthesis"}]},
     "next_status": {"enum": ["COMPLETED", "NEEDS_REVIEW"]},
-    "review_reasons": {"type": "array", "items": {"enum": ["low_verification", "synthesis_failed"]}},
+    "review_reasons": {"type": "array", "items": {"enum": ["low_verification", "synthesis_failed", "uncertain_type", "ticket_failed"]}},
+    "classification": {
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false, "required": ["type", "language_mix", "confidence"],
+        "properties": {"type": {"type": ["string", "null"]}, "language_mix": {"enum": ["english", "hindi", "hinglish", null]},
+                       "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}}
+      }]
+    },
+    "phases": {
+      "oneOf": [{"type": "null"}, {"type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["phase", "start_utterance_id", "end_utterance_id", "start_ms", "end_ms"],
+        "properties": {"phase": {"type": "string"}, "start_utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},
+                       "end_utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},
+                       "start_ms": {"type": "integer", "minimum": 0}, "end_ms": {"type": "integer", "minimum": 1}}
+      }}]
+    },
+    "ticket": {
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false, "required": ["category", "status", "follow_up", "summary"],
+        "properties": {
+          "category": {"enum": ["complaint", "information", "fee", "admission", "other"]},
+          "status": {"enum": ["resolved", "pending", "escalated"]},
+          "follow_up": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false,
+            "required": ["text", "owner_role"], "properties": {"text": {"type": "string"}, "owner_role": {"type": "string"}}}]},
+          "summary": {"type": "string", "minLength": 1}
+        }
+      }]
+    },
     "model_ids": {"type": "array", "items": {"type": "string"}},
     "prompts": {
       "type": "object",

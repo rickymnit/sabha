@@ -79,15 +79,19 @@ TURN_GAP_MS = 3000
 """Utterances of one role less than this far apart (after the turn's latest end) belong to the same turn."""
 
 LONG_SILENCE_MS = 5000
+HOLD_GAP_MS = 10_000
+"""A gap longer than this between stretches of speech counts as a hold (P5.8: reception holds or silences)."""
 """A gap between segments strictly longer than this is a long silence (P5.5: long pauses > 5 s)."""
 
-RUBRIC_KEY_ALIASES: Mapping[str, str] = MappingProxyType({"call_duration_s": "duration_s"})
+RUBRIC_KEY_ALIASES: Mapping[str, str] = MappingProxyType(
+    {"call_duration_s": "duration_s", "handle_time_s": "duration_s"}
+)
 """Rubric metric names that are another name for a computed key."""
 
 ROLE_METRIC_SUFFIXES = ("talk_share", "turn_count", "question_count")
 """Per-role keys are f"{role}_{suffix}"."""
 
-RECORDING_METRIC_KEYS = ("duration_s", "silence_share", "longest_silence_s", "long_silence_count")
+RECORDING_METRIC_KEYS = ("duration_s", "silence_share", "longest_silence_s", "long_silence_count", "hold_gap_count")
 PRIMARY_METRIC_KEYS = (
     "open_question_count",
     "open_question_ratio",
@@ -364,10 +368,10 @@ def compute_metrics(
         question_counts[u["role"]][0] += questions
         question_counts[u["role"]][1] += open_questions
 
-    gaps = (
+    gaps = [
         later.orig_start_ms - earlier.orig_end_ms
         for earlier, later in zip(segment_map.segments, segment_map.segments[1:], strict=False)
-    )
+    ]
     metrics = [
         Metric("duration_s", total_ms / 1000, "s", "Length of the whole recording."),
         Metric(
@@ -387,6 +391,12 @@ def compute_metrics(
             sum(1 for gap in gaps if gap > LONG_SILENCE_MS),
             "count",
             f"Number of gaps with no speech longer than {LONG_SILENCE_MS // 1000} s between stretches of speech.",
+        ),
+        Metric(
+            "hold_gap_count",
+            sum(1 for gap in gaps if gap > HOLD_GAP_MS),
+            "count",
+            f"Number of holds: gaps with no speech longer than {HOLD_GAP_MS // 1000} s between stretches of speech.",
         ),
     ]
     for role in resolved:

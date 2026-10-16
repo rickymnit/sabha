@@ -1,0 +1,42 @@
+# Test fixture only: a small, valid reception rubric for the P5.8 tests. Not a real rubric; the wording is fictional.
+id: reception.testing.v1.0
+segment: testing
+version: "1.0"
+roles: [receptionist, caller]
+
+dimensions:
+  - key: intent_captured
+    name: Intent captured
+    weight: 0.5
+    definition: "The receptionist finds out what the caller needs and says it back."
+    min_quotes: 1
+    anchors:
+      1: "The receptionist never asks what the caller needs."
+      2: "The need is guessed without asking."
+      3: "The receptionist asks what the caller needs."
+      4: "The receptionist asks and confirms the need."
+      5: "The receptionist asks, confirms and checks nothing else is needed."
+    examples:
+      1: "Haan bolo."
+      5: "Toh aapko admission form chahiye, aur kuch?"
+
+  - key: resolution
+    name: Resolution
+    weight: 0.5
+    definition: "The call ends with an answer or a clear next step."
+    min_quotes: 1
+    anchors:
+      1: "The call ends with nothing agreed."
+      2: "A vague promise is made."
+      3: "An answer is given."
+      4: "An answer and a next step are given."
+      5: "An answer, a next step, who will do it and by when."
+    examples:
+      1: "Dekhte hain."
+      5: "Accounts office kal shaam tak call karega."
+
+computed_metrics: [receptionist_talk_share, caller_talk_share, hold_gap_count]
+
+output: [summary, strengths, gaps, suggestions, category, status, follow_up]
+
+visibility_gate: {metric: cohens_kappa, min: 0.60}

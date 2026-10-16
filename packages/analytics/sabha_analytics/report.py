@@ -22,12 +22,15 @@ What the report guarantees (`check_report` enforces it in code; schemas/analysis
 from __future__ import annotations
 
 import json
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
 from typing import Any
 
+from sabha_analytics.classify import UNCERTAIN_TYPE, Classification
 from sabha_analytics.grounding import PreparedTranscript
+from sabha_analytics.phases import PhaseOutcome, segment_phases
+from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, write_ticket
 from sabha_analytics.scoring import (
     CallRecord,
     DimensionResult,
@@ -118,13 +121,20 @@ def build_report(
     synthesis: SynthesisOutcome | None,
     calls: tuple[CallRecord, ...],
     prompt_hashes: Mapping[str, Mapping[str, str]],
+    classification: Classification | None = None,
+    phases: PhaseOutcome | None = None,
+    ticket: TicketOutcome | None = None,
 ) -> AnalysisResult:
     """Assemble and check an analysis@v1 report (module docstring)."""
     reasons: list[str] = []
-    if overall.score is None:
+    if classification is not None and classification.needs_review_reason is not None:
+        reasons.append(classification.needs_review_reason)
+    elif overall.score is None:
         reasons.append(LOW_VERIFICATION)
     elif synthesis is None or synthesis.synthesis is None:
         reasons.append(SYNTHESIS_FAILED)
+    if ticket is not None and ticket.ticket is None:
+        reasons.append(TICKET_FAILED)
     status = RecordingStatus.NEEDS_REVIEW if reasons else RecordingStatus.COMPLETED
     check_transition(RecordingStatus.ANALYZING, status)
 
@@ -157,6 +167,35 @@ def build_report(
         "model_ids": sorted({c.model_id for c in calls}),
         "prompts": {name: dict(record) for name, record in sorted(prompt_hashes.items())},
         "usage": _usage(calls),
+        "classification": None
+        if classification is None
+        else {
+            "type": classification.type,
+            "language_mix": classification.language_mix,
+            "confidence": classification.confidence,
+        },
+        "phases": None
+        if phases is None or phases.phases is None
+        else [
+            {
+                "phase": ph.name,
+                "start_utterance_id": ph.start_utterance_id,
+                "end_utterance_id": ph.end_utterance_id,
+                "start_ms": ph.start_ms,
+                "end_ms": ph.end_ms,
+            }
+            for ph in phases.phases
+        ],
+        "ticket": None
+        if ticket is None or ticket.ticket is None
+        else {
+            "category": ticket.ticket.category,
+            "status": ticket.ticket.status,
+            "follow_up": None
+            if ticket.ticket.follow_up is None
+            else {"text": ticket.ticket.follow_up.text, "owner_role": ticket.ticket.follow_up.owner_role},
+            "summary": ticket.ticket.summary,
+        },
     }
     check_report(report, transcript)
     return AnalysisResult(report, status)
@@ -186,6 +225,10 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
         for suggestion in synthesis["suggestions"]:
             if transcript.get(suggestion["utterance_id"]) is None:
                 problems.append(f"suggestion points at unknown utterance {suggestion['utterance_id']!r}")
+    for phase in report.get("phases") or []:
+        for uid in (phase["start_utterance_id"], phase["end_utterance_id"]):
+            if transcript.get(uid) is None:
+                problems.append(f"phase {phase['phase']} points at unknown utterance {uid!r}")
     if report["overall"]["score"] is None and report["next_status"] != RecordingStatus.NEEDS_REVIEW.value:
         problems.append("no overall score, but the report does not ask for review")
     if problems:
@@ -206,8 +249,29 @@ def analyse(
     metrics: Iterable[Mapping[str, object]],
     model: JudgeModel,
     analysed_roles: Collection[str],
+    classification: Classification | None = None,
+    phase_names: Sequence[str] | None = None,
+    reception: bool = False,
 ) -> AnalysisResult:
-    """Score, compute the overall score, synthesise when there is one, and assemble the report."""
+    """Score, compute the overall score, synthesise when there is one, and assemble the report.
+
+    `classification`: the result of classify.classify when the type had to be inferred. If it asks for review
+    ("uncertain_type"), nothing is scored, because the rubric itself is in doubt. `phase_names`: split the
+    conversation into these phases for the timeline. `reception`: also write the call's ticket.
+    """
+    if classification is not None and classification.needs_review_reason == UNCERTAIN_TYPE:
+        empty = compute_overall(())
+        return build_report(
+            rubric=rubric,
+            transcript=transcript,
+            dimensions=(),
+            metrics=(),
+            overall=empty,
+            synthesis=None,
+            calls=classification.calls,
+            prompt_hashes={p.name: p.to_record() for p in classification.prompts},
+            classification=classification,
+        )
     scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model)
     overall = compute_overall(scoring.dimensions)
     synthesis = None
@@ -221,7 +285,10 @@ def analyse(
             model=model,
             analysed_roles=analysed_roles,
         )
-    prompts = (*scoring.prompts, *(synthesis.prompts if synthesis else ()))
+    phases = segment_phases(transcript, model=model, phase_names=phase_names) if phase_names else None
+    ticket = write_ticket(transcript, model=model) if reception else None
+    steps = [step for step in (classification, synthesis, phases, ticket) if step is not None]
+    prompts = (*scoring.prompts, *(p for step in steps for p in step.prompts))
     return build_report(
         rubric=rubric,
         transcript=transcript,
@@ -229,6 +296,13 @@ def analyse(
         metrics=scoring.metrics,
         overall=overall,
         synthesis=synthesis,
-        calls=(*scoring.calls, *(synthesis.calls if synthesis else ())),
+        calls=(
+            *(classification.calls if classification else ()),
+            *scoring.calls,
+            *(c for step in steps if step is not classification for c in step.calls),
+        ),
         prompt_hashes={p.name: p.to_record() for p in prompts},
+        classification=classification,
+        phases=phases,
+        ticket=ticket,
     )
