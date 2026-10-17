@@ -1298,11 +1298,15 @@ name = "sabha-asr"
 version = "0.0.0"
 source = { editable = "packages/asr" }
 dependencies = [
+    { name = "httpx" },
     { name = "sabha-core" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sabha-core", editable = "packages/core" }]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "sabha-core", editable = "packages/core" },
+]
 
 [[package]]
 name = "sabha-core"

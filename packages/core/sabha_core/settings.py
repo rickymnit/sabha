@@ -82,6 +82,15 @@ class Settings(BaseSettings):
     oidc_audience: str
     oidc_client_id: str
 
+    # Speech recognition (packages/asr, docs/adr/0006-asr-sarvam.md). The speech worker refuses to start without a
+    # provider. Fallbacks are tried in order only when listed here, and every use is logged (golden rule 7).
+    asr_provider: str | None = None
+    asr_fallbacks: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    asr_model: str | None = None  # the provider's default when unset
+    asr_language: str = "unknown"  # a BCP-47 hint such as hi-IN, or "unknown" to detect the language
+    sarvam_api_key: SecretStr | None = None
+    sarvam_base_url: str = "https://api.sarvam.ai"
+
     # LLM providers (docs/llm-providers.md). Data-residency approval comes first (golden rule 12).
     openai_api_key: SecretStr | None = None
     openai_base_url: str | None = None
@@ -105,6 +114,13 @@ class Settings(BaseSettings):
     artefact_version_diarize: str = "v1"
     artefact_version_transcribe: str = "v1"
     artefact_version_analyze: str = "v1"
+
+    @field_validator("asr_fallbacks", mode="before")
+    @classmethod
+    def _split_fallbacks(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -145,7 +161,9 @@ class Settings(BaseSettings):
             raise ValueError("GIT_SHA must be 7 to 40 lowercase hex characters")
         return value
 
-    @field_validator("s3_endpoint_url", "langfuse_host", "openai_base_url", "otel_exporter_otlp_endpoint")
+    @field_validator(
+        "s3_endpoint_url", "langfuse_host", "openai_base_url", "otel_exporter_otlp_endpoint", "sarvam_base_url"
+    )
     @classmethod
     def _check_http_url(cls, value: str | None) -> str | None:
         return None if value is None else _check_url(value, ("http", "https"), "value")
@@ -191,6 +209,16 @@ class Settings(BaseSettings):
                 raise ValueError(f"OIDC_ISSUER must use https in {self.app_env}")
             if self.openai_base_url is not None and not self.openai_base_url.startswith("https://"):
                 raise ValueError(f"OPENAI_BASE_URL must use https in {self.app_env}")
+            if not self.sarvam_base_url.startswith("https://"):
+                raise ValueError(f"SARVAM_BASE_URL must use https in {self.app_env}")
+            if "fake" in (self.asr_provider, *self.asr_fallbacks):
+                raise ValueError(f"the fake ASR provider is for tests and local development, not {self.app_env}")
+        if self.asr_provider is not None and self.asr_provider in self.asr_fallbacks:
+            raise ValueError("ASR_FALLBACKS must not repeat ASR_PROVIDER")
+        if len(set(self.asr_fallbacks)) != len(self.asr_fallbacks):
+            raise ValueError("ASR_FALLBACKS lists a provider twice")
+        if "sarvam" in (self.asr_provider, *self.asr_fallbacks) and self.sarvam_api_key is None:
+            raise ValueError("SARVAM_API_KEY is required when Sarvam is the ASR provider or a fallback")
         return self
 
 

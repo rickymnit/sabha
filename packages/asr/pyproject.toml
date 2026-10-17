@@ -1,9 +1,15 @@
 [project]
 name = "sabha-asr"
 version = "0.0.0"
-description = "Multi-provider speech recognition, ported from LIS."
+description = "Multi-provider speech recognition."
 requires-python = ">=3.12,<3.13"
-dependencies = ["sabha-core"]
+dependencies = [
+    "httpx>=0.28",
+    "sabha-core",
+]
+
+[project.scripts]
+sabha-asr-transcribe = "sabha_asr.cli:main"  # transcribe one WAV with the configured provider (P3.1)
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]
