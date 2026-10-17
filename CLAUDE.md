@@ -57,7 +57,7 @@ apps/api/            FastAPI app: routers/, services/, schemas/, auth/, main.py
 apps/workers/        Celery app and tasks: preprocess.py, speech.py, analyze.py, notify.py, meter.py, relay.py
 apps/web/            React app; src/design/ holds tokens and components
 packages/core/       sabha_core: settings, repo (tenant-scoped), models, state machine, storage, logging, telemetry
-packages/asr/        sabha_asr: multi-provider ASR abstraction ported from LIS
+packages/asr/        sabha_asr: multi-provider ASR abstraction (built here; there is no earlier codebase to port)
 packages/llm/        sabha_llm: gateway, providers, redaction, prompt caching, cost accounting
 packages/analytics/  sabha_analytics: rubric loader, metrics, scoring, grounding, synthesis
 rubrics/             rubric files: <type>.<segment>.v<major>.<minor>.yaml

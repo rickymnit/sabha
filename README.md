@@ -102,7 +102,7 @@ Stop the services with `make down`. Data volumes are kept.
 | [`apps/workers`](apps/workers) | Celery workers for each pipeline stage, plus the outbox relay |
 | [`apps/web`](apps/web) | React 18 + TypeScript + Vite app. Design tokens and components are in `src/design/` |
 | [`packages/core`](packages/core) | `sabha_core`: settings, tenant-scoped repository, models, state machine, time mapping, profiles |
-| [`packages/asr`](packages/asr) | `sabha_asr`: multi-provider speech recognition, ported from LIS |
+| [`packages/asr`](packages/asr) | `sabha_asr`: multi-provider speech recognition |
 | [`packages/llm`](packages/llm) | `sabha_llm`: LLM gateway with routing, budgets, PII redaction, caching and cost accounting |
 | [`packages/analytics`](packages/analytics) | `sabha_analytics`: rubric loading, metrics, scoring, grounding and synthesis |
 | [`rubrics`](rubrics) | Versioned rubric files: `<type>.<segment>.v<major>.<minor>.yaml` |
@@ -138,7 +138,8 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | PII redaction (P5.2) | Done. Not yet behind the LLM gateway (P5.1) |
 | Gold-set freeze and coverage report, WER and role-accuracy eval (P4.2, P4.3) | Done. Gate targets in `eval/targets.yaml` are unset until baselines exist |
 | Transcript view with synced player (P6.5) | Done with mock data, at `/dev/transcript` |
-| LLM provider shortlist (P0.6), LIS baselines (P0.7) | Waiting on inputs |
+| LLM provider shortlist (P0.6) | o3-mini chosen; details to confirm with OpenAI |
+| LIS baselines (P0.7) | Dropped: there is no LIS codebase. ASR providers are chosen by our own bake-off on the gold set |
 | API, identity, tenancy, uploads, workers, ASR providers, LLM gateway, scoring, reports | Not started |
 
 ## Continuous integration
