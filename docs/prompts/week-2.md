@@ -6,6 +6,8 @@ Goal: an upload flows automatically through cleaning and speaker detection, and 
 
 ## P2.3 · Job state machine and stage runs
 
+> **Status (2026-10-17).** Already built: `RecordingStatus`, the transition table, `check_transition`, `InvalidTransition` / `ConcurrentTransition` (sabha_core/state.py). Remaining: `transition()` with the conditional update in a MongoDB session returning the outbox event, `stage_runs` documents per attempt, and their tests.
+
 Plan task 2.3. **Tests first.** Read first: `CLAUDE.md` (domain model).
 
 ```text
@@ -101,6 +103,8 @@ Done when: the recordings list updates without a refresh as a job moves.
 
 ## P1.7 · Organisation profiles and label dictionary
 
+> **Status (2026-10-17).** Already built: profile defaults for school, college and company (sabha_core/profiles.py) and `Tenant.from_profile` (P1.6). Remaining: `POST /v1/admin/tenants`, `PATCH /v1/settings`, `useLabels()` in the web app, and blocking uploads of disabled types.
+
 Plan task 1.7.
 
 ```text
@@ -138,27 +142,6 @@ Done when: opening a recording's audio writes an audit entry visible to an admin
 
 ---
 
-## P3.1 · Port the LIS multi-provider ASR abstraction
-
-Plan task 3.1. Read first: the LIS repo's ASR package (give the path).
-
-```text
-Port our LIS multi-provider ASR abstraction into packages/asr as sabha_asr.
-
-- Keep its provider interface and the explicit no-silent-fallback behaviour exactly; list every change you make
-  and why.
-- Providers: the ones LIS supports (Qwen3-ASR, Parakeet, IndicConformer, faster-whisper); configuration chooses
-  ONE active provider per deployment, with an optional explicit fallback list that is logged when used.
-- Standard output: words [{text, start_ms, end_ms, confidence}], language tags per segment if available,
-  model id and version, real-time factor.
-- Copy the relevant LIS tests and make them pass here.
-Do not change model behaviour. Show me a diff summary between LIS and the port before finishing.
-```
-
-Done when: the ported tests pass and a sample file transcribes through the new package.
-
----
-
 ## P3.2 · Validate and normalise audio
 
 Plan task 3.2.
@@ -180,6 +163,8 @@ Done when: any supported fixture produces `normalised.wav` and `playback.opus`.
 ---
 
 ## P3.3 · Voice activity detection and segment map
+
+> **Status (2026-10-17).** Already built: `sabha_core/timemap.py` (segment map, compact/original mapping, stats) with its tests. Remaining: the Silero VAD step that writes `segments@v1.json` and `compact.wav`, and the PREPROCESSING → DIARIZING transition. The 300 ms end padding is an unmeasured default (there is no LIS); tune it on the gold set.
 
 Plan task 3.3. **Tests first** for the time mapping.
 
@@ -260,6 +245,8 @@ Done when: uploads appear and change status live on the overview.
 ---
 
 ## P7.1 · Monitoring and tracing
+
+> **Status (2026-10-17).** Already built: OpenTelemetry tracing set-up for the API (sabha_core/telemetry.py). Remaining: trace propagation through outbox and Celery, Prometheus metrics, Grafana dashboards, Sentry.
 
 Plan task 7.1.
 

@@ -4,56 +4,6 @@ Goal: a logged-in user uploads a large file directly to storage and sees status 
 
 ---
 
-## P1.1 · Monorepo tooling
-
-Plan task 1.1. Read first: `CLAUDE.md` (stack, repo layout, commands).
-
-```text
-Set up the Python and web tooling for the monorepo described in CLAUDE.md.
-
-1. uv workspace with members packages/core, packages/asr, packages/llm, packages/analytics, apps/api,
-   apps/workers. Python 3.12. Each has pyproject.toml, src layout, and an empty tests/ folder.
-2. ruff (lint + format) and mypy (strict for packages/*, normal for apps/*) configured at the root.
-3. pnpm for apps/web with eslint, prettier, tsc --noEmit, vitest.
-4. pre-commit hooks: ruff, ruff-format, mypy (changed files), eslint, prettier, detect-secrets, end-of-file.
-5. Makefile with the targets listed in CLAUDE.md (dev, test, lint, e2e, eval-wer, eval-kappa); targets that
-   are not implemented yet print "not implemented yet" and exit 0.
-6. docker-compose.dev.yml (in infra/) with mongo:7 started as a single-node replica set (rs.initiate in a
-   healthcheck/init container), redis:7, minio with a created bucket, and placeholders for api, workers, web.
-7. A test in packages/core proving the dev Mongo is a replica set and a transaction commits.
-
-Out of scope: application features.
-```
-
-Done when: a fresh clone runs `make dev`, `make lint` and `make test` successfully.
-
----
-
-## P1.2 · CI pipeline
-
-Plan task 1.2.
-
-```text
-Create GitHub Actions workflows.
-
-.github/workflows/ci.yml on pull_request and push to main:
-- Python job: uv sync, ruff, mypy, pytest (with testcontainers for Mongo replica set, Redis, MinIO), coverage
-  report as an artifact.
-- Web job: pnpm install, eslint, tsc, vitest, vite build.
-- Security job: pip-audit (or uv equivalent), pnpm audit --audit-level=high, gitleaks.
-- Build job (main only): build Docker images for api, workers (CPU and GPU variants) and web; push to GHCR
-  tagged with the commit SHA.
-Cache uv and pnpm. Fail fast on lint. Keep total CI time under ~10 minutes; tell me if it cannot be.
-
-Also add Dockerfiles: apps/api/Dockerfile (slim, non-root), apps/workers/Dockerfile.cpu,
-apps/workers/Dockerfile.gpu (CUDA runtime base matching an NVIDIA L4, ffmpeg installed), apps/web/Dockerfile
-(build then nginx serving static files with security headers).
-```
-
-Done when: a PR shows green checks and images appear in GHCR from main.
-
----
-
 ## P1.3 · Staging with Docker Compose and Terraform
 
 Plan task 1.3. Read first: `docs/setup/cloud-checklist.md`, `.env.example`.
@@ -78,31 +28,9 @@ Done when: staging is reachable over HTTPS and `/health` responds.
 
 ---
 
-## P1.4 · API skeleton
-
-Plan task 1.4. Read first: `CLAUDE.md` (API conventions).
-
-```text
-Build the FastAPI skeleton in apps/api.
-
-- main.py app factory; settings from sabha_core.settings; lifespan creating one AsyncMongoClient and Redis client.
-- Middleware: request id (accept X-Request-Id or generate), structured JSON access log, CORS from settings,
-  security headers.
-- Error handling: every error returns RFC 9457 problem+json {type, title, status, detail, code, request_id};
-  define an ApiError base class with stable codes; validation errors mapped to code "validation_error".
-- Endpoints: GET /health (liveness), GET /ready (Mongo, Redis, S3 reachable), GET /v1/meta (version, git sha).
-- OpenAPI served at /docs only when APP_ENV != prod.
-- sabha_core/logging.py: JSON logging with request_id and tenant_id in context vars; secrets never logged.
-- sabha_core/telemetry.py: OpenTelemetry tracing setup (OTLP exporter), FastAPI instrumentation.
-
-Tests: problem+json shape for 404, 422 and an ApiError; request id propagates; /ready fails when Mongo is down.
-```
-
-Done when: tests pass and `/docs` shows the API on dev.
-
----
-
 ## P1.5 · Identity and roles
+
+> **Status (2026-10-17).** Already built (P1.5a): Auth0 token validation, `current_principal` / `require_role`, web AuthProvider, ProtectedRoute and sign-out, ADR 0002, `docs/setup/auth.md`. Remaining (P1.5b): look up users through the `identities` collection, `POST /v1/users/invites`, `GET /v1/me`. Needs an Auth0 dev tenant for the "Done when".
 
 Plan task 1.5. Read first: `docs/adr/` (write 0002-auth.md as part of this task).
 
@@ -129,6 +57,8 @@ Done when: you log in with Google on dev and `/v1/me` returns your role and tena
 ---
 
 ## P1.6 · Tenant model and tenant-scoped repository
+
+> **Status (2026-10-17).** Already built, not yet committed: `models.py`, `repo.py` (TenantRepo, SyncTenantRepo, SystemRepo), `indexes.py`, the isolation and lint tests (all pass). Remaining: fix /tenant-check findings 1 (per-user rate-limit key without tenant) and 2 (duplicate-key id oracle: test plus no-client-ids rule); the API dependency that builds TenantRepo from the principal; commit.
 
 Plan task 1.6. **Write the tests first.** Read first: `CLAUDE.md` golden rule 1.
 
@@ -205,28 +135,6 @@ Done when: a duplicate upload is caught and a normal upload reaches `UPLOADED`.
 
 ---
 
-## P6.1 · Design system in code
-
-Plan task 6.1. Read first: `docs/design/tokens.md`, all `docs/design/*.png`, `docs/design/source/*.dc.html`.
-
-```text
-Turn the design into a small component library in apps/web/src/design/.
-
-Components (TypeScript, Tailwind, accessible): Button (primary, secondary, ghost; 44px min height),
-Input, Select, Checkbox, Label, Card/Panel, StatusChip (Analysed, Transcribing, Analysing, Needs review,
-Failed, Uploading), TypeDot (5 conversation types), ScoreChip (1–5 with colour bands), ScoreBar (5 segments),
-Table (with horizontal scroll on narrow screens), Tabs/SegmentedControl, ProgressBar, EmptyState, Toast,
-Sidebar nav item, PageHeader, MetricStrip (the 4-cell panel), Skeleton.
-
-Rules: colours only from tokens; visible focus ring; prefers-reduced-motion respected; numbers use
-tabular-nums; every component has a Vitest test and a story-like demo page at /dev/components (dev only).
-Compare against the screenshots and list any differences you could not match.
-```
-
-Done when: `/dev/components` shows every component matching the design.
-
----
-
 ## P6.2 · App shell, login and navigation
 
 Plan task 6.2. Read first: `docs/design/01-overview.png` (sidebar), P1.5 output.
@@ -247,19 +155,3 @@ Tests: protected route redirects; labels render from /v1/me; Playwright smoke te
 ```
 
 Done when: you log in on staging and see the shell with your tenant's labels.
-
----
-
-## P8.3 · Recording guide for pilot schools
-
-Plan task 8.3.
-
-```text
-Write docs/guides/recording-guide.md and a printable one-page version (docs/guides/recording-guide.html with
-print CSS) for teachers and front-desk staff: phone placement (within 2 m of the teacher, not near fans/AC),
-lapel mic option, airplane mode, battery, file formats, uploading the original file (not via WhatsApp,
-which re-compresses audio), front-desk call notice, and what NOT to record. English and Hindi. Use simple
-words and icons from text only (no external images).
-```
-
-Done when: the guide is sent to pilot coordinators.

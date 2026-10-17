@@ -6,6 +6,8 @@ Goal: both conversation types work, staff can dispute scores, and one busy schoo
 
 ## P5.8 · Classify, segment and the reception rubric
 
+> **Status (2026-10-17).** Already built: classify step, phase segmentation, reception ticket and hold-gap metric (sabha_analytics). Remaining: publish `rubrics/reception.school.v1.0.yaml` (needs the academic head's v0.2) and wire both steps into the analyze stage.
+
 Plan task 5.8. Read first: `rubrics/reception.school.v0.2.yaml`.
 
 ```text
@@ -30,6 +32,8 @@ Done when: 10 real calls produce ticket-style reports.
 
 ## P6.7 · Disputes and reviews
 
+> **Status (2026-10-17).** Already built: the dispute dialog and `/reviews` page on mock data (`/dev/reviews`). Remaining: the three endpoints, the `disputes` collection, override scores with history, calibration records, and the resolution notification.
+
 Plan task 6.7.
 
 ```text
@@ -51,28 +55,9 @@ Done when: a teacher disputes a score and a reviewer resolves it end to end.
 
 ---
 
-## P4.6 · Agreement and grounding evaluation
-
-Plan task 4.6. Read first: `CLAUDE.md` golden rule 6.
-
-```text
-Implement eval/kappa.py and eval/grounding.py (make eval-kappa).
-
-- Split: assign each calibration recording to train or holdout once (stratified by school and type, seeded),
-  stored in eval/calibration/split.json; the holdout is never used for tuning.
-- Human reference per dimension = median of the 3 raters.
-- Report per rubric and dimension: quadratic-weighted Cohen's kappa between AI and human reference, rater-rater
-  agreement for context, exact and within-1 agreement, bootstrap CI, n.
-- grounding.py: share of evidence quotes verified, per model and prompt version; share of dimensions excluded.
-- Output eval/reports/kappa-<date>.md/.json; mark each dimension PASS (>= 0.60) or FAIL against eval/targets.yaml.
-Tests: hand-computed kappa on a toy set; split is deterministic and holdout untouched by tuning code paths.
-```
-
-Done when: the first per-dimension agreement table is produced on real rater scores.
-
----
-
 ## P7.2 · Rate limits, quotas, priority lanes and fair scheduling
+
+> **Status (2026-10-17).** Already built: the fair GPU scheduler and ADR 0005, the Redis token-bucket rate limiter, quota rules and priority-lane routing. Remaining: call the limiter from the auth dependency (with a per-tenant user key, /tenant-check finding 1), quota checks in the upload API with the 80% banner, the `gpu.speech` dispatcher, and the admission-control ETA.
 
 Plan task 7.2.
 
@@ -97,6 +82,8 @@ Done when: short calls finish within 5 minutes during a bulk upload from another
 ---
 
 ## P2.7 · Notifications
+
+> **Status (2026-10-17).** Already built: notification rules, English and Hindi templates, signed webhooks, the SES adapter. Remaining: the `io.notify` Celery task, the delivery log in MongoDB keyed by (tenant_id, delivery_key) (/tenant-check finding 3), per-user preferences, webhook retries and delivery log.
 
 Implied by the plan's notify stage.
 
@@ -132,6 +119,8 @@ Done when: changing a rubric and re-analysing keeps both versions visible.
 ---
 
 ## P6.4b · Overview with real numbers
+
+> **Status (2026-10-17).** Already built: the overview UI, "Where coaching helps most" panel and IST date-range picker on mock data (`/dev/overview`). Remaining: `GET /v1/overview` aggregations through TenantRepo and the nightly weekly summary (`$merge` needs a vetted repository method, see `sabha_core/repo.py`).
 
 Plan task 6.4.
 

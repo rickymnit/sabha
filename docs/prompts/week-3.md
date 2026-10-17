@@ -22,6 +22,8 @@ Done when: the chosen diarizer runs reliably on all gold files.
 
 ## P3.5 · Speech-to-text with batching
 
+> **Status (2026-10-17).** Already built: chunk planning and merging (`chunking.py`), the batcher (`batcher.py`), and the ASR provider layer with Sarvam AI (P3.1, ADR 0006; there are no LIS baselines). Sarvam's REST limit is 30 s per chunk and it gives phrase-level timestamps. Remaining: the transcribe stage on `gpu.speech` writing `asr@v1.json` and recording cost inputs in `stage_runs`.
+
 Plan task 3.5. Read first: `eval/baselines/lis-baselines.md`.
 
 ```text
@@ -43,6 +45,8 @@ Done when: real pilot lessons transcribe on staging with timestamps.
 ---
 
 ## P3.6 · Speaker role assignment
+
+> **Status (2026-10-17).** Already built: heuristic role assignment (`sabha_asr/roles.py`) with tests. Remaining: run it as a pipeline step that writes `roles@v1.json`, with the LLM tie-break and NEEDS_REVIEW path.
 
 Plan task 3.6.
 
@@ -66,6 +70,8 @@ Done when: roles are correct on most gold files and low-confidence cases are fla
 
 ## P3.7 · Transcript assembly
 
+> **Status (2026-10-17).** Already built: transcript assembly and validation (`sabha_asr/assembly.py`, `transcript.v1.schema.json`), including null confidence and `word_timing`. Remaining: run it in the transcribe stage, store `transcript@v1.json` and the `transcripts` record, and transition to ANALYZING.
+
 Plan task 3.7.
 
 ```text
@@ -83,47 +89,6 @@ Tests: original-time remap correct across a removed silence; JSON schema validat
 ```
 
 Done when: every processed file has a canonical transcript with original timestamps.
-
----
-
-## P4.2 · Gold-set tooling and freeze
-
-Plan task 4.2 (people correct transcripts; this builds the tooling).
-
-```text
-Build eval/goldset/:
-- manifest.csv schema {recording_id, file, type, language_mix, room_type, duration_s, consent_ref, split
-  (dev|holdout), annotator, status}.
-- freeze.py: validates every holdout file has a completed gold transcript and speaker labels, computes total
-  hours per language mix and room type, writes eval/goldset/FROZEN.json with file hashes, and refuses to run if
-  holdout hours < the target in eval/targets.yaml.
-- After freezing, any change to a holdout file fails CI (hash check).
-- report.py prints coverage: hours by language mix, room type, school.
-```
-
-Done when: the hold-out set is frozen at 15–20 hours.
-
----
-
-## P4.3 · WER and role-accuracy evaluation
-
-Plan task 4.3.
-
-```text
-Implement eval/wer.py and eval/roles.py (make eval-wer).
-
-- Text normalisation for Hinglish: lowercase, punctuation stripped, numbers normalised consistently, Devanagari
-  and Roman kept as written (report both raw and a transliterated-normalised WER using a documented
-  transliteration step).
-- WER and CER per file, per language mix, per room type, overall (word-weighted); confidence intervals by
-  bootstrap over files.
-- roles.py: role accuracy per file (share of reference speech time attributed to the correct role) and DER.
-- Output eval/reports/wer-<date>.md and .json; compare against eval/targets.yaml; never print a target as met
-  if data is missing.
-Tests: known small examples with hand-computed WER; bootstrap reproducible with a seed.
-```
-
-Done when: one command prints WER and role accuracy on the hold-out set.
 
 ---
 
@@ -152,27 +117,6 @@ Done when: every LLM call is traced with tokens and cost.
 
 ---
 
-## P5.2 · PII redaction
-
-Plan task 5.2. **Tests first.**
-
-```text
-Add redaction in sabha_llm/redact.py, applied automatically inside the gateway before any provider call.
-
-- Microsoft Presidio with custom recognisers: Indian mobile numbers (+91 and 10-digit), Aadhaar-like 12-digit
-  patterns (with and without spaces), PAN pattern, emails, and a configurable list of names to mask (school
-  staff names are NOT masked by default; student names in teaching transcripts are).
-- Replace with stable placeholders per document ([PHONE_1], [STUDENT_2]) and keep the mapping server-side so
-  quotes can be shown un-redacted to authorised users after verification.
-- Grounding (P5.6) must match quotes against the redacted text, then map back.
-Tests first: each pattern, Hinglish sentences, no false positive on times like "10:30" or class names like
-"Class 10".
-```
-
-Done when: no unmasked phone, Aadhaar-like number or email reaches a provider in tests.
-
----
-
 ## P5.3 · Model bake-off harness
 
 Plan task 5.3.
@@ -190,25 +134,6 @@ Never invent figures; missing → MISSING.
 ```
 
 Done when: you record the chosen model in `docs/adr/0004-llm-choice.md`.
-
----
-
-## P6.5 · Transcript view with synced player
-
-Plan task 6.5.
-
-```text
-Build the transcript panel and audio player used on /recordings/:id.
-
-- Audio player for playback.opus (presigned URL from the transcript endpoint; refresh before expiry);
-  play/pause, seek, speed 0.75–2x, keyboard shortcuts.
-- Transcript list: time, role (from labels), text; current line highlighted while playing; click a line to
-  seek; low-confidence spans styled subtly; search within the transcript.
-- Virtualised list for 3-hour recordings.
-Tests: click-to-seek, highlight follows playback, virtualisation renders 5,000 lines smoothly.
-```
-
-Done when: clicking any line plays that exact moment.
 
 ---
 
