@@ -110,6 +110,36 @@ def test_average_confidence_and_low_confidence_spans() -> None:
     assert strict.low_confidence_spans == ((0, 10), (16, 22))
 
 
+def test_words_without_confidence_are_never_marked_and_are_left_out_of_the_average() -> None:
+    # Providers such as Sarvam give no word confidence (ADR 0006).
+    unknown = [Word("ek", 0, 100, None), Word("do", 200, 300, None)]
+    (utterance,) = assemble_utterances(unknown, WHOLE, ROLES, SEGMENTS)
+    assert utterance.avg_confidence is None
+    assert utterance.low_confidence_spans == ()
+
+    mixed = [w("ek", 0, 100, 0.2), Word("do", 200, 300, None), w("teen", 400, 500, 0.3), w("char", 600, 700, 0.8)]
+    (utterance,) = assemble_utterances(mixed, WHOLE, ROLES, SEGMENTS)
+    assert utterance.avg_confidence == round((0.2 + 0.3 + 0.8) / 3, 4)
+    assert [utterance.text[a:b] for a, b in utterance.low_confidence_spans] == ["ek", "teen"]
+
+
+def test_word_timing_is_recorded() -> None:
+    assert good_transcript()["word_timing"] == "word"
+    approximate = assemble_transcript(
+        [Word("ek", 0, 100, None)], WHOLE, ROLES, SEGMENTS, asr_model="sarvam/saaras:v3", word_timing="approximate"
+    )
+    assert approximate["word_timing"] == "approximate"
+    assert approximate["utterances"][0]["avg_confidence"] is None
+    validate_transcript(dict(approximate))
+    jsonschema.validate(dict(approximate), load_transcript_schema(), cls=jsonschema.Draft202012Validator)
+
+
+def test_transcripts_written_before_word_timing_existed_stay_valid() -> None:
+    doc = mutate(("word_timing",), DELETE)
+    validate_transcript(doc)
+    jsonschema.validate(doc, load_transcript_schema(), cls=jsonschema.Draft202012Validator)
+
+
 def test_words_are_ordered_by_time_whatever_the_input_order() -> None:
     words = [w("do", 600, 900), w("ek", 100, 400)]
     assert spans(assemble_utterances(words, WHOLE, ROLES, SEGMENTS)) == [("T", 1100, 1900, "ek do")]
@@ -199,6 +229,8 @@ SCHEMA_VIOLATIONS = [
     pytest.param(("utterances", 0, "role"), "", id="blank-role"),
     pytest.param(("utterances", 0, "speaker_label"), DELETE, id="missing-speaker"),
     pytest.param(("utterances", 0, "avg_confidence"), 1.5, id="confidence-above-one"),
+    pytest.param(("utterances", 0, "avg_confidence"), "high", id="confidence-not-a-number"),
+    pytest.param(("word_timing",), "guessed", id="unknown-word-timing"),
     pytest.param(("utterances", 0, "low_confidence_spans"), [[0]], id="span-not-a-pair"),
     pytest.param(("utterances", 0, "low_confidence_spans"), [[-1, 2]], id="negative-span"),
     pytest.param(("utterances", 0, "student_id"), "x", id="unknown-utterance-key"),

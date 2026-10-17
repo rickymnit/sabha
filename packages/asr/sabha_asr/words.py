@@ -34,7 +34,7 @@ class WordRecord(TypedDict):
     text: str
     start_ms: int
     end_ms: int
-    confidence: float
+    confidence: float | None
 
 
 class TurnRecord(TypedDict):
@@ -55,17 +55,18 @@ def _is_number(value: object) -> TypeGuard[int | float]:
 
 @dataclass(frozen=True, slots=True)
 class Word:
-    """One recognised word, [start_ms, end_ms), with the ASR's confidence in [0, 1].
+    """One recognised word, [start_ms, end_ms), with the ASR's confidence in [0, 1], or None.
 
     Leading and trailing whitespace is stripped from `text` (some providers prefix words with a space); text that is
-    blank after stripping is refused, so provider adapters must drop empty tokens. `confidence` is stored as float.
-    Zero-length words (start_ms == end_ms) are allowed.
+    blank after stripping is refused, so provider adapters must drop empty tokens. `confidence` is stored as float,
+    or None when the provider gives no confidence (Sarvam, ADR 0006). Zero-length words (start_ms == end_ms) are
+    allowed.
     """
 
     text: str
     start_ms: int
     end_ms: int
-    confidence: float
+    confidence: float | None
 
     def __post_init__(self) -> None:
         if not isinstance(self.text, str) or not self.text.strip():
@@ -74,10 +75,11 @@ class Word:
             raise ValueError(f"word times must be whole milliseconds (int): {self!r}")
         if not 0 <= self.start_ms <= self.end_ms:
             raise ValueError(f"word times must satisfy 0 <= start_ms <= end_ms: {self!r}")
-        if not _is_number(self.confidence) or math.isnan(self.confidence) or not 0 <= self.confidence <= 1:
-            raise ValueError(f"word confidence must be a number in [0, 1]: {self!r}")
+        if self.confidence is not None:
+            if not _is_number(self.confidence) or math.isnan(self.confidence) or not 0 <= self.confidence <= 1:
+                raise ValueError(f"word confidence must be a number in [0, 1] or None: {self!r}")
+            object.__setattr__(self, "confidence", float(self.confidence))
         object.__setattr__(self, "text", self.text.strip())
-        object.__setattr__(self, "confidence", float(self.confidence))
 
     @property
     def duration_ms(self) -> int:

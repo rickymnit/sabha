@@ -19,8 +19,8 @@ export interface Utterance {
   start_ms: number;
   end_ms: number;
   text: string;
-  /** Mean ASR word confidence for the utterance, 0 to 1. */
-  avg_confidence: number;
+  /** Mean ASR word confidence for the utterance, 0 to 1; null when the ASR gives no confidence (ADR 0006). */
+  avg_confidence: number | null;
   low_confidence_spans: LowConfidenceSpan[];
 }
 
@@ -30,6 +30,11 @@ export interface Transcript {
   /** Always the original recording, never the compact (silence-removed) audio. */
   timeline: "original";
   asr_model: string;
+  /**
+   * "approximate" when the ASR timed only phrases and word times were spread across them (ADR 0006), so playback
+   * positions are phrase-accurate. Absent in older transcripts, meaning "word".
+   */
+  word_timing?: "word" | "approximate";
   word_count: number;
   utterances: Utterance[];
 }
