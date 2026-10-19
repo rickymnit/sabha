@@ -49,11 +49,20 @@ def test_ensure_indexes_is_idempotent(db: Database[dict[str, Any]]) -> None:
 
 def test_every_tenant_collection_index_starts_with_tenant_id(db: Database[dict[str, Any]]) -> None:
     # A query always carries tenant_id first (TenantRepo), so an index that does not start with it is either unused
-    # or a sign of a query that is not tenant-scoped.
+    # or a sign of a query that is not tenant-scoped. TTL indexes are the exception: MongoDB requires them to have a
+    # single field, and they serve the server's own expiry, not queries.
     ensure_indexes(db)
     for collection in set(COLLECTIONS) - set(SYSTEM_COLLECTIONS):
-        for name, (fields, _) in keys(db, collection).items():
-            assert fields[0][0] == "tenant_id", f"{collection}.{name}"
+        for name, info in db[collection].index_information().items():
+            if name == "_id_" or "expireAfterSeconds" in info:
+                continue
+            assert next(iter(info["key"]))[0] == "tenant_id", f"{collection}.{name}"
+
+
+def test_idempotency_records_expire_after_24_hours(db: Database[dict[str, Any]]) -> None:
+    ensure_indexes(db)
+    ttl = [info for info in db.idempotency_keys.index_information().values() if "expireAfterSeconds" in info]
+    assert [(list(i["key"]), i["expireAfterSeconds"]) for i in ttl] == [([("created_at", 1)], 86_400)]
 
 
 @pytest.mark.parametrize(
@@ -62,8 +71,9 @@ def test_every_tenant_collection_index_starts_with_tenant_id(db: Database[dict[s
         ("users", ["tenant_id", "email"]),
         ("identities", ["issuer", "subject"]),
         ("identities", ["tenant_id", "email"]),
-        ("stage_runs", ["tenant_id", "recording_id", "stage", "version"]),
+        ("stage_runs", ["tenant_id", "recording_id", "stage", "version", "attempt"]),
         ("analyses", ["tenant_id", "recording_id", "version"]),
+        ("idempotency_keys", ["tenant_id", "route", "key"]),
     ],
 )
 def test_unique_indexes_that_protect_invariants(

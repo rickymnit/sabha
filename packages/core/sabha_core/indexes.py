@@ -2,7 +2,7 @@
 
 In tenant collections every index starts with tenant_id, because every query the repository runs does
 (sabha_core.repo). Unique indexes protect invariants: one user per email in a tenant, one stage run per
-(recording, stage, version), one analysis per (recording, version), one login per (issuer, subject).
+(recording, stage, version, attempt), one analysis per (recording, version), one login per (issuer, subject).
 
 Running `ensure_indexes` again changes nothing; an index whose definition changed under the same name makes MongoDB
 raise, which is what we want: changing an index is a deliberate migration.
@@ -21,6 +21,7 @@ from pymongo.errors import CollectionInvalid
 from sabha_core.repo import COLLECTIONS
 
 T = "tenant_id"
+IDEMPOTENCY_TTL_S = 24 * 3600  # CLAUDE.md: replays within 24 h return the original response
 
 
 def _ix(name: str, *keys: tuple[str, int], unique: bool = False, **options: Any) -> IndexModel:
@@ -45,11 +46,12 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "stage_runs": [
         _ix(
-            "tenant_recording_stage_version",
+            "tenant_recording_stage_version_attempt",
             (T, ASCENDING),
             ("recording_id", ASCENDING),
             ("stage", ASCENDING),
             ("version", ASCENDING),
+            ("attempt", ASCENDING),
             unique=True,
         )
     ],
@@ -74,6 +76,11 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "usage_events": [_ix("tenant_occurred", (T, ASCENDING), ("occurred_at", ASCENDING))],
     "audit_log": [_ix("tenant_at", (T, ASCENDING), ("at", DESCENDING))],
+    "idempotency_keys": [
+        _ix("tenant_route_key", (T, ASCENDING), ("route", ASCENDING), ("key", ASCENDING), unique=True),
+        # TTL indexes must have a single field; MongoDB deletes expired records itself (no query involved).
+        _ix("expiry", ("created_at", ASCENDING), expireAfterSeconds=IDEMPOTENCY_TTL_S),
+    ],
     # System collections (sabha_core.repo.SYSTEM_COLLECTIONS): read across tenants by the relay and by login.
     "outbox": [
         _ix("unpublished", ("published_at", ASCENDING), ("created_at", ASCENDING)),

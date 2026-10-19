@@ -6,17 +6,28 @@ Each worker stage (PREPROCESSING, DIARIZING, TRANSCRIBING, ANALYZING) can also m
 COMPLETED -> ANALYZING is allowed only for re-analysis, and only when the caller says so (`reanalysis=True`).
 Nothing leaves FAILED or NEEDS_REVIEW: retries and review outcomes are not defined yet, so they are not here.
 
-This module is the pure part of plan task P2.3: the table and `check_transition`. `transition(session, ...)`,
-which makes the conditional MongoDB update and returns the outbox event, and the stage_runs collection arrive with
-P2.3's database part, once the tenant-scoped repository (P1.6) exists. That is also where golden rule 9 (no
-consent_ref, no move past UPLOADED) belongs, because checking it needs the recording document.
+`transition()` (sync, for workers) and `transition_async()` (for the API) apply a change through the
+tenant-scoped repository with a conditional update: the recording must still be in `from_status`, so of two
+workers racing, one wins and the other gets ConcurrentTransition. They enforce golden rule 9 in the same update: a
+recording without a consent_ref cannot move past UPLOADED (ConsentRequired). They return the outbox event
+describing the change, `recording.<new status>`; the caller writes it in the same transaction (P2.5). Pass the
+transaction's session.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # models import RecordingStatus from here, so these are imported where they are used
+    from pymongo.asynchronous.client_session import AsyncClientSession
+    from pymongo.client_session import ClientSession
+
+    from sabha_core.models import OutboxEvent, Recording
+    from sabha_core.repo import SyncTenantRepo, TenantRepo
 
 
 class RecordingStatus(StrEnum):
@@ -74,10 +85,15 @@ class InvalidTransition(TransitionError):
 
 
 class ConcurrentTransition(TransitionError):
-    """The recording was no longer in the expected status when the conditional update ran; another worker won.
+    """The recording was no longer in the expected status when the conditional update ran; another worker won."""
 
-    Raised by `transition()` once P2.3's database part lands.
-    """
+
+class ConsentRequired(TransitionError):
+    """Golden rule 9: a recording without a consent_ref cannot move past UPLOADED."""
+
+
+class RecordingNotFound(TransitionError):
+    """No recording with this id in the repository's tenant."""
 
 
 def next_statuses(from_status: RecordingStatus | str, *, reanalysis: bool = False) -> frozenset[RecordingStatus]:
@@ -111,3 +127,101 @@ def check_transition(
         names = ", ".join(status for status in RecordingStatus if status in allowed)
         message = f"cannot move a recording from {source} to {target}; allowed next: {names}"
     raise InvalidTransition(source, target, message)
+
+
+# --- Applying a transition (database part) ---
+
+_NO_CONSENT_NEEDED = frozenset({_S.UPLOADED})  # an upload may complete before consent is recorded (P2.2)
+
+
+def _plan(
+    recording_id: str,
+    from_status: RecordingStatus | str,
+    to_status: RecordingStatus | str,
+    *,
+    tenant_id: str,
+    reason: str,
+    meta: Mapping[str, Any] | None,
+    reanalysis: bool,
+    now: datetime | None,
+) -> tuple[dict[str, Any], dict[str, Any], OutboxEvent]:
+    from sabha_core.models import OutboxEvent, utc_now
+
+    check_transition(from_status, to_status, reanalysis=reanalysis)
+    source, target = RecordingStatus(from_status), RecordingStatus(to_status)
+    at = now or utc_now()
+    filter: dict[str, Any] = {"_id": recording_id, "status": source.value}
+    if target not in _NO_CONSENT_NEEDED:
+        filter["consent_ref"] = {"$type": "string", "$ne": ""}
+    update = {"$set": {"status": target.value, "status_reason": reason, "status_changed_at": at}}
+    event = OutboxEvent(
+        tenant_id=tenant_id,
+        type=f"recording.{target.lower()}",
+        payload={
+            "recording_id": recording_id,
+            "from_status": source.value,
+            "to_status": target.value,
+            "reason": reason,
+            "meta": dict(meta or {}),
+        },
+        created_at=at,
+    )
+    return filter, update, event
+
+
+def _refusal(recording: Recording | None, recording_id: str, source: RecordingStatus) -> TransitionError:
+    if recording is None:
+        return RecordingNotFound(f"no recording {recording_id!r} in this tenant")
+    if recording.status is not source:
+        return ConcurrentTransition(f"recording {recording_id!r} is {recording.status}, not {source}")
+    return ConsentRequired(f"recording {recording_id!r} has no consent_ref; it cannot move past UPLOADED")
+
+
+def transition(
+    recordings: SyncTenantRepo[Recording],
+    recording_id: str,
+    from_status: RecordingStatus | str,
+    to_status: RecordingStatus | str,
+    *,
+    reason: str,
+    meta: Mapping[str, Any] | None = None,
+    reanalysis: bool = False,
+    session: ClientSession | None = None,
+    now: datetime | None = None,
+) -> OutboxEvent:
+    """Move a recording from `from_status` to `to_status` and return the outbox event (not written).
+
+    Raises InvalidTransition, ConcurrentTransition, ConsentRequired or RecordingNotFound; on any of them the
+    recording is unchanged.
+    """
+    filter, update, event = _plan(
+        recording_id, from_status, to_status,
+        tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, now=now,
+    )  # fmt: skip
+    if recordings.update_one(filter, update, session=session) == 1:
+        return event
+    current = recordings.find_one({"_id": recording_id}, session=session)
+    raise _refusal(current, recording_id, RecordingStatus(from_status))
+
+
+async def transition_async(
+    recordings: TenantRepo[Recording],
+    recording_id: str,
+    from_status: RecordingStatus | str,
+    to_status: RecordingStatus | str,
+    *,
+    reason: str,
+    meta: Mapping[str, Any] | None = None,
+    reanalysis: bool = False,
+    session: AsyncClientSession | None = None,
+    now: datetime | None = None,
+) -> OutboxEvent:
+    """`transition` for the API's async repository."""
+    filter, update, event = _plan(
+        recording_id, from_status, to_status,
+        tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, now=now,
+    )  # fmt: skip
+    if await recordings.update_one(filter, update, session=session) == 1:
+        return event
+    current = await recordings.find_one({"_id": recording_id}, session=session)
+    raise _refusal(current, recording_id, RecordingStatus(from_status))

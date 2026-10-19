@@ -56,6 +56,7 @@ COLLECTIONS = (
     "outbox",
     "audit_log",
     "identities",
+    "idempotency_keys",
 )
 SYSTEM_COLLECTIONS = ("tenants", "outbox", "identities")
 _NOT_TENANT_SCOPED = frozenset({"tenants"})  # the scope itself: no tenant_id field

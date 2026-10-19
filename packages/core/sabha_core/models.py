@@ -23,6 +23,7 @@ from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field,
 from sabha_core.profiles import ConversationType, Labels, ProfileName, get_profile
 from sabha_core.quota import Plan
 from sabha_core.settings import INDIA_REGION
+from sabha_core.state import RecordingStatus
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -176,3 +177,49 @@ class OutboxEvent(TenantDoc):
     payload: dict[str, Any] = Field(default_factory=dict)
     created_at: UtcDatetime = Field(default_factory=utc_now)
     published_at: UtcDatetime | None = None
+
+
+class IdempotencyRecord(TenantDoc):
+    """A create request seen with an Idempotency-Key, and its response for replays (sabha_api.idempotency).
+
+    Expires 24 h after `created_at` (TTL index). `request_hash` is the SHA-256 of the canonical request body.
+    """
+
+    route: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    request_hash: str = Field(min_length=1)
+    status: Literal["in_progress", "done"] = "in_progress"
+    response_status: int | None = None
+    response_body: dict[str, Any] | None = None
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
+class Recording(TenantDoc):
+    """A recorded conversation. Status changes only through sabha_core.state.transition (CLAUDE.md).
+
+    Minimal for P2.3; P2.1 adds the upload fields (file name, size, storage key, person, unit, checksum).
+    """
+
+    type: ConversationType
+    status: RecordingStatus = RecordingStatus.CREATED
+    consent_ref: str | None = None  # golden rule 9: without it nothing moves past UPLOADED
+    status_reason: str | None = None
+    status_changed_at: UtcDatetime | None = None
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
+class StageRun(TenantDoc):
+    """One attempt of one pipeline stage for one recording (plan task P2.3); cost inputs go in `meta`."""
+
+    recording_id: str = Field(min_length=1)
+    stage: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    attempt: int = Field(ge=1)
+    status: Literal["running", "succeeded", "failed"] = "running"
+    worker: str = Field(min_length=1)
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None = None
+    duration_ms: int | None = Field(default=None, ge=0)
+    error_code: str | None = None
+    error_detail: str | None = Field(default=None, max_length=2000)
+    meta: dict[str, Any] = Field(default_factory=dict)

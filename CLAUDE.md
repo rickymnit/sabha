@@ -69,7 +69,8 @@ docs/                adr/, runbook.md, prompts/, design/, guides for raters and 
 ## Domain model
 
 Collections: `tenants, units, users, people, recordings, stage_runs, transcripts, rubrics, analyses, scores,
-disputes, usage_events, outbox, audit_log`.
+disputes, usage_events, outbox, audit_log`, plus `identities` (login links, ADR 0002) and `idempotency_keys`
+(create replays, 24 h TTL). The full list with indexes is `sabha_core/indexes.py`.
 
 Recording status (state machine in `sabha_core/state.py`, the ONLY place transitions are defined):
 `CREATED → UPLOADED → PREPROCESSING → DIARIZING → TRANSCRIBING → ANALYZING → COMPLETED`,
