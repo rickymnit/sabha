@@ -30,21 +30,21 @@ only candidate.
 
 | Field | OpenAI | Candidate 2 | Candidate 3 |
 | --- | --- | --- | --- |
-| Models we would use: mid tier (scoring, synthesis) | `o3-mini` (chosen 2026-10-16; availability TBD) | TBD | TBD |
+| Models we would use: mid tier (scoring, synthesis) | `o3-mini` (chosen 2026-10-16). Model page, 2026-10-19: not deprecated, no shutdown date, Chat Completions and Responses endpoints, 200 000-token context, 100 000-token output. A third-party article claims a 2026-10-01 retirement; OpenAI's page does not: confirm in our dashboard | TBD | TBD |
 | Models we would use: small tier (role tie-breaker) | TBD (`o3-mini` too, or a smaller model) | TBD | TBD |
-| Reasoning effort / temperature support | TBD | TBD | TBD |
+| Reasoning effort / temperature support | Not stated on the model page (2026-10-19): the gateway sends neither until confirmed | TBD | TBD |
 | India region available (yes / no / how) | TBD | TBD | TBD |
 | Data retention policy (API inputs and outputs) | TBD | TBD | TBD |
 | Training on our data (default, and how to opt out) | TBD | TBD | TBD |
 | DPA available (and covers DPDP Act, 2023?) | TBD | TBD | TBD |
-| Structured output / JSON schema support | TBD | TBD | TBD |
-| Prompt caching (how, minimum prefix, price) | TBD | TBD | TBD |
+| Structured output / JSON schema support | Supported (model page, 2026-10-19) | TBD | TBD |
+| Prompt caching (how, minimum prefix, price) | Cached input priced at $0.55 per million tokens (model page, 2026-10-19); how and minimum prefix TBD | TBD | TBD |
 | Batch API and discount | TBD | TBD | TBD |
 | Rate limits for our tier | TBD | TBD | TBD |
-| Price per million input tokens | TBD | TBD | TBD |
-| Price per million output tokens | TBD | TBD | TBD |
-| Source link(s) | TBD | TBD | TBD |
-| Date checked | TBD | TBD | TBD |
+| Price per million input tokens | $1.10 (`o3-mini`, model page, 2026-10-19) | TBD | TBD |
+| Price per million output tokens | $4.40 (`o3-mini`, model page, 2026-10-19) | TBD | TBD |
+| Source link(s) | https://developers.openai.com/api/docs/models/o3-mini | TBD | TBD |
+| Date checked | 2026-10-19 | TBD | TBD |
 
 Prices go into the gateway's price table (plan task 5.1) only from this sheet, with the date; cost figures are
 never estimated.

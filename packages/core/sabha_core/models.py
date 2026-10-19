@@ -260,3 +260,28 @@ class AuditEntry(TenantDoc):
     user_agent: str | None = Field(default=None, max_length=500)
     request_id: str | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class LlmCall(TenantDoc):
+    """One request to an LLM provider, written by the gateway (sabha_llm.gateway, plan task P5.1).
+
+    Measured values only: token counts as the provider reported them, cost from the published price table or None
+    when the model has no price there (golden rule 6). No prompt text is stored, only its hash.
+    """
+
+    recording_id: str | None = None
+    task: str = Field(min_length=1)
+    provider: str
+    model: str
+    prompt_hash: str
+    prompt_version: str | None = None
+    status: Literal["ok", "error"]
+    error_code: str | None = None
+    tokens_in: int = Field(default=0, ge=0)
+    tokens_out: int = Field(default=0, ge=0)
+    cached_tokens: int = Field(default=0, ge=0)
+    cost_usd: float | None = None
+    latency_ms: int = Field(ge=0)
+    attempt: int = Field(ge=1)
+    fallback_reason: str | None = None
+    created_at: UtcDatetime = Field(default_factory=utc_now)

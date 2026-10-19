@@ -3,34 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from redis.asyncio import Redis
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
 from sabha_api.ratelimit import Bucket, Decision, RateLimitedError, RateLimiter
-
-REDIS_IMAGE = "redis:7.4.11-alpine"  # keep in step with infra/docker-compose.dev.yml
 
 
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"  # async tests run on anyio's pytest plugin (installed with Starlette)
-
-
-@pytest.fixture(scope="module")
-def redis_url() -> Iterator[str]:
-    container = (
-        DockerContainer(REDIS_IMAGE)
-        .with_exposed_ports(6379)
-        .waiting_for(LogMessageWaitStrategy("Ready to accept connections"))
-    )
-    with container:
-        yield f"redis://{container.get_container_host_ip()}:{container.get_exposed_port(6379)}/0"
 
 
 @pytest.fixture

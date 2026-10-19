@@ -1334,11 +1334,21 @@ name = "sabha-llm"
 version = "0.0.0"
 source = { editable = "packages/llm" }
 dependencies = [
+    { name = "httpx" },
+    { name = "jsonschema" },
+    { name = "opentelemetry-api" },
+    { name = "redis" },
     { name = "sabha-core" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sabha-core", editable = "packages/core" }]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "jsonschema", specifier = ">=4.26" },
+    { name = "opentelemetry-api", specifier = ">=1.45,<1.45.1" },
+    { name = "redis", specifier = ">=5.0" },
+    { name = "sabha-core", editable = "packages/core" },
+]
 
 [[package]]
 name = "sabha-workers"

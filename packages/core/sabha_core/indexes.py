@@ -76,6 +76,10 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "usage_events": [_ix("tenant_occurred", (T, ASCENDING), ("occurred_at", ASCENDING))],
     "audit_log": [_ix("tenant_at", (T, ASCENDING), ("at", DESCENDING))],
+    "llm_calls": [
+        _ix("tenant_created", (T, ASCENDING), ("created_at", DESCENDING)),
+        _ix("tenant_recording", (T, ASCENDING), ("recording_id", ASCENDING)),
+    ],
     "idempotency_keys": [
         _ix("tenant_route_key", (T, ASCENDING), ("route", ASCENDING), ("key", ASCENDING), unique=True),
         # TTL indexes must have a single field; MongoDB deletes expired records itself (no query involved).

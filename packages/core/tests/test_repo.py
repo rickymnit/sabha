@@ -47,10 +47,10 @@ def db(mongo_replica_set: MongoClient[dict[str, Any]]) -> Iterator[Database[dict
 
 
 def test_collections_are_the_domain_model_plus_identities() -> None:
-    # CLAUDE.md "Domain model", plus `identities` (ADR 0002) and `idempotency_keys` (API conventions).
+    # CLAUDE.md "Domain model", plus `identities` (ADR 0002), `idempotency_keys` (API conventions), `llm_calls` (P5.1).
     assert set(COLLECTIONS) == {
         "tenants", "units", "users", "people", "recordings", "stage_runs", "transcripts", "rubrics", "analyses",
-        "scores", "disputes", "usage_events", "outbox", "audit_log", "identities", "idempotency_keys",
+        "scores", "disputes", "usage_events", "outbox", "audit_log", "identities", "idempotency_keys", "llm_calls",
     }  # fmt: skip
     assert set(SYSTEM_COLLECTIONS) == {"tenants", "outbox", "identities"}
 

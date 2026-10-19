@@ -27,7 +27,7 @@ their heading saying what exists and what remains. Removed prompts are in git hi
 | --- | --- | --- |
 | `week-1.md` | Foundations | P1.3 compose and Terraform, P6.2 app shell |
 | `week-2.md` | Orchestration and audio | P2.4 queues and DLQ, P2.5 outbox relay, P2.6 SSE, P1.7 labels and profiles (partly built), P1.8 audit log, P3.2 normalise, P3.3 VAD and segment map (partly built), P3.4a diarization, P6.3 upload screen, P6.4a overview shell, P7.1 monitoring (partly built) |
-| `week-3.md` | Speech and Gate 1 | P3.4b diarization finish, P3.5 ASR stage (partly built), P3.6 roles (partly built), P3.7 transcript assembly (partly built), P5.1 LLM gateway, P5.3 model bake-off, Gate 1 |
+| `week-3.md` | Speech and Gate 1 | P3.4b diarization finish, P3.5 ASR stage (partly built), P3.6 roles (partly built), P3.7 transcript assembly (partly built), P5.3 model bake-off, Gate 1 |
 | `week-4.md` | Scoring | P5.6 scoring and grounding (partly built), P5.7 synthesis and storage (partly built), P5.7b analysis API |
 | `week-5.md` | Reception and fairness | P5.8 classify, segment, reception rubric (partly built), P6.7 disputes and reviews (partly built), P7.2 limits, quotas and lanes (partly built), P2.7 notifications (partly built), P2.8 re-analysis, P6.4b overview with real data (partly built) |
 | `week-6.md` | Calibration and Gate 2 | P5.9 calibration loop, P4.7 CI eval gate, P7.3 backups, retention, erasure, P7.4 isolation tests, P6.8 role views, P6.9 consent in UI, Gate 2 |
@@ -47,6 +47,7 @@ their heading saying what exists and what remains. Removed prompts are in git hi
 | P2.3 state machine and stage runs (`transition()`, `stage_runs`) | Its "Done when" (the complete endpoint uses `transition()`) is met |
 | P2.1 create recording and presigned multipart upload (`POST /v1/recordings`, `/parts`, `sabha_core/storage.py`) | "Done when" (a script uploads 500 MB part by part) is shown at small scale in tests; the full-size run needs P2.2's complete endpoint and staging |
 | P2.2 complete upload, checksum and duplicates (`POST /v1/recordings/{id}/complete`, `upload_cleanup.py`) | The outbox event is written in P2.5 (TODO in `services/recordings.py`); P2.4 schedules the stale-upload cleanup |
+| P5.1 LLM gateway (`sabha_llm.gateway`, OpenAI Responses adapter, budgets, `llm_calls`, `sabha_analytics.judge`) | Tracing is OpenTelemetry; a Langfuse adapter waits for a self-hosted instance in India. "Done when" on real calls needs an OpenAI key (test data only until the residency sign-off) and confirming `o3-mini` is still available to the project |
 | P1.6 tenancy (`sabha_core` models, repo, indexes; `sabha_api.deps.tenant_repo`) | /tenant-check finding 3, email delivery keys without a tenant, is fixed when P2.7 stores its delivery log |
 | P3.1 ASR provider layer (Sarvam AI, ADR 0006) | "Done when" needs a valid `SARVAM_API_KEY` (the current one is rejected with 403) and Sarvam's data terms in writing before real audio |
 | P4.2 gold-set tooling, P4.3 WER and role eval, P4.6 kappa and grounding eval | Tools built; run them on the real gold set and rater scores once those exist |

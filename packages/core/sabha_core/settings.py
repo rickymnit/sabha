@@ -97,6 +97,17 @@ class Settings(BaseSettings):
     sarvam_api_key: SecretStr | None = None
     sarvam_base_url: str = "https://api.sarvam.ai"
 
+    # LLM gateway (packages/llm, plan task P5.1). Models are "<provider>:<model>", e.g. "openai:o3-mini". Fallbacks
+    # are per task and only used when listed: {"score_dimension": ["openai:o4-mini"]} (golden rule 7). Token
+    # budgets are per UTC day; unset means no limit (the owner sets the numbers; none are assumed here).
+    llm_model_small: str = "openai:o3-mini"
+    llm_model_mid: str = "openai:o3-mini"
+    llm_fallbacks: dict[str, list[str]] = Field(default_factory=dict)
+    llm_timeout_s: float = Field(default=120.0, gt=0)
+    llm_max_retries: int = Field(default=3, ge=0, le=10)
+    llm_tenant_daily_token_budget: int | None = Field(default=None, ge=1)
+    llm_global_daily_token_budget: int | None = Field(default=None, ge=1)
+
     # LLM providers (docs/llm-providers.md). Data-residency approval comes first (golden rule 12).
     openai_api_key: SecretStr | None = None
     openai_base_url: str | None = None

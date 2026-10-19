@@ -92,31 +92,6 @@ Done when: every processed file has a canonical transcript with original timesta
 
 ---
 
-## P5.1 · LLM gateway
-
-Plan task 5.1. Read first: `CLAUDE.md` golden rules 5, 7, 8; `docs/llm-providers.md`.
-
-```text
-Build packages/llm (sabha_llm): the only way any code calls an LLM.
-
-- Provider adapters (start with the 3 bake-off candidates) behind one interface: complete(messages,
-  json_schema?, model_tier: small|mid, temperature=0, max_tokens, cache_hint) → {text|json, usage, cost, latency,
-  model_id}.
-- Routing by task name → tier → configured model; per-tenant and global token budgets (Redis counters);
-  timeouts; retries with jitter on 429/5xx only; explicit fallback list per task, logged with reason (never
-  silent).
-- Prompt caching support where the provider offers it (stable prefix: system prompt + rubric + transcript).
-- Cost accounting from a price table in config (values filled by me, not invented); write usage to an
-  llm_calls collection {tenant_id, recording_id, task, model, tokens_in, tokens_out, cached_tokens, cost, ms}.
-- Langfuse tracing for every call with prompt hash and version.
-Tests with a fake provider: budget exceeded blocks, retry only on retryable codes, fallback logged, JSON schema
-enforced (invalid JSON → one repair attempt → error).
-```
-
-Done when: every LLM call is traced with tokens and cost.
-
----
-
 ## P5.3 · Model bake-off harness
 
 Plan task 5.3.

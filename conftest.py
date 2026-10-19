@@ -6,6 +6,7 @@ deselects them.
 
 - `mongo_replica_set`: a sync client for a single-node MongoDB 7 replica set, shared by the session.
 - `mongo_uri`: its connection string, for tests that need their own (for example async) client.
+- `redis_url`: a Redis 7 container's URL, shared by the session (tests flush it themselves).
 - `s3_storage`: a RustFS container (ADR 0003) with the buckets `sabha-audio`, `sabha-artefacts`, `sabha-backups`.
 """
 
@@ -122,3 +123,17 @@ def s3_storage() -> Iterator[S3Storage]:
         for bucket in storage.buckets:
             client.create_bucket(Bucket=bucket)
         yield storage
+
+
+REDIS_IMAGE = "redis:7.4.11-alpine"  # keep in step with infra/docker-compose.dev.yml
+
+
+@pytest.fixture(scope="session")
+def redis_url() -> Iterator[str]:
+    container = (
+        DockerContainer(REDIS_IMAGE)
+        .with_exposed_ports(6379)
+        .waiting_for(LogMessageWaitStrategy("Ready to accept connections"))
+    )
+    with container:
+        yield f"redis://{container.get_container_host_ip()}:{container.get_exposed_port(6379)}/0"
