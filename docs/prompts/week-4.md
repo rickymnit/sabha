@@ -37,7 +37,7 @@ Done when: a planted fake quote never reaches the stored analysis.
 
 ## P5.7 · Synthesis, schema validation and storage
 
-> **Status (2026-10-17).** Already built: synthesis, `analysis@v1` schema validation and the report builder (sabha_analytics/synthesis.py, report.py). Remaining: store analyses and scores through TenantRepo and finish the analyze stage.
+> **Status (2026-10-19).** Already built: synthesis, `analysis@v1` schema validation, the report builder, and LLM calls through the gateway (`sabha_analytics.judge.GatewayJudge`, P5.1). Remaining: storing analyses and scores through TenantRepo and the analyze stage's `work` function. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError).
 
 Plan task 5.7.
 

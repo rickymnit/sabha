@@ -57,7 +57,7 @@ Done when: a teacher disputes a score and a reviewer resolves it end to end.
 
 ## P7.2 · Rate limits, quotas, priority lanes and fair scheduling
 
-> **Status (2026-10-17).** Already built: the fair GPU scheduler and ADR 0005, the Redis token-bucket rate limiter, quota rules and priority-lane routing. Remaining: call the limiter from the auth dependency (with a per-tenant user key, /tenant-check finding 1), quota checks in the upload API with the 80% banner, the `gpu.speech` dispatcher, and the admission-control ETA.
+> **Status (2026-10-19).** Already built: the fair GPU scheduler and ADR 0005, the Redis token-bucket rate limiter (user buckets keyed by tenant, /tenant-check finding 1 fixed), quota rules, priority-lane queue names, and Celery queues for every lane (P2.4). Remaining: call the limiter from the auth dependency, quota checks in the upload API with the 80% banner, choosing the lane from the recording's duration (from P3.2), the `gpu.speech` dispatcher with the fair scheduler, and the admission-control ETA.
 
 Plan task 7.2.
 

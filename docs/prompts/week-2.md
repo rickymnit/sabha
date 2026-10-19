@@ -46,6 +46,8 @@ Done when: switching a test tenant to `company` changes the UI words to Sales re
 
 ## P1.8 · Audit log
 
+> **Status (2026-10-19).** Partly built: the `AuditEntry` model, `audit_log` collection with its (tenant_id, at) index, and `sabha_api.audit.audit()` used for `recording.create` (P2.1). Remaining: the other actions as their routes land, `GET /v1/audit` (owner/admin, filters, cursor pagination) and the immutability tests.
+
 Plan task 1.8.
 
 ```text
@@ -63,6 +65,8 @@ Done when: opening a recording's audio writes an audit entry visible to an admin
 ---
 
 ## P3.2 · Validate and normalise audio
+
+> **Status (2026-10-19).** Not built. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError). Also record the duration on the recording: P7.2's priority lanes and P8.6's billing need it. Use `-protocol_whitelist file` with ffmpeg (P7.6).
 
 Plan task 3.2.
 
@@ -107,6 +111,8 @@ Done when: 5 real files have segment maps that round-trip exactly.
 ---
 
 ## P3.4a · Diarization (first pass)
+
+> **Status (2026-10-19).** Not built. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError).
 
 Plan task 3.4 (continues in week 3).
 

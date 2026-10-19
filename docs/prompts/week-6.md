@@ -114,6 +114,8 @@ Done when: a staff account cannot open a colleague's report.
 
 ## P6.9 · Consent in the product
 
+> **Status (2026-10-19).** Partly built: golden rule 9 is enforced by `transition()` (no consent_ref, nothing moves past UPLOADED), and the complete endpoint keeps recordings without consent at UPLOADED with `awaiting_consent` and does not start processing (P2.2/P2.5). Remaining: consent records (scope, validity), checking expiry and scope, releasing an awaiting recording when consent is added (write `recording.ready`), the admin UI and the upload selector.
+
 Covers the consent tick in task 6.3 and golden rule 9.
 
 ```text

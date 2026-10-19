@@ -26,12 +26,12 @@ their heading saying what exists and what remains. Removed prompts are in git hi
 | File | Week | Prompts still to do |
 | --- | --- | --- |
 | `week-1.md` | Foundations | P1.3 compose and Terraform, P6.2 app shell |
-| `week-2.md` | Orchestration and audio | P2.6 SSE, P1.7 labels and profiles (partly built), P1.8 audit log, P3.2 normalise, P3.3 VAD and segment map (partly built), P3.4a diarization, P6.3 upload screen, P6.4a overview shell, P7.1 monitoring (partly built) |
+| `week-2.md` | Orchestration and audio | P2.6 SSE, P1.7 labels and profiles (partly built), P1.8 audit log (partly built), P3.2 normalise, P3.3 VAD and segment map (partly built), P3.4a diarization, P6.3 upload screen, P6.4a overview shell, P7.1 monitoring (partly built) |
 | `week-3.md` | Speech and Gate 1 | P3.4b diarization finish, P3.5 ASR stage (partly built), P3.6 roles (partly built), P3.7 transcript assembly (partly built), P5.3 model bake-off, Gate 1 |
 | `week-4.md` | Scoring | P5.6 scoring and grounding (partly built), P5.7 synthesis and storage (partly built), P5.7b analysis API |
 | `week-5.md` | Reception and fairness | P5.8 classify, segment, reception rubric (partly built), P6.7 disputes and reviews (partly built), P7.2 limits, quotas and lanes (partly built), P2.7 notifications (partly built), P2.8 re-analysis, P6.4b overview with real data (partly built) |
-| `week-6.md` | Calibration and Gate 2 | P5.9 calibration loop, P4.7 CI eval gate, P7.3 backups, retention, erasure, P7.4 isolation tests, P6.8 role views, P6.9 consent in UI, Gate 2 |
-| `week-7.md` | Hardening | P7.5 load and chaos, P7.6 security, P7.7 production and alerts, P7.8 admin ops (DLQ replay, seed tenant), P8.4 onboarding pack, P8.6 usage export, Gate 3 |
+| `week-6.md` | Calibration and Gate 2 | P5.9 calibration loop, P4.7 CI eval gate, P7.3 backups, retention, erasure, P7.4 isolation tests (partly built), P6.8 role views, P6.9 consent (partly built), Gate 2 |
+| `week-7.md` | Hardening | P7.5 load and chaos, P7.6 security (started), P7.7 production and alerts, P7.8 admin ops (partly built), P8.4 onboarding pack, P8.6 usage export, Gate 3 |
 | `week-8.md` | Pilot | P8.8 go-live checklist, P8.9 daily health report, P8.7 feedback log, hotfix and retro templates |
 
 ### Removed because they are done (or dropped)
