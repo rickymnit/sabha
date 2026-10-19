@@ -34,6 +34,8 @@ Done when: killing a worker mid-job loses nothing (demonstrate in a test and man
 
 ## P2.5 · Transactional outbox and change-stream relay
 
+> **Status (2026-10-19).** Already built: `sabha_core/outbox.py`, `apps/workers/sabha_workers/relay.py` (change stream with stored resume token, 10 s sweep, routing table, no duplicate dispatch, `events:{tenant_id}` publish) and the complete endpoint writing its event in the same transaction. Remaining: the Celery dispatcher and the relay's process entry point (with P2.4), then "Done when" (an upload starts preprocessing for real).
+
 Plan task 2.5.
 
 ```text

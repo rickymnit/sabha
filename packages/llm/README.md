@@ -3,9 +3,10 @@
 `sabha_llm`, the only way any code calls an LLM (plan task P5.1).
 
 ```python
-gateway = build_gateway(settings, database=db, redis=redis)          # once per worker process
-result = gateway.complete(task="analysis.scoring", messages=[...], tenant_id=..., recording_id=...,
-                          json_schema=schema, prompt_version="3")
+gateway = build_gateway(settings, database=db, redis=redis)  # once per worker process
+result = gateway.complete(
+    task="analysis.scoring", messages=[...], tenant_id=..., recording_id=..., json_schema=schema, prompt_version="3"
+)
 ```
 
 | Step | What happens |

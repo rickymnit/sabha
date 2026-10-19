@@ -24,6 +24,9 @@ SHA-256 is stored. CREATED -> UPLOADED goes through sabha_core.state.transition_
   held; 409 `duplicate_recording` (with `duplicate_of`) unless `force=true`; calling again with force confirms;
 - no consent_ref: awaiting_consent is set; the recording waits (golden rule 9; consent is added in P6.9);
 - calling complete again with the same hash returns the current state, so a client may retry safely.
+The status change and its outbox event (`recording.uploaded`, with meta.ready) are written in one transaction
+(P2.5); the relay starts preprocessing only for a ready recording. Confirming a held duplicate later writes
+`recording.ready`.
 """
 
 from __future__ import annotations
@@ -41,11 +44,12 @@ from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import ApiError, ConflictError, ForbiddenError, NotFoundError
-from sabha_core.models import AuditEntry, Person, Recording, Tenant, Unit, new_id, utc_now
+from sabha_core.models import AuditEntry, OutboxEvent, Person, Recording, Tenant, Unit, new_id, utc_now
+from sabha_core.outbox import READY, record_event_async, record_transition_async
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
 from sabha_core.settings import Settings
-from sabha_core.state import RecordingStatus, transition_async
+from sabha_core.state import RecordingStatus
 from sabha_core.storage import original_key
 
 ROUTE = "POST /v1/recordings"
@@ -397,6 +401,7 @@ async def complete(
     *,
     storage: UploadStorage,
     recordings: TenantRepo[Recording],
+    outbox: TenantRepo[OutboxEvent],
     transactions: Transactions,
 ) -> CompleteOut:
     recording = await recordings.find_one({"_id": recording_id})
@@ -404,7 +409,7 @@ async def complete(
         raise NotFoundError("Recording not found.")
 
     if recording.status is RecordingStatus.UPLOADED and recording.sha256 == body.sha256:
-        return await _again(recording, body, recordings)  # a retry, or confirming a duplicate
+        return await _again(recording, body, recordings, outbox, transactions)  # a retry, or confirming a duplicate
     if recording.status is not RecordingStatus.CREATED or not recording.upload_id or not recording.storage_key:
         raise UploadNotOpenError("This recording's upload is already complete or was never started.")
 
@@ -423,17 +428,18 @@ async def complete(
         {"sha256": body.sha256, "_id": {"$ne": recording_id}, "status": {"$ne": RecordingStatus.FAILED.value}}
     )
     awaiting_consent = not recording.consent_ref
+    ready = not awaiting_consent and (other is None or body.force)  # the relay starts preprocessing only if ready
     async with transactions.run() as session:
-        await transition_async(
+        await record_transition_async(
             recordings,
+            outbox,
             recording_id,
             RecordingStatus.CREATED,
             RecordingStatus.UPLOADED,
             reason="upload_complete",
-            meta={"size_bytes": size, "duplicate_of": other.id if other else None},
+            meta={"size_bytes": size, "duplicate_of": other.id if other else None, "ready": ready},
             session=session,
         )
-        # TODO(P2.5): write the returned outbox event here, in this transaction.
         await recordings.update_one(
             {"_id": recording_id},
             {
@@ -457,12 +463,25 @@ async def complete(
     )
 
 
-async def _again(recording: Recording, body: CompleteIn, recordings: TenantRepo[Recording]) -> CompleteOut:
+async def _again(
+    recording: Recording,
+    body: CompleteIn,
+    recordings: TenantRepo[Recording],
+    outbox: TenantRepo[OutboxEvent],
+    transactions: Transactions,
+) -> CompleteOut:
     """Complete called again for an uploaded recording with the same checksum."""
     if recording.duplicate_of and not recording.duplicate_confirmed:
         if not body.force:
             raise _duplicate(recording.duplicate_of)
-        await recordings.update_one({"_id": recording.id}, {"$set": {"duplicate_confirmed": True}})
+        async with transactions.run() as session:
+            confirmed = await recordings.update_one(
+                {"_id": recording.id, "duplicate_confirmed": False},
+                {"$set": {"duplicate_confirmed": True}},
+                session=session,
+            )
+            if confirmed and not recording.awaiting_consent:  # released: the relay starts preprocessing
+                await record_event_async(outbox, READY, {"recording_id": recording.id}, session=session)
     return CompleteOut(
         recording_id=recording.id,
         status=recording.status,

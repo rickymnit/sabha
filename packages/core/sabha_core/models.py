@@ -177,6 +177,7 @@ class OutboxEvent(TenantDoc):
     payload: dict[str, Any] = Field(default_factory=dict)
     created_at: UtcDatetime = Field(default_factory=utc_now)
     published_at: UtcDatetime | None = None
+    dispatched: list[str] = Field(default_factory=list)  # pipeline tasks already sent for this event (relay)
 
 
 class IdempotencyRecord(TenantDoc):
@@ -285,3 +286,10 @@ class LlmCall(TenantDoc):
     attempt: int = Field(ge=1)
     fallback_reason: str | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
+class RelayState(Document):
+    """Where the outbox relay's change stream stopped (system collection `relay_state`; P2.5)."""
+
+    resume_token: dict[str, Any] | None = None
+    updated_at: UtcDatetime = Field(default_factory=utc_now)

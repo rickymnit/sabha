@@ -16,7 +16,7 @@ from sabha_api.deps import Transactions, tenant_repo, transactions
 from sabha_api.errors import NotFoundError, NotReadyError
 from sabha_api.idempotency import HEADER, idempotent
 from sabha_api.services import recordings as service
-from sabha_core.models import AuditEntry, IdempotencyRecord, Person, Recording, Unit
+from sabha_core.models import AuditEntry, IdempotencyRecord, OutboxEvent, Person, Recording, Unit
 from sabha_core.repo import TenantRepo
 
 router = APIRouter(prefix="/v1/recordings", tags=["recordings"])
@@ -96,9 +96,10 @@ async def complete_upload(
     principal: Annotated[Principal, Depends(current_principal)],
     storage: Storage,
     recordings: Recordings,
+    outbox: Annotated[TenantRepo[OutboxEvent], Depends(tenant_repo("outbox", OutboxEvent))],
     txn: Annotated[Transactions, Depends(transactions)],
 ) -> service.CompleteOut:
     """Finish an upload: every part with its ETag, and the file's SHA-256. Safe to retry with the same body."""
     return await service.complete(
-        principal, recording_id, body, storage=storage, recordings=recordings, transactions=txn
+        principal, recording_id, body, storage=storage, recordings=recordings, outbox=outbox, transactions=txn
     )

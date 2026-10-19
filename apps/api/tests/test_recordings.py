@@ -8,6 +8,7 @@ import hashlib
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 import httpx
@@ -18,9 +19,10 @@ from pymongo.database import Database
 
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import IdentityLink, Person, Role, Tenant, Unit, User
+from sabha_core.models import IdentityLink, OutboxEvent, Person, RelayState, Role, Tenant, Unit, User
 from sabha_core.quota import Plan
-from sabha_core.repo import COLLECTIONS
+from sabha_core.repo import COLLECTIONS, SyncSystemRepo
+from sabha_workers.relay import Relay
 
 pytestmark = pytest.mark.integration
 
@@ -417,3 +419,69 @@ def test_a_completed_upload_cannot_complete_with_another_file(api: Api) -> None:
     complete(api, up)
     up.sha256 = "0" * 64
     problem(complete(api, up), 409, "upload_not_open")
+
+
+# --- The outbox event and the relay (P2.5) ---
+
+
+class RecordingDispatcher:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str]] = []
+
+    def send(self, task: str, event: OutboxEvent) -> None:
+        self.sent.append((task, event.payload["recording_id"]))
+
+
+class NoPublisher:
+    def publish(self, channel: str, message: str) -> None:
+        pass
+
+
+def relay_all(api: Api) -> list[tuple[str, str]]:
+    dispatcher = RecordingDispatcher()
+    relay = Relay(
+        SyncSystemRepo(api.db, "outbox", OutboxEvent),
+        SyncSystemRepo(api.db, "relay_state", RelayState),
+        dispatcher,
+        NoPublisher(),
+    )
+    relay.sweep(older_than=timedelta(0))
+    return dispatcher.sent
+
+
+def events(api: Api, recording_id: str) -> list[dict[str, Any]]:
+    return list(api.db.outbox.find({"payload.recording_id": recording_id}).sort("created_at", 1))
+
+
+def test_complete_writes_the_upload_event_in_the_same_change(api: Api) -> None:
+    up = upload(api)
+    complete(api, up)
+    (event,) = events(api, up.recording_id)
+    assert (event["tenant_id"], event["type"]) == ("tenant-a", "recording.uploaded")
+    assert event["payload"]["meta"]["ready"] is True
+
+
+def test_completing_an_upload_starts_preprocessing(api: Api) -> None:
+    up = upload(api)
+    complete(api, up)
+    assert relay_all(api) == [("preprocess", up.recording_id)]
+
+
+def test_a_recording_without_consent_is_not_processed(api: Api) -> None:
+    up = upload(api, consent_ref=None)
+    complete(api, up)
+    assert events(api, up.recording_id)[0]["payload"]["meta"]["ready"] is False
+    assert relay_all(api) == []
+
+
+def test_a_held_duplicate_is_processed_only_once_confirmed(api: Api) -> None:
+    original = upload(api)
+    complete(api, original)
+    relay_all(api)
+    copy = upload(api)
+    complete(api, copy)
+    assert relay_all(api) == []  # held
+    complete(api, copy, force=True)
+    complete(api, copy, force=True)  # confirming again writes no second event
+    assert [e["type"] for e in events(api, copy.recording_id)] == ["recording.uploaded", "recording.ready"]
+    assert relay_all(api) == [("preprocess", copy.recording_id)]

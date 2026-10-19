@@ -90,6 +90,7 @@ INDEXES: dict[str, list[IndexModel]] = {
         _ix("unpublished", ("published_at", ASCENDING), ("created_at", ASCENDING)),
         _ix("tenant_created", (T, ASCENDING), ("created_at", ASCENDING)),
     ],
+    "relay_state": [],
     "identities": [
         # Pending invites have no subject yet; only linked logins must be unique.
         _ix(

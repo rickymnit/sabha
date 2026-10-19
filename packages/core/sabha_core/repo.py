@@ -15,7 +15,8 @@ collection, tenant and model. Every operation is scoped to that tenant:
   that needs a join or a $merge gets its own vetted method here.
 - Only collections in COLLECTIONS can be used, and `tenants` only through the SystemRepo.
 
-`SystemRepo` / `SyncSystemRepo` are unscoped and serve SYSTEM_COLLECTIONS only: tenants, the outbox (the relay reads
+`SystemRepo` / `SyncSystemRepo` are unscoped and serve SYSTEM_COLLECTIONS only: tenants, the relay's own state, the
+outbox (the relay reads
 every tenant's events) and identities (login finds a user before the tenant is known, ADR 0002). A lint test
 (tests/security/test_raw_collection_access.py) limits which modules may import them.
 
@@ -58,9 +59,10 @@ COLLECTIONS = (
     "identities",
     "idempotency_keys",
     "llm_calls",
+    "relay_state",
 )
-SYSTEM_COLLECTIONS = ("tenants", "outbox", "identities")
-_NOT_TENANT_SCOPED = frozenset({"tenants"})  # the scope itself: no tenant_id field
+SYSTEM_COLLECTIONS = ("tenants", "outbox", "identities", "relay_state")
+_NOT_TENANT_SCOPED = frozenset({"tenants", "relay_state"})  # no tenant_id field
 
 TENANT_FIELD = "tenant_id"
 _CODE_OPERATORS = frozenset({"$where", "$function", "$accumulator"})
@@ -383,6 +385,21 @@ class SyncSystemRepo[M: BaseModel]:
     def insert_one(self, doc: M, *, session: ClientSession | None = None) -> M:
         self._collection.insert_one(_dump(doc), session=session)
         return doc
+
+    def watch_inserts(self, *, resume_after: Mapping[str, Any] | None = None, max_await_ms: int = 1000) -> Any:
+        """A change stream of inserted documents, for the outbox relay only (P2.5); use it as a context manager."""
+        if self._collection.name != "outbox":
+            raise CollectionNotAllowedError("only the outbox relay watches a collection")
+        return self._collection.watch(
+            [{"$match": {"operationType": "insert"}}],
+            resume_after=resume_after,
+            max_await_time_ms=max_await_ms,
+        )
+
+    def upsert(self, filter: Filter, update: Mapping[str, Any], *, session: ClientSession | None = None) -> None:
+        """Update or insert one document (the relay's own state)."""
+        check_update(update)
+        self._collection.update_one(dict(filter), update, upsert=True, session=session)
 
     def update_one(self, filter: Filter, update: Mapping[str, Any], *, session: ClientSession | None = None) -> int:
         check_update(update)
