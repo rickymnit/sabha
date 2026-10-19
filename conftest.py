@@ -15,6 +15,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from docker.types import Ulimit
 from pymongo import MongoClient
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
@@ -30,6 +31,10 @@ def mongo_uri() -> Iterator[str]:
         DockerContainer(MONGO_IMAGE)
         .with_command(f"--replSet {REPLICA_SET} --bind_ip_all --wiredTigerCacheSizeGB 0.25")
         .with_exposed_ports(27017)
+        # Every collection and index is an open file in WiredTiger. Tests create hundreds of short-lived databases,
+        # and Docker's default soft limit of 1024 made mongod panic ("Too many open files"). 64000 is MongoDB's
+        # recommended minimum.
+        .with_kwargs(ulimits=[Ulimit(name="nofile", soft=64000, hard=64000)])
         .waiting_for(LogMessageWaitStrategy("Waiting for connections"))
     )
     with container:

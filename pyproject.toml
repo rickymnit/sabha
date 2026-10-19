@@ -67,6 +67,7 @@ testpaths = [
   "eval/goldset/tests",
   "eval/raters/tests",
   "tests/security",
+  "tests/scripts",
 ]
 # importlib mode: test files in different packages may share a name without colliding.
 addopts = ["--import-mode=importlib", "--strict-markers"]
@@ -103,4 +104,9 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 # boto3 ships no type information; only scripts/ and storage helpers touch it.
 module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The Docker SDK (pulled in by testcontainers) ships no type information; only test fixtures touch it.
+module = ["docker", "docker.*"]
 ignore_missing_imports = true

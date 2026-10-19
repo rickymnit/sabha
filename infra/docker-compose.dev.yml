@@ -15,6 +15,12 @@ services:
     command: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
     ports:
       - "127.0.0.1:27017:27017"
+    # WiredTiger keeps a file open per collection and index; Docker's default soft limit (1024) is too low.
+    # 64000 is MongoDB's recommended minimum.
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
     volumes:
       - mongo-data:/data/db
     healthcheck:
