@@ -12,19 +12,16 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
-import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from pymongo import MongoClient
 from pymongo.database import Database
 
-from sabha_api.auth import TokenVerifier
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
 from sabha_core.models import IdentityLink, Role, Tenant, User
@@ -35,48 +32,13 @@ pytestmark = pytest.mark.integration
 
 ISSUER = "https://auth.example.com"  # BASE_SETTINGS in conftest.py
 AUDIENCE = "https://api.example.com"
-KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
-
-@dataclass
-class FakeIdp:
-    """Discovery, JWKS and userinfo for ISSUER. `emails` maps subject -> (email, email_verified)."""
-
-    emails: dict[str, tuple[str, bool]] = field(default_factory=dict)
-    userinfo_calls: int = 0
-
-    async def fetch(self, url: str) -> Mapping[str, Any]:
-        if url == f"{ISSUER}/.well-known/openid-configuration":
-            return {"issuer": f"{ISSUER}/", "jwks_uri": f"{ISSUER}/jwks", "userinfo_endpoint": f"{ISSUER}/userinfo"}
-        if url == f"{ISSUER}/jwks":
-            entry = jwt.algorithms.RSAAlgorithm.to_jwk(KEY.public_key(), as_dict=True)
-            return {"keys": [{**entry, "kid": "k1", "use": "sig", "alg": "RS256"}]}
-        raise httpx.ConnectError(url)
-
-    async def fetch_userinfo(self, url: str, token: str) -> Mapping[str, Any]:
-        assert url == f"{ISSUER}/userinfo"
-        self.userinfo_calls += 1
-        sub = jwt.decode(token, options={"verify_signature": False})["sub"]
-        email, verified = self.emails[sub]
-        return {"sub": sub, "email": email, "email_verified": verified}
-
-    def token(self, sub: str) -> str:
-        now = int(time.time())
-        claims = {
-            "iss": f"{ISSUER}/",
-            "aud": [AUDIENCE, f"{ISSUER}/userinfo"],
-            "sub": sub,
-            "iat": now,
-            "exp": now + 600,
-        }
-        return jwt.encode(claims, KEY, algorithm="RS256", headers={"kid": "k1"})
 
 
 @dataclass
 class Api:
     client: TestClient
     db: Database[dict[str, Any]]
-    idp: FakeIdp
+    idp: Any  # conftest.FakeIdp
 
     def get(self, path: str, sub: str | None) -> httpx.Response:
         headers = {"Authorization": f"Bearer {self.idp.token(sub)}"} if sub else {}
@@ -121,13 +83,15 @@ def shared_db(mongo_replica_set: MongoClient[dict[str, Any]]) -> Iterator[str]:
 
 
 @pytest.fixture
-def api(make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]], shared_db: str) -> Api:
+def api(
+    make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]], shared_db: str, fake_idp: Any
+) -> Api:
     db = mongo_replica_set[shared_db]
     for collection in COLLECTIONS:
         db[collection].delete_many({})
     seed(db)
-    idp = FakeIdp()
-    verifier = TokenVerifier(ISSUER, AUDIENCE, fetch=idp.fetch, fetch_userinfo=idp.fetch_userinfo)
+    idp = fake_idp
+    verifier = idp.verifier()
     client = make_client(
         resources=open_resources,
         token_verifier=verifier,

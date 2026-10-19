@@ -77,6 +77,12 @@ class Settings(BaseSettings):
     s3_access_key_id: SecretStr | None = None
     s3_secret_access_key: SecretStr | None = None
 
+    # Browser uploads (P2.1): direct to the audio bucket with presigned multipart URLs (golden rule 2). S3 needs
+    # parts of at least 5 MiB (except the last) and at most 10 000 parts.
+    upload_max_bytes: int = Field(default=1024**3, ge=1)  # 1 GiB
+    upload_part_size_bytes: int = Field(default=16 * 1024**2, ge=5 * 1024**2)
+    upload_url_expiry_s: int = Field(default=900, ge=60, le=3600)  # each presigned part URL
+
     # Authentication (OIDC)
     oidc_issuer: str
     oidc_audience: str

@@ -6,11 +6,16 @@ returns a started TestClient; `client` is the default one.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterator
+import time
+from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import ExitStack, asynccontextmanager
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+import httpx
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
 from sabha_api.auth import PrincipalStore, TokenVerifier
@@ -86,3 +91,56 @@ def make_client() -> Iterator[MakeClient]:
 @pytest.fixture
 def client(make_client: MakeClient) -> TestClient:
     return make_client()
+
+
+# --- A fake identity provider for tests that sign in (test_users.py, test_recordings.py) ---
+
+OIDC_ISSUER = BASE_SETTINGS["oidc_issuer"]
+OIDC_AUDIENCE = BASE_SETTINGS["oidc_audience"]
+_IDP_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+@dataclass
+class FakeIdp:
+    """Discovery, JWKS and userinfo for the test issuer. `emails` maps subject -> (email, email_verified)."""
+
+    emails: dict[str, tuple[str, bool]] = field(default_factory=dict)
+    userinfo_calls: int = 0
+
+    async def fetch(self, url: str) -> Mapping[str, Any]:
+        if url == f"{OIDC_ISSUER}/.well-known/openid-configuration":
+            return {
+                "issuer": f"{OIDC_ISSUER}/",
+                "jwks_uri": f"{OIDC_ISSUER}/jwks",
+                "userinfo_endpoint": f"{OIDC_ISSUER}/userinfo",
+            }
+        if url == f"{OIDC_ISSUER}/jwks":
+            entry = jwt.algorithms.RSAAlgorithm.to_jwk(_IDP_KEY.public_key(), as_dict=True)
+            return {"keys": [{**entry, "kid": "k1", "use": "sig", "alg": "RS256"}]}
+        raise httpx.ConnectError(url)
+
+    async def fetch_userinfo(self, url: str, token: str) -> Mapping[str, Any]:
+        assert url == f"{OIDC_ISSUER}/userinfo"
+        self.userinfo_calls += 1
+        sub = jwt.decode(token, options={"verify_signature": False})["sub"]
+        email, verified = self.emails[sub]
+        return {"sub": sub, "email": email, "email_verified": verified}
+
+    def token(self, sub: str) -> str:
+        now = int(time.time())
+        claims = {
+            "iss": f"{OIDC_ISSUER}/",
+            "aud": [OIDC_AUDIENCE, f"{OIDC_ISSUER}/userinfo"],
+            "sub": sub,
+            "iat": now,
+            "exp": now + 600,
+        }
+        return jwt.encode(claims, _IDP_KEY, algorithm="RS256", headers={"kid": "k1"})
+
+    def verifier(self) -> TokenVerifier:
+        return TokenVerifier(OIDC_ISSUER, OIDC_AUDIENCE, fetch=self.fetch, fetch_userinfo=self.fetch_userinfo)
+
+
+@pytest.fixture
+def fake_idp() -> FakeIdp:
+    return FakeIdp()

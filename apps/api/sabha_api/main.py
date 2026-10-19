@@ -23,7 +23,7 @@ from sabha_api.auth.directory import Directory
 from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
 from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
-from sabha_api.routers import health, me, users
+from sabha_api.routers import health, me, recordings, users
 from sabha_core.logging import configure_logging
 from sabha_core.settings import Settings, get_settings
 from sabha_core.telemetry import package_version, setup_tracing
@@ -77,6 +77,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(users.router)
+    app.include_router(recordings.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

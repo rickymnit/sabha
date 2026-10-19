@@ -28,34 +28,6 @@ Done when: staging is reachable over HTTPS and `/health` responds.
 
 ---
 
-## P2.1 · Create recording and presigned multipart upload
-
-Plan task 2.1. Read first: `CLAUDE.md` golden rules 2 and 9, API conventions.
-
-```text
-Implement POST /v1/recordings.
-
-Request: {type: teaching|reception|counselling|meeting|sales, person_id?, unit_id?, file_name, size_bytes,
-content_type, consent_ref?, recorded_at?} and an Idempotency-Key header (required).
-Behaviour:
-- Validate type is in the tenant's enabled_types; content type/extension in
-  mp3,m4a,wav,ogg,webm,mp4; size <= 1 GB.
-- Store the idempotency key per tenant (Redis + Mongo fallback, 24 h); a replay returns the same response.
-- Insert recording with status CREATED and storage_key {tenant_id}/{recording_id}/original/<safe file name>.
-- Start an S3 multipart upload; return recording_id, upload_id, part_size (e.g. 16 MB) and presigned URLs
-  for every part (15-minute expiry), plus an endpoint to fetch more URLs: POST /v1/recordings/{id}/parts
-  {part_numbers:[...]} for resumed uploads.
-- Write an audit_log entry.
-Service code lives in apps/api/services/recordings.py; routers stay thin.
-
-Tests: happy path against MinIO, idempotent replay, disabled type rejected, oversize rejected, tenant B
-cannot request parts for tenant A's recording.
-```
-
-Done when: a script can upload a 500 MB file part by part using the returned URLs.
-
----
-
 ## P2.2 · Complete upload, checksum and duplicate detection
 
 > **Status (2026-10-19).** `transition()` / `transition_async()` exist (P2.3, sabha_core/state.py): use them for CREATED → UPLOADED instead of a stub. They also enforce golden rule 9 (no consent_ref, nothing moves past UPLOADED). Use `sabha_api.idempotency` for the Idempotency-Key.

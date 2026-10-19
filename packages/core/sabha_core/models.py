@@ -197,7 +197,8 @@ class IdempotencyRecord(TenantDoc):
 class Recording(TenantDoc):
     """A recorded conversation. Status changes only through sabha_core.state.transition (CLAUDE.md).
 
-    Minimal for P2.3; P2.1 adds the upload fields (file name, size, storage key, person, unit, checksum).
+    Upload fields (P2.1): the browser uploads the original straight to `storage_key` in the audio bucket, in
+    `part_count` parts of `part_size` bytes (the last may be smaller), under the multipart `upload_id`.
     """
 
     type: ConversationType
@@ -205,6 +206,17 @@ class Recording(TenantDoc):
     consent_ref: str | None = None  # golden rule 9: without it nothing moves past UPLOADED
     status_reason: str | None = None
     status_changed_at: UtcDatetime | None = None
+    person_id: str | None = None  # the staff member analysed
+    unit_id: str | None = None
+    file_name: str | None = None  # as the user named it; storage uses a safe form
+    size_bytes: int | None = Field(default=None, ge=1)
+    content_type: str | None = None
+    recorded_at: UtcDatetime | None = None
+    storage_key: str | None = None
+    upload_id: str | None = None
+    part_size: int | None = Field(default=None, ge=1)
+    part_count: int | None = Field(default=None, ge=1)
+    created_by: str | None = None  # user id
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
@@ -222,4 +234,22 @@ class StageRun(TenantDoc):
     duration_ms: int | None = Field(default=None, ge=0)
     error_code: str | None = None
     error_detail: str | None = Field(default=None, max_length=2000)
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuditEntry(TenantDoc):
+    """One append-only audit record (CLAUDE.md: playback, export and score changes are audited; P1.8 completes it).
+
+    Written by sabha_api.audit.audit; nothing updates or deletes these.
+    """
+
+    actor_user_id: str
+    actor_role: str
+    action: str = Field(min_length=1)  # e.g. recording.create, recording.play, score.change
+    target_type: str
+    target_id: str
+    at: UtcDatetime = Field(default_factory=utc_now)
+    ip: str | None = None
+    user_agent: str | None = Field(default=None, max_length=500)
+    request_id: str | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
