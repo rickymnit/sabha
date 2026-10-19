@@ -83,3 +83,22 @@ async def part_urls(
 ) -> service.PartsOut:
     """Fresh presigned URLs for some parts of an upload still in progress (for resuming)."""
     return await service.part_urls(principal, recording_id, body, storage=storage, recordings=recordings)
+
+
+@router.post(
+    "/{recording_id}/complete",
+    response_model=service.CompleteOut,
+    responses={409: {"description": "`duplicate_recording` (with `duplicate_of`) or `upload_not_open`"}},
+)
+async def complete_upload(
+    recording_id: str,
+    body: service.CompleteIn,
+    principal: Annotated[Principal, Depends(current_principal)],
+    storage: Storage,
+    recordings: Recordings,
+    txn: Annotated[Transactions, Depends(transactions)],
+) -> service.CompleteOut:
+    """Finish an upload: every part with its ETag, and the file's SHA-256. Safe to retry with the same body."""
+    return await service.complete(
+        principal, recording_id, body, storage=storage, recordings=recordings, transactions=txn
+    )

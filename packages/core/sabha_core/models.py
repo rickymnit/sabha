@@ -217,6 +217,13 @@ class Recording(TenantDoc):
     part_size: int | None = Field(default=None, ge=1)
     part_count: int | None = Field(default=None, ge=1)
     created_by: str | None = None  # user id
+    # Completion (P2.2): the browser's SHA-256 of the file; a recording with the same hash already in the tenant
+    # holds this one until the uploader confirms (force); without consent it waits as well.
+    sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    duplicate_of: str | None = None
+    duplicate_confirmed: bool = False
+    awaiting_consent: bool = False
+    completed_at: UtcDatetime | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

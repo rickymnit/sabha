@@ -28,31 +28,6 @@ Done when: staging is reachable over HTTPS and `/health` responds.
 
 ---
 
-## P2.2 · Complete upload, checksum and duplicate detection
-
-> **Status (2026-10-19).** `transition()` / `transition_async()` exist (P2.3, sabha_core/state.py): use them for CREATED → UPLOADED instead of a stub. They also enforce golden rule 9 (no consent_ref, nothing moves past UPLOADED). Use `sabha_api.idempotency` for the Idempotency-Key.
-
-Plan task 2.2.
-
-```text
-Implement POST /v1/recordings/{id}/complete {parts:[{part_number, etag}], sha256}.
-
-- Complete the S3 multipart upload; verify object size matches size_bytes.
-- The client sends a SHA-256 computed in the browser (Web Crypto, streamed). Store it. If another recording
-  in the same tenant has the same sha256 and is not FAILED, mark this one duplicate_of=<id>, status stays
-  UPLOADED, and return 409 with code "duplicate_recording" unless the request has force=true.
-- If consent_ref is missing, keep status UPLOADED with flag awaiting_consent=true and do not enqueue.
-- Otherwise transition CREATED → UPLOADED through the state machine helper (stub it now; P2.3 builds it) and
-  leave a TODO hook where P2.5 will write the outbox event.
-- Abort and clean up multipart uploads older than 24 h with a periodic task stub (scheduled in P2.4).
-
-Tests: size mismatch fails, duplicate detection, force=true path, missing consent does not enqueue.
-```
-
-Done when: a duplicate upload is caught and a normal upload reaches `UPLOADED`.
-
----
-
 ## P6.2 · App shell, login and navigation
 
 Plan task 6.2. Read first: `docs/design/01-overview.png` (sidebar), P1.5 output.

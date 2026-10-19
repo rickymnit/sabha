@@ -4,6 +4,7 @@ by PUTting bytes to the presigned URLs, so the URLs are proven to work, not just
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -268,3 +269,151 @@ def test_keys_are_always_under_the_callers_tenant(api: Api) -> None:
         rid = api.create(sub, LESSON).json()["recording_id"]
         doc = api.db.recordings.find_one({"_id": rid})
         assert doc is not None and doc["storage_key"].startswith(f"{doc['tenant_id']}/{rid}/original/")
+
+
+# --- Complete (P2.2) ---
+
+
+@dataclass
+class Uploaded:
+    recording_id: str
+    parts: list[dict[str, Any]]
+    sha256: str
+
+
+def upload(api: Api, sub: str = "owner-a", content: bytes = b"a" * PART + b"b", **body: Any) -> Uploaded:
+    """Create a recording for `content` and PUT its parts, as the browser does."""
+    created = api.create(
+        sub, {**LESSON, "consent_ref": "consent-7b", **body, "size_bytes": body.get("size_bytes", len(content))}
+    )
+    assert created.status_code == 201, created.text
+    out = created.json()
+    parts = []
+    for part in out["parts"]:
+        start = (part["part_number"] - 1) * PART
+        put = httpx.put(part["url"], content=content[start : start + PART])
+        assert put.status_code == 200, put.text
+        parts.append({"part_number": part["part_number"], "etag": put.headers["etag"]})
+    return Uploaded(out["recording_id"], parts, hashlib.sha256(content).hexdigest())
+
+
+def complete(api: Api, up: Uploaded, sub: str = "owner-a", **extra: Any) -> httpx.Response:
+    body = {"parts": up.parts, "sha256": up.sha256, **extra}
+    return api.client.post(f"/v1/recordings/{up.recording_id}/complete", json=body, headers=api.headers(sub))
+
+
+def test_complete_moves_the_recording_to_uploaded(api: Api) -> None:
+    up = upload(api)
+    response = complete(api, up)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "recording_id": up.recording_id,
+        "status": "UPLOADED",
+        "awaiting_consent": False,
+        "duplicate_of": None,
+    }
+    doc = api.db.recordings.find_one({"_id": up.recording_id})
+    assert doc is not None
+    assert (doc["status"], doc["status_reason"], doc["sha256"]) == ("UPLOADED", "upload_complete", up.sha256)
+    assert api.s3.head_object(Bucket=api.bucket, Key=doc["storage_key"])["ContentLength"] == PART + 1
+
+
+def test_without_consent_the_recording_waits(api: Api) -> None:
+    up = upload(api, consent_ref=None)
+    body = complete(api, up).json()
+    assert (body["status"], body["awaiting_consent"]) == ("UPLOADED", True)
+
+
+def test_complete_is_safe_to_retry(api: Api) -> None:
+    up = upload(api)
+    first = complete(api, up)
+    again = complete(api, up)
+    assert again.status_code == 200 and again.json() == first.json()
+
+
+def test_every_part_is_needed(api: Api) -> None:
+    up = upload(api)
+    up.parts = up.parts[:1]
+    problem(complete(api, up), 422, "invalid_parts")
+
+
+def test_a_wrong_etag_is_refused(api: Api) -> None:
+    up = upload(api)
+    up.parts[0]["etag"] = '"0123456789abcdef0123456789abcdef"'  # pragma: allowlist secret  (a made-up ETag)
+    problem(complete(api, up), 422, "invalid_parts")
+    doc = api.db.recordings.find_one({"_id": up.recording_id})
+    assert doc is not None and doc["status"] == "CREATED"
+
+
+def test_a_size_mismatch_discards_the_upload(api: Api) -> None:
+    up = upload(api, content=b"a" * PART + b"b", size_bytes=PART + 10)
+    problem(complete(api, up), 422, "size_mismatch")
+    doc = api.db.recordings.find_one({"_id": up.recording_id})
+    assert doc is not None and doc["status"] == "CREATED" and doc["upload_id"] is None
+    with pytest.raises(api.s3.exceptions.ClientError):
+        api.s3.head_object(Bucket=api.bucket, Key=doc["storage_key"])
+    problem(api.parts("owner-a", up.recording_id, [1]), 409, "upload_not_open")
+
+
+def test_a_duplicate_is_held_until_confirmed(api: Api) -> None:
+    original = upload(api)
+    assert complete(api, original).status_code == 200
+    copy = upload(api)
+    response = complete(api, copy)
+    problem(response, 409, "duplicate_recording")
+    assert response.json()["duplicate_of"] == original.recording_id
+    doc = api.db.recordings.find_one({"_id": copy.recording_id})
+    assert doc is not None and doc["status"] == "UPLOADED" and doc["duplicate_confirmed"] is False
+
+    problem(complete(api, copy), 409, "duplicate_recording")  # a plain retry is still held
+    forced = complete(api, copy, force=True)
+    assert forced.status_code == 200 and forced.json()["duplicate_of"] == original.recording_id
+    doc = api.db.recordings.find_one({"_id": copy.recording_id})
+    assert doc is not None and doc["duplicate_confirmed"] is True
+    assert complete(api, copy).status_code == 200  # confirmed: retries succeed
+
+
+def test_force_on_the_first_call_confirms_at_once(api: Api) -> None:
+    original = upload(api)
+    complete(api, original)
+    copy = upload(api)
+    assert complete(api, copy, force=True).status_code == 200
+
+
+def test_duplicates_are_per_tenant(api: Api) -> None:
+    complete(api, upload(api, "owner-a"))
+    assert complete(api, upload(api, "owner-b"), "owner-b").status_code == 200
+
+
+def test_a_failed_recording_is_not_a_duplicate(api: Api) -> None:
+    original = upload(api)
+    complete(api, original)
+    api.db.recordings.update_one({"_id": original.recording_id}, {"$set": {"status": "FAILED"}})
+    assert complete(api, upload(api)).status_code == 200
+
+
+def test_another_tenant_cannot_complete(api: Api) -> None:
+    problem(complete(api, upload(api), "owner-b"), 404, "not_found")
+
+
+def test_staff_cannot_complete_a_colleagues_upload(api: Api) -> None:
+    problem(complete(api, upload(api), "staff-a"), 404, "not_found")
+
+
+def test_staff_complete_their_own_upload(api: Api) -> None:
+    up = upload(api, "staff-a")
+    assert complete(api, up, "staff-a").status_code == 200
+
+
+@pytest.mark.parametrize("sha", ["", "xyz", "a" * 63, "g" * 64])
+def test_the_checksum_must_be_sha256_hex(api: Api, sha: str) -> None:
+    up = upload(api)
+    up.sha256 = sha
+    problem(complete(api, up), 422, "validation_error")
+
+
+def test_a_completed_upload_cannot_complete_with_another_file(api: Api) -> None:
+    up = upload(api)
+    complete(api, up)
+    up.sha256 = "0" * 64
+    problem(complete(api, up), 409, "upload_not_open")

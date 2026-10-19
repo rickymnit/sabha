@@ -16,6 +16,14 @@ Rules:
   only for recordings they created. Another tenant's recording, or a colleague's for staff, is 404.
 
 Every create writes an audit entry (recording.create) in the same transaction as the recording.
+
+Completing (P2.2, `complete`): every part 1..part_count with its ETag; the stored object must have the announced
+size (otherwise it is deleted, the upload closed, and 422 `size_mismatch`: start a new recording). The browser's
+SHA-256 is stored. CREATED -> UPLOADED goes through sabha_core.state.transition_async. Then:
+- the same hash in another recording of the tenant that has not FAILED: duplicate_of is set and the recording is
+  held; 409 `duplicate_recording` (with `duplicate_of`) unless `force=true`; calling again with force confirms;
+- no consent_ref: awaiting_consent is set; the recording waits (golden rule 9; consent is added in P6.9);
+- calling complete again with the same hash returns the current state, so a client may retry safely.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
+from botocore.exceptions import ClientError
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
@@ -36,7 +45,7 @@ from sabha_core.models import AuditEntry, Person, Recording, Tenant, Unit, new_i
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
 from sabha_core.settings import Settings
-from sabha_core.state import RecordingStatus
+from sabha_core.state import RecordingStatus, transition_async
 from sabha_core.storage import original_key
 
 ROUTE = "POST /v1/recordings"
@@ -137,6 +146,14 @@ class InvalidPartNumberError(ApiError):
     status, code, title = 422, "invalid_part_number", "Invalid part number"
 
 
+class StorageError(Exception):
+    """S3 refused a request; `code` is S3's error code (e.g. InvalidPart, NoSuchUpload)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 class UploadStorage:
     """The audio bucket, through the API's boto3 client. Only metadata calls: no audio passes through the API."""
 
@@ -153,6 +170,32 @@ class UploadStorage:
 
     async def abort(self, key: str, upload_id: str) -> None:
         await asyncio.to_thread(self._s3.abort_multipart_upload, Bucket=self._bucket, Key=key, UploadId=upload_id)
+
+    async def complete(self, key: str, upload_id: str, parts: list[PartIn]) -> None:
+        listing = [{"PartNumber": p.part_number, "ETag": p.etag} for p in sorted(parts, key=lambda p: p.part_number)]
+        try:
+            await asyncio.to_thread(
+                self._s3.complete_multipart_upload,
+                Bucket=self._bucket,
+                Key=key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": listing},
+            )
+        except ClientError as exc:
+            raise StorageError(str(exc.response.get("Error", {}).get("Code", "unknown"))) from exc
+
+    async def size(self, key: str) -> int | None:
+        """The object's size in bytes, or None if it does not exist."""
+        try:
+            head = await asyncio.to_thread(self._s3.head_object, Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return None
+            raise
+        return int(head["ContentLength"])
+
+    async def delete(self, key: str) -> None:
+        await asyncio.to_thread(self._s3.delete_object, Bucket=self._bucket, Key=key)
 
     def part_urls(self, key: str, upload_id: str, numbers: list[int]) -> tuple[list[PartUrl], datetime]:
         expires = utc_now() + timedelta(seconds=self._expiry)
@@ -289,3 +332,147 @@ async def part_urls(
         raise InvalidPartNumberError(f"This upload has parts 1 to {count}; not {wrong}.")
     parts, expires = storage.part_urls(recording.storage_key, recording.upload_id, sorted(set(body.part_numbers)))
     return PartsOut(parts=parts, urls_expire_at=expires)
+
+
+# --- Completing an upload (plan task P2.2) ---
+
+
+class PartIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    part_number: int = Field(ge=1, le=MAX_PARTS)
+    etag: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+
+class CompleteIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parts: list[PartIn] = Field(min_length=1, max_length=MAX_PARTS)
+    sha256: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, pattern=r"^[0-9a-f]{64}$")]
+    force: bool = False  # upload even though the same file is already in the organisation
+
+
+class CompleteOut(BaseModel):
+    recording_id: str
+    status: RecordingStatus
+    awaiting_consent: bool
+    duplicate_of: str | None
+
+
+class InvalidPartsError(ApiError):
+    status, code, title = 422, "invalid_parts", "Invalid parts"
+
+
+class SizeMismatchError(ApiError):
+    status, code, title = 422, "size_mismatch", "Size mismatch"
+
+
+class DuplicateRecordingError(ConflictError):
+    code, title = "duplicate_recording", "Duplicate recording"
+
+
+async def _finish_in_storage(storage: UploadStorage, recording: Recording, parts: list[PartIn]) -> int:
+    """Complete the multipart upload and return the object's size. A retry after a completed upload is fine."""
+    assert recording.storage_key is not None and recording.upload_id is not None  # noqa: S101  # checked by caller
+    wanted = set(range(1, (recording.part_count or 0) + 1))
+    numbers = [p.part_number for p in parts]
+    if sorted(numbers) != sorted(wanted) or len(set(numbers)) != len(numbers):
+        raise InvalidPartsError(f"Send every part from 1 to {recording.part_count} once, with its ETag.")
+    try:
+        await storage.complete(recording.storage_key, recording.upload_id, parts)
+    except StorageError as exc:
+        if exc.code != "NoSuchUpload":
+            raise InvalidPartsError("Storage did not accept the parts; check their ETags.") from exc
+        # The upload is gone: either an earlier call completed it (and then failed to record that) or it expired.
+    size = await storage.size(recording.storage_key)
+    if size is None:
+        raise UploadNotOpenError("This upload no longer exists in storage. Start a new recording.")
+    return size
+
+
+async def complete(
+    principal: Principal,
+    recording_id: str,
+    body: CompleteIn,
+    *,
+    storage: UploadStorage,
+    recordings: TenantRepo[Recording],
+    transactions: Transactions,
+) -> CompleteOut:
+    recording = await recordings.find_one({"_id": recording_id})
+    if recording is None or (principal.role is Role.STAFF and recording.created_by != principal.user_id):
+        raise NotFoundError("Recording not found.")
+
+    if recording.status is RecordingStatus.UPLOADED and recording.sha256 == body.sha256:
+        return await _again(recording, body, recordings)  # a retry, or confirming a duplicate
+    if recording.status is not RecordingStatus.CREATED or not recording.upload_id or not recording.storage_key:
+        raise UploadNotOpenError("This recording's upload is already complete or was never started.")
+
+    size = await _finish_in_storage(storage, recording, body.parts)
+    if size != recording.size_bytes:
+        await storage.delete(recording.storage_key)
+        await recordings.update_one(
+            {"_id": recording_id, "status": RecordingStatus.CREATED.value},
+            {"$set": {"upload_id": None, "status_reason": "size_mismatch"}},
+        )
+        raise SizeMismatchError(
+            f"The uploaded file has {size} bytes, not the {recording.size_bytes} announced. Start a new recording."
+        )
+
+    other = await recordings.find_one(
+        {"sha256": body.sha256, "_id": {"$ne": recording_id}, "status": {"$ne": RecordingStatus.FAILED.value}}
+    )
+    awaiting_consent = not recording.consent_ref
+    async with transactions.run() as session:
+        await transition_async(
+            recordings,
+            recording_id,
+            RecordingStatus.CREATED,
+            RecordingStatus.UPLOADED,
+            reason="upload_complete",
+            meta={"size_bytes": size, "duplicate_of": other.id if other else None},
+            session=session,
+        )
+        # TODO(P2.5): write the returned outbox event here, in this transaction.
+        await recordings.update_one(
+            {"_id": recording_id},
+            {
+                "$set": {
+                    "sha256": body.sha256,
+                    "duplicate_of": other.id if other else None,
+                    "duplicate_confirmed": bool(other) and body.force,
+                    "awaiting_consent": awaiting_consent,
+                    "completed_at": utc_now(),
+                }
+            },
+            session=session,
+        )
+    if other is not None and not body.force:
+        raise _duplicate(other.id)
+    return CompleteOut(
+        recording_id=recording_id,
+        status=RecordingStatus.UPLOADED,
+        awaiting_consent=awaiting_consent,
+        duplicate_of=other.id if other else None,
+    )
+
+
+async def _again(recording: Recording, body: CompleteIn, recordings: TenantRepo[Recording]) -> CompleteOut:
+    """Complete called again for an uploaded recording with the same checksum."""
+    if recording.duplicate_of and not recording.duplicate_confirmed:
+        if not body.force:
+            raise _duplicate(recording.duplicate_of)
+        await recordings.update_one({"_id": recording.id}, {"$set": {"duplicate_confirmed": True}})
+    return CompleteOut(
+        recording_id=recording.id,
+        status=recording.status,
+        awaiting_consent=recording.awaiting_consent,
+        duplicate_of=recording.duplicate_of,
+    )
+
+
+def _duplicate(original_id: str) -> DuplicateRecordingError:
+    return DuplicateRecordingError(
+        "This file was already uploaded to your organisation. Send force=true to process it again.",
+        extra={"duplicate_of": original_id},
+    )
