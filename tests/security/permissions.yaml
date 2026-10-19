@@ -1,8 +1,8 @@
 # Who may call what: the permission matrix for every API route (plan task P7.4).
 #
-# DRAFT for the owner's review (2026-10-19). Once agreed, tests/security/test_permission_matrix.py calls every
-# route as every caller and fails on any difference. Every route in the OpenAPI spec must appear here
-# (test_every_route_is_in_the_matrix), so a new route cannot ship without a decision.
+# Reviewed by the owner on 2026-10-19. tests/security/test_permission_matrix.py calls every route as every caller
+# and fails on any difference. Every route in the OpenAPI spec must appear here (test_every_route_is_in_the_matrix),
+# so a new route cannot ship without a decision.
 #
 # Callers. Tenant A has units unit-1 and unit-2. The target recording (for routes with {recording_id}) belongs to
 # tenant A, unit-1, person "Asha" (linked to staff_uploader), and was uploaded by staff_uploader.
@@ -16,7 +16,7 @@
 #   other_tenant         owner of tenant B
 #
 # Statuses are what the caller gets. 404 (not 403) for a recording the caller may not see, so its existence is not
-# revealed. "PROPOSED" marks a cell where the code today does something else; those are the decisions to review.
+# revealed.
 
 callers:
   - anonymous
@@ -74,9 +74,9 @@ routes:
     owner: 201
     admin: 201
     manager_unit: 201
-    manager_other_unit: 201  # PROPOSED change: 403, a manager uploads only for people in their units (today 201)
+    manager_other_unit: 403  # managers and reviewers upload only for people in their units (person_not_allowed)
     reviewer_unit: 201
-    staff_uploader: 201  # staff upload only for their own person (default rule, not yet confirmed by the owner)
+    staff_uploader: 201  # staff upload only for their own person
     staff_colleague: 403  # person_not_allowed
     other_tenant: 422  # unknown_person: Asha is not in tenant B
 
@@ -85,9 +85,9 @@ routes:
     anonymous: 401
     owner: 200
     admin: 200
-    manager_unit: 404  # PROPOSED change: only the uploader, owners and admins resume an upload (today 200)
-    manager_other_unit: 404  # PROPOSED change (today 200)
-    reviewer_unit: 404  # PROPOSED change (today 200)
+    manager_unit: 404  # only the uploader, owners and admins resume an upload
+    manager_other_unit: 404
+    reviewer_unit: 404
     staff_uploader: 200
     staff_colleague: 404
     other_tenant: 404
@@ -97,9 +97,9 @@ routes:
     anonymous: 401
     owner: 200
     admin: 200
-    manager_unit: 404  # PROPOSED change (today 200)
-    manager_other_unit: 404  # PROPOSED change (today 200)
-    reviewer_unit: 404  # PROPOSED change (today 200)
+    manager_unit: 404
+    manager_other_unit: 404
+    reviewer_unit: 404
     staff_uploader: 200
     staff_colleague: 404
     other_tenant: 404

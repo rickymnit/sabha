@@ -72,6 +72,8 @@ Done when: a restore is rehearsed on staging and the retention job runs nightly.
 
 ## P7.4 · Tenant-isolation and permission tests
 
+> **Status (2026-10-19).** Already built: `tests/security/permissions.yaml` (reviewed by the owner) and `test_permission_matrix.py`, which fails if an OpenAPI route is missing from the matrix and calls every route as nine callers (anonymous, owner, admin, managers of the recording's unit and another unit, a reviewer, the uploader, a colleague, another tenant). Presigned upload keys are checked to sit under the caller's tenant (`test_recordings.py`). Remaining: add each new route to the matrix as it lands (the test enforces it), the SSE checks (with P2.6), aggregation checks (with P6.4b), and a final `/tenant-check` run.
+
 Plan task 7.4.
 
 ```text

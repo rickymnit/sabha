@@ -9,11 +9,12 @@ Rules:
 - File extension and content type: mp3, m4a, wav, ogg, webm or mp4 with a matching type (422 `unsupported_format`).
 - At most UPLOAD_MAX_BYTES, 1 GiB by default (422 `file_too_large`).
 - Person and unit must exist in the tenant (422 `unknown_person` / `unknown_unit`).
-- Staff upload only their own recordings: the person defaults to the one linked to their user and may not be
-  anyone else (403 `person_not_allowed`; 403 `no_linked_person` if none is linked). Other roles may name any
-  person in the tenant. Unit-level limits for managers come with the permission matrix (P7.4).
-- Fresh part URLs for a resumed upload: only while the recording is CREATED, only part numbers it has, and staff
-  only for recordings they created. Another tenant's recording, or a colleague's for staff, is 404.
+- Who may upload for whom (tests/security/permissions.yaml, decided 2026-10-19): staff only their own recordings
+  (the person defaults to the one linked to their user; 403 `person_not_allowed`, or `no_linked_person` if none is
+  linked); managers and reviewers only for people and units they are assigned to (403 `person_not_allowed`);
+  owners and admins for anyone in the tenant.
+- Fresh part URLs and completion: only the uploader, owners and admins, only while the recording is CREATED, and
+  only part numbers it has. Anyone else, and any other tenant, gets 404.
 
 Every create writes an audit entry (recording.create) in the same transaction as the recording.
 
@@ -226,6 +227,15 @@ def _check_format(file_name: str, content_type: str) -> None:
         raise UnsupportedFormatError(f"A .{extension} file should have content type {' or '.join(sorted(allowed))}.")
 
 
+UNIT_SCOPED = frozenset({Role.MANAGER, Role.REVIEWER})  # upload only for people in their own units
+UPLOAD_ADMINS = frozenset({Role.OWNER, Role.ADMIN})
+
+
+def may_handle_upload(principal: Principal, recording: Recording) -> bool:
+    """Resuming or completing an upload: the uploader, owners and admins (decided 2026-10-19)."""
+    return principal.role in UPLOAD_ADMINS or recording.created_by == principal.user_id
+
+
 async def _person_for(principal: Principal, person_id: str | None, people: TenantRepo[Person]) -> Person | None:
     if principal.role is Role.STAFF:
         own = await people.find_one({"user_id": principal.user_id})
@@ -239,6 +249,8 @@ async def _person_for(principal: Principal, person_id: str | None, people: Tenan
     person = await people.find_one({"_id": person_id})
     if person is None:
         raise UnknownPersonError("This person does not exist in your organisation.")
+    if principal.role in UNIT_SCOPED and person.unit_id not in principal.unit_ids:
+        raise PersonNotAllowedError("You can upload only for people in your units.")
     return person
 
 
@@ -267,6 +279,8 @@ async def create(
         raise FileTooLargeError("This file needs more upload parts than storage allows.")
     person = await _person_for(principal, body.person_id, people)
     unit_id = body.unit_id or (person.unit_id if person else None)
+    if principal.role in UNIT_SCOPED and unit_id is not None and unit_id not in principal.unit_ids:
+        raise PersonNotAllowedError("You can upload only for your units.")
     if body.unit_id is not None and await units.find_one({"_id": body.unit_id}) is None:
         raise UnknownUnitError("This unit does not exist in your organisation.")
 
@@ -326,7 +340,7 @@ async def part_urls(
     recordings: TenantRepo[Recording],
 ) -> PartsOut:
     recording = await recordings.find_one({"_id": recording_id})
-    if recording is None or (principal.role is Role.STAFF and recording.created_by != principal.user_id):
+    if recording is None or not may_handle_upload(principal, recording):
         raise NotFoundError("Recording not found.")
     if recording.status is not RecordingStatus.CREATED or not recording.upload_id or not recording.storage_key:
         raise UploadNotOpenError("This recording's upload is already complete or was never started.")
@@ -405,7 +419,7 @@ async def complete(
     transactions: Transactions,
 ) -> CompleteOut:
     recording = await recordings.find_one({"_id": recording_id})
-    if recording is None or (principal.role is Role.STAFF and recording.created_by != principal.user_id):
+    if recording is None or not may_handle_upload(principal, recording):
         raise NotFoundError("Recording not found.")
 
     if recording.status is RecordingStatus.UPLOADED and recording.sha256 == body.sha256:
