@@ -4,33 +4,6 @@ Goal: an upload flows automatically through cleaning and speaker detection, and 
 
 ---
 
-## P2.3 · Job state machine and stage runs
-
-> **Status (2026-10-17).** Already built: `RecordingStatus`, the transition table, `check_transition`, `InvalidTransition` / `ConcurrentTransition` (sabha_core/state.py). Remaining: `transition()` with the conditional update in a MongoDB session returning the outbox event, `stage_runs` documents per attempt, and their tests.
-
-Plan task 2.3. **Tests first.** Read first: `CLAUDE.md` (domain model).
-
-```text
-Implement packages/core/sabha_core/state.py: the ONLY place recording status transitions are defined.
-
-- Enum RecordingStatus with CREATED, UPLOADED, PREPROCESSING, DIARIZING, TRANSCRIBING, ANALYZING, COMPLETED,
-  FAILED, NEEDS_REVIEW.
-- An explicit allowed-transitions table; FAILED and NEEDS_REVIEW reachable from every worker stage;
-  COMPLETED → ANALYZING allowed only for re-analysis.
-- transition(session, recording_id, tenant_id, from_status, to_status, reason, meta) performs a conditional
-  update (status must equal from_status) inside the given MongoDB session; raises InvalidTransition or
-  ConcurrentTransition. It also returns the outbox event to write (P2.5 writes it in the same transaction).
-- stage_runs collection: one document per attempt {recording_id, tenant_id, stage, version, attempt, status
-  running|succeeded|failed, started_at, finished_at, error_code, error_detail, worker, duration_ms}.
-
-Tests first: every allowed and disallowed transition, concurrent transition loses cleanly, stage_runs written
-per attempt.
-```
-
-Done when: tests pass and the complete endpoint uses `transition()` for `CREATED → UPLOADED`.
-
----
-
 ## P2.4 · Celery queues, retries and dead-letter queue
 
 Plan task 2.4. Read first: `CLAUDE.md` golden rule 3.

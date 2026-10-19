@@ -28,34 +28,6 @@ Done when: staging is reachable over HTTPS and `/health` responds.
 
 ---
 
-## P1.5 · Identity and roles
-
-> **Status (2026-10-17).** Already built (P1.5a): Auth0 token validation, `current_principal` / `require_role`, web AuthProvider, ProtectedRoute and sign-out, ADR 0002, `docs/setup/auth.md`. Remaining (P1.5b): look up users through the `identities` collection, `POST /v1/users/invites`, `GET /v1/me`. Needs an Auth0 dev tenant for the "Done when".
-
-Plan task 1.5. Read first: `docs/adr/` (write 0002-auth.md as part of this task).
-
-```text
-Add authentication and roles. We use an external OIDC provider (Auth0 or Keycloak — write
-docs/adr/0002-auth.md comparing them in 10 lines and recommend one for a solo engineer; I will confirm).
-
-API:
-- auth/oidc.py: validate JWT access tokens against the issuer's JWKS (cached), audience and expiry.
-- Map token claims to an internal user: look up users by (issuer, subject); first login creates nothing
-  unless an admin has invited that email (invite flow: POST /v1/users/invites by owner/admin).
-- Roles: owner, admin, manager, reviewer, staff. A dependency `require_role(...)` and `current_principal`
-  returning user_id, tenant_id, role, unit_ids.
-- GET /v1/me returns the principal and the tenant's labels.
-Web:
-- Login with the provider's SPA SDK (PKCE), token refresh, logout; an AuthProvider and a ProtectedRoute.
-
-Tests: expired token 401, wrong audience 401, staff hitting an admin route 403, uninvited user 403.
-Out of scope: SSO configuration in the provider console (document the steps in docs/setup/auth.md instead).
-```
-
-Done when: you log in with Google on dev and `/v1/me` returns your role and tenant.
-
----
-
 ## P2.1 · Create recording and presigned multipart upload
 
 Plan task 2.1. Read first: `CLAUDE.md` golden rules 2 and 9, API conventions.
@@ -85,6 +57,8 @@ Done when: a script can upload a 500 MB file part by part using the returned URL
 ---
 
 ## P2.2 · Complete upload, checksum and duplicate detection
+
+> **Status (2026-10-19).** `transition()` / `transition_async()` exist (P2.3, sabha_core/state.py): use them for CREATED → UPLOADED instead of a stub. They also enforce golden rule 9 (no consent_ref, nothing moves past UPLOADED). Use `sabha_api.idempotency` for the Idempotency-Key.
 
 Plan task 2.2.
 
