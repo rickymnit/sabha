@@ -1317,6 +1317,7 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pymongo" },
 ]
 
 [package.metadata]
@@ -1325,6 +1326,7 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.45,<1.45.1" },
     { name = "pydantic", specifier = ">=2.11" },
     { name = "pydantic-settings", specifier = ">=2.10" },
+    { name = "pymongo", specifier = ">=4.9" },
 ]
 
 [[package]]

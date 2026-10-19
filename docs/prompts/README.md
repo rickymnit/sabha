@@ -25,7 +25,7 @@ their heading saying what exists and what remains. Removed prompts are in git hi
 
 | File | Week | Prompts still to do |
 | --- | --- | --- |
-| `week-1.md` | Foundations | P1.3 compose and Terraform, P1.5 identity (partly built), P1.6 tenancy (partly built), P2.1 recordings and upload, P2.2 complete and dedupe, P6.2 app shell |
+| `week-1.md` | Foundations | P1.3 compose and Terraform, P1.5 identity (partly built), P2.1 recordings and upload, P2.2 complete and dedupe, P6.2 app shell |
 | `week-2.md` | Orchestration and audio | P2.3 state machine (partly built), P2.4 queues and DLQ, P2.5 outbox relay, P2.6 SSE, P1.7 labels and profiles (partly built), P1.8 audit log, P3.2 normalise, P3.3 VAD and segment map (partly built), P3.4a diarization, P6.3 upload screen, P6.4a overview shell, P7.1 monitoring (partly built) |
 | `week-3.md` | Speech and Gate 1 | P3.4b diarization finish, P3.5 ASR stage (partly built), P3.6 roles (partly built), P3.7 transcript assembly (partly built), P5.1 LLM gateway, P5.3 model bake-off, Gate 1 |
 | `week-4.md` | Scoring | P5.6 scoring and grounding (partly built), P5.7 synthesis and storage (partly built), P5.7b analysis API |
@@ -43,6 +43,7 @@ their heading saying what exists and what remains. Removed prompts are in git hi
 | P0.7 LIS baselines | Dropped: there is no LIS codebase. ASR providers are compared on our own gold set instead |
 | P8.1 consent drafts | With the lawyer; sign-off is a people task (plan 8.5) |
 | P1.2 CI | The `images` job stays off until the repository variable `PUBLISH_IMAGES` is `true`; turn it on once the Celery app (P2.4) exists |
+| P1.6 tenancy (`sabha_core` models, repo, indexes; `sabha_api.deps.tenant_repo`) | /tenant-check finding 3, email delivery keys without a tenant, is fixed when P2.7 stores its delivery log |
 | P3.1 ASR provider layer (Sarvam AI, ADR 0006) | "Done when" needs a valid `SARVAM_API_KEY` (the current one is rejected with 403) and Sarvam's data terms in writing before real audio |
 | P4.2 gold-set tooling, P4.3 WER and role eval, P4.6 kappa and grounding eval | Tools built; run them on the real gold set and rater scores once those exist |
 | P5.2 PII redaction | Built with regular expressions; CLAUDE.md names Presidio. Decide whether to adopt Presidio |

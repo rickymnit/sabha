@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Annotated, Protocol
 
 from fastapi import Depends, Request
@@ -25,14 +24,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from sabha_api.auth.oidc import Identity, TokenVerifier
 from sabha_api.errors import ForbiddenError, NotReadyError, UnauthorizedError
-
-
-class Role(StrEnum):
-    OWNER = "owner"
-    ADMIN = "admin"
-    MANAGER = "manager"
-    REVIEWER = "reviewer"
-    STAFF = "staff"
+from sabha_core.models import Role
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +36,7 @@ class Principal:
 
 
 class PrincipalStore(Protocol):
-    async def find(self, identity: Identity) -> Principal | None:
+    async def principal_for(self, identity: Identity) -> Principal | None:
         """The user this identity is linked to, or None if no tenant has invited it."""
         ...
 
@@ -66,7 +58,7 @@ async def current_principal(
     store: PrincipalStore | None = request.app.state.principals
     if store is None:
         raise NotReadyError("The user directory is not available yet.")
-    principal = await store.find(identity)
+    principal = await store.principal_for(identity)
     if principal is None:
         raise NotInvitedError("Your account has not been invited. Ask your administrator for an invite.")
     return principal

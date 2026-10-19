@@ -56,34 +56,6 @@ Done when: you log in with Google on dev and `/v1/me` returns your role and tena
 
 ---
 
-## P1.6 · Tenant model and tenant-scoped repository
-
-> **Status (2026-10-17).** Already built, not yet committed: `models.py`, `repo.py` (TenantRepo, SyncTenantRepo, SystemRepo), `indexes.py`, the isolation and lint tests (all pass). Remaining: fix /tenant-check findings 1 (per-user rate-limit key without tenant) and 2 (duplicate-key id oracle: test plus no-client-ids rule); the API dependency that builds TenantRepo from the principal; commit.
-
-Plan task 1.6. **Write the tests first.** Read first: `CLAUDE.md` golden rule 1.
-
-```text
-Implement tenancy. Write the tests first and show them to me before the implementation.
-
-packages/core/sabha_core/:
-- models.py: Pydantic models for Tenant (name, profile school|college|company, enabled_types, labels dict,
-  plan, retention_days, region, kms_key_id), Unit (tree via parent_id), User, Person.
-- repo.py: TenantRepo[T] bound to (db, collection, tenant_id). Every find/insert/update/delete/aggregate
-  injects tenant_id; insert sets it; update cannot change it; aggregate prepends a $match on tenant_id.
-  Constructing it without a tenant_id raises. A separate SystemRepo exists only for tenants and outbox,
-  and is importable only from apps/workers/relay.py and admin scripts (enforce with a lint test).
-- indexes.py: creates all indexes listed in CLAUDE.md's domain model, idempotently, at startup.
-API: dependency that builds TenantRepo instances from the current principal's tenant_id.
-
-Tests (tests/security/test_tenant_isolation.py): two tenants with data; tenant A cannot read, update,
-delete or aggregate tenant B's documents through any repo method; a raw collection import outside allowed
-modules fails the lint test.
-```
-
-Done when: the isolation tests pass and `/tenant-check` reports no findings.
-
----
-
 ## P2.1 · Create recording and presigned multipart upload
 
 Plan task 2.1. Read first: `CLAUDE.md` golden rules 2 and 9, API conventions.

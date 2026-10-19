@@ -1,8 +1,11 @@
-"""Shared fixtures for sabha_core tests.
+"""Fixtures shared by every test suite in the repository.
 
 Integration fixtures start throwaway containers with testcontainers (CLAUDE.md: integration tests never touch the
 developer's own services). Tests that use them must be marked `@pytest.mark.integration`; `make test-fast`
 deselects them.
+
+- `mongo_replica_set`: a sync client for a single-node MongoDB 7 replica set, shared by the session.
+- `mongo_uri`: its connection string, for tests that need their own (for example async) client.
 """
 
 from __future__ import annotations
@@ -21,8 +24,8 @@ REPLICA_SET = "rs0"
 
 
 @pytest.fixture(scope="session")
-def mongo_replica_set() -> Iterator[MongoClient[dict[str, Any]]]:
-    """A single-node MongoDB 7 replica set in a container, shared by the whole test session."""
+def mongo_uri() -> Iterator[str]:
+    """Connection string of a single-node MongoDB 7 replica set in a container, shared by the whole test session."""
     container = (
         DockerContainer(MONGO_IMAGE)
         .with_command(f"--replSet {REPLICA_SET} --bind_ip_all --wiredTigerCacheSizeGB 0.25")
@@ -35,14 +38,22 @@ def mongo_replica_set() -> Iterator[MongoClient[dict[str, Any]]]:
         assert code == 0, output
         host, port = container.get_container_host_ip(), container.get_exposed_port(27017)
         # directConnection: the member advertises localhost:27017 inside the container, not the mapped port.
-        client: MongoClient[dict[str, Any]] = MongoClient(
-            f"mongodb://{host}:{port}/?directConnection=true", serverSelectionTimeoutMS=30_000
-        )
+        uri = f"mongodb://{host}:{port}/?directConnection=true"
+        client: MongoClient[dict[str, Any]] = MongoClient(uri, serverSelectionTimeoutMS=30_000)
         try:
             _wait_for_primary(client)
-            yield client
         finally:
             client.close()
+        yield uri
+
+
+@pytest.fixture(scope="session")
+def mongo_replica_set(mongo_uri: str) -> Iterator[MongoClient[dict[str, Any]]]:
+    client: MongoClient[dict[str, Any]] = MongoClient(mongo_uri, serverSelectionTimeoutMS=30_000)
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 def _wait_for_primary(client: MongoClient[dict[str, Any]]) -> None:

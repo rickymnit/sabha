@@ -66,6 +66,7 @@ testpaths = [
   "eval/tests",
   "eval/goldset/tests",
   "eval/raters/tests",
+  "tests/security",
 ]
 # importlib mode: test files in different packages may share a name without colliding.
 addopts = ["--import-mode=importlib", "--strict-markers"]
@@ -83,6 +84,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "S105", "S106"]  # asserts and fake credentials are expected in tests
+"conftest.py" = ["S101"]  # shared test fixtures at the repo root
 # Lists Devanagari signs and apostrophe variants on purpose: it exists to normalise them.
 "eval/textnorm.py" = ["RUF001", "RUF002"]
 "packages/analytics/sabha_analytics/grounding.py" = ["RUF001"]

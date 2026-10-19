@@ -95,7 +95,7 @@ class InMemoryPrincipals:
     def __init__(self, by_subject: Mapping[str, Principal]) -> None:
         self.by_subject = by_subject
 
-    async def find(self, identity: Identity) -> Principal | None:
+    async def principal_for(self, identity: Identity) -> Principal | None:
         assert identity.issuer == ISSUER
         return self.by_subject.get(identity.subject)
 

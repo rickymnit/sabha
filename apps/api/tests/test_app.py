@@ -165,3 +165,34 @@ def test_unmatched_paths_are_not_logged_by_path(client: TestClient, caplog: pyte
         client.get("/docs")
     unmatched, docs = [r.__dict__["route"] for r in caplog.records if r.name == "sabha.access"]
     assert (unmatched, docs) == ("<unmatched>", "/docs")
+
+
+@pytest.mark.integration
+def test_indexes_are_created_in_the_background_and_reported_ready(
+    make_client: Any, mongo_uri: str, mongo_replica_set: Any
+) -> None:
+    import time
+    import uuid
+
+    db_name = f"startup_{uuid.uuid4().hex[:12]}"
+    client = make_client(
+        resources=open_resources,
+        mongo_uri=f"{mongo_uri}&replicaSet=rs0",
+        mongo_db=db_name,
+        redis_url="redis://127.0.0.1:1/0",
+        s3_endpoint_url="http://127.0.0.1:1",
+        s3_access_key_id="test",
+        s3_secret_access_key="test",  # pragma: allowlist secret  (fake test value)
+    )
+    try:
+        deadline = time.monotonic() + 30
+        checks: dict[str, str] = {}
+        while time.monotonic() < deadline:
+            checks = client.get("/ready").json()["checks"]
+            if checks.get("indexes") == "ok":
+                break
+            time.sleep(0.5)
+        assert checks["indexes"] == "ok" and checks["mongo"] == "ok"
+        assert "people" in mongo_replica_set[db_name].list_collection_names()
+    finally:
+        mongo_replica_set.drop_database(db_name)
