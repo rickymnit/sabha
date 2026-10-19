@@ -41,6 +41,8 @@ RAW_ACCESS_ALLOWED = {
     "apps/api/sabha_api/resources.py": "opens the database handle once at start-up; reads no documents",
     "apps/api/sabha_api/deps.py": "hands the database handle to TenantRepo and transactions; reads no documents",
     "apps/api/sabha_api/main.py": "hands the database handle to the user directory at start-up; reads no documents",
+    "packages/core/sabha_core/mongo.py": "opens the synchronous database handle for workers and scripts",
+    "apps/workers/sabha_workers/tasks.py": "the worker's set-up: hands the database handle to the runner and sweeper",
 }
 
 RAW_ACCESS_ALLOWED_PREFIXES = {
@@ -54,6 +56,7 @@ _HANDLE_ATTRIBUTES = frozenset({"db", "mongo"})
 SYSTEM_REPO_ALLOWED = {
     "packages/core/sabha_core/repo.py": "defines them",
     "apps/workers/sabha_workers/relay.py": "the outbox relay reads every tenant's events (P2.5)",
+    "apps/workers/sabha_workers/maintenance.py": "reads the tenant list, then sweeps each tenant through TenantRepo",
     "apps/api/sabha_api/auth/directory.py": "login looks up identities before the tenant is known (ADR 0002)",
 }
 SYSTEM_REPO_ALLOWED_PREFIXES = {

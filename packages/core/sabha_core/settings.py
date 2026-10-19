@@ -126,6 +126,12 @@ class Settings(BaseSettings):
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
 
+    # Celery workers (P2.4). A task not acknowledged within the visibility timeout is handed to another worker, so it
+    # must exceed the longest stage (GPU stages on long lessons); the CPU workers may use a shorter one.
+    celery_visibility_timeout_s: int = Field(default=4 * 3600, ge=1)
+    stage_max_attempts: int = Field(default=6, ge=1, le=20)  # the first try plus up to 5 retries
+    stuck_after_s: int = Field(default=30 * 60, ge=60)  # a running stage with no heartbeat this long is re-sent
+
     # Artefact versions: part of every artefact path, {tenant_id}/{recording_id}/{stage}@{version}/
     artefact_version_preprocess: str = "v1"
     artefact_version_diarize: str = "v1"

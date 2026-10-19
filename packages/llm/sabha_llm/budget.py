@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 
 from redis import Redis
 from redis.exceptions import RedisError
@@ -49,7 +50,8 @@ class TokenBudget:
             return
         tenant_key, global_key = self._keys(tenant_id)
         try:
-            tenant_used, global_used = (int(v or 0) for v in self._redis.mget([tenant_key, global_key]))
+            values = cast(list[bytes | None], self._redis.mget([tenant_key, global_key]))  # sync client: a list
+            tenant_used, global_used = (int(v or 0) for v in values)
         except RedisError as exc:
             raise BudgetUnavailableError("token budgets cannot be read; LLM calls are paused") from exc
         if self._tenant_daily and tenant_used >= self._tenant_daily:

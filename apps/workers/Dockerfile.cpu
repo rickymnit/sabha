@@ -27,5 +27,6 @@ RUN apt-get update \
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER sabha
-# The Celery app (sabha_workers.celery_app) arrives with plan task P2.4; compose sets the queues per service.
-CMD ["celery", "-A", "sabha_workers.celery_app", "worker", "--loglevel=INFO"]
+# Compose sets the queues per service, e.g. `celery -A sabha_workers.worker worker -Q cpu.preprocess,io.notify`;
+# the relay runs as `python -m sabha_workers.relay` and beat as `celery -A sabha_workers.worker beat`.
+CMD ["celery", "-A", "sabha_workers.worker", "worker", "--loglevel=INFO"]

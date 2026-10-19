@@ -110,3 +110,8 @@ ignore_missing_imports = true
 # The Docker SDK (pulled in by testcontainers) ships no type information; only test fixtures touch it.
 module = ["docker", "docker.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Celery and Kombu ship no type information; only apps/workers uses them.
+module = ["celery", "celery.*", "kombu", "kombu.*"]
+ignore_missing_imports = true

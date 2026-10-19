@@ -10,6 +10,7 @@ dependencies = [
     "sabha-llm",
     "sabha-analytics",
     "redis>=5.0",
+    "celery[redis]>=5.5",
 ]
 
 [build-system]

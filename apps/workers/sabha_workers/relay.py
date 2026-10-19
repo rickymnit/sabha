@@ -159,3 +159,37 @@ class Relay:
     def _save(self, token: dict[str, Any] | None) -> None:
         if token is not None:
             self._state.upsert({"_id": STATE_ID}, {"$set": {"resume_token": token, "updated_at": self._now()}})
+
+
+def main() -> None:  # pragma: no cover - the process entry point; the parts are tested
+    """`python -m sabha_workers.relay`: run the relay until SIGTERM or Ctrl-C."""
+    import signal
+
+    from sabha_core.logging import configure_logging
+    from sabha_core.mongo import open_sync
+    from sabha_core.settings import get_settings
+    from sabha_workers.celery_app import create_app
+    from sabha_workers.dispatch import CeleryDispatcher
+
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    client, database = open_sync(settings)
+    relay = Relay(
+        SyncSystemRepo(database, "outbox", OutboxEvent),
+        SyncSystemRepo(database, "relay_state", RelayState),
+        CeleryDispatcher(create_app(settings)),
+        RedisPublisher(Redis.from_url(settings.redis_url.get_secret_value())),
+    )
+    stop = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: stop.set())
+    log.info("outbox relay started")
+    try:
+        relay.run(stop)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        client.close()
+
+
+if __name__ == "__main__":
+    main()

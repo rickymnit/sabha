@@ -238,6 +238,7 @@ class StageRun(TenantDoc):
     status: Literal["running", "succeeded", "failed"] = "running"
     worker: str = Field(min_length=1)
     started_at: UtcDatetime
+    heartbeat_at: UtcDatetime | None = None  # refreshed while a long stage runs; the stuck-job sweeper reads it
     finished_at: UtcDatetime | None = None
     duration_ms: int | None = Field(default=None, ge=0)
     error_code: str | None = None
@@ -293,3 +294,17 @@ class RelayState(Document):
 
     resume_token: dict[str, Any] | None = None
     updated_at: UtcDatetime = Field(default_factory=utc_now)
+
+
+class DeadLetter(TenantDoc):
+    """A pipeline job that failed for good, with what an operator needs to replay it (P2.4; replay in P7.8)."""
+
+    recording_id: str
+    stage: str
+    task: str
+    error_code: str
+    error_detail: str | None = Field(default=None, max_length=2000)
+    attempts: int = Field(ge=1)
+    args: dict[str, Any] = Field(default_factory=dict)
+    replayed_at: UtcDatetime | None = None
+    created_at: UtcDatetime = Field(default_factory=utc_now)

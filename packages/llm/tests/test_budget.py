@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 from redis import Redis
@@ -54,7 +55,8 @@ def test_budgets_reset_each_day(redis: Redis) -> None:
 
 def test_counters_expire(redis: Redis) -> None:
     TokenBudget(redis, tenant_daily=10, global_daily=None, now=lambda: DAY).charge("tenant-a", 1)
-    assert 0 < redis.ttl("llmb:t:tenant-a:20261019") <= 2 * 24 * 3600
+    ttl = cast(int, redis.ttl("llmb:t:tenant-a:20261019"))  # sync client: an int
+    assert 0 < ttl <= 2 * 24 * 3600
 
 
 def test_without_limits_nothing_is_checked() -> None:

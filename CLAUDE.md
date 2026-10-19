@@ -70,7 +70,7 @@ docs/                adr/, runbook.md, prompts/, design/, guides for raters and 
 
 Collections: `tenants, units, users, people, recordings, stage_runs, transcripts, rubrics, analyses, scores,
 disputes, usage_events, outbox, audit_log`, plus `identities` (login links, ADR 0002), `idempotency_keys`
-(create replays, 24 h TTL) and `llm_calls` (LLM usage, P5.1). The full list with indexes is `sabha_core/indexes.py`.
+(create replays, 24 h TTL), `llm_calls` (LLM usage, P5.1), `dlq` (failed pipeline jobs, P2.4) and `relay_state`. The full list with indexes is `sabha_core/indexes.py`.
 
 Recording status (state machine in `sabha_core/state.py`, the ONLY place transitions are defined):
 `CREATED → UPLOADED → PREPROCESSING → DIARIZING → TRANSCRIBING → ANALYZING → COMPLETED`,
