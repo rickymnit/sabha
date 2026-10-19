@@ -12,8 +12,8 @@ result is recorded for a check that did not run.
 | 1 | 2026-10-19 | `pip-audit` (all Python dependencies from `uv.lock`) | No known vulnerabilities | none | closed | None needed |
 | 2 | 2026-10-19 | `pnpm audit` (apps/web) | [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm): `braces` via `tailwindcss` -> `chokidar` | high | accepted | No patched version exists; build-time only, inputs are our own config. Recorded in `apps/web/README.md`; goes away with Tailwind 4 |
 | 3 | 2026-10-19 | `pnpm audit` (apps/web) | [GHSA-rj75-hqrm-r3gf](https://github.com/advisories/GHSA-rj75-hqrm-r3gf): `postcss-selector-parser` 6.1.4 via `tailwindcss` (CPU exhaustion on hostile selectors) | moderate | accepted | Fixed only in 7.1.6, which Tailwind 3 (`^6.1.2`) cannot use. Build-time only: it parses our own CSS, never user input, and never ships to browsers. Goes away with Tailwind 4 |
-| 4 | 2026-10-17 | `/tenant-check` | Per-user rate-limit key without tenant | low | fixed | 4656949 (P1.6) |
-| 5 | 2026-10-17 | `/tenant-check` | Duplicate-key error reveals that an id exists in another tenant | low | fixed | Rule: ids are server-generated, clients cannot send them; test in `tests/security` (P1.6, P1.5b, P2.1) |
+| 4 | 2026-10-17 | `/tenant-check` | Per-user rate-limit key without tenant | low | fixed | 30a907b (P1.6) |
+| 5 | 2026-10-17 | `/tenant-check` | Duplicate-key error reveals that an id exists in another tenant | low | fixed | 30a907b (P1.6): rule that ids are server-generated, with a test in `tests/security`; request bodies refuse `id` (P1.5b, P2.1) |
 | 6 | 2026-10-17 | `/tenant-check` | Email delivery keys without tenant | low | fixed | 17b60cf: `deliveries` unique per (tenant, key) (P2.7) |
 
 ## Reviewed in code (no finding)
