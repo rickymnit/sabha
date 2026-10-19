@@ -2,7 +2,8 @@
 
 Stages not built yet (P3.2 preprocess, P3.4 diarize, P3.5 transcribe, P5.7 analyze) fail honestly with
 `stage_not_built`: the recording goes to FAILED with a dead letter, so nothing silently stalls and the job can be
-replayed once the stage exists (P7.8). notify and meter only log until P2.7 and P8.6 wire them.
+replayed once the stage exists (P7.8). notify sends the status emails (P2.7, sabha_workers.notifications.notify);
+meter only logs until P8.6.
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ from sabha_core.settings import Settings, get_settings
 from sabha_core.state import RecordingStatus
 from sabha_workers.dispatch import CeleryDispatcher
 from sabha_workers.maintenance import requeue_stuck
+from sabha_workers.notifications.notify import notify as send_notifications
+from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
 from sabha_workers.upload_cleanup import abort_stale_uploads
 
@@ -48,6 +51,7 @@ def not_built(stage: str) -> Work:
 
 
 WORKS: dict[str, Work] = {name: not_built(name) for name in SPECS}
+NOTIFY_MAX_RETRIES = 8  # SES throttling or outage: waits double from 1 min, capped at 1 h
 
 
 @dataclass(frozen=True)
@@ -56,6 +60,7 @@ class Runtime:
     db: Database[dict[str, Any]]
     s3: Any
     runner: StageRunner
+    sender: EmailSender | None  # None without SES_SENDER: notify logs and sends nothing
 
 
 def s3_client(settings: Settings) -> Any:
@@ -90,7 +95,8 @@ def runtime() -> Runtime:
         worker=f"{socket.gethostname()}:{os.getpid()}",
         max_attempts=settings.stage_max_attempts,
     )
-    return Runtime(settings, db, s3, runner)
+    sender = SesSender.from_settings(settings) if settings.ses_sender else None
+    return Runtime(settings, db, s3, runner, sender)
 
 
 def register(app: Celery) -> None:
@@ -98,7 +104,7 @@ def register(app: Celery) -> None:
 
     def stage_task(name: str) -> None:
         @app.task(bind=True, name=f"sabha.{name}", acks_late=True, reject_on_worker_lost=True, max_retries=None)
-        def run(self: Task, tenant_id: str, recording_id: str) -> str:
+        def run(self: Task, tenant_id: str, recording_id: str, event_id: str | None = None) -> str:
             outcome = runtime().runner.run(SPECS[name], WORKS[name], tenant_id, recording_id,
                                            attempt=self.request.retries + 1)  # fmt: skip
             if outcome.result == "retry":
@@ -108,13 +114,23 @@ def register(app: Celery) -> None:
     for stage in SPECS:
         stage_task(stage)
 
-    @app.task(name="sabha.notify", acks_late=True)
-    def notify(tenant_id: str, recording_id: str) -> str:
-        log.info("notify is not wired yet (P2.7)", extra={"recording_id": recording_id})
-        return "not_built"
+    @app.task(bind=True, name="sabha.notify", acks_late=True, max_retries=NOTIFY_MAX_RETRIES)
+    def notify(self: Task, tenant_id: str, recording_id: str, event_id: str | None = None) -> str:
+        if event_id is None:
+            log.warning("notify needs the event that started it", extra={"recording_id": recording_id})
+            return "no_event"
+        rt = runtime()
+        try:
+            result = send_notifications(
+                rt.db, tenant_id=tenant_id, recording_id=recording_id, event_id=event_id,
+                sender=rt.sender, web_base_url=rt.settings.web_base_url,
+            )  # fmt: skip
+        except RetryableSendError as exc:
+            raise self.retry(exc=exc, countdown=min(3600, 60 * 2**self.request.retries)) from exc
+        return f"sent={result.sent} skipped={result.skipped} failed={result.failed}"
 
     @app.task(name="sabha.meter", acks_late=True)
-    def meter(tenant_id: str, recording_id: str) -> str:
+    def meter(tenant_id: str, recording_id: str, event_id: str | None = None) -> str:
         log.info("metering is not wired yet (P8.6)", extra={"recording_id": recording_id})
         return "not_built"
 

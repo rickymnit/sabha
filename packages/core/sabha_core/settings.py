@@ -119,9 +119,10 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None
 
-    # Email (Amazon SES)
+    # Email (Amazon SES). Without SES_SENDER no email is sent (the notify task logs that and skips).
     ses_region: str = INDIA_REGION
     ses_sender: str | None = None
+    web_base_url: str = "http://localhost:5173"  # links in emails point here
 
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
@@ -185,7 +186,12 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
-        "s3_endpoint_url", "langfuse_host", "openai_base_url", "otel_exporter_otlp_endpoint", "sarvam_base_url"
+        "s3_endpoint_url",
+        "langfuse_host",
+        "openai_base_url",
+        "otel_exporter_otlp_endpoint",
+        "sarvam_base_url",
+        "web_base_url",
     )
     @classmethod
     def _check_http_url(cls, value: str | None) -> str | None:

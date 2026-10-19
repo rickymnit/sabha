@@ -82,11 +82,19 @@ def test_a_killed_worker_loses_nothing(
         "KILL_VISIBILITY_S": str(VISIBILITY_S),
         "KILL_WORK_S": "4",
     }
-    settings = Settings(  # type: ignore[call-arg]  # pydantic-settings
-        _env_file=None, app_env="test", mongo_uri=f"{mongo_uri}&replicaSet=rs0", redis_url=redis_url,
-        s3_bucket_audio="a", s3_bucket_artefacts="b", s3_bucket_backups="c", oidc_issuer="https://auth.example.com",
-        oidc_audience="https://api.example.com", oidc_client_id="web", celery_visibility_timeout_s=VISIBILITY_S,
-    )  # fmt: skip
+    values: dict[str, Any] = {
+        "app_env": "test",
+        "mongo_uri": f"{mongo_uri}&replicaSet=rs0",
+        "redis_url": redis_url,
+        "s3_bucket_audio": "a",
+        "s3_bucket_artefacts": "b",
+        "s3_bucket_backups": "c",
+        "oidc_issuer": "https://auth.example.com",
+        "oidc_audience": "https://api.example.com",
+        "oidc_client_id": "web",
+        "celery_visibility_timeout_s": VISIBILITY_S,
+    }
+    settings = Settings(_env_file=None, **values)  # type: ignore[call-arg]  # pydantic-settings
     CeleryDispatcher(create_app(settings)).send_stage("preprocess", "t1", rid)
 
     first = start_worker(env)

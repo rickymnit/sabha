@@ -83,7 +83,7 @@ Done when: short calls finish within 5 minutes during a bulk upload from another
 
 ## P2.7 · Notifications
 
-> **Status (2026-10-17).** Already built: notification rules, English and Hindi templates, signed webhooks, the SES adapter. Remaining: the `io.notify` Celery task, the delivery log in MongoDB keyed by (tenant_id, delivery_key) (/tenant-check finding 3), per-user preferences, webhook retries and delivery log.
+> **Status (2026-10-19).** Emails are done: the `io.notify` task (`sabha_workers/notifications/notify.py`) emails the person analysed and their unit managers on COMPLETED and admins on FAILED/NEEDS_REVIEW, in each user's language, once per (tenant, delivery key) in the `deliveries` collection, with per-user `report_emails` / `language`; refused emails are recorded and not retried. Remaining: webhooks (tenant endpoint settings, signed delivery task with 24 h retries and its delivery log, SSRF guard) and the "Done when" with a real SES sender.
 
 Implied by the plan's notify stage.
 

@@ -146,6 +146,9 @@ class User(TenantDoc):
     role: Role
     unit_ids: list[str] = Field(default_factory=list)
     status: Literal["invited", "active", "disabled"] = "invited"
+    # Notification preferences (P2.7)
+    report_emails: bool = True  # "report ready" emails for their own recordings and their units'
+    language: Literal["en", "hi"] = "en"
 
 
 class Person(TenantDoc):
@@ -308,3 +311,18 @@ class DeadLetter(TenantDoc):
     args: dict[str, Any] = Field(default_factory=dict)
     replayed_at: UtcDatetime | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
+class Delivery(TenantDoc):
+    """One email or webhook delivery, keyed so a retried event never sends it twice (P2.7).
+
+    claimed: a worker is sending it; sent: done; failed: refused for good (not retried).
+    """
+
+    key: str = Field(min_length=1)
+    channel: Literal["email", "webhook"] = "email"
+    status: Literal["claimed", "sent", "failed"] = "claimed"
+    message_id: str | None = None
+    last_error: str | None = Field(default=None, max_length=500)
+    claimed_at: UtcDatetime = Field(default_factory=utc_now)
+    sent_at: UtcDatetime | None = None

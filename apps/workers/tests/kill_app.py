@@ -16,19 +16,19 @@ from sabha_workers.celery_app import create_app
 from sabha_workers.stages.runner import S3Artefacts, StageContext, StageRunner, StageSpec
 
 E = os.environ
-settings = Settings(  # type: ignore[call-arg]  # pydantic-settings
-    _env_file=None,
-    app_env="test",
-    mongo_uri=E["KILL_MONGO_URI"],
-    redis_url=E["KILL_REDIS_URL"],
-    s3_bucket_audio="sabha-audio",
-    s3_bucket_artefacts="sabha-artefacts",
-    s3_bucket_backups="sabha-backups",
-    oidc_issuer="https://auth.example.com",
-    oidc_audience="https://api.example.com",
-    oidc_client_id="web",
-    celery_visibility_timeout_s=int(E["KILL_VISIBILITY_S"]),
-)
+values: dict[str, Any] = {
+    "app_env": "test",
+    "mongo_uri": E["KILL_MONGO_URI"],
+    "redis_url": E["KILL_REDIS_URL"],
+    "s3_bucket_audio": "sabha-audio",
+    "s3_bucket_artefacts": "sabha-artefacts",
+    "s3_bucket_backups": "sabha-backups",
+    "oidc_issuer": "https://auth.example.com",
+    "oidc_audience": "https://api.example.com",
+    "oidc_client_id": "web",
+    "celery_visibility_timeout_s": int(E["KILL_VISIBILITY_S"]),
+}
+settings = Settings(_env_file=None, **values)  # type: ignore[call-arg]  # pydantic-settings
 app = create_app(settings)
 client: MongoClient[dict[str, Any]] = MongoClient(E["KILL_MONGO_URI"], tz_aware=True)
 database = client.get_database(E["KILL_DB"])

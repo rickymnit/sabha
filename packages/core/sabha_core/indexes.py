@@ -76,6 +76,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "usage_events": [_ix("tenant_occurred", (T, ASCENDING), ("occurred_at", ASCENDING))],
     "audit_log": [_ix("tenant_at", (T, ASCENDING), ("at", DESCENDING))],
+    "deliveries": [_ix("tenant_key", (T, ASCENDING), ("key", ASCENDING), unique=True)],
     "dlq": [
         _ix("tenant_created", (T, ASCENDING), ("created_at", DESCENDING)),
         _ix("tenant_recording", (T, ASCENDING), ("recording_id", ASCENDING)),

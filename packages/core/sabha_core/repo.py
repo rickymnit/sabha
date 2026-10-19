@@ -39,7 +39,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.client_session import ClientSession
 from pymongo.database import Database
 
-from sabha_core.models import TenantDoc
+from sabha_core.models import Tenant, TenantDoc
 
 COLLECTIONS = (
     "tenants",
@@ -61,6 +61,7 @@ COLLECTIONS = (
     "llm_calls",
     "relay_state",
     "dlq",
+    "deliveries",
 )
 SYSTEM_COLLECTIONS = ("tenants", "outbox", "identities", "relay_state")
 _NOT_TENANT_SCOPED = frozenset({"tenants", "relay_state"})  # no tenant_id field
@@ -405,3 +406,11 @@ class SyncSystemRepo[M: BaseModel]:
     def update_one(self, filter: Filter, update: Mapping[str, Any], *, session: ClientSession | None = None) -> int:
         check_update(update)
         return self._collection.update_one(dict(filter), update, session=session).matched_count
+
+
+def own_tenant(db: Database[dict[str, Any]], tenant_id: str) -> Tenant | None:
+    """The tenant record for `tenant_id` (labels, profile, plan), for code already working for that tenant.
+
+    Unlike SystemRepo this reads one tenant, by the caller's own tenant id only.
+    """
+    return SyncSystemRepo(db, "tenants", Tenant).find_one({"_id": _check_tenant_id(tenant_id)})

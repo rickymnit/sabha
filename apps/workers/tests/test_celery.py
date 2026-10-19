@@ -6,7 +6,7 @@ import json
 import uuid
 from collections.abc import Iterator
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pymongo import MongoClient
@@ -81,7 +81,7 @@ def test_the_dispatcher_puts_the_task_on_its_queue(redis_url: str) -> None:
     dispatcher = CeleryDispatcher(create_app(settings(redis_url)))
     event = OutboxEvent(id="ev1", tenant_id="t1", type="recording.diarizing", payload={"recording_id": "r1"})
     dispatcher.send("diarize", event)
-    (raw,) = redis.lrange("gpu.speech", 0, -1)
+    (raw,) = cast(list[bytes], redis.lrange("gpu.speech", 0, -1))  # sync client: a list
     message = json.loads(raw)
     assert message["headers"]["task"] == "sabha.diarize" and message["headers"]["id"] == "ev1.diarize"
     assert redis.llen("cpu.preprocess") == 0
