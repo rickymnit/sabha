@@ -9,10 +9,12 @@ never touch the database handle itself.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import Depends, Request
+from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.asynchronous.database import AsyncDatabase
 
 from sabha_api.auth import Principal, current_principal
@@ -39,3 +41,19 @@ def tenant_repo[T: TenantDoc](collection: str, model: type[T]) -> Callable[..., 
         return TenantRepo(db, collection, principal.tenant_id, model)
 
     return dependency
+
+
+class Transactions:
+    """Runs several repository writes in one MongoDB transaction: pass `session` to each repo call."""
+
+    def __init__(self, db: AsyncDatabase[dict[str, Any]]) -> None:
+        self._client = db.client
+
+    @asynccontextmanager
+    async def run(self) -> AsyncIterator[AsyncClientSession]:
+        async with self._client.start_session() as session, await session.start_transaction():
+            yield session
+
+
+def transactions(db: Annotated[AsyncDatabase[dict[str, Any]], Depends(_database)]) -> Transactions:
+    return Transactions(db)

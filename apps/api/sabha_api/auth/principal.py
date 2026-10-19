@@ -36,8 +36,8 @@ class Principal:
 
 
 class PrincipalStore(Protocol):
-    async def principal_for(self, identity: Identity) -> Principal | None:
-        """The user this identity is linked to, or None if no tenant has invited it."""
+    async def principal_for(self, identity: Identity, access_token: str) -> Principal | None:
+        """The user this identity is linked to, or None if no tenant has invited it. The token is for userinfo."""
         ...
 
 
@@ -58,7 +58,7 @@ async def current_principal(
     store: PrincipalStore | None = request.app.state.principals
     if store is None:
         raise NotReadyError("The user directory is not available yet.")
-    principal = await store.principal_for(identity)
+    principal = await store.principal_for(identity, credentials.credentials)
     if principal is None:
         raise NotInvitedError("Your account has not been invited. Ask your administrator for an invite.")
     return principal

@@ -79,7 +79,13 @@ blocks sign-in and token renewal.
 
 ## Checking it works
 
-1. `make api` and `pnpm -C apps/web dev`, then open http://localhost:5173/. You should be sent to Auth0, sign in
+1. Create a tenant and invite yourself as its owner, with the email of the Google account you will sign in with:
+   `uv run python scripts/admin/create_tenant.py --name "Test School" --owner-email you@example.com --owner-name "You"`.
+2. `make api` and `pnpm -C apps/web dev`, then open http://localhost:5173/. You should be sent to Auth0, sign in
    with Google, and come back to Sabha.
-2. Until invites exist (P1.5b), the API answers 503 `not_ready` on protected routes: it has no user directory yet.
-   After P1.5b, `GET /v1/me` returns your role and tenant.
+3. `GET /v1/me` with your access token returns your role (owner) and your tenant's labels. Your first sign-in
+   links the invite to your login and marks you active.
+
+Owners and admins invite everyone else with `POST /v1/users/invites` (owners any role; admins manager, reviewer
+and staff). People sign in with the invited email; an unverified email, or invites from two organisations, are
+refused with a clear error.

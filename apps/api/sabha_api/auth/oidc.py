@@ -40,6 +40,7 @@ JWKS_MIN_REFETCH_S = 30.0
 _HTTP_TIMEOUT_S = 5.0
 
 FetchJson = Callable[[str], Awaitable[Mapping[str, Any]]]
+FetchUserinfo = Callable[[str, str], Awaitable[Mapping[str, Any]]]  # (userinfo URL, access token)
 
 
 async def fetch_json(url: str) -> Mapping[str, Any]:
@@ -48,6 +49,19 @@ async def fetch_json(url: str) -> Mapping[str, Any]:
         response = await client.get(url)
         response.raise_for_status()
         body = response.json()
+    if not isinstance(body, dict):
+        raise ValueError("expected a JSON object")
+    return body
+
+
+async def fetch_userinfo(url: str, token: str) -> Mapping[str, Any]:
+    """GET the OIDC userinfo endpoint with the caller's access token. A rejected token raises InvalidTokenError."""
+    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_S, follow_redirects=False) as client:
+        response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+    if response.status_code == 401:
+        raise InvalidTokenError("The identity provider did not accept the access token.")
+    response.raise_for_status()
+    body = response.json()
     if not isinstance(body, dict):
         raise ValueError("expected a JSON object")
     return body
@@ -81,11 +95,14 @@ class TokenVerifier:
         audience: str,
         *,
         fetch: FetchJson = fetch_json,
+        fetch_userinfo: FetchUserinfo = fetch_userinfo,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.issuer = issuer.rstrip("/")
         self.audience = audience
         self._fetch = fetch
+        self._fetch_userinfo = fetch_userinfo
+        self._userinfo_uri: str | None = None
         self._clock = clock
         self._jwks_uri: str | None = None
         self._keys: dict[str, Any] = {}
@@ -124,6 +141,22 @@ class TokenVerifier:
         if not isinstance(subject, str) or not subject:
             raise InvalidTokenError("The access token has no subject.")
         return Identity(issuer=self.issuer, subject=subject)
+
+    async def verified_email(self, token: str) -> str | None:
+        """The caller's email from the provider's userinfo endpoint, if the provider says it is verified.
+
+        Needed only at a first login, to find the invite: Auth0 access tokens carry no email. Call it after
+        `verify` (which loads the discovery document). Returns None when the email is missing or unverified.
+        """
+        if self._userinfo_uri is None:
+            raise AuthUnavailableError("The identity provider does not offer a userinfo endpoint.")
+        try:
+            info = await self._fetch_userinfo(self._userinfo_uri, token)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("userinfo request failed", extra={"error_type": type(exc).__name__})
+            raise AuthUnavailableError("Sign-in details could not be loaded. Try again shortly.") from exc
+        email, verified = info.get("email"), info.get("email_verified")
+        return email if isinstance(email, str) and email and verified is True else None
 
     async def _key(self, kid: str) -> Any:
         if kid in self._keys and self._is_fresh():
@@ -169,6 +202,11 @@ class TokenVerifier:
             raise ValueError("the discovery document has no jwks_uri")
         if jwks_uri.startswith("http://") and self.issuer.startswith("https://"):
             raise ValueError("jwks_uri must use https for an https issuer")
+        userinfo = config.get("userinfo_endpoint")
+        if isinstance(userinfo, str) and userinfo.startswith(
+            "https://" if self.issuer.startswith("https://") else "http"
+        ):
+            self._userinfo_uri = userinfo
         return jwks_uri
 
     @staticmethod

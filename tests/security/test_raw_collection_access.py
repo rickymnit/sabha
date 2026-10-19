@@ -1,7 +1,12 @@
 """Lint tests for golden rule 1: no raw MongoDB access outside the repository (plan task P1.6).
 
-1. Only the modules in RAW_ACCESS_ALLOWED may call collection or database methods (`find`, `aggregate`,
-   `insert_one`, `get_collection`, `watch`, ...) or index a client or database (`db["recordings"]`).
+1. Only the modules in RAW_ACCESS_ALLOWED may touch MongoDB directly:
+   - call a collection or database method (`find`, `aggregate`, `insert_one`, `watch`, ...) on a raw handle, that
+     is an expression naming a db, database, mongo, client, collection or coll (`db.recordings.find()`);
+     the tenant repository has methods with the same names, so calls on repositories (`users.find_one()`) are fine;
+   - call `get_collection` / `get_database` on anything, or index a client or database (`db["recordings"]`);
+   - read the `.db` or `.mongo` attribute (sabha_api.resources.Resources): without them, code cannot get a raw
+     handle in the first place.
 2. Only the modules in SYSTEM_REPO_ALLOWED may import SystemRepo or SyncSystemRepo, the unscoped repositories for the
    `tenants`, `outbox` and `identities` collections (ADR 0002).
 
@@ -34,7 +39,17 @@ RAW_ACCESS_ALLOWED = {
     "packages/core/sabha_core/repo.py": "the tenant-scoped and system repositories themselves",
     "packages/core/sabha_core/indexes.py": "creates indexes at start-up; reads no documents",
     "apps/api/sabha_api/resources.py": "opens the database handle once at start-up; reads no documents",
+    "apps/api/sabha_api/deps.py": "hands the database handle to TenantRepo and transactions; reads no documents",
+    "apps/api/sabha_api/main.py": "hands the database handle to the user directory at start-up; reads no documents",
 }
+
+RAW_ACCESS_ALLOWED_PREFIXES = {
+    "scripts/admin/": "operator scripts open their own connection and use the repositories",
+}
+
+_ALWAYS_RAW = frozenset({"get_collection", "get_database"})
+_HANDLE_WORDS = frozenset({"db", "database", "mongo", "client", "collection", "coll"})
+_HANDLE_ATTRIBUTES = frozenset({"db", "mongo"})
 
 SYSTEM_REPO_ALLOWED = {
     "packages/core/sabha_core/repo.py": "defines them",
@@ -60,14 +75,27 @@ def source_files() -> list[Path]:
 
 
 def raw_access(source: str) -> list[tuple[int, str]]:
-    """(line, what) for every call of a MongoDB collection method and every subscript of a client or database."""
+    """(line, what) for every direct MongoDB access: see the module docstring for the rules."""
     found = []
     for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in MONGO_METHODS:
-            found.append((node.lineno, f".{node.func.attr}()"))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            method = node.func.attr
+            if method in _ALWAYS_RAW or (method in MONGO_METHODS and _names_a_handle(node.func.value)):
+                found.append((node.lineno, f"{ast.unparse(node.func.value)}.{method}()"))
         elif isinstance(node, ast.Subscript) and _looks_like_database(node.value):
             found.append((node.lineno, f"{ast.unparse(node.value)}[...]"))
+        elif isinstance(node, ast.Attribute) and node.attr in _HANDLE_ATTRIBUTES:
+            found.append((node.lineno, f"{ast.unparse(node)}"))
     return found
+
+
+def _names_a_handle(node: ast.expr) -> bool:
+    """True if any identifier in the expression has a word like db, mongo, client or collection."""
+    for part in ast.walk(node):
+        name = part.id if isinstance(part, ast.Name) else part.attr if isinstance(part, ast.Attribute) else ""
+        if any(word in _HANDLE_WORDS or word.startswith("mongo") for word in name.lower().split("_")):
+            return True
+    return False
 
 
 def _looks_like_database(node: ast.expr) -> bool:
@@ -99,7 +127,7 @@ def test_no_raw_collection_access_outside_the_repository() -> None:
     offenders = []
     for path in source_files():
         rel = path.relative_to(ROOT).as_posix()
-        if rel in RAW_ACCESS_ALLOWED:
+        if rel in RAW_ACCESS_ALLOWED or rel.startswith(tuple(RAW_ACCESS_ALLOWED_PREFIXES)):
             continue
         offenders += [f"{rel}:{line} {what}" for line, what in raw_access(path.read_text())]
     assert not offenders, "use TenantRepo (sabha_core.repo) instead of raw collection access:\n" + "\n".join(offenders)
@@ -137,6 +165,11 @@ def test_the_scan_sees_the_code_it_must_police() -> None:
         "request.app.state.resources.mongo['sabha']",
         "coll.update_many({}, {'$set': {'x': 1}})",
         "db.outbox.watch()",
+        "self._db.people.insert_one({})",
+        "collection.find_one({'_id': 1})",
+        "request.app.state.resources.db",
+        "resources.mongo",
+        "anything.get_collection('people')",
     ],
 )
 def test_raw_access_detector_flags(snippet: str) -> None:
@@ -150,6 +183,10 @@ def test_raw_access_detector_flags(snippet: str) -> None:
         "repo.count({})",
         "values[0]",
         "store.principal_for(identity)",
+        "await users.find_one({'_id': user_id})",
+        "await self._identities.update_one({'_id': i}, {'$set': {'subject': s}})",
+        "await records.insert_one(record)",
+        "await repo.aggregate([])",
     ],
 )
 def test_raw_access_detector_ignores(snippet: str) -> None:

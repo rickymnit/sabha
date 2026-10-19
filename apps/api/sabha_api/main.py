@@ -19,10 +19,11 @@ from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from sabha_api.auth import PrincipalStore, TokenVerifier
+from sabha_api.auth.directory import Directory
 from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
 from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
-from sabha_api.routers import health
+from sabha_api.routers import health, me, users
 from sabha_core.logging import configure_logging
 from sabha_core.settings import Settings, get_settings
 from sabha_core.telemetry import package_version, setup_tracing
@@ -49,6 +50,8 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with resources(settings) as opened:
             app.state.resources = opened
+            if app.state.principals is None and opened.db is not None:
+                app.state.directory = app.state.principals = Directory(opened.db, app.state.token_verifier)
             try:
                 yield
             finally:
@@ -67,9 +70,13 @@ def create_app(
     )
     app.state.settings = settings
     app.state.token_verifier = token_verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_audience)
-    app.state.principals = principals  # None until P1.5b's MongoDB-backed store; protected routes then answer 503
+    # The MongoDB-backed directory is created with the resources (lifespan); tests may pass their own store.
+    app.state.principals = principals
+    app.state.directory = None
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(me.router)
+    app.include_router(users.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:
