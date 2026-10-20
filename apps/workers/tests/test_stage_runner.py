@@ -211,3 +211,15 @@ def test_work_that_fails_writes_no_done_marker(db: Database[dict[str, Any]], art
     rid = make(db, S.UPLOADED)
     runner(db, artefacts).run(PREPROCESS, Work(TransientError("x")), "t1", rid, attempt=1)
     assert not artefacts.exists(f"t1/{rid}/preprocess@v1/{DONE_MARKER}")
+
+
+# --- Artefacts ---
+
+
+def test_put_file_uploads_from_disk_with_its_content_type(artefacts: S3Artefacts, s3_storage: Any,
+                                                          tmp_path: Any) -> None:  # fmt: skip
+    path = tmp_path / "playback.opus"
+    path.write_bytes(b"OggS" + bytes(range(256)) * 64)
+    artefacts.put_file("t1/r1/preprocess@v1/playback.opus", path, "audio/ogg")
+    stored = s3_storage.client().get_object(Bucket="sabha-artefacts", Key="t1/r1/preprocess@v1/playback.opus")
+    assert stored["Body"].read() == path.read_bytes() and stored["ContentType"] == "audio/ogg"

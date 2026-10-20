@@ -29,6 +29,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from opentelemetry import trace
@@ -82,6 +83,10 @@ class ArtefactStore(Protocol):
 
     def put(self, key: str, body: bytes, content_type: str = "application/octet-stream") -> None: ...
 
+    def put_file(self, key: str, path: Path, content_type: str) -> None:
+        """Upload a file from disk (in parts when large, so it is never held in memory)."""
+        ...
+
 
 class S3Artefacts:
     """The artefacts bucket through a boto3 client."""
@@ -101,6 +106,9 @@ class S3Artefacts:
 
     def put(self, key: str, body: bytes, content_type: str = "application/octet-stream") -> None:
         self._s3.put_object(Bucket=self._bucket, Key=key, Body=body, ContentType=content_type)
+
+    def put_file(self, key: str, path: Path, content_type: str) -> None:
+        self._s3.upload_file(str(path), self._bucket, key, ExtraArgs={"ContentType": content_type})
 
 
 @dataclass(frozen=True, slots=True)

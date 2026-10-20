@@ -198,6 +198,16 @@ class IdempotencyRecord(TenantDoc):
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
+class AudioInfo(BaseModel):
+    """The original's audio stream as ffprobe reported it (P3.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    codec: str = Field(min_length=1)
+    sample_rate: int = Field(ge=1)
+    channels: int = Field(ge=1)
+
+
 class Recording(TenantDoc):
     """A recorded conversation. Status changes only through sabha_core.state.transition (CLAUDE.md).
 
@@ -228,6 +238,10 @@ class Recording(TenantDoc):
     duplicate_confirmed: bool = False
     awaiting_consent: bool = False
     completed_at: UtcDatetime | None = None
+    # Preprocess (P3.2): the length of the recording (the original timeline) and its audio stream. The priority
+    # lanes (P7.2) and billing (P8.6) read duration_ms.
+    duration_ms: int | None = Field(default=None, ge=0)
+    audio: AudioInfo | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
