@@ -6,7 +6,7 @@ Goal: both conversation types work, staff can dispute scores, and one busy schoo
 
 ## P5.8 · Classify, segment and the reception rubric
 
-> **Status (2026-10-17).** Already built: classify step, phase segmentation, reception ticket and hold-gap metric (sabha_analytics). Remaining: publish `rubrics/reception.school.v1.0.yaml` (needs the academic head's v0.2) and wire both steps into the analyze stage.
+> **Status (2026-10-20).** Already built: classify step, phase segmentation, reception ticket and hold-gap metric (sabha_analytics). `rubrics/reception.school.v0.2.yaml` was reviewed, approved as-is and is the pilot version. Escalation handling is "not applicable" on calls with nothing to escalate, and its weight is then shared out over the other dimensions. Ticket categories and statuses are read from the rubric's `output_values`. Remaining: wire classify, segment and the ticket into the analyze stage (after the P3 audio pipeline), then run 10 real calls.
 
 Plan task 5.8. Read first: `rubrics/reception.school.v0.2.yaml`.
 
@@ -19,9 +19,9 @@ Extend the analyze stage.
 - Segment step (small tier): split into phases from the rubric's phase list (teaching: introduction,
   explanation, guided practice, closing; reception: greeting, need, information, resolution, close) with
   utterance-id boundaries; verify boundaries exist; store for the timeline.
-- Publish rubrics/reception.school.v1.0.yaml. Reception output adds: category (complaint, information, fee,
-  admission, other), resolution status (resolved, pending, escalated), follow_up (text + owner role), and a
-  ticket-style summary.
+- Use rubrics/reception.school.v0.2.yaml (approved). Reception output adds: category and resolution status from
+  the rubric's output_values (category: admission_enquiry, fee_query, transport, general_information, complaint,
+  other; status: resolved, follow_up_needed, escalated), follow_up (text + owner role), and a ticket-style summary.
 - Reception computed metrics: handle time, hold or silence gaps > 10 s, caller talk share.
 Tests: fixture reception call yields a valid report; misclassified-type path goes to NEEDS_REVIEW.
 ```
