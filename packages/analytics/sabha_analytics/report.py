@@ -80,6 +80,8 @@ def _dimension_record(dimension: DimensionResult) -> dict[str, Any]:
             "evidence": [],
             "failure_reasons": list(dimension.failure_reasons),
         }
+    if dimension.not_applicable:
+        record["not_applicable"] = True
     return {
         **record,
         "score": dimension.score,
@@ -210,7 +212,10 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
             if dimension["score"] is not None or dimension["rationale"] is not None or dimension["evidence"]:
                 problems.append(f"{key}: an unverified dimension carries a score, rationale or evidence")
             continue
-        if not isinstance(dimension["score"], int) or not 1 <= dimension["score"] <= 5:
+        if dimension.get("not_applicable"):
+            if dimension["score"] is not None or not dimension["rationale"] or not dimension["evidence"]:
+                problems.append(f"{key}: a not-applicable dimension needs no score, a rationale and evidence")
+        elif not isinstance(dimension["score"], int) or not 1 <= dimension["score"] <= 5:
             problems.append(f"{key}: verified dimension without a score from 1 to 5")
         for item in dimension["evidence"]:
             utterance = transcript.get(item["utterance_id"])

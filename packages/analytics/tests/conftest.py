@@ -71,6 +71,17 @@ def rubric() -> Rubric:
     return rubric
 
 
+NOT_APPLICABLE_WHEN = "The lesson ends early because of an assembly, so there is no time to close it."
+
+
+@pytest.fixture
+def optional_recap_rubric(rubric: Rubric) -> Rubric:
+    """The fixture rubric with recap_and_closure allowed to be not applicable (rubric `not_applicable_when`)."""
+    concept, recap = rubric.dimensions
+    optional = recap.model_copy(update={"not_applicable_when": NOT_APPLICABLE_WHEN})
+    return rubric.model_copy(update={"dimensions": (concept, optional)})
+
+
 @dataclass
 class FakeJudge:
     """Returns `answers` in order; records each call's keyword arguments."""
@@ -130,6 +141,18 @@ class Answers:
                  "start_ms": 500_000}
             ],
         }  # fmt: skip
+
+    @property
+    def recap_not_applicable(self) -> dict[str, Any]:
+        """A null score with one real quote of what the lesson was about."""
+        return {
+            "key": "recap_and_closure",
+            "score": None,
+            "rationale": "The lesson was cut short by an assembly, so there was no time for a recap.",
+            "evidence": [
+                {"quote": "Aaj hum photosynthesis ke baare mein padhenge", "utterance_id": "u0000", "start_ms": 0}
+            ],
+        }
 
     @property
     def bad_concept(self) -> dict[str, Any]:

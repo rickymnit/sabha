@@ -22,6 +22,10 @@ def dim(key: str, weight: float, score: int | None, verified: bool = True) -> Di
     return DimensionResult(key, key, weight, verified, score if verified else None, "r" if verified else None, (), 1)
 
 
+def not_applicable(key: str, weight: float) -> DimensionResult:
+    return DimensionResult(key, key, weight, True, None, "r", (), 1, not_applicable=True)
+
+
 # --- overall score ---------------------------------------------------------------------------------------------------
 
 
@@ -43,6 +47,22 @@ def test_unverified_dimensions_are_left_out_of_the_mean() -> None:
 def test_no_overall_below_sixty_percent_verified_weight() -> None:
     overall = compute_overall([dim("a", 0.5, 5), dim("b", 0.5, None, verified=False)])
     assert overall.score is None and overall.needs_review
+
+
+def test_a_not_applicable_dimension_leaves_the_total_and_the_rest_is_rescaled() -> None:
+    overall = compute_overall([dim("a", 0.5, 4), dim("b", 0.3, 2), not_applicable("c", 0.2)])
+    assert overall.score == 3.3  # (0.5 * 4 + 0.3 * 2) / 0.8 = 3.25, half up
+    assert (overall.total_weight, overall.verified_share) == (0.8, 1.0)
+
+
+def test_unverified_dimensions_stay_in_the_total_when_another_is_not_applicable() -> None:
+    # 0.4 verified of 0.8 applicable is 50%: no score, although 0.4 + 0.2 of the rubric was answered.
+    overall = compute_overall([dim("a", 0.4, 4), dim("b", 0.4, None, verified=False), not_applicable("c", 0.2)])
+    assert overall.score is None and overall.verified_share == 0.5
+
+
+def test_nothing_applicable_gives_no_overall_score() -> None:
+    assert compute_overall([not_applicable("a", 1.0)]).score is None
 
 
 # --- synthesis and report --------------------------------------------------------------------------------------------
@@ -146,4 +166,38 @@ def test_check_report_refuses_a_tampered_report(rubric: Rubric, lesson: Prepared
     report = run(rubric, lesson, fake_judge([scoring_answer(answers), good_synthesis()])).report
     report["dimensions"][0]["evidence"][0]["quote"] = answers.fake_quote
     with pytest.raises(InvalidReport, match="not the transcript's own wording"):
+        check_report(report, lesson)
+
+
+def concept_only_synthesis() -> dict[str, Any]:
+    """Suggestions only on lines the verified, applicable dimension cited (u0001, u0003)."""
+    suggestions = [{**s, "utterance_id": "u0001"} if s["utterance_id"] == "u0004" else s
+                   for s in good_synthesis()["suggestions"]]  # fmt: skip
+    return good_synthesis(suggestions=suggestions)
+
+
+def test_a_not_applicable_dimension_in_the_report(optional_recap_rubric: Rubric, lesson: PreparedTranscript,
+                                                  fake_judge: Any, answers: Any) -> None:  # fmt: skip
+    scoring = {"dimensions": [answers.good_concept, answers.recap_not_applicable]}
+    result = run(optional_recap_rubric, lesson, fake_judge([scoring, concept_only_synthesis()]))
+    report = result.report
+
+    jsonschema.validate(report, load_report_schema())
+    recap = next(d for d in report["dimensions"] if d["key"] == "recap_and_closure")
+    assert recap["not_applicable"] is True and recap["verified"] is True and recap["score"] is None
+    assert recap["rationale"] and recap["evidence"]
+    assert "not_applicable" not in next(d for d in report["dimensions"] if d["key"] == "concept_clarity")
+    assert report["overall"]["score"] == 4.0  # concept alone, rescaled to the whole
+    assert result.next_status is RecordingStatus.COMPLETED
+
+
+@pytest.mark.parametrize("tamper", [{"score": 3}, {"evidence": []}, {"rationale": None}])
+def test_check_report_refuses_a_malformed_not_applicable_dimension(
+    optional_recap_rubric: Rubric, lesson: PreparedTranscript, fake_judge: Any, answers: Any, tamper: dict[str, Any]
+) -> None:
+    scoring = {"dimensions": [answers.good_concept, answers.recap_not_applicable]}
+    report = run(optional_recap_rubric, lesson, fake_judge([scoring, concept_only_synthesis()])).report
+    recap = next(d for d in report["dimensions"] if d["key"] == "recap_and_closure")
+    recap.update(tamper)
+    with pytest.raises(InvalidReport, match="not-applicable dimension needs no score"):
         check_report(report, lesson)

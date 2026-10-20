@@ -95,6 +95,10 @@
         "name": {"type": "string"},
         "weight": {"type": "number", "exclusiveMinimum": 0},
         "verified": {"type": "boolean"},
+        "not_applicable": {
+          "const": true,
+          "description": "Present only when the dimension was verified as not applying to this conversation (rubric not_applicable_when): no score, left out of the overall score; the rationale and evidence say why."
+        },
         "attempts": {"type": "integer", "minimum": 1, "maximum": 2},
         "grounding": {
           "type": "object", "additionalProperties": false, "required": ["quotes_offered", "quotes_verified"],
