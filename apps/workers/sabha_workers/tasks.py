@@ -1,6 +1,7 @@
 """Celery task definitions (plan task P2.4). Each pipeline stage task is a thin wrapper around StageRunner.
 
-Stages not built yet (P3.2 preprocess, P3.4 diarize, P3.5 transcribe, P5.7 analyze) fail honestly with
+preprocess (P3.2) is sabha_workers.stages.preprocess. Stages not built yet (P3.4 diarize, P3.5 transcribe, P5.7
+analyze) fail honestly with
 `stage_not_built`: the recording goes to FAILED with a dead letter, so nothing silently stalls and the job can be
 replayed once the stage exists (P7.8). notify sends the status emails (P2.7, sabha_workers.notifications.notify);
 meter only logs until P8.6.
@@ -21,14 +22,16 @@ from botocore.config import Config
 from celery import Celery, Task
 from pymongo.database import Database
 
-from sabha_core.models import utc_now
+from sabha_core.models import AudioInfo, Recording, utc_now
 from sabha_core.mongo import open_sync
+from sabha_core.repo import SyncTenantRepo
 from sabha_core.settings import Settings, get_settings
 from sabha_core.state import RecordingStatus
 from sabha_workers.dispatch import CeleryDispatcher
 from sabha_workers.maintenance import requeue_stuck
 from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
+from sabha_workers.stages import preprocess
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
 from sabha_workers.upload_cleanup import abort_stale_uploads
 
@@ -50,7 +53,6 @@ def not_built(stage: str) -> Work:
     return work
 
 
-WORKS: dict[str, Work] = {name: not_built(name) for name in SPECS}
 NOTIFY_MAX_RETRIES = 8  # SES throttling or outage: waits double from 1 min, capped at 1 h
 
 
@@ -60,6 +62,7 @@ class Runtime:
     db: Database[dict[str, Any]]
     s3: Any
     runner: StageRunner
+    works: dict[str, Work]
     sender: EmailSender | None  # None without SES_SENDER: notify logs and sends nothing
 
 
@@ -96,7 +99,18 @@ def runtime() -> Runtime:
         max_attempts=settings.stage_max_attempts,
     )
     sender = SesSender.from_settings(settings) if settings.ses_sender else None
-    return Runtime(settings, db, s3, runner, sender)
+    return Runtime(settings, db, s3, runner, works(db, s3, settings), sender)
+
+
+def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str, Work]:
+    def record_audio(tenant_id: str, recording_id: str, duration_ms: int, audio: AudioInfo) -> None:
+        recordings = SyncTenantRepo(db, "recordings", tenant_id, Recording)
+        recordings.update_one(
+            {"_id": recording_id}, {"$set": {"duration_ms": duration_ms, "audio": audio.model_dump()}}
+        )
+
+    built = {"preprocess": preprocess.make_work(preprocess.S3Originals(s3, settings.s3_bucket_audio), record_audio)}
+    return {name: built.get(name) or not_built(name) for name in SPECS}
 
 
 def register(app: Celery) -> None:
@@ -105,8 +119,9 @@ def register(app: Celery) -> None:
     def stage_task(name: str) -> None:
         @app.task(bind=True, name=f"sabha.{name}", acks_late=True, reject_on_worker_lost=True, max_retries=None)
         def run(self: Task, tenant_id: str, recording_id: str, event_id: str | None = None) -> str:
-            outcome = runtime().runner.run(SPECS[name], WORKS[name], tenant_id, recording_id,
-                                           attempt=self.request.retries + 1)  # fmt: skip
+            rt = runtime()
+            outcome = rt.runner.run(SPECS[name], rt.works[name], tenant_id, recording_id,
+                                    attempt=self.request.retries + 1)  # fmt: skip
             if outcome.result == "retry":
                 raise self.retry(countdown=outcome.retry_in)
             return outcome.result
