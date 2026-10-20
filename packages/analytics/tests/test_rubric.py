@@ -24,6 +24,7 @@ from sabha_analytics.rubric import (
     RubricError,
     RubricVersionConflictError,
     RubricVersionExistsError,
+    canonical_json,
     diff_rubrics,
     find_previous_version,
     load_rubric,
@@ -36,6 +37,7 @@ REPO = Path(__file__).resolve().parents[3]
 RUBRICS = REPO / "rubrics"
 TEACHING = RUBRICS / "teaching.school.v0.1.yaml"
 RECEPTION = RUBRICS / "reception.school.v0.1.yaml"
+RECEPTION_V0_2 = RUBRICS / "reception.school.v0.2.yaml"
 FIXTURE = Path(__file__).parent / "fixtures" / "rubrics" / "teaching.testing.v1.0.yaml"
 
 
@@ -101,6 +103,33 @@ def test_reception_v0_1_validates_with_output_values() -> None:
     assert rubric.output_values is not None
     assert rubric.output_values["status"] == ("resolved", "follow_up_needed", "escalated")
     assert "complaint" in rubric.output_values["category"]
+
+
+def test_reception_v0_2_is_v0_1_plus_not_applicable_escalation() -> None:
+    # Reviewed and approved as-is by the academic head (2026-10-20); escalation is not applicable on calls with
+    # nothing to escalate (owner's decision).
+    old, _ = load_rubric(RECEPTION)
+    new, _ = load_rubric(RECEPTION_V0_2)
+    assert new.version == "0.2"
+    changes = diff_rubrics(old, new)
+    assert [(c.dimension, c.item) for c in changes] == [("escalation_handling", "not_applicable_when")]
+    escalation = next(d for d in new.dimensions if d.key == "escalation_handling")
+    assert escalation.not_applicable_when is not None and "nothing to escalate" in escalation.not_applicable_when
+    assert all(d.not_applicable_when is None for d in new.dimensions if d.key != "escalation_handling")
+
+
+def test_not_applicable_when_must_not_be_blank(tmp_path: Path) -> None:
+    def blank(data: dict[str, Any]) -> None:
+        data["dimensions"][0]["not_applicable_when"] = "   "
+
+    assert "not_applicable_when" in problems_of(changed(blank), tmp_path)
+
+
+def test_adding_the_optional_field_keeps_old_hashes() -> None:
+    # exclude_none: rubrics without not_applicable_when hash exactly as before the field existed.
+    rubric, content_hash = load_rubric(RECEPTION)
+    assert "not_applicable_when" not in canonical_json(rubric)
+    assert rubric_hash(rubric) == content_hash
 
 
 def test_dimension_interface_agreed_with_scoring() -> None:

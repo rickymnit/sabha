@@ -17,7 +17,8 @@ Schema (matches rubrics/teaching.school.v0.1.yaml and rubrics/reception.school.v
   context only and are never scored (golden rule 10). `primary_role` returns it.
 - Each dimension: snake_case `key` unique within the rubric, non-blank `name` and `definition`, `weight` in (0, 1],
   `min_quotes` >= 1, `anchors` with exactly the levels 1-5 and non-blank text, and `examples` for some of the
-  levels 1-5 that include at least 1 and 5. Weights must sum to 1.0 within WEIGHT_TOLERANCE (0.001).
+  levels 1-5 that include at least 1 and 5, and an optional non-blank `not_applicable_when` (a condition under which
+  the dimension does not apply to a conversation). Weights must sum to 1.0 within WEIGHT_TOLERANCE (0.001).
 - `computed_metrics` must be keys sabha_analytics.metrics computes for the rubric's roles (or a documented alias).
 - `output` sections are snake_case and unique; every `output_values` key must be one of them, with a non-empty list
   of unique snake_case values.
@@ -125,6 +126,10 @@ class Dimension(_Frozen):
     min_quotes: Annotated[int, Field(strict=True, ge=1)]
     anchors: ScaleText
     examples: ScaleText
+    # When set, the judge may answer "not applicable" for a conversation that matches this condition (for example a
+    # call with nothing to escalate). Such a dimension is left out of that conversation's overall score and the other
+    # weights are rescaled (sabha_analytics.synthesis). The judge must still quote what the conversation was about.
+    not_applicable_when: Text | None = None
 
     @field_validator("anchors")
     @classmethod
@@ -421,7 +426,7 @@ def diff_rubrics(old: Rubric, new: Rubric) -> tuple[Change, ...]:
         after = new_dims.get(key)
         if after is None:
             continue
-        for name in ("name", "weight", "definition", "min_quotes"):
+        for name in ("name", "weight", "definition", "min_quotes", "not_applicable_when"):
             if getattr(before, name) != getattr(after, name):
                 changes.append(Change(key, name, _show(getattr(before, name)), _show(getattr(after, name))))
         for field_name, levels in (("anchors", SCALE), ("examples", sorted({*before.examples, *after.examples}))):
