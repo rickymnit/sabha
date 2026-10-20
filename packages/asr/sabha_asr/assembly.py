@@ -21,9 +21,14 @@ Rules:
   original-minus-compact offsets. Reason: an utterance is played back and quoted as one span; spanning a long
   removed silence would make playback include that silence and make its original-time length overstate speech.
   Pauses inside one segment do not split (they are real time the speaker held the floor).
-- avg_confidence is the mean word confidence, rounded to 4 decimals. low_confidence_spans are half-open
+- avg_confidence is the mean confidence of the utterance's words that have one, rounded to 4 decimals, or None when
+  none do (providers without word confidence, such as Sarvam: ADR 0006). low_confidence_spans are half-open
   [start, end) character ranges of `text` (Unicode code points) covering runs of consecutive words with confidence
-  below `low_confidence_below`; the space between two low-confidence words is inside the span.
+  below `low_confidence_below`; the space between two low-confidence words is inside the span. A word without a
+  confidence is never marked and ends a run.
+- word_timing says how word times were obtained: "word" when the ASR timed each word, "approximate" when it timed
+  only phrases and words were spread across them (sabha_asr.provider.spread_words). With approximate timing,
+  speaker assignment and quote timestamps are only as precise as the phrases.
 - Overlapping speech is kept: words of two speakers that interleave in time make alternating short utterances.
 
 transcript@v1.json is documented by schemas/transcript.v1.schema.json (JSON Schema 2020-12, the contract);
@@ -38,12 +43,13 @@ from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, TypedDict, TypeGuard
+from typing import Any, Literal, TypedDict, TypeGuard
 
 from sabha_asr.words import Turn, Word, assign_words_to_turns
 from sabha_core.timemap import DEFAULT_MERGE_GAP_MS, SegmentMap
 
 TRANSCRIPT_VERSION = "transcript@v1"
+WordTiming = Literal["word", "approximate"]
 TIMELINE = "original"
 
 DEFAULT_SPLIT_SILENCE_MS = DEFAULT_MERGE_GAP_MS
@@ -55,6 +61,8 @@ per provider against the gold set once the provider is chosen."""
 
 _SCHEMA_FILE = "transcript.v1.schema.json"
 _TOP_KEYS = frozenset({"version", "timeline", "asr_model", "word_count", "utterances"})
+_OPTIONAL_TOP_KEYS = frozenset({"word_timing"})  # absent in transcripts written before Sarvam (ADR 0006): "word"
+WORD_TIMINGS = ("word", "approximate")
 _UTTERANCE_KEYS = frozenset(
     {"role", "speaker_label", "start_ms", "end_ms", "text", "avg_confidence", "low_confidence_spans"}
 )
@@ -66,7 +74,7 @@ class UtteranceRecord(TypedDict):
     start_ms: int
     end_ms: int
     text: str
-    avg_confidence: float
+    avg_confidence: float | None
     low_confidence_spans: list[list[int]]
 
 
@@ -76,6 +84,7 @@ class TranscriptRecord(TypedDict):
     version: str
     timeline: str
     asr_model: str
+    word_timing: WordTiming
     word_count: int
     utterances: list[UtteranceRecord]
 
@@ -89,7 +98,7 @@ class Utterance:
     start_ms: int
     end_ms: int
     text: str
-    avg_confidence: float
+    avg_confidence: float | None
     low_confidence_spans: tuple[tuple[int, int], ...]
 
     def to_record(self) -> UtteranceRecord:
@@ -144,7 +153,8 @@ def _utterance(group: Sequence[_Placed], role: str, low_confidence_below: float)
         if texts:
             cursor += 1  # the joining space
         word_end = cursor + len(placed.word.text)
-        if placed.word.confidence < low_confidence_below:
+        confidence = placed.word.confidence
+        if confidence is not None and confidence < low_confidence_below:
             if span_start is None:
                 span_start = cursor
             spans.append((span_start, word_end))
@@ -152,6 +162,7 @@ def _utterance(group: Sequence[_Placed], role: str, low_confidence_below: float)
             span_start = None
         texts.append(placed.word.text)
         cursor = word_end
+    known = [p.word.confidence for p in group if p.word.confidence is not None]
     merged: list[tuple[int, int]] = []
     for start, end in spans:  # spans of one run share their start; keep the longest
         if merged and merged[-1][0] == start:
@@ -164,7 +175,7 @@ def _utterance(group: Sequence[_Placed], role: str, low_confidence_below: float)
         start_ms=min(p.orig_start_ms for p in group),
         end_ms=max(p.orig_end_ms for p in group),
         text=" ".join(texts),
-        avg_confidence=round(math.fsum(p.word.confidence for p in group) / len(group), 4),
+        avg_confidence=round(math.fsum(known) / len(known), 4) if known else None,
         low_confidence_spans=tuple(merged),
     )
 
@@ -215,6 +226,7 @@ def assemble_transcript(
     segment_map: SegmentMap,
     *,
     asr_model: str,
+    word_timing: WordTiming = "word",
     split_silence_ms: int = DEFAULT_SPLIT_SILENCE_MS,
     low_confidence_below: float = DEFAULT_LOW_CONFIDENCE_BELOW,
 ) -> TranscriptRecord:
@@ -231,6 +243,7 @@ def assemble_transcript(
         "version": TRANSCRIPT_VERSION,
         "timeline": TIMELINE,
         "asr_model": asr_model,
+        "word_timing": word_timing,
         "word_count": len(words),
         "utterances": [u.to_record() for u in utterances],
     }
@@ -270,8 +283,10 @@ def _check_utterance(path: str, utterance: object) -> tuple[int, int]:
     if end <= start:
         raise ValueError(f"{path} must end ({end} ms) after it starts ({start} ms)")
     confidence = utterance["avg_confidence"]
-    if not isinstance(confidence, int | float) or isinstance(confidence, bool) or not 0 <= confidence <= 1:
-        raise ValueError(f"{path}.avg_confidence must be a number in [0, 1]")
+    if confidence is not None and (
+        not isinstance(confidence, int | float) or isinstance(confidence, bool) or not 0 <= confidence <= 1
+    ):
+        raise ValueError(f"{path}.avg_confidence must be a number in [0, 1] or null")
     spans = utterance["low_confidence_spans"]
     if not isinstance(spans, list):
         raise ValueError(f"{path}.low_confidence_spans must be a list")
@@ -294,8 +309,12 @@ def validate_transcript(doc: object) -> None:
     """Raise ValueError, naming the first problem, unless `doc` is valid transcript@v1 content."""
     if not isinstance(doc, dict):
         raise ValueError("transcript must be an object")
-    if set(doc) != _TOP_KEYS:
-        raise ValueError(f"transcript must have exactly the keys {', '.join(sorted(_TOP_KEYS))}")
+    if not _TOP_KEYS <= set(doc) <= _TOP_KEYS | _OPTIONAL_TOP_KEYS:
+        raise ValueError(
+            f"transcript must have the keys {', '.join(sorted(_TOP_KEYS))} and may have {', '.join(_OPTIONAL_TOP_KEYS)}"
+        )
+    if doc.get("word_timing", "word") not in WORD_TIMINGS:
+        raise ValueError(f"word_timing must be one of {', '.join(WORD_TIMINGS)}")
     if doc["version"] != TRANSCRIPT_VERSION:
         raise ValueError(f"transcript version must be {TRANSCRIPT_VERSION!r}")
     if doc["timeline"] != TIMELINE:

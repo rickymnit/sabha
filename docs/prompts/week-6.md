@@ -72,6 +72,8 @@ Done when: a restore is rehearsed on staging and the retention job runs nightly.
 
 ## P7.4 · Tenant-isolation and permission tests
 
+> **Status (2026-10-19).** Already built: `tests/security/permissions.yaml` (reviewed by the owner) and `test_permission_matrix.py`, which fails if an OpenAPI route is missing from the matrix and calls every route as nine callers (anonymous, owner, admin, managers of the recording's unit and another unit, a reviewer, the uploader, a colleague, another tenant). Presigned upload keys are checked to sit under the caller's tenant (`test_recordings.py`). Remaining: add each new route to the matrix as it lands (the test enforces it), the SSE checks (with P2.6), aggregation checks (with P6.4b), and a final `/tenant-check` run.
+
 Plan task 7.4.
 
 ```text
@@ -111,6 +113,8 @@ Done when: a staff account cannot open a colleague's report.
 ---
 
 ## P6.9 · Consent in the product
+
+> **Status (2026-10-19).** Partly built: golden rule 9 is enforced by `transition()` (no consent_ref, nothing moves past UPLOADED), and the complete endpoint keeps recordings without consent at UPLOADED with `awaiting_consent` and does not start processing (P2.2/P2.5). Remaining: consent records (scope, validity), checking expiry and scope, releasing an awaiting recording when consent is added (write `recording.ready`), the admin UI and the upload selector.
 
 Covers the consent tick in task 6.3 and golden rule 9.
 

@@ -4,84 +4,6 @@ Goal: an upload flows automatically through cleaning and speaker detection, and 
 
 ---
 
-## P2.3 · Job state machine and stage runs
-
-Plan task 2.3. **Tests first.** Read first: `CLAUDE.md` (domain model).
-
-```text
-Implement packages/core/sabha_core/state.py: the ONLY place recording status transitions are defined.
-
-- Enum RecordingStatus with CREATED, UPLOADED, PREPROCESSING, DIARIZING, TRANSCRIBING, ANALYZING, COMPLETED,
-  FAILED, NEEDS_REVIEW.
-- An explicit allowed-transitions table; FAILED and NEEDS_REVIEW reachable from every worker stage;
-  COMPLETED → ANALYZING allowed only for re-analysis.
-- transition(session, recording_id, tenant_id, from_status, to_status, reason, meta) performs a conditional
-  update (status must equal from_status) inside the given MongoDB session; raises InvalidTransition or
-  ConcurrentTransition. It also returns the outbox event to write (P2.5 writes it in the same transaction).
-- stage_runs collection: one document per attempt {recording_id, tenant_id, stage, version, attempt, status
-  running|succeeded|failed, started_at, finished_at, error_code, error_detail, worker, duration_ms}.
-
-Tests first: every allowed and disallowed transition, concurrent transition loses cleanly, stage_runs written
-per attempt.
-```
-
-Done when: tests pass and the complete endpoint uses `transition()` for `CREATED → UPLOADED`.
-
----
-
-## P2.4 · Celery queues, retries and dead-letter queue
-
-Plan task 2.4. Read first: `CLAUDE.md` golden rule 3.
-
-```text
-Set up the worker system in apps/workers.
-
-- celery_app.py: Redis broker/backend from settings; queues cpu.preprocess, gpu.speech, llm.analyze,
-  io.notify, billing.meter; task routes by name prefix; acks_late=True; task_reject_on_worker_lost=True;
-  prefetch multiplier 1 for gpu.speech and llm.analyze; per-queue visibility timeouts (gpu long).
-- A base task class SabhaStageTask that: loads the recording via TenantRepo; skips if the output artefact
-  exists (idempotency); records stage_runs start/finish; classifies exceptions into TransientError (retry with
-  exponential backoff + jitter, max 5) and PermanentError (fail now); on final failure transitions to FAILED
-  with an error code and pushes the job to a dead-letter collection `dlq` with full context; emits OTel spans
-  and Prometheus metrics (queue wait, run time, retries).
-- A heartbeat for long tasks; a beat schedule including the stale multipart cleanup from P2.2 and a
-  "stuck jobs" sweeper that requeues jobs stuck in a running state past their timeout.
-- Docker Compose services: workers-cpu (cpu.preprocess, io.notify, billing.meter, llm.analyze),
-  workers-gpu (gpu.speech, concurrency 1), beat.
-
-Tests: a task killed mid-run is redelivered and completes once; transient errors retry; permanent errors land
-in dlq with context; existing artefact causes a skip.
-```
-
-Done when: killing a worker mid-job loses nothing (demonstrate in a test and manually).
-
----
-
-## P2.5 · Transactional outbox and change-stream relay
-
-Plan task 2.5.
-
-```text
-Make status changes and their events impossible to disagree.
-
-- When transition() runs, write the status update and an outbox document {event_id, tenant_id, type,
-  payload, created_at, published_at:null} in ONE MongoDB transaction (helper in sabha_core/outbox.py).
-- apps/workers/relay.py: a long-running process that watches the outbox collection via a change stream
-  (resume token persisted in Mongo), publishes each event (a) as a Celery task for the next pipeline stage
-  per a routing table, and (b) to a Redis pub/sub channel `events:{tenant_id}` for SSE; marks published_at;
-  on restart resumes from the token; a fallback poll every 10 s publishes anything unpublished older than 30 s.
-- Routing table: UPLOADED→preprocess, PREPROCESSING done→diarize, DIARIZING done→transcribe,
-  TRANSCRIBING done→analyze, COMPLETED→notify and meter.
-- Wire P2.2's complete endpoint to write the outbox event.
-
-Tests: transaction rollback leaves no event; relay restart does not lose or duplicate dispatch (dispatch is
-idempotent by event_id); end-to-end: complete → preprocess task enqueued.
-```
-
-Done when: completing an upload automatically starts preprocessing.
-
----
-
 ## P2.6 · Live status over Server-Sent Events
 
 Plan task 2.6.
@@ -100,6 +22,8 @@ Done when: the recordings list updates without a refresh as a job moves.
 ---
 
 ## P1.7 · Organisation profiles and label dictionary
+
+> **Status (2026-10-17).** Already built: profile defaults for school, college and company (sabha_core/profiles.py) and `Tenant.from_profile` (P1.6). Remaining: `POST /v1/admin/tenants`, `PATCH /v1/settings`, `useLabels()` in the web app, and blocking uploads of disabled types.
 
 Plan task 1.7.
 
@@ -122,6 +46,8 @@ Done when: switching a test tenant to `company` changes the UI words to Sales re
 
 ## P1.8 · Audit log
 
+> **Status (2026-10-19).** Partly built: the `AuditEntry` model, `audit_log` collection with its (tenant_id, at) index, and `sabha_api.audit.audit()` used for `recording.create` (P2.1). Remaining: the other actions as their routes land, `GET /v1/audit` (owner/admin, filters, cursor pagination) and the immutability tests.
+
 Plan task 1.8.
 
 ```text
@@ -138,28 +64,9 @@ Done when: opening a recording's audio writes an audit entry visible to an admin
 
 ---
 
-## P3.1 · Port the LIS multi-provider ASR abstraction
-
-Plan task 3.1. Read first: the LIS repo's ASR package (give the path).
-
-```text
-Port our LIS multi-provider ASR abstraction into packages/asr as sabha_asr.
-
-- Keep its provider interface and the explicit no-silent-fallback behaviour exactly; list every change you make
-  and why.
-- Providers: the ones LIS supports (Qwen3-ASR, Parakeet, IndicConformer, faster-whisper); configuration chooses
-  ONE active provider per deployment, with an optional explicit fallback list that is logged when used.
-- Standard output: words [{text, start_ms, end_ms, confidence}], language tags per segment if available,
-  model id and version, real-time factor.
-- Copy the relevant LIS tests and make them pass here.
-Do not change model behaviour. Show me a diff summary between LIS and the port before finishing.
-```
-
-Done when: the ported tests pass and a sample file transcribes through the new package.
-
----
-
 ## P3.2 · Validate and normalise audio
+
+> **Status (2026-10-19).** Not built. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError). Also record the duration on the recording: P7.2's priority lanes and P8.6's billing need it. Use `-protocol_whitelist file` with ffmpeg (P7.6).
 
 Plan task 3.2.
 
@@ -180,6 +87,8 @@ Done when: any supported fixture produces `normalised.wav` and `playback.opus`.
 ---
 
 ## P3.3 · Voice activity detection and segment map
+
+> **Status (2026-10-17).** Already built: `sabha_core/timemap.py` (segment map, compact/original mapping, stats) with its tests. Remaining: the Silero VAD step that writes `segments@v1.json` and `compact.wav`, and the PREPROCESSING → DIARIZING transition. The 300 ms end padding is an unmeasured default (there is no LIS); tune it on the gold set.
 
 Plan task 3.3. **Tests first** for the time mapping.
 
@@ -202,6 +111,8 @@ Done when: 5 real files have segment maps that round-trip exactly.
 ---
 
 ## P3.4a · Diarization (first pass)
+
+> **Status (2026-10-19).** Not built. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError).
 
 Plan task 3.4 (continues in week 3).
 
@@ -260,6 +171,8 @@ Done when: uploads appear and change status live on the overview.
 ---
 
 ## P7.1 · Monitoring and tracing
+
+> **Status (2026-10-17).** Already built: OpenTelemetry tracing set-up for the API (sabha_core/telemetry.py). Remaining: trace propagation through outbox and Celery, Prometheus metrics, Grafana dashboards, Sentry.
 
 Plan task 7.1.
 

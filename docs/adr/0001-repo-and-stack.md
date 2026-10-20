@@ -9,8 +9,10 @@
 Sabha turns recorded conversations into speaker-labelled transcripts and rubric-based, evidence-backed
 feedback for schools, colleges and companies. The 8-week pilot covers teaching and reception for schools.
 The system must keep data in India, isolate tenants strictly, run a GPU speech pipeline and an LLM scoring
-stage reliably, and be small enough for one team to operate. Speech recognition is ported from our Lecture
-Intelligence System (LIS), so the Python side should stay close to that code.
+stage reliably, and be small enough for one team to operate.
+
+Correction (2026-10-17): an earlier version said speech recognition would be ported from a "Lecture Intelligence
+System (LIS)". No such codebase exists; `packages/asr` is built here.
 
 ## Decision
 
@@ -37,7 +39,7 @@ Stack:
 | Audio | ffmpeg/ffprobe, Silero VAD, pyannote or NeMo Sortformer, ASR via `packages/asr` |
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
 | Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |
-| Auth | OIDC (Auth0 or Keycloak, decided in ADR 0002); JWT validated in the API |
+| Auth | OIDC with Auth0 (ADR 0002); JWT validated in the API |
 | Infra | Docker Compose (dev, staging, prod pilot), Terraform for AWS, GitHub Actions |
 | Observability | OpenTelemetry, Prometheus, Grafana, Sentry, structured JSON logs |
 

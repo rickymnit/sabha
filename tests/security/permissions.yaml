@@ -1,0 +1,105 @@
+# Who may call what: the permission matrix for every API route (plan task P7.4).
+#
+# Reviewed by the owner on 2026-10-19. tests/security/test_permission_matrix.py calls every route as every caller
+# and fails on any difference. Every route in the OpenAPI spec must appear here (test_every_route_is_in_the_matrix),
+# so a new route cannot ship without a decision.
+#
+# Callers. Tenant A has units unit-1 and unit-2. The target recording (for routes with {recording_id}) belongs to
+# tenant A, unit-1, person "Asha" (linked to staff_uploader), and was uploaded by staff_uploader.
+#   anonymous            no token
+#   owner, admin         tenant A
+#   manager_unit         tenant A manager of unit-1 (the recording's unit)
+#   manager_other_unit   tenant A manager of unit-2
+#   reviewer_unit        tenant A reviewer of unit-1
+#   staff_uploader       tenant A staff, the person analysed, who uploaded the recording
+#   staff_colleague      tenant A staff, someone else
+#   other_tenant         owner of tenant B
+#
+# Statuses are what the caller gets. 404 (not 403) for a recording the caller may not see, so its existence is not
+# revealed.
+
+callers:
+  - anonymous
+  - owner
+  - admin
+  - manager_unit
+  - manager_other_unit
+  - reviewer_unit
+  - staff_uploader
+  - staff_colleague
+  - other_tenant
+
+routes:
+  GET /health:
+    # Load balancers and the deploy script; never touches a dependency.
+    all: 200
+
+  GET /ready:
+    # Public like /health; 503 while a dependency is down, never 401/403.
+    all: [200, 503]
+
+  GET /v1/meta:
+    all: 200
+
+  GET /v1/me:
+    anonymous: 401
+    others: 200  # each caller sees only themselves and their own tenant
+
+  POST /v1/users/invites:
+    # Body: a new user with role "staff". Owners invite any role; admins manager, reviewer and staff (2026-10-19).
+    anonymous: 401
+    owner: 201
+    admin: 201
+    manager_unit: 403
+    manager_other_unit: 403
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 201  # creates the user in tenant B, never in tenant A
+
+  POST /v1/users/invites (admin inviting an admin):
+    anonymous: 401
+    owner: 201
+    admin: 403  # role_not_allowed
+    manager_unit: 403
+    manager_other_unit: 403
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 201
+
+  POST /v1/recordings:
+    # Body: a teaching recording for person Asha (staff_uploader's person).
+    anonymous: 401
+    owner: 201
+    admin: 201
+    manager_unit: 201
+    manager_other_unit: 403  # managers and reviewers upload only for people in their units (person_not_allowed)
+    reviewer_unit: 201
+    staff_uploader: 201  # staff upload only for their own person
+    staff_colleague: 403  # person_not_allowed
+    other_tenant: 422  # unknown_person: Asha is not in tenant B
+
+  POST /v1/recordings/{recording_id}/parts:
+    # Fresh part URLs to resume an upload still in progress.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 404  # only the uploader, owners and admins resume an upload
+    manager_other_unit: 404
+    reviewer_unit: 404
+    staff_uploader: 200
+    staff_colleague: 404
+    other_tenant: 404
+
+  POST /v1/recordings/{recording_id}/complete:
+    # Finishing an upload; same rule as /parts.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 404
+    manager_other_unit: 404
+    reviewer_unit: 404
+    staff_uploader: 200
+    staff_colleague: 404
+    other_tenant: 404

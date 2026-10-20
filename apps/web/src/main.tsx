@@ -7,6 +7,7 @@ import "./index.css";
 import { StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { AuthProvider, ProtectedRoute, readAuthConfig } from "./auth";
 import OverviewSpike from "./spike/OverviewSpike";
 
 const container = document.getElementById("root");
@@ -28,5 +29,12 @@ if (import.meta.env.DEV && location.pathname === "/dev/components") {
 } else if (import.meta.env.DEV && location.pathname === "/dev/overview") {
   void import("./dev/OverviewDemo").then(({ default: OverviewDemo }) => render(<OverviewDemo />));
 } else {
-  render(<OverviewSpike />);
+  // The demos above use mock data and stay open in development; the app itself needs a signed-in person.
+  render(
+    <AuthProvider config={readAuthConfig(import.meta.env)}>
+      <ProtectedRoute>
+        <OverviewSpike />
+      </ProtectedRoute>
+    </AuthProvider>,
+  );
 }

@@ -33,5 +33,5 @@ COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER sabha
-# One task at a time per GPU (P2.4); the Celery app arrives with plan task P2.4.
-CMD ["celery", "-A", "sabha_workers.celery_app", "worker", "--queues=gpu.speech", "--concurrency=1", "--prefetch-multiplier=1", "--loglevel=INFO"]
+# One task at a time per GPU (P2.4): run with --concurrency 1 on the gpu.speech queues.
+CMD ["celery", "-A", "sabha_workers.worker", "worker", "--queues=gpu.speech.priority,gpu.speech", "--concurrency=1", "--prefetch-multiplier=1", "--loglevel=INFO"]

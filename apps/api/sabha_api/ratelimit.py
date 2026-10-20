@@ -78,14 +78,25 @@ class Bucket:
     id: str
     per_minute: int
     burst_factor: float = 1.5
+    # Required for "user": a user's bucket lives under their tenant, so equal user ids in two tenants never share a
+    # budget (golden rule 1).
+    tenant_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.per_minute < 1 or self.burst_factor < 1:
             raise ValueError("per_minute must be >= 1 and burst_factor >= 1")
+        if self.scope not in ("tenant", "user"):
+            raise ValueError(f"unknown bucket scope {self.scope!r}")
+        if self.scope == "user" and not self.tenant_id:
+            raise ValueError("a user bucket needs the user's tenant_id")
+        if self.scope == "tenant" and self.tenant_id not in (None, self.id):
+            raise ValueError("a tenant bucket's id is its tenant_id")
 
     @property
     def key(self) -> str:
-        return f"{KEY_PREFIX}:{self.scope}:{self.id}"
+        if self.scope == "user":
+            return f"{KEY_PREFIX}:user:{self.tenant_id}:{self.id}"
+        return f"{KEY_PREFIX}:tenant:{self.id}"
 
     @property
     def refill_per_ms(self) -> float:

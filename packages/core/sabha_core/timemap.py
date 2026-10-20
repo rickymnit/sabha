@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from typing import TypedDict, TypeGuard
 
 DEFAULT_END_PAD_MS = 300
-"""Padding added to the end of each VAD speech region (P3.3: LIS showed Silero clips 250-350 ms off utterance ends)."""
+"""Padding added to the end of each VAD speech region (P3.3). An unmeasured starting value: tune it on the gold set."""
 
 DEFAULT_MERGE_GAP_MS = 1500
 """Speech regions separated by less silence than this are merged into one segment (P3.3)."""

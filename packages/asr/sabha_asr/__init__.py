@@ -1,1 +1,1 @@
-"""Multi-provider speech recognition, ported from LIS."""
+"""Multi-provider speech recognition."""

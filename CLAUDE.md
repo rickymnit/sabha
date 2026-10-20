@@ -46,7 +46,7 @@ Read this file fully before any task. If a request conflicts with a rule below, 
 | Audio | ffmpeg/ffprobe, Silero VAD, pyannote or NeMo Sortformer, ASR via `packages/asr` |
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
 | Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |
-| Auth | OIDC (Auth0 or Keycloak — see `docs/adr/0002-auth.md`); JWT validated in the API |
+| Auth | OIDC with Auth0 (`docs/adr/0002-auth.md`); JWT validated in the API; roles and tenants from our own records |
 | Infra | Docker Compose (dev, staging, prod pilot), Terraform for AWS, GitHub Actions |
 | Observability | OpenTelemetry, Prometheus, Grafana, Sentry, structured JSON logs |
 
@@ -57,7 +57,7 @@ apps/api/            FastAPI app: routers/, services/, schemas/, auth/, main.py
 apps/workers/        Celery app and tasks: preprocess.py, speech.py, analyze.py, notify.py, meter.py, relay.py
 apps/web/            React app; src/design/ holds tokens and components
 packages/core/       sabha_core: settings, repo (tenant-scoped), models, state machine, storage, logging, telemetry
-packages/asr/        sabha_asr: multi-provider ASR abstraction ported from LIS
+packages/asr/        sabha_asr: multi-provider ASR abstraction (built here; there is no earlier codebase to port)
 packages/llm/        sabha_llm: gateway, providers, redaction, prompt caching, cost accounting
 packages/analytics/  sabha_analytics: rubric loader, metrics, scoring, grounding, synthesis
 rubrics/             rubric files: <type>.<segment>.v<major>.<minor>.yaml
@@ -69,7 +69,8 @@ docs/                adr/, runbook.md, prompts/, design/, guides for raters and 
 ## Domain model
 
 Collections: `tenants, units, users, people, recordings, stage_runs, transcripts, rubrics, analyses, scores,
-disputes, usage_events, outbox, audit_log`.
+disputes, usage_events, outbox, audit_log`, plus `identities` (login links, ADR 0002), `idempotency_keys`
+(create replays, 24 h TTL), `llm_calls` (LLM usage, P5.1), `dlq` (failed pipeline jobs, P2.4), `deliveries` (emails and webhooks sent, P2.7) and `relay_state`. The full list with indexes is `sabha_core/indexes.py`.
 
 Recording status (state machine in `sabha_core/state.py`, the ONLY place transitions are defined):
 `CREATED → UPLOADED → PREPROCESSING → DIARIZING → TRANSCRIBING → ANALYZING → COMPLETED`,

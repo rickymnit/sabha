@@ -45,12 +45,22 @@ def test_zero_length_word_is_allowed() -> None:
         {"confidence": -0.1},
         {"confidence": math.nan},
         {"confidence": True},
+        {"confidence": "0.5"},
     ],
 )
 def test_word_rejects_bad_values(kwargs: dict[str, Any]) -> None:
     fields: dict[str, Any] = {"text": "x", "start_ms": 0, "end_ms": 500, "confidence": 0.5, **kwargs}
     with pytest.raises(ValueError):
         Word(**fields)
+
+
+def test_word_without_confidence_is_allowed_and_round_trips() -> None:
+    # Sarvam gives no word confidence (ADR 0006); the key stays, with null.
+    w = Word("haan", 10, 20, None)
+    assert w.confidence is None
+    assert w.to_record() == {"text": "haan", "start_ms": 10, "end_ms": 20, "confidence": None}
+    assert Word.from_record(w.to_record()) == w
+    assert w.shifted(5).confidence is None
 
 
 def test_word_record_round_trip() -> None:

@@ -30,6 +30,8 @@ Done when: p95 targets are met with zero lost jobs, or the report states exactly
 
 ## P7.6 · Security checks
 
+> **Status (2026-10-19).** Started: `docs/security/findings.md` (pip-audit clean; pnpm audit: one high and one moderate, both build-time Tailwind 3 dependencies, accepted with reasons; the three /tenant-check findings fixed). Remaining: the checks listed there under "Not run yet" (ZAP, trivy, bucket policies and IAM, webhook SSRF, ffmpeg protocol whitelist, secrets rotation).
+
 Plan task 7.6.
 
 ```text
@@ -71,6 +73,8 @@ Done when: a test alert reaches your phone and a rollback has been rehearsed.
 ---
 
 ## P7.8 · Admin operations tools
+
+> **Status (2026-10-19).** Partly built: `scripts/admin/create_tenant.py` creates a tenant and invites its first owner; dead letters are written to `dlq` with replay arguments (P2.4); stage runs carry a heartbeat. Remaining: the admin endpoints and UI, replay, abandon, pause/resume, the recording timeline and `seed_demo.py`. Decide who the cross-tenant "internal admin" is.
 
 Implied by the dead-letter queue and pilot operations.
 

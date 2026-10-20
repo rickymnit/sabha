@@ -18,10 +18,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
+from sabha_api.auth import PrincipalStore, TokenVerifier
+from sabha_api.auth.directory import Directory
 from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
 from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
-from sabha_api.routers import health
+from sabha_api.routers import health, me, recordings, users
 from sabha_core.logging import configure_logging
 from sabha_core.settings import Settings, get_settings
 from sabha_core.telemetry import package_version, setup_tracing
@@ -31,8 +33,15 @@ SERVICE_NAME = "sabha-api"
 ResourcesFactory = Callable[[Settings], AbstractAsyncContextManager[Resources]]
 
 
-def create_app(settings: Settings | None = None, *, resources: ResourcesFactory = open_resources) -> FastAPI:
-    """Build the app. Tests pass their own `settings` and, to avoid real services, a `resources` factory."""
+def create_app(
+    settings: Settings | None = None,
+    *,
+    resources: ResourcesFactory = open_resources,
+    token_verifier: TokenVerifier | None = None,
+    principals: PrincipalStore | None = None,
+) -> FastAPI:
+    """Build the app. Tests pass their own `settings` and, to avoid real services, a `resources` factory, a
+    `token_verifier` with a fake key fetcher and an in-memory `principals` store (sabha_api.auth)."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
     tracer_provider = setup_tracing(SERVICE_NAME, settings)
@@ -41,6 +50,8 @@ def create_app(settings: Settings | None = None, *, resources: ResourcesFactory 
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with resources(settings) as opened:
             app.state.resources = opened
+            if app.state.principals is None and opened.db is not None:
+                app.state.directory = app.state.principals = Directory(opened.db, app.state.token_verifier)
             try:
                 yield
             finally:
@@ -58,8 +69,15 @@ def create_app(settings: Settings | None = None, *, resources: ResourcesFactory 
         responses=PROBLEM_RESPONSES,
     )
     app.state.settings = settings
+    app.state.token_verifier = token_verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_audience)
+    # The MongoDB-backed directory is created with the resources (lifespan); tests may pass their own store.
+    app.state.principals = principals
+    app.state.directory = None
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(me.router)
+    app.include_router(users.router)
+    app.include_router(recordings.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:
@@ -77,7 +95,7 @@ def create_app(settings: Settings | None = None, *, resources: ResourcesFactory 
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", REQUEST_ID_HEADER],
-        expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
+        expose_headers=[REQUEST_ID_HEADER, "Retry-After", "WWW-Authenticate"],
         max_age=600,
     )
     app.add_middleware(RequestContextMiddleware, hsts=settings.app_env in ("staging", "production"))

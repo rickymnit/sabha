@@ -18,6 +18,10 @@
       "type": "string",
       "pattern": "\\S"
     },
+    "word_timing": {
+      "description": "How word times were obtained: \"word\" when the ASR timed each word, \"approximate\" when it timed only phrases and words were spread across them (ADR 0006). Absent means \"word\".",
+      "enum": ["word", "approximate"]
+    },
     "word_count": {
       "description": "Number of ASR words in the transcript.",
       "type": "integer",
@@ -69,8 +73,8 @@
           "pattern": "\\S"
         },
         "avg_confidence": {
-          "description": "Mean ASR word confidence, rounded to 4 decimals.",
-          "type": "number",
+          "description": "Mean confidence of the words that have one, rounded to 4 decimals; null when the ASR gives no word confidence (ADR 0006).",
+          "type": ["number", "null"],
           "minimum": 0,
           "maximum": 1
         },

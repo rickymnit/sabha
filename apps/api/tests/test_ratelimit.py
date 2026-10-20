@@ -3,34 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from redis.asyncio import Redis
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
 from sabha_api.ratelimit import Bucket, Decision, RateLimitedError, RateLimiter
-
-REDIS_IMAGE = "redis:7.4.11-alpine"  # keep in step with infra/docker-compose.dev.yml
 
 
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"  # async tests run on anyio's pytest plugin (installed with Starlette)
-
-
-@pytest.fixture(scope="module")
-def redis_url() -> Iterator[str]:
-    container = (
-        DockerContainer(REDIS_IMAGE)
-        .with_exposed_ports(6379)
-        .waiting_for(LogMessageWaitStrategy("Ready to accept connections"))
-    )
-    with container:
-        yield f"redis://{container.get_container_host_ip()}:{container.get_exposed_port(6379)}/0"
 
 
 @pytest.fixture
@@ -56,9 +41,22 @@ def test_bucket_arithmetic() -> None:
     assert bucket.refill_per_ms == pytest.approx(0.001)
     assert bucket.floor == -30
     with pytest.raises(ValueError):
-        Bucket("user", "u", per_minute=0)
+        Bucket("user", "u", per_minute=0, tenant_id="t1")
     with pytest.raises(ValueError):
-        Bucket("user", "u", per_minute=10, burst_factor=0.5)
+        Bucket("user", "u", per_minute=10, burst_factor=0.5, tenant_id="t1")
+
+
+def test_user_buckets_are_keyed_by_tenant() -> None:
+    # /tenant-check finding 1: equal user ids in two tenants must never share a budget.
+    a = Bucket("user", "u1", per_minute=10, tenant_id="tenant-a")
+    b = Bucket("user", "u1", per_minute=10, tenant_id="tenant-b")
+    assert a.key == "rl:user:tenant-a:u1" and b.key == "rl:user:tenant-b:u1"
+    with pytest.raises(ValueError, match="tenant_id"):
+        Bucket("user", "u1", per_minute=10)
+    with pytest.raises(ValueError, match="tenant_id"):
+        Bucket("tenant", "tenant-a", per_minute=10, tenant_id="tenant-b")
+    with pytest.raises(ValueError, match="scope"):
+        Bucket("global", "x", per_minute=10)
 
 
 def test_headers() -> None:
@@ -95,7 +93,7 @@ async def test_a_refused_request_takes_no_tokens(limiter: RateLimiter) -> None:
 @pytest.mark.integration
 @pytest.mark.anyio
 async def test_tokens_refill_over_time(limiter: RateLimiter) -> None:
-    bucket = [Bucket("user", "u1", per_minute=60, burst_factor=1.0)]  # one token a second
+    bucket = [Bucket("user", "u1", per_minute=60, burst_factor=1.0, tenant_id="t1")]  # one token a second
     await hits(limiter, bucket, 60)
     [refused] = await hits(limiter, bucket, 1)
     assert not refused.allowed
@@ -109,14 +107,22 @@ async def test_tokens_refill_over_time(limiter: RateLimiter) -> None:
 @pytest.mark.anyio
 async def test_the_tighter_bucket_decides_and_neither_is_charged_on_refusal(limiter: RateLimiter) -> None:
     tenant = Bucket("tenant", "t3", per_minute=100, burst_factor=1.0)
-    user = Bucket("user", "u3", per_minute=3, burst_factor=1.0)
+    user = Bucket("user", "u3", per_minute=3, burst_factor=1.0, tenant_id="t3")
     decisions = await hits(limiter, [tenant, user], 4)
     assert [d.allowed for d in decisions] == [True, True, True, False]
     assert decisions[0].limit == 3  # headers describe the user's bucket, the tighter one
     # The tenant bucket paid for the three allowed requests only: another user of the tenant still has 97.
-    [other] = await hits(limiter, [tenant, Bucket("user", "u4", per_minute=1000, burst_factor=1.0)], 1)
+    [other] = await hits(limiter, [tenant, Bucket("user", "u4", per_minute=1000, burst_factor=1.0, tenant_id="t3")], 1)
     assert other.limit == 100
     assert other.remaining == 96
+
+
+@pytest.mark.integration
+@pytest.mark.anyio
+async def test_the_same_user_id_in_another_tenant_has_its_own_budget(limiter: RateLimiter) -> None:
+    await hits(limiter, [Bucket("user", "same", per_minute=2, burst_factor=1.0, tenant_id="ta")], 3)
+    [other] = await hits(limiter, [Bucket("user", "same", per_minute=2, burst_factor=1.0, tenant_id="tb")], 1)
+    assert other.allowed and other.remaining == 1
 
 
 @pytest.mark.integration

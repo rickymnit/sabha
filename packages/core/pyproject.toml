@@ -8,6 +8,7 @@ dependencies = [
   "opentelemetry-sdk>=1.45,<1.45.1",
   "pydantic>=2.11",
   "pydantic-settings>=2.10",
+  "pymongo>=4.9",
 ]
 
 [build-system]

@@ -77,10 +77,36 @@ class Settings(BaseSettings):
     s3_access_key_id: SecretStr | None = None
     s3_secret_access_key: SecretStr | None = None
 
+    # Browser uploads (P2.1): direct to the audio bucket with presigned multipart URLs (golden rule 2). S3 needs
+    # parts of at least 5 MiB (except the last) and at most 10 000 parts.
+    upload_max_bytes: int = Field(default=1024**3, ge=1)  # 1 GiB
+    upload_part_size_bytes: int = Field(default=16 * 1024**2, ge=5 * 1024**2)
+    upload_url_expiry_s: int = Field(default=900, ge=60, le=3600)  # each presigned part URL
+
     # Authentication (OIDC)
     oidc_issuer: str
     oidc_audience: str
     oidc_client_id: str
+
+    # Speech recognition (packages/asr, docs/adr/0006-asr-sarvam.md). The speech worker refuses to start without a
+    # provider. Fallbacks are tried in order only when listed here, and every use is logged (golden rule 7).
+    asr_provider: str | None = None
+    asr_fallbacks: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    asr_model: str | None = None  # the provider's default when unset
+    asr_language: str = "unknown"  # a BCP-47 hint such as hi-IN, or "unknown" to detect the language
+    sarvam_api_key: SecretStr | None = None
+    sarvam_base_url: str = "https://api.sarvam.ai"
+
+    # LLM gateway (packages/llm, plan task P5.1). Models are "<provider>:<model>", e.g. "openai:o3-mini". Fallbacks
+    # are per task and only used when listed: {"score_dimension": ["openai:o4-mini"]} (golden rule 7). Token
+    # budgets are per UTC day; unset means no limit (the owner sets the numbers; none are assumed here).
+    llm_model_small: str = "openai:o3-mini"
+    llm_model_mid: str = "openai:o3-mini"
+    llm_fallbacks: dict[str, list[str]] = Field(default_factory=dict)
+    llm_timeout_s: float = Field(default=120.0, gt=0)
+    llm_max_retries: int = Field(default=3, ge=0, le=10)
+    llm_tenant_daily_token_budget: int | None = Field(default=None, ge=1)
+    llm_global_daily_token_budget: int | None = Field(default=None, ge=1)
 
     # LLM providers (docs/llm-providers.md). Data-residency approval comes first (golden rule 12).
     openai_api_key: SecretStr | None = None
@@ -93,18 +119,32 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None
 
-    # Email (Amazon SES)
+    # Email (Amazon SES). Without SES_SENDER no email is sent (the notify task logs that and skips).
     ses_region: str = INDIA_REGION
     ses_sender: str | None = None
+    web_base_url: str = "http://localhost:5173"  # links in emails point here
 
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
+
+    # Celery workers (P2.4). A task not acknowledged within the visibility timeout is handed to another worker, so it
+    # must exceed the longest stage (GPU stages on long lessons); the CPU workers may use a shorter one.
+    celery_visibility_timeout_s: int = Field(default=4 * 3600, ge=1)
+    stage_max_attempts: int = Field(default=6, ge=1, le=20)  # the first try plus up to 5 retries
+    stuck_after_s: int = Field(default=30 * 60, ge=60)  # a running stage with no heartbeat this long is re-sent
 
     # Artefact versions: part of every artefact path, {tenant_id}/{recording_id}/{stage}@{version}/
     artefact_version_preprocess: str = "v1"
     artefact_version_diarize: str = "v1"
     artefact_version_transcribe: str = "v1"
     artefact_version_analyze: str = "v1"
+
+    @field_validator("asr_fallbacks", mode="before")
+    @classmethod
+    def _split_fallbacks(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -145,7 +185,14 @@ class Settings(BaseSettings):
             raise ValueError("GIT_SHA must be 7 to 40 lowercase hex characters")
         return value
 
-    @field_validator("s3_endpoint_url", "langfuse_host", "openai_base_url", "otel_exporter_otlp_endpoint")
+    @field_validator(
+        "s3_endpoint_url",
+        "langfuse_host",
+        "openai_base_url",
+        "otel_exporter_otlp_endpoint",
+        "sarvam_base_url",
+        "web_base_url",
+    )
     @classmethod
     def _check_http_url(cls, value: str | None) -> str | None:
         return None if value is None else _check_url(value, ("http", "https"), "value")
@@ -191,6 +238,16 @@ class Settings(BaseSettings):
                 raise ValueError(f"OIDC_ISSUER must use https in {self.app_env}")
             if self.openai_base_url is not None and not self.openai_base_url.startswith("https://"):
                 raise ValueError(f"OPENAI_BASE_URL must use https in {self.app_env}")
+            if not self.sarvam_base_url.startswith("https://"):
+                raise ValueError(f"SARVAM_BASE_URL must use https in {self.app_env}")
+            if "fake" in (self.asr_provider, *self.asr_fallbacks):
+                raise ValueError(f"the fake ASR provider is for tests and local development, not {self.app_env}")
+        if self.asr_provider is not None and self.asr_provider in self.asr_fallbacks:
+            raise ValueError("ASR_FALLBACKS must not repeat ASR_PROVIDER")
+        if len(set(self.asr_fallbacks)) != len(self.asr_fallbacks):
+            raise ValueError("ASR_FALLBACKS lists a provider twice")
+        if "sarvam" in (self.asr_provider, *self.asr_fallbacks) and self.sarvam_api_key is None:
+            raise ValueError("SARVAM_API_KEY is required when Sarvam is the ASR provider or a fallback")
         return self
 
 

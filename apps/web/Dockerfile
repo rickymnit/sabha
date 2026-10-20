@@ -1,7 +1,8 @@
 # Web image (plan task P1.2): build the static app, then serve it with nginx and security headers.
 # Build from the repo root:
 #   docker build -f apps/web/Dockerfile -t sabha-web .
-# Run: CSP_CONNECT_SRC lists the origins the browser may call (API, and the S3 bucket for direct uploads).
+# Run: CSP_CONNECT_SRC lists the origins the browser may call (API, the identity provider for sign-in and token
+# renewal, and the S3 bucket for direct uploads).
 
 FROM node:22.23.0-alpine AS build
 RUN corepack enable
@@ -9,6 +10,8 @@ WORKDIR /web
 COPY apps/web/package.json apps/web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY apps/web ./
+# Sign-in settings are baked into the bundle (apps/web/.env.example); pass them with --build-arg. Not secrets.
+ARG VITE_OIDC_AUTHORITY VITE_OIDC_CLIENT_ID VITE_OIDC_AUDIENCE
 RUN pnpm build
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine
