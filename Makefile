@@ -11,7 +11,7 @@ PY_APPS := apps/api apps/workers scripts
 MYPY := $(UV) run mypy --config-file $(CURDIR)/pyproject.toml
 
 .DEFAULT_GOAL := help
-.PHONY: workers beat relay help env setup dev api down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
+.PHONY: workers beat relay help env setup models dev api down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
 
 help: ## List the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -23,10 +23,14 @@ env: ## Create .env from .env.example with random local RustFS credentials (neve
 		        s|^S3_SECRET_ACCESS_KEY=$$|S3_SECRET_ACCESS_KEY=$$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')|" .env && \
 		chmod 600 .env && echo "created .env (fill in OIDC_* when P1.5 lands)"; fi
 
-setup: env ## Install Python and web dependencies and the git hooks
+setup: env ## Install Python and web dependencies, the git hooks and the VAD model
 	$(UV) sync
 	$(PNPM) -C apps/web install
 	$(UV) run pre-commit install
+	$(MAKE) models
+
+models: ## Fetch the pinned Silero VAD model into ~/.cache/sabha/models (checksum verified; P3.3)
+	$(UV) run python -m sabha_workers.stages.vad fetch
 
 dev: env ## Start Mongo (replica set), Redis and RustFS, then create the buckets
 	$(COMPOSE) up -d --wait

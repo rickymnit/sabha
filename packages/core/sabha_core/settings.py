@@ -17,6 +17,8 @@ from urllib.parse import parse_qs, urlsplit
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from sabha_core.timemap import DEFAULT_END_PAD_MS, DEFAULT_MERGE_GAP_MS
+
 INDIA_REGION = "ap-south-1"
 """The only AWS region allowed in staging and production (golden rule 12)."""
 
@@ -126,6 +128,16 @@ class Settings(BaseSettings):
 
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
+
+    # Voice activity detection (P3.3, preprocess step 2). Unmeasured starting values: tune them on the gold set.
+    vad_model_path: str | None = None  # None: ~/.cache/sabha/models (`make models`); the worker image sets its own
+    vad_threshold: float = Field(default=0.5, gt=0, lt=1)  # a 32 ms window at or above this is speech
+    vad_min_speech_ms: int = Field(default=250, ge=0)  # shorter speech regions are dropped
+    vad_min_silence_ms: int = Field(default=100, ge=0)  # speech ends after this much silence
+    vad_end_pad_ms: int = Field(
+        default=DEFAULT_END_PAD_MS, ge=0
+    )  # added to each region's end: Silero tends to clip word ends
+    vad_merge_gap_ms: int = Field(default=DEFAULT_MERGE_GAP_MS, ge=0)  # regions closer than this become one segment
 
     # Celery workers (P2.4). A task not acknowledged within the visibility timeout is handed to another worker, so it
     # must exceed the longest stage (GPU stages on long lessons); the CPU workers may use a shorter one.

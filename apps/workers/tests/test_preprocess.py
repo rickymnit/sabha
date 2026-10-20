@@ -24,6 +24,7 @@ from sabha_core.models import AudioInfo, Recording
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import SyncTenantRepo
 from sabha_core.state import RecordingStatus
+from sabha_core.timemap import SegmentMap
 from sabha_workers.stages.preprocess import (
     INVALID_AUDIO,
     MAX_DURATION_MS,
@@ -41,6 +42,7 @@ from sabha_workers.stages.preprocess import (
     wav_duration_ms,
 )
 from sabha_workers.stages.runner import DONE_MARKER, PermanentError, S3Artefacts, StageRunner, StageSpec
+from sabha_workers.stages.vad import SileroVad
 
 S = RecordingStatus
 PREPROCESS = StageSpec("preprocess", working=S.PREPROCESSING, done_to=S.DIARIZING, entry_from=S.UPLOADED)
@@ -210,7 +212,7 @@ def db(mongo_replica_set: MongoClient[dict[str, Any]], shared_db: str) -> Databa
 
 
 class Stage:
-    def __init__(self, db: Database[dict[str, Any]], s3_storage: Any) -> None:
+    def __init__(self, db: Database[dict[str, Any]], s3_storage: Any, vad: SileroVad, tmp: Path) -> None:
         self.db = db
         self.s3 = s3_storage.client()
         self.artefacts = S3Artefacts(self.s3, "sabha-artefacts")
@@ -220,8 +222,9 @@ class Stage:
             recordings.update_one({"_id": recording_id},
                                   {"$set": {"duration_ms": duration_ms, "audio": audio.model_dump()}})  # fmt: skip
 
-        self.work = make_work(S3Originals(self.s3, "sabha-audio"), record_audio)
+        self.work = make_work(S3Originals(self.s3, "sabha-audio"), record_audio, lambda: vad)
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"preprocess": "v1"}, worker="test")
+        self.tmp = tmp
 
     def upload(self, path: Path | None) -> str:
         recording = Recording(type=ConversationType.TEACHING, status=S.UPLOADED, consent_ref="c")
@@ -235,6 +238,11 @@ class Stage:
     def run(self, rid: str) -> str:
         return self.runner.run(PREPROCESS, self.work, "t1", rid, attempt=1).result
 
+    def artefacts_path(self, key: str) -> Path:
+        path = self.tmp / key.replace("/", "_")
+        self.s3.download_file("sabha-artefacts", key, str(path))
+        return path
+
     def recording(self, rid: str) -> dict[str, Any]:
         doc = self.db.recordings.find_one({"_id": rid})
         assert doc is not None
@@ -242,28 +250,53 @@ class Stage:
 
 
 @pytest.fixture
-def stage(db: Database[dict[str, Any]], s3_storage: Any) -> Stage:
-    return Stage(db, s3_storage)
+def stage(db: Database[dict[str, Any]], s3_storage: Any, vad: SileroVad, tmp_path: Path) -> Stage:
+    return Stage(db, s3_storage, vad, tmp_path)
 
 
 @pytest.mark.integration
-def test_the_stage_writes_both_files_and_records_the_length(stage: Stage, media: dict[str, Path]) -> None:
-    rid = stage.upload(media["cover.mp3"])
+def test_the_stage_writes_its_files_maps_the_speech_and_moves_on(stage: Stage, spoken_lesson: Any) -> None:
+    rid = stage.upload(spoken_lesson.mp3)
     assert stage.run(rid) == "done"
 
     recording = stage.recording(rid)
     assert recording["status"] == "DIARIZING"
-    assert abs(recording["duration_ms"] - TONE_S * 1000) < 100
-    assert recording["audio"] == {"codec": "mp3", "sample_rate": 44_100, "channels": 2}
+    assert abs(recording["duration_ms"] - spoken_lesson.total_ms) < 100
+    assert recording["audio"] == {"codec": "mp3", "sample_rate": 16_000, "channels": 1}
     prefix = f"t1/{rid}/preprocess@v1/"
-    for name in ("normalised.wav", "playback.opus", "audio.json", DONE_MARKER):
+    names = ("normalised.wav", "playback.opus", "audio.json", "compact.wav", "segments@v1.json", DONE_MARKER)
+    for name in names:
         assert stage.artefacts.exists(prefix + name), name
-    summary = json.loads(stage.s3.get_object(Bucket="sabha-artefacts", Key=prefix + "audio.json")["Body"].read())
-    assert summary["original"]["other_streams"] == ["video"] and summary["normalised"]["sample_rate"] == 16_000
+
+    def read(name: str) -> bytes:
+        body: bytes = stage.s3.get_object(Bucket="sabha-artefacts", Key=prefix + name)["Body"].read()
+        return body
+
+    segment_map = SegmentMap.from_json(read("segments@v1.json"))
+    assert len(segment_map.segments) == 2  # the two sentences; the silences are cut out but indexed
+    summary = json.loads(read("audio.json"))
+    assert summary["speech"]["speech_ms"] == segment_map.compact_length_ms
+    assert summary["speech"]["vad"]["model"].startswith("silero_vad@")
+    compact = stage.artefacts_path(prefix + "compact.wav")
+    with wave.open(str(compact), "rb") as wav:
+        assert wav.getnframes() == segment_map.compact_length_ms * 16
     original = stage.s3.get_object(Bucket="sabha-audio", Key=recording["storage_key"])["Body"].read()
-    assert original == media["cover.mp3"].read_bytes()  # never modified
+    assert original == spoken_lesson.mp3.read_bytes()  # never modified
     (run,) = stage.db.stage_runs.find({"recording_id": rid})
-    assert run["meta"]["codec"] == "mp3"
+    assert run["meta"]["speech_ms"] == segment_map.compact_length_ms
+
+
+@pytest.mark.integration
+def test_a_recording_without_speech_asks_for_review(stage: Stage, media: dict[str, Path]) -> None:
+    rid = stage.upload(media["cover.mp3"])  # a 35 s tone: valid audio, no speech
+    assert stage.run(rid) == "needs_review"
+    recording = stage.recording(rid)
+    assert (recording["status"], recording["status_reason"]) == ("NEEDS_REVIEW", "no_speech")
+    assert recording["duration_ms"] > 0  # recorded before the review was asked for
+    prefix = f"t1/{rid}/preprocess@v1/"
+    assert stage.artefacts.exists(prefix + "playback.opus")  # so a reviewer can listen
+    assert not stage.artefacts.exists(prefix + "compact.wav") and not stage.artefacts.exists(prefix + DONE_MARKER)
+    assert stage.db.dlq.count_documents({"recording_id": rid}) == 0  # a person decides; nothing to replay
 
 
 @pytest.mark.integration

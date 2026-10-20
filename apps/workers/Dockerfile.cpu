@@ -17,6 +17,8 @@ RUN uv sync --frozen --no-dev --package sabha-workers --no-install-workspace
 COPY packages packages
 COPY apps/workers apps/workers
 RUN uv sync --frozen --no-dev --package sabha-workers --no-editable
+# The pinned Silero VAD model (P3.3), checksum verified; never downloaded while processing a recording.
+RUN /app/.venv/bin/python -m sabha_workers.stages.vad fetch /app/models/silero_vad.onnx
 
 FROM python:3.12.15-slim-bookworm
 # ffmpeg/ffprobe for audio validation and normalisation (P3.2).
@@ -25,7 +27,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
-ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+COPY --from=build --chown=sabha:sabha /app/models /app/models
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 VAD_MODEL_PATH=/app/models/silero_vad.onnx
+# onnxruntime's built-in Microsoft telemetry stays off (golden rule 12; sabha_workers/stages/vad.py).
+ENV ORT_DISABLE_TELEMETRY=1
 USER sabha
 # Compose sets the queues per service, e.g. `celery -A sabha_workers.worker worker -Q cpu.preprocess,io.notify`;
 # the relay runs as `python -m sabha_workers.relay` and beat as `celery -A sabha_workers.worker beat`.

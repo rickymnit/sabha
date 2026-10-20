@@ -66,7 +66,7 @@ Done when: opening a recording's audio writes an audit entry visible to an admin
 
 ## P3.2 · Validate and normalise audio
 
-> **Status (2026-10-20).** Built: `apps/workers/sabha_workers/stages/preprocess.py`. It writes `normalised.wav`, `playback.opus` and `audio.json`, and records `duration_ms` and `audio` on the recording. Checked on a real 21-minute lecture (mp3 with cover art). Note for P3.3: VAD is step 2 of this same stage. A recording preprocessed before P3.3 already has `preprocess@v1/_DONE`, so bump `ARTEFACT_VERSION_PREPROCESS` to v2 when adding VAD.
+> **Status (2026-10-20).** Built: `apps/workers/sabha_workers/stages/preprocess.py`. It writes `normalised.wav`, `playback.opus` and `audio.json`, and records `duration_ms` and `audio` on the recording. Checked on a real 21-minute lecture (mp3 with cover art).
 
 Plan task 3.2.
 
@@ -88,7 +88,7 @@ Done when: any supported fixture produces `normalised.wav` and `playback.opus`.
 
 ## P3.3 · Voice activity detection and segment map
 
-> **Status (2026-10-17).** Already built: `sabha_core/timemap.py` (segment map, compact/original mapping, stats) with its tests. Remaining: the Silero VAD step that writes `segments@v1.json` and `compact.wav`, and the PREPROCESSING → DIARIZING transition. The 300 ms end padding is an unmeasured default (there is no LIS); tune it on the gold set.
+> **Status (2026-10-20).** Built: `apps/workers/sabha_workers/stages/vad.py` (Silero VAD v6.2.3 through onnxruntime, model pinned by SHA-256 and fetched by `make models`, telemetry forced off: docs/security/findings.md #7). It is step 2 of the preprocess stage and writes `compact.wav` and `segments@v1.json`; a recording with no speech goes to NEEDS_REVIEW (`no_speech`). Every time mapped exactly in both directions on 2 real dev files (a 21-minute lecture and an 18-minute interview). Remaining: 3 more real files for the "done when", and tuning the `VAD_*` settings (unmeasured defaults) on the gold set.
 
 Plan task 3.3. **Tests first** for the time mapping.
 

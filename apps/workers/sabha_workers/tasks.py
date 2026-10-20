@@ -15,6 +15,7 @@ import socket
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cache
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -33,6 +34,7 @@ from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
 from sabha_workers.stages import preprocess
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
+from sabha_workers.stages.vad import DEFAULT_MODEL_PATH, SileroVad
 from sabha_workers.upload_cleanup import abort_stale_uploads
 
 log = logging.getLogger("sabha.workers.tasks")
@@ -109,7 +111,17 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
             {"_id": recording_id}, {"$set": {"duration_ms": duration_ms, "audio": audio.model_dump()}}
         )
 
-    built = {"preprocess": preprocess.make_work(preprocess.S3Originals(s3, settings.s3_bucket_audio), record_audio)}
+    @cache
+    def vad() -> SileroVad:  # loaded on the first preprocess task only, then reused
+        return SileroVad(Path(settings.vad_model_path) if settings.vad_model_path else DEFAULT_MODEL_PATH)
+
+    params = preprocess.VadParams(
+        threshold=settings.vad_threshold, min_speech_ms=settings.vad_min_speech_ms,
+        min_silence_ms=settings.vad_min_silence_ms, end_pad_ms=settings.vad_end_pad_ms,
+        merge_gap_ms=settings.vad_merge_gap_ms,
+    )  # fmt: skip
+    originals = preprocess.S3Originals(s3, settings.s3_bucket_audio)
+    built = {"preprocess": preprocess.make_work(originals, record_audio, vad, params)}
     return {name: built.get(name) or not_built(name) for name in SPECS}
 
 
