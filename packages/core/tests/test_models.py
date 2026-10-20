@@ -5,7 +5,18 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from sabha_core.models import IdentityLink, OutboxEvent, Person, Role, Tenant, TenantDoc, Unit, User
+from sabha_core.models import (
+    AudioInfo,
+    IdentityLink,
+    OutboxEvent,
+    Person,
+    Recording,
+    Role,
+    Tenant,
+    TenantDoc,
+    Unit,
+    User,
+)
 from sabha_core.profiles import ConversationType, ProfileName, get_profile
 from sabha_core.quota import Plan
 
@@ -116,3 +127,15 @@ def test_outbox_event_starts_unpublished() -> None:
     event = OutboxEvent(type="recording.completed", payload={"recording_id": "r1"})
     assert event.published_at is None
     assert event.created_at.tzinfo is not None  # UTC, CLAUDE.md API conventions
+
+
+def test_preprocess_fields_are_optional_and_checked() -> None:
+    recording = Recording(type=ConversationType.TEACHING, tenant_id="t1")
+    assert recording.duration_ms is None and recording.audio is None
+    done = recording.model_copy(update={"duration_ms": 1_252_693})
+    assert done.duration_ms == 1_252_693
+    assert AudioInfo(codec="mp3", sample_rate=44_100, channels=2).channels == 2
+    with pytest.raises(ValidationError):
+        AudioInfo(codec="mp3", sample_rate=0, channels=2)
+    with pytest.raises(ValidationError):
+        Recording(type=ConversationType.TEACHING, tenant_id="t1", duration_ms=-1)

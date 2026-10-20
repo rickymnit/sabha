@@ -66,7 +66,7 @@ Done when: opening a recording's audio writes an audit entry visible to an admin
 
 ## P3.2 · Validate and normalise audio
 
-> **Status (2026-10-19).** Not built. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError). Also record the duration on the recording: P7.2's priority lanes and P8.6's billing need it. Use `-protocol_whitelist file` with ffmpeg (P7.6).
+> **Status (2026-10-20).** Built: `apps/workers/sabha_workers/stages/preprocess.py`. It writes `normalised.wav`, `playback.opus` and `audio.json`, and records `duration_ms` and `audio` on the recording. Checked on a real 21-minute lecture (mp3 with cover art). Note for P3.3: VAD is step 2 of this same stage. A recording preprocessed before P3.3 already has `preprocess@v1/_DONE`, so bump `ARTEFACT_VERSION_PREPROCESS` to v2 when adding VAD.
 
 Plan task 3.2.
 
