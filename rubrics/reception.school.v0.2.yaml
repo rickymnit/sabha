@@ -1,0 +1,139 @@
+# Reception rubric v0.2: reviewed by the academic head and approved without changes (2026-10-20), as the
+# front-desk checklist "Reception Rubric v0.1, draft for review". This is the version used for the pilot.
+#
+# Changes from v0.1 (reception.school.v0.1.yaml stays as the record of the first draft):
+# - escalation_handling gets `not_applicable_when`: calls with nothing to escalate are marked not applicable,
+#   left out of the call's overall score, and the other weights are rescaled (owner's decision, 2026-10-20).
+# - The draft markers are removed; content, weights, anchors, examples and output values are unchanged.
+#
+# Rules:
+# - Anchors describe only what the receptionist says or does that a rater can point to in the
+#   transcript or audio. No guesses about intentions or feelings.
+# - Callers are never scored. Caller talk appears only as evidence of what the receptionist did.
+# - Example utterances are illustrative Hinglish. All names, amounts, places and times in them
+#   are fictional. "[school name]" stands in for the school's own name.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: reception.school.v0.2
+segment: school
+version: "0.2"
+roles: [receptionist, caller]  # receptionist is the person analysed; caller is context only
+
+dimensions:
+  - key: intent_captured
+    name: Intent captured
+    weight: 0.20
+    definition: "The receptionist finds out and confirms the caller's reason for calling before giving information or taking action."
+    min_quotes: 1
+    anchors:
+      1: "The receptionist does not ask why the person is calling and answers a different question from the one the caller asked."
+      2: "The receptionist responds to the first thing the caller says without asking any follow-up question about the request."
+      3: "The receptionist asks at least one follow-up question about the request (for example the child's class or which fee) but does not repeat the request back to the caller."
+      4: "The receptionist asks follow-up questions to get the needed details and repeats the main request back to the caller before answering."
+      5: "The receptionist asks follow-up questions for all needed details, repeats the full request back in their own words, and asks whether the caller has any other request before closing."
+    examples:
+      1: "Haan ji, admission ke liye hi call kiya hoga, form office se le jaiye."
+      5: "Toh aap jaanna chahte hain ki Class 3 ke liye bus Sector 12 se jaati hai ya nahi, aur uski monthly fee kitni hai. Sahi samjha maine? Aur koi cheez?"
+
+  # Raters may not know the school's facts (fees, timings, dates, routes). Before rating, the
+  # school needs to supply a fact sheet for raters. Until then, these anchors are judged only on
+  # what is heard in the call: specific vs vague, consistent vs contradictory, and confirming
+  # vs guessing.
+  - key: information_accuracy
+    name: Information accuracy
+    weight: 0.25
+    definition: "The receptionist gives specific, consistent information and says so when a detail needs to be confirmed rather than guessing."
+    min_quotes: 2
+    anchors:
+      1: "The receptionist gives information that contradicts itself within the call (for example two different fee amounts) or guesses with words like 'shayad' or 'lagta hai' without offering to confirm."
+      2: "The receptionist gives some specific details but leaves key details vague ('thoda zyada hai', 'aas paas') and does not offer to confirm them."
+      3: "The receptionist gives specific details for the main request but is vague on at least one follow-up detail and does not say whether it will be confirmed."
+      4: "The receptionist gives specific details (amounts, dates, timings, document names) that stay consistent through the call, and says they will confirm any detail they cannot give on the spot."
+      5: "The receptionist gives specific, consistent details, names the source (fee chart, circular or website page) where relevant, offers to confirm any open detail with a named role and a time, and repeats the key figures back at the end."
+    examples:
+      1: "Fees? Shayad 40-45 hazaar hogi... ya 50, pakka nahi pata, aap aa ke dekh lo."
+      5: "Class 5 ki tuition fee 38,000 rupaye per year hai, do instalments mein, yeh current fee chart se bata rahi hoon. Transport fee route pe depend karti hai, woh main accounts se confirm karke aaj shaam 5 baje tak call karti hoon."
+
+  - key: courtesy
+    name: Courtesy
+    weight: 0.15
+    definition: "The receptionist uses polite, respectful language from greeting to close and lets the caller finish speaking."
+    min_quotes: 2
+    anchors:
+      1: "The receptionist uses dismissive or rude language (for example 'pata nahi' and hanging up), interrupts repeatedly, or skips both greeting and closing."
+      2: "The receptionist greets the caller but gives curt replies, interrupts the caller more than once, or ends the call without a closing."
+      3: "The receptionist greets and closes politely but gives curt replies or interrupts the caller at least once during the call."
+      4: "The receptionist greets with the school name, uses polite forms ('ji', 'aap', 'please') throughout, lets the caller finish speaking, and closes politely."
+      5: "The receptionist greets with the school name and their own name, uses polite forms throughout, lets the caller finish speaking, acknowledges any concern or complaint in words before answering, and thanks the caller at the close."
+    examples:
+      1: "Haan bolo. ... Arre yeh sab office time mein aake poochho, abhi busy hoon."
+      5: "Good morning, [school name], main Neha bol rahi hoon. Bataiye ji, main aapki kya help kar sakti hoon?"
+
+  - key: resolution
+    name: Resolution
+    weight: 0.25
+    definition: "The receptionist ends the call with the caller's request answered or with a specific next step that says who will act and by when."
+    min_quotes: 1
+    anchors:
+      1: "The call ends with the caller's request neither answered nor given any next step."
+      2: "The receptionist gives a vague next step such as 'dekhte hain' or 'baad mein call karna' with no person, action or time named."
+      3: "The receptionist answers the request or gives a next step, but leaves out who will act or by when."
+      4: "The receptionist answers the request or gives a next step that names who will act and by when."
+      5: "The receptionist answers the request or gives a next step naming who will act and by when, summarises it back to the caller, and confirms how the caller will be contacted if a call-back is promised."
+    examples:
+      1: "Pata nahi madam, aap kabhi aake dekh lena. ... Haan theek hai, bye."
+      5: "Toh final: aapki transport request maine note kar li hai, transport incharge kal 12 baje tak aapko isi number pe call karenge. Tab tak call na aaye toh 1 baje ke baad mujhe direct call kar lijiye."
+
+  - key: escalation_handling
+    name: Escalation handling
+    weight: 0.15
+    definition: "When a request is a complaint, is urgent or is outside the receptionist's authority, the receptionist passes it to the right role or team in a way the caller can follow up on."
+    min_quotes: 1
+    not_applicable_when: "The call contains no complaint, no urgent matter and no request outside the receptionist's authority, so there is nothing to escalate."
+    anchors:
+      1: "The receptionist argues with or dismisses a complaint or out-of-scope request, or transfers or ends the call without saying where the request is going."
+      2: "The receptionist says someone else will handle it but does not name the person, role or team, or how the caller will hear back."
+      3: "The receptionist names the role or team that will handle the request but does not note the details or say when the caller will hear back."
+      4: "The receptionist names the role or team, notes the key details of the issue, and tells the caller when they will hear back."
+      5: "The receptionist acknowledges the issue in words, names the role or team, repeats the key details that will be passed on, tells the caller when and how they will hear back, and gives a way to follow up if they do not."
+    examples:
+      1: "Complaint hai toh principal se baat karo, mere paas kuch nahi hai. ... Nahi, number nahi de sakti."
+      5: "Bus roz late aa rahi hai, yeh sach mein pareshani ki baat hai. Main yeh complaint abhi transport incharge ko bhej rahi hoon, route number aur dates note kar li hain. Woh aaj 4 baje tak aapko call karenge, na aaye toh mujhe is reference number ke saath call kijiye."
+
+# Numbers computed in code from the transcript and audio (CLAUDE.md golden rule 5), shown next
+# to the scores and never produced by the LLM. No targets or thresholds are set.
+computed_metrics:
+  - call_duration_s           # length of the call, in seconds
+  - receptionist_talk_share   # share of speech time spoken by the receptionist
+  - caller_talk_share         # share of speech time spoken by the caller
+  - silence_share             # share of the call with no speech (includes holds)
+  - longest_silence_s         # longest stretch with no speech, such as a hold, in seconds
+  - long_silence_count        # number of long gaps or holds; the gap length is defined and documented in the metrics code, not here
+
+output:
+  - summary      # short ticket-style summary of the call
+  - strengths
+  - gaps
+  - suggestions
+  - category     # one value from output_values.category
+  - status       # one value from output_values.status
+  - follow_up    # what needs to happen next and which role owns it; empty if nothing
+
+# Allowed values, approved by the reviewer.
+output_values:
+  category:
+    - admission_enquiry
+    - fee_query
+    - transport
+    - general_information   # school timings, holidays, events, documents
+    - complaint
+    - other
+  status:
+    - resolved
+    - follow_up_needed
+    - escalated
+
+# Scores from this rubric stay hidden from users until agreement between the model and human
+# raters, measured by eval/kappa.py on real annotated recordings, reaches this value.
+# No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}

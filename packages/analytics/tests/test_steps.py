@@ -11,7 +11,7 @@ import pytest
 from sabha_analytics.classify import UNCERTAIN_TYPE, classify, needs_classification
 from sabha_analytics.grounding import PreparedTranscript, prepare_transcript
 from sabha_analytics.phases import DEFAULT_PHASES, segment_phases
-from sabha_analytics.reception import TICKET_FAILED, validate_ticket
+from sabha_analytics.reception import TICKET_FAILED, TicketValues, ticket_values, validate_ticket
 from sabha_analytics.report import analyse, load_report_schema
 from sabha_analytics.rubric import Rubric, load_rubric
 from sabha_core.state import RecordingStatus
@@ -69,8 +69,8 @@ PHASES = {
     ]
 }
 TICKET = {
-    "category": "admission",
-    "status": "pending",
+    "category": "admission_enquiry",
+    "status": "follow_up_needed",
     "follow_up": {"text": "Call the caller back with the Grade 3 fees.", "owner_role": "accounts office"},
     "summary": "Caller asked about Grade 3 admission and fees; the accounts office will call back with the fees.",
 }
@@ -217,13 +217,15 @@ def test_bad_boundaries_are_reasked_then_dropped(
     [
         ({"category": "gossip"}, "invalid_category"),
         ({"status": "resolved"}, "unexpected_follow_up"),  # resolved calls have no follow-up
-        ({"follow_up": None}, "missing_follow_up"),  # pending calls need one
+        ({"follow_up": None}, "missing_follow_up"),  # every call that is not resolved needs one
+        ({"status": "escalated", "follow_up": None}, "missing_follow_up"),
+        ({"status": "pending"}, "invalid_status"),  # the draft's word, not in the approved list
         ({"summary": "Caller [NAME_1] asked about fees."}, "placeholder_in_text"),
         ({"summary": "word " * 61}, "too_long"),
     ],
 )
-def test_ticket_rules(change: dict[str, object], code: str) -> None:
-    ticket, problems = validate_ticket({**TICKET, **change})
+def test_ticket_rules(reception_rubric: Rubric, change: dict[str, object], code: str) -> None:
+    ticket, problems = validate_ticket({**TICKET, **change}, ticket_values(reception_rubric.output_values))
     assert ticket is None and code in {p.code for p in problems}
 
 
@@ -243,7 +245,7 @@ def test_a_reception_call_yields_a_valid_ticket_style_report(
     report = result.report
     jsonschema.validate(report, load_report_schema())
     assert result.next_status is RecordingStatus.COMPLETED
-    assert report["ticket"]["category"] == "admission"
+    assert report["ticket"]["category"] == "admission_enquiry"
     assert report["ticket"]["follow_up"] == {
         "text": "Call the caller back with the Grade 3 fees.",
         "owner_role": "accounts office",
@@ -269,3 +271,46 @@ def test_a_failed_ticket_asks_for_review_but_keeps_the_scores(
     assert result.report["review_reasons"] == [TICKET_FAILED]
     assert result.report["ticket"] is None
     assert all(d["verified"] for d in result.report["dimensions"])
+
+
+def test_the_ticket_lists_come_from_the_rubric(reception_rubric: Rubric, call: PreparedTranscript,
+                                              fake_judge: Any) -> None:  # fmt: skip
+    values = ticket_values(reception_rubric.output_values)
+    assert values == TicketValues(
+        ("admission_enquiry", "fee_query", "transport", "general_information", "complaint", "other"),
+        ("resolved", "follow_up_needed", "escalated"),
+    )
+    model = fake_judge([SCORES, SYNTHESIS, TICKET])
+    analyse(rubric=reception_rubric, transcript=call, metrics=METRICS, model=model, analysed_roles={"receptionist"},
+            reception=True)  # fmt: skip
+    ticket_call = model.calls[-1]
+    assert ticket_call["json_schema"]["properties"]["status"]["enum"] == list(values.statuses)
+    assert "Allowed categories: admission_enquiry, fee_query, transport" in ticket_call["messages"][0]["content"]
+
+
+def test_the_approved_school_rubric_makes_tickets() -> None:
+    rubric, _ = load_rubric(Path(__file__).resolve().parents[3] / "rubrics" / "reception.school.v0.2.yaml")
+    assert ticket_values(rubric.output_values).statuses == ("resolved", "follow_up_needed", "escalated")
+
+
+@pytest.mark.parametrize(
+    ("output_values", "message"),
+    [
+        (None, "no output_values for category and status"),
+        ({"category": ("other",)}, "no output_values for status"),
+        ({"category": ("other",), "status": ("open", "closed")}, "must include 'resolved'"),
+    ],
+)
+def test_a_rubric_that_cannot_make_tickets_is_refused(output_values: Any, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        ticket_values(output_values)
+
+
+def test_a_reception_analysis_without_ticket_lists_fails_before_any_model_call(
+    rubric: Rubric, call: PreparedTranscript, fake_judge: Any
+) -> None:
+    model = fake_judge([])
+    with pytest.raises(ValueError, match="cannot make tickets"):
+        analyse(rubric=rubric, transcript=call, metrics=METRICS, model=model, analysed_roles={"receptionist"},
+                reception=True)  # fmt: skip
+    assert model.calls == []

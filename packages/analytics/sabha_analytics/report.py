@@ -30,7 +30,7 @@ from typing import Any
 from sabha_analytics.classify import UNCERTAIN_TYPE, Classification
 from sabha_analytics.grounding import PreparedTranscript
 from sabha_analytics.phases import PhaseOutcome, segment_phases
-from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, write_ticket
+from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, ticket_values, write_ticket
 from sabha_analytics.scoring import (
     CallRecord,
     DimensionResult,
@@ -80,6 +80,8 @@ def _dimension_record(dimension: DimensionResult) -> dict[str, Any]:
             "evidence": [],
             "failure_reasons": list(dimension.failure_reasons),
         }
+    if dimension.not_applicable:
+        record["not_applicable"] = True
     return {
         **record,
         "score": dimension.score,
@@ -210,7 +212,10 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
             if dimension["score"] is not None or dimension["rationale"] is not None or dimension["evidence"]:
                 problems.append(f"{key}: an unverified dimension carries a score, rationale or evidence")
             continue
-        if not isinstance(dimension["score"], int) or not 1 <= dimension["score"] <= 5:
+        if dimension.get("not_applicable"):
+            if dimension["score"] is not None or not dimension["rationale"] or not dimension["evidence"]:
+                problems.append(f"{key}: a not-applicable dimension needs no score, a rationale and evidence")
+        elif not isinstance(dimension["score"], int) or not 1 <= dimension["score"] <= 5:
             problems.append(f"{key}: verified dimension without a score from 1 to 5")
         for item in dimension["evidence"]:
             utterance = transcript.get(item["utterance_id"])
@@ -257,7 +262,8 @@ def analyse(
 
     `classification`: the result of classify.classify when the type had to be inferred. If it asks for review
     ("uncertain_type"), nothing is scored, because the rubric itself is in doubt. `phase_names`: split the
-    conversation into these phases for the timeline. `reception`: also write the call's ticket.
+    conversation into these phases for the timeline. `reception`: also write the call's ticket, with the categories
+    and statuses of the rubric's `output_values` (ValueError before any model call if the rubric has none).
     """
     if classification is not None and classification.needs_review_reason == UNCERTAIN_TYPE:
         empty = compute_overall(())
@@ -272,6 +278,7 @@ def analyse(
             prompt_hashes={p.name: p.to_record() for p in classification.prompts},
             classification=classification,
         )
+    values = ticket_values(rubric.output_values) if reception else None
     scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model)
     overall = compute_overall(scoring.dimensions)
     synthesis = None
@@ -286,7 +293,7 @@ def analyse(
             analysed_roles=analysed_roles,
         )
     phases = segment_phases(transcript, model=model, phase_names=phase_names) if phase_names else None
-    ticket = write_ticket(transcript, model=model) if reception else None
+    ticket = write_ticket(transcript, values=values, model=model) if values is not None else None
     steps = [step for step in (classification, synthesis, phases, ticket) if step is not None]
     prompts = (*scoring.prompts, *(p for step in steps for p in step.prompts))
     return build_report(

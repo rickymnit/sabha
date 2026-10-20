@@ -39,4 +39,8 @@ computed_metrics: [receptionist_talk_share, caller_talk_share, hold_gap_count]
 
 output: [summary, strengths, gaps, suggestions, category, status, follow_up]
 
+output_values:  # the lists approved in reception.school.v0.2
+  category: [admission_enquiry, fee_query, transport, general_information, complaint, other]
+  status: [resolved, follow_up_needed, escalated]
+
 visibility_gate: {metric: cohens_kappa, min: 0.60}

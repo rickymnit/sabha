@@ -175,3 +175,48 @@ def test_quote_counts_cover_both_attempts(rubric: Rubric, lesson: PreparedTransc
         "recap_and_closure"
     ]
     assert (recap.quotes_offered, recap.quotes_verified) == (1, 1)
+
+
+# --- Not applicable (rubric `not_applicable_when`) ---
+
+
+def test_a_null_score_is_not_applicable_where_the_rubric_allows_it(
+    optional_recap_rubric: Rubric, lesson: PreparedTranscript, fake_judge: Any, answers: Any
+) -> None:
+    model = fake_judge([{"dimensions": [answers.good_concept, answers.recap_not_applicable]}])
+    recap = by_key(run(optional_recap_rubric, lesson, model))["recap_and_closure"]
+
+    assert recap.verified and recap.not_applicable and recap.score is None
+    assert recap.rationale and [e.utterance_id for e in recap.evidence] == ["u0000"]
+    score = model.calls[0]["json_schema"]["properties"]["dimensions"]["items"]["properties"]["score"]
+    assert score["type"] == ["integer", "null"]
+    assert (
+        "Not applicable when: The lesson ends early"
+        in model.calls[0]["system"] + model.calls[0]["messages"][0]["content"]
+    )
+
+
+def test_a_null_score_on_a_dimension_that_always_applies_is_reasked(
+    rubric: Rubric, lesson: PreparedTranscript, fake_judge: Any, answers: Any
+) -> None:
+    model = fake_judge(
+        [{"dimensions": [answers.good_concept, answers.recap_not_applicable]},
+         {"dimensions": [answers.recap_not_applicable]}]
+    )  # fmt: skip
+    recap = by_key(run(rubric, lesson, model))["recap_and_closure"]
+
+    assert len(model.calls) == 2
+    assert "always applies" in model.calls[1]["messages"][0]["content"]
+    assert not recap.verified and not recap.not_applicable and "invalid_score" in recap.failure_reasons
+
+
+def test_not_applicable_still_needs_a_verified_quote(
+    optional_recap_rubric: Rubric, lesson: PreparedTranscript, fake_judge: Any, answers: Any
+) -> None:
+    unquoted = {**answers.recap_not_applicable, "evidence": []}
+    faked = {**unquoted, "evidence": [{"quote": answers.fake_quote, "utterance_id": "u0000", "start_ms": 0}]}
+    model = fake_judge([{"dimensions": [answers.good_concept, unquoted]}, {"dimensions": [faked]}])
+    recap = by_key(run(optional_recap_rubric, lesson, model))["recap_and_closure"]
+
+    assert len(model.calls) == 2
+    assert not recap.verified and not recap.not_applicable and recap.evidence == ()

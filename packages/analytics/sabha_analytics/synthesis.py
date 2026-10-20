@@ -4,7 +4,10 @@ Overall score (`compute_overall`):
 
 - The weighted mean of VERIFIED dimensions only, weights as written in the rubric, computed exactly with fractions
   and rounded half up to one decimal (3.25 -> 3.3; Python's round() would give 3.2 on an exact half).
-- If the verified weight is less than 60% of the rubric's total weight, there is no overall score: too little of
+- A dimension verified as not applicable (rubric `not_applicable_when`, for example escalation on a call with
+  nothing to escalate) is left out entirely: its weight leaves the total, so the other weights are rescaled. An
+  unverified dimension stays in the total (we do not know whether it applied).
+- If the verified weight is less than 60% of the applicable weight, there is no overall score: too little of
   the rubric is backed by verified evidence for a number to be fair. The report then asks for review
   (RecordingStatus.NEEDS_REVIEW, reason "low_verification") and the synthesis call is skipped.
 
@@ -80,6 +83,7 @@ class OverallScore:
     """Weighted mean of verified dimensions to 1 decimal, or None when less than 60% of the weight is verified."""
     verified_weight: float
     total_weight: float
+    """The weight of the dimensions that apply (not-applicable ones are left out)."""
     verified_share: float
     """verified_weight / total_weight, rounded to 4 decimals."""
 
@@ -90,8 +94,9 @@ class OverallScore:
 
 def compute_overall(dimensions: Sequence[DimensionResult]) -> OverallScore:
     """The overall score of a rubric's dimension results (module docstring)."""
-    total = sum((_weight(dimension.weight) for dimension in dimensions), Fraction(0))
-    verified = [dimension for dimension in dimensions if dimension.verified and dimension.score is not None]
+    applicable = [d for d in dimensions if not (d.verified and d.not_applicable)]
+    total = sum((_weight(dimension.weight) for dimension in applicable), Fraction(0))
+    verified = [dimension for dimension in applicable if dimension.verified and dimension.score is not None]
     verified_weight = sum((_weight(dimension.weight) for dimension in verified), Fraction(0))
     share = verified_weight / total if total > 0 else Fraction(0)
     score: float | None = None
@@ -296,7 +301,7 @@ def synthesise(
 ) -> SynthesisOutcome:
     """Ask for the summary, strengths, gaps and suggestions from verified results only (module docstring)."""
     roles = frozenset(analysed_roles)
-    verified = [dimension for dimension in dimensions if dimension.verified]
+    verified = [d for d in dimensions if d.verified and not d.not_applicable]  # not-applicable ones have no score
     if not verified:
         return SynthesisOutcome(None, 0, ("no_verified_dimensions",), (), ())
     moments = allowed_moments(verified, transcript, roles)

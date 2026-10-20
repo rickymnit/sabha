@@ -32,6 +32,10 @@ Calls (deterministic):
   60 words, no placeholder (a placeholder would name a student once un-redacted, golden rule 10); evidence at
   least `min_quotes` items of the right shape; every quote verified by grounding; at least `min_quotes` DISTINCT
   verified passages (the same passage twice does not count twice).
+- Not applicable: a dimension whose rubric entry has `not_applicable_when` (reception's escalation handling: a call
+  with nothing to escalate) may be answered with `score: null`. The model must still give a rationale and at least
+  ONE verified quote showing what the conversation was about (golden rule 5: no unsupported claim, including
+  "nothing to escalate"). For any other dimension a null score is a problem like any other.
 - A dimension that fails any check is re-asked ONCE, alone, with the specific problems as feedback. If it fails
   again it is kept with verified=False, no score, no rationale and no evidence: it is excluded from the overall
   score and from the UI. Quotes are never dropped or fixed to make a dimension pass.
@@ -108,6 +112,8 @@ class RubricSpec(Protocol):
     def version(self) -> str: ...
     @property
     def dimensions(self) -> Sequence[DimensionSpec]: ...
+    @property
+    def output_values(self) -> Mapping[str, Sequence[str]] | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,6 +325,12 @@ def group_dimensions(dimensions: Sequence[DimensionSpec]) -> list[tuple[Dimensio
     return out
 
 
+def not_applicable_when(dimension: DimensionSpec) -> str | None:
+    """The rubric's condition under which this dimension does not apply, or None (most dimensions)."""
+    condition = getattr(dimension, "not_applicable_when", None)
+    return condition if isinstance(condition, str) and condition.strip() else None
+
+
 def render_dimension(dimension: DimensionSpec) -> str:
     lines = [
         f"## {dimension.key}: {dimension.name} (minimum quotes: {dimension.min_quotes})",
@@ -328,6 +340,13 @@ def render_dimension(dimension: DimensionSpec) -> str:
         "Anchors:",
         *(f"{level}: {dimension.anchors[level]}" for level in range(SCORE_MIN, SCORE_MAX + 1)),
     ]
+    condition = not_applicable_when(dimension)
+    if condition is not None:
+        lines += [
+            "",
+            f"Not applicable when: {condition} In that case answer score null, say in the rationale why it does not "
+            "apply, and quote at least one line showing what the conversation was about.",
+        ]
     if dimension.examples:
         lines += ["", "Examples (illustrative, not from this recording):"]
         lines += [f"{level}: {dimension.examples[level]}" for level in sorted(dimension.examples)]
@@ -355,11 +374,17 @@ def scoring_output_schema(dimensions: Sequence[DimensionSpec]) -> dict[str, Any]
         "required": ["key", "score", "rationale", "evidence"],
         "properties": {
             "key": {"enum": [dimension.key for dimension in dimensions]},
-            "score": {"type": "integer", "minimum": SCORE_MIN, "maximum": SCORE_MAX},
+            "score": {
+                "type": ["integer", "null"] if any(not_applicable_when(d) for d in dimensions) else "integer",
+                "minimum": SCORE_MIN,
+                "maximum": SCORE_MAX,
+            },
             "rationale": {"type": "string", "minLength": 1},
             "evidence": {
                 "type": "array",
-                "minItems": min(dimension.min_quotes for dimension in dimensions),
+                "minItems": 1
+                if any(not_applicable_when(d) for d in dimensions)
+                else min(dimension.min_quotes for dimension in dimensions),
                 "items": evidence,
             },
         },
@@ -391,6 +416,7 @@ class Judgement:
     rationale: str | None
     evidence: tuple[GroundingResult, ...]
     problems: tuple[Problem, ...]
+    not_applicable: bool = False
 
     @property
     def ok(self) -> bool:
@@ -425,7 +451,7 @@ def _check_text(where: str, text: object, max_words: int) -> list[Problem]:
 
 
 def _verify_evidence(
-    dimension: DimensionSpec, evidence: object, transcript: PreparedTranscript
+    dimension: DimensionSpec, evidence: object, transcript: PreparedTranscript, min_quotes: int | None = None
 ) -> tuple[list[GroundingResult], list[Problem]]:
     key = dimension.key
     if not isinstance(evidence, list):
@@ -475,11 +501,12 @@ def _verify_evidence(
     distinct = {(result.utterance_id, result.original_range) for result in verified}
     if len(distinct) < len(verified):
         problems.append(Problem("duplicate_quote", f"{key}: the same passage is quoted more than once."))
-    if len(distinct) < dimension.min_quotes:
+    needed = dimension.min_quotes if min_quotes is None else min_quotes
+    if len(distinct) < needed:
         problems.append(
             Problem(
                 "too_few_quotes",
-                f"{key}: needs at least {dimension.min_quotes} different verified quotes; found {len(distinct)}.",
+                f"{key}: needs at least {needed} different verified quotes; found {len(distinct)}.",
             )
         )
     return results, problems
@@ -492,11 +519,17 @@ def _judge_item(item: object, dimension: DimensionSpec, transcript: PreparedTran
         return Judgement(key, None, None, (), (problem,))
     problems: list[Problem] = []
     score = item["score"]
-    if not _is_int(score) or not SCORE_MIN <= score <= SCORE_MAX:
+    not_applicable = score is None and not_applicable_when(dimension) is not None
+    if score is None and not not_applicable:
+        problems.append(Problem("invalid_score", f"{key}: this dimension always applies; give a score from 1 to 5."))
+    elif not not_applicable and (not _is_int(score) or not SCORE_MIN <= score <= SCORE_MAX):
         problems.append(Problem("invalid_score", f"{key}: score must be a whole number from 1 to 5."))
     rationale = item["rationale"]
     problems += _check_text(f"{key}: rationale", rationale, MAX_RATIONALE_WORDS)
-    evidence, evidence_problems = _verify_evidence(dimension, item["evidence"], transcript)
+    # Not applicable still needs evidence: at least one quote showing what the conversation was about.
+    evidence, evidence_problems = _verify_evidence(
+        dimension, item["evidence"], transcript, min_quotes=1 if not_applicable else None
+    )
     problems += evidence_problems
     return Judgement(
         key=key,
@@ -504,6 +537,7 @@ def _judge_item(item: object, dimension: DimensionSpec, transcript: PreparedTran
         rationale=rationale if isinstance(rationale, str) else None,
         evidence=tuple(evidence),
         problems=tuple(problems),
+        not_applicable=not_applicable,
     )
 
 
@@ -571,6 +605,9 @@ class DimensionResult:
     """Well-formed quotes the model offered for this dimension, over all attempts (for eval/grounding.py)."""
     quotes_verified: int = 0
     """How many of those passed the grounding verifier."""
+    not_applicable: bool = False
+    """Verified as not applying to this conversation (rubric `not_applicable_when`): no score, left out of the
+    overall score; the rationale and evidence say why."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -587,18 +624,20 @@ def _result(dimension: DimensionSpec, judgement: Judgement, *all_attempts: Judge
     attempts = len(all_attempts)
     offered = sum(len(j.evidence) for j in all_attempts)
     verified = sum(1 for j in all_attempts for e in j.evidence if e.verified)
-    if judgement.ok and judgement.score is not None and judgement.rationale is not None:  # ok implies both are set
+    scored_or_not_applicable = judgement.score is not None or judgement.not_applicable
+    if judgement.ok and scored_or_not_applicable and judgement.rationale is not None:  # ok implies both are set
         return DimensionResult(
             dimension.key,
             dimension.name,
             float(dimension.weight),
             True,
-            judgement.score,
+            None if judgement.not_applicable else judgement.score,
             judgement.rationale,
             judgement.evidence,
             attempts,
             quotes_offered=offered,
             quotes_verified=verified,
+            not_applicable=judgement.not_applicable,
         )
     codes = tuple(dict.fromkeys(problem.code for problem in judgement.problems))
     return DimensionResult(
