@@ -80,6 +80,7 @@ REASONS: dict[str, dict[str, str]] = {
         "synthesis_failed": "The written summary could not be produced.",
         "invalid_audio": "The audio file could not be read.",
         "uncertain_type": "We could not tell what kind of conversation this is.",
+        "no_speech": "No speech was found in the recording.",
     },
     "hi": {
         "unclear_roles": "बोलने वालों को ठीक से अलग नहीं पहचाना जा सका।",
@@ -87,6 +88,7 @@ REASONS: dict[str, dict[str, str]] = {
         "synthesis_failed": "लिखित सारांश नहीं बन सका।",
         "invalid_audio": "ऑडियो फ़ाइल पढ़ी नहीं जा सकी।",
         "uncertain_type": "यह किस तरह की बातचीत है, यह तय नहीं हो सका।",
+        "no_speech": "रिकॉर्डिंग में कोई बोली नहीं मिली।",
     },
 }
 

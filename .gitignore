@@ -12,6 +12,8 @@ dist/
 *.webm
 *.mp4
 eval/goldset/audio/
+# Development audio (public interviews, lectures): never committed, whatever the format.
+eval/dev-audio/
 
 # Annotation (P4.1): gold transcripts and Label Studio exports of pilot recordings are real data.
 # Label Studio's own data lives in a named Docker volume, not in this repository.

@@ -1,4 +1,4 @@
-"""The preprocess stage, step 1 of 2: check and normalise the uploaded audio (plan task P3.2).
+"""The preprocess stage: check and normalise the uploaded audio (P3.2), then find the speech (P3.3).
 
 `work(ctx)`:
 
@@ -14,15 +14,18 @@
      exactly on the target (a 21-minute lecture came out at -25.9 LUFS); two passes would, at twice the time. ASR
      and VAD need consistent levels, not an exact figure, so one pass is used until the gold set says otherwise.
    - `playback.opus`: a 32 kbps Opus copy of it for the web player (same timeline: nothing is trimmed).
-   - `audio.json`: what was probed and the normalised length, for audit and debugging.
+   - `audio.json`: what was probed, the normalised length and the speech totals, for audit and debugging.
 4. Records `duration_ms` (from the normalised file's sample count, exact) and `audio` on the recording.
+5. Runs voice activity detection (sabha_workers.stages.vad, Silero) on normalised.wav and builds the segment map
+   (sabha_core.timemap.build_segment_map: end padding, short gaps merged; parameters in VadParams, from settings).
+   Writes `segments@v1.json` (the map: golden rule 4, silence is indexed, not deleted) and `compact.wav` (the speech
+   only, which diarization and ASR read). No speech at all: NeedsReviewError `no_speech`, after the playback copy is
+   stored so a reviewer can listen.
 
 ffmpeg and ffprobe read local files only (`-protocol_whitelist file`, P7.6: a crafted playlist cannot make them
 fetch URLs or read other files), never read stdin, and run under a time limit. A file ffmpeg cannot decode is
 `invalid_audio`; a run over the time limit is `preprocess_timeout` (permanent: retrying the same file would take as
 long again; the dead letter allows a replay).
-
-Step 2 (P3.3, Silero VAD and the segment map) will add to this stage.
 """
 
 from __future__ import annotations
@@ -39,7 +42,9 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from sabha_core.models import AudioInfo
-from sabha_workers.stages.runner import PermanentError, StageContext, Work
+from sabha_core.timemap import DEFAULT_END_PAD_MS, DEFAULT_MERGE_GAP_MS, build_segment_map, stats
+from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext, Work
+from sabha_workers.stages.vad import MODEL_VERSION, SileroVad, speech_regions, write_compact
 
 log = logging.getLogger("sabha.workers.preprocess")
 
@@ -189,10 +194,12 @@ def playback_copy(source: Path, target: Path, duration_ms: int, run: Runner = ru
 
 
 def wav_duration_ms(path: Path) -> int:
+    """Whole milliseconds, rounded DOWN: every millisecond of the timeline is backed by samples (a last fraction of
+    a millisecond, under 16 samples, is left out), so a segment ending at the duration never runs past the audio."""
     with wave.open(str(path), "rb") as wav:
         if (wav.getframerate(), wav.getnchannels(), wav.getsampwidth()) != (SAMPLE_RATE, 1, 2):
             raise PermanentError("normalise_failed", "the normalised file is not 16 kHz mono 16-bit")
-        return round(wav.getnframes() * 1000 / SAMPLE_RATE)
+        return wav.getnframes() // (SAMPLE_RATE // 1000)
 
 
 class Originals(Protocol):
@@ -221,8 +228,26 @@ RecordAudio = Callable[[str, str, int, AudioInfo], None]
 """(tenant_id, recording_id, duration_ms, audio): store them on the recording."""
 
 
-def make_work(originals: Originals, record_audio: RecordAudio, run: Runner = run_tool) -> Work:
-    """The preprocess `work` function for StageRunner (module docstring)."""
+NO_SPEECH = "no_speech"
+
+
+@dataclass(frozen=True, slots=True)
+class VadParams:
+    threshold: float = 0.5
+    min_speech_ms: int = 250
+    min_silence_ms: int = 100
+    end_pad_ms: int = DEFAULT_END_PAD_MS
+    merge_gap_ms: int = DEFAULT_MERGE_GAP_MS
+
+
+def make_work(
+    originals: Originals,
+    record_audio: RecordAudio,
+    vad: Callable[[], SileroVad],
+    params: VadParams = VadParams(),  # noqa: B008  # frozen dataclass: a safe default
+    run: Runner = run_tool,
+) -> Work:
+    """The preprocess `work` function for StageRunner (module docstring). `vad` returns the (cached) model."""
 
     def work(ctx: StageContext) -> dict[str, Any]:
         recording = ctx.recording
@@ -243,6 +268,12 @@ def make_work(originals: Originals, record_audio: RecordAudio, run: Runner = run
             duration_ms = wav_duration_ms(normalised)
             check(replace(probed, duration_ms=duration_ms))  # the header's length may have been wrong
             playback_copy(normalised, playback, duration_ms, run)
+            regions = speech_regions(
+                vad().speech_probabilities(normalised), duration_ms, threshold=params.threshold,
+                min_speech_ms=params.min_speech_ms, min_silence_ms=params.min_silence_ms,
+            )  # fmt: skip
+            segment_map = build_segment_map(regions, duration_ms, params.end_pad_ms, params.merge_gap_ms)
+            speech = stats(segment_map, duration_ms)
             ctx.artefacts.put_file(ctx.prefix + "normalised.wav", normalised, "audio/wav")
             ctx.artefacts.put_file(ctx.prefix + "playback.opus", playback, "audio/ogg")
             summary = {
@@ -250,11 +281,20 @@ def make_work(originals: Originals, record_audio: RecordAudio, run: Runner = run
                 "normalised": {"sample_rate": SAMPLE_RATE, "channels": 1, "duration_ms": duration_ms,
                                "filters": f"highpass=f={HIGH_PASS_HZ},{LOUDNORM}"},
                 "playback": {"codec": "opus", "bitrate": PLAYBACK_BITRATE, "size_bytes": playback.stat().st_size},
+                "speech": {**speech, "segments": len(segment_map.segments), "vad_regions": len(regions),
+                           "vad": {"model": f"silero_vad@{MODEL_VERSION}", **asdict(params)}},
             }  # fmt: skip
             ctx.artefacts.put(ctx.prefix + "audio.json", json.dumps(summary, indent=2).encode(), "application/json")
-        record_audio(ctx.tenant_id, recording.id, duration_ms, probed.audio_info())
+            record_audio(ctx.tenant_id, recording.id, duration_ms, probed.audio_info())
+            if not segment_map.segments:
+                raise NeedsReviewError(NO_SPEECH, "voice activity detection found no speech in the recording")
+            compact = folder / "compact.wav"
+            write_compact(normalised, compact, segment_map)
+            ctx.artefacts.put_file(ctx.prefix + "compact.wav", compact, "audio/wav")
+            ctx.artefacts.put(ctx.prefix + "segments@v1.json", segment_map.to_json().encode(), "application/json")
         seconds = round(time.monotonic() - started, 1)
         log.info("preprocessed", extra={"recording_id": recording.id, "duration_ms": duration_ms, "seconds": seconds})
-        return {"duration_ms": duration_ms, "codec": probed.codec, "processing_s": seconds}
+        return {"duration_ms": duration_ms, "speech_ms": speech["speech_ms"], "codec": probed.codec,
+                "processing_s": seconds}  # fmt: skip
 
     return work

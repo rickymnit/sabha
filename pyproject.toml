@@ -115,3 +115,8 @@ ignore_missing_imports = true
 # Celery and Kombu ship no type information; only apps/workers uses them.
 module = ["celery", "celery.*", "kombu", "kombu.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# onnxruntime ships no type information; only the VAD step (apps/workers/sabha_workers/stages/vad.py) uses it.
+module = ["onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true

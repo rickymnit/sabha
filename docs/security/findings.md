@@ -15,6 +15,7 @@ result is recorded for a check that did not run.
 | 4 | 2026-10-17 | `/tenant-check` | Per-user rate-limit key without tenant | low | fixed | 30a907b (P1.6) |
 | 5 | 2026-10-17 | `/tenant-check` | Duplicate-key error reveals that an id exists in another tenant | low | fixed | 30a907b (P1.6): rule that ids are server-generated, with a test in `tests/security`; request bodies refuse `id` (P1.5b, P2.1) |
 | 6 | 2026-10-17 | `/tenant-check` | Email delivery keys without tenant | low | fixed | 17b60cf: `deliveries` unique per (tenant, key) (P2.7) |
+| 7 | 2026-10-20 | `strace` on the VAD step (P3.3) | `onnxruntime` 1.30 (Linux) ships Microsoft telemetry that opened HTTPS connections to Microsoft addresses (`mobile.events.data.microsoft.com`); `disable_telemetry_events()` did not stop it. A service outside India nobody approved (golden rule 12). No audio is involved, but usage data would leave | medium | fixed | P3.3: `ORT_DISABLE_TELEMETRY=1` is set by `sabha_workers/stages/vad.py` before onnxruntime is imported, and in the CPU worker image; strace then shows no connections. A test fails if other code imports onnxruntime. Recheck when P3.4 adds pyannote or NeMo |
 
 ## Reviewed in code (no finding)
 
