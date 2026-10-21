@@ -1,7 +1,7 @@
 """Celery task definitions (plan task P2.4). Each pipeline stage task is a thin wrapper around StageRunner.
 
-preprocess (P3.2) is sabha_workers.stages.preprocess. Stages not built yet (P3.4 diarize, P3.5 transcribe, P5.7
-analyze) fail honestly with
+preprocess (P3.2, P3.3) and diarize (P3.4) are in sabha_workers.stages. Stages not built yet (P3.5 transcribe,
+P5.7 analyze) fail honestly with
 `stage_not_built`: the recording goes to FAILED with a dead letter, so nothing silently stalls and the job can be
 replayed once the stage exists (P7.8). notify sends the status emails (P2.7, sabha_workers.notifications.notify);
 meter only logs until P8.6.
@@ -23,6 +23,8 @@ from botocore.config import Config
 from celery import Celery, Task
 from pymongo.database import Database
 
+from sabha_asr.diarization import DEFAULT_MODEL_DIR as DEFAULT_PYANNOTE_DIR
+from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_core.models import AudioInfo, Recording, utc_now
 from sabha_core.mongo import open_sync
 from sabha_core.repo import SyncTenantRepo
@@ -32,7 +34,7 @@ from sabha_workers.dispatch import CeleryDispatcher
 from sabha_workers.maintenance import requeue_stuck
 from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
-from sabha_workers.stages import preprocess
+from sabha_workers.stages import diarize, preprocess
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
 from sabha_workers.stages.vad import DEFAULT_MODEL_PATH, SileroVad
 from sabha_workers.upload_cleanup import abort_stale_uploads
@@ -121,7 +123,20 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         merge_gap_ms=settings.vad_merge_gap_ms,
     )  # fmt: skip
     originals = preprocess.S3Originals(s3, settings.s3_bucket_audio)
-    built = {"preprocess": preprocess.make_work(originals, record_audio, vad, params)}
+
+    @cache
+    def diarizer() -> Diarizer:  # loaded on the first diarize task only (pyannote is an optional install)
+        if settings.diarizer == "fake":  # APP_ENV=test only (settings): one speaker for the whole file
+            return ScriptedDiarizer([("A", 0, 2**62)])
+        model_dir = Path(settings.diarization_model_dir) if settings.diarization_model_dir else None
+        return PyannoteDiarizer(
+            model_dir or DEFAULT_PYANNOTE_DIR, settings.diarization_device, settings.diarization_batch_size
+        )
+
+    built = {
+        "preprocess": preprocess.make_work(originals, record_audio, vad, params),
+        "diarize": diarize.make_work(diarizer, settings.artefact_version_preprocess, settings.diarization_device),
+    }
     return {name: built.get(name) or not_built(name) for name in SPECS}
 
 

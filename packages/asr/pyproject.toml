@@ -8,6 +8,15 @@ dependencies = [
     "sabha-core",
 ]
 
+[project.optional-dependencies]
+# Speaker diarization (P3.4): installed only for the speech worker and on dev machines (`make setup-speech`), so the
+# API, the CPU worker and CI never pull in PyTorch. torch/torchaudio come from PyTorch's CPU index (root pyproject).
+diarization = [
+    "pyannote.audio>=4.0.7,<4.1",
+    "torch>=2.8",
+    "torchaudio>=2.8",
+]
+
 [project.scripts]
 sabha-asr-transcribe = "sabha_asr.cli:main"  # transcribe one WAV with the configured provider (P3.1)
 

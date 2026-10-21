@@ -17,6 +17,10 @@ dependencies = [
   "redis>=5.0",
 ]
 
+[project.optional-dependencies]
+# `uv sync --extra speech` (make setup-speech): pyannote and PyTorch for speaker diarization (P3.4).
+speech = ["sabha-asr[diarization]"]
+
 [dependency-groups]
 dev = [
   "detect-secrets>=1.5.0",
@@ -54,6 +58,14 @@ sabha-llm = { workspace = true }
 sabha-analytics = { workspace = true }
 sabha-api = { workspace = true }
 sabha-workers = { workspace = true }
+# CPU-only PyTorch (~200 MB) instead of the default CUDA build (~2 GB); the GPU image will use a CUDA index.
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -120,3 +132,14 @@ ignore_missing_imports = true
 # onnxruntime ships no type information; only the VAD step (apps/workers/sabha_workers/stages/vad.py) uses it.
 module = ["onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# pyannote.audio, torch and huggingface_hub are an optional install (sabha-asr[diarization]); CI does not have them.
+module = ["pyannote.*", "torch", "torch.*", "huggingface_hub", "huggingface_hub.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# httpx2 arrives with the speech extra (via huggingface_hub), and Starlette's TestClient then prefers it over httpx.
+# Not analysing it keeps API test types the same with or without the extra, so `make lint` agrees with CI.
+module = ["httpx2", "httpx2.*"]
+follow_imports = "skip"

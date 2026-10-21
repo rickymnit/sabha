@@ -129,6 +129,13 @@ class Settings(BaseSettings):
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
 
+    # Speaker diarization (P3.4). "fake" (a scripted diarizer) is only allowed when APP_ENV=test.
+    diarizer: Literal["pyannote", "fake"] = "pyannote"
+    diarization_device: str = Field(default="cpu", pattern=r"^(cpu|cuda(:[0-9]+)?)$")
+    diarization_batch_size: int = Field(default=8, ge=1, le=128)  # 8: half the CPU memory of pyannote's 32
+    diarization_model_dir: str | None = None  # None: ~/.cache/sabha/models (`make models-speech`)
+    hf_token: SecretStr | None = None  # Hugging Face read token: only to download the pyannote model, never at runtime
+
     # Voice activity detection (P3.3, preprocess step 2). Unmeasured starting values: tune them on the gold set.
     vad_model_path: str | None = None  # None: ~/.cache/sabha/models (`make models`); the worker image sets its own
     vad_threshold: float = Field(default=0.5, gt=0, lt=1)  # a 32 ms window at or above this is speech
@@ -235,6 +242,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_combinations(self) -> Settings:
+        if self.diarizer == "fake" and self.app_env != "test":
+            raise ValueError("DIARIZER=fake is for tests only (APP_ENV=test)")
         if (self.langfuse_public_key is None) != (self.langfuse_secret_key is None):
             raise ValueError("set both LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY, or neither")
         if self.langfuse_public_key is not None and self.langfuse_host is None:
