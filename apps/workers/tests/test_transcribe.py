@@ -6,6 +6,7 @@ import json
 import uuid
 import wave
 from collections.abc import Iterator, Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,18 +18,23 @@ from sabha_asr.provider import AudioChunk, ChunkResult, ProviderError
 from sabha_asr.providers.fake import FakeProvider
 from sabha_asr.transcriber import Transcriber
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import Recording
+from sabha_core.models import Recording, Tenant, Transcript
 from sabha_core.profiles import ConversationType
+from sabha_core.quota import Plan
 from sabha_core.repo import SyncTenantRepo
 from sabha_core.state import RecordingStatus
 from sabha_core.timemap import Segment, SegmentMap
+from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
 from sabha_workers.stages.transcribe import BATCH_SIZE, make_work, plan_key
+from sabha_workers.stages.transcript import TranscriptDeps
 
 S = RecordingStatus
 TRANSCRIBE = StageSpec("transcribe", working=S.TRANSCRIBING, done_to=S.ANALYZING)
 # Compact: a 40 s stretch of talk, then (after a removed silence) 10 s more.
 MAP = SegmentMap((Segment(2_000, 42_000, 0), Segment(60_000, 70_000, 40_000)))
+RUBRICS = Path(__file__).resolve().parents[3] / "rubrics"
+TENANT = Tenant.from_profile("school", name="Sunrise Public School", plan=Plan.PILOT, id="t1")
 
 
 class FlakyProvider(FakeProvider):
@@ -82,6 +88,11 @@ class Stage:
         self.db = db
         self.artefacts = S3Artefacts(s3_storage.client(), "sabha-artefacts")
         self.tmp = tmp
+        self.saved: list[Transcript] = []
+        self.transcript_deps = TranscriptDeps(
+            diarize_version="v1", tenant=lambda _: TENANT, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
+            tie_breaker=lambda *_: None, save=self.saved.append,
+        )  # fmt: skip
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"transcribe": "v1"}, worker="test",
                                   jitter=lambda: 0.0)  # fmt: skip
 
@@ -97,10 +108,13 @@ class Stage:
                 out.writeframes(b"\x01\x00" * 16 * segment_map.compact_length_ms)
             self.artefacts.put_file(f"t1/{rid}/preprocess@v1/compact.wav", compact, "audio/wav")
             self.artefacts.put(f"t1/{rid}/preprocess@v1/segments@v1.json", segment_map.to_json().encode())
+            # One teacher talking throughout: roles are clear, so the stage ends in ANALYZING.
+            turns = [{"speaker_label": "S0", "start_ms": 0, "end_ms": segment_map.compact_length_ms}]
+            self.artefacts.put(f"t1/{rid}/diarize@v1/diarization@v1.json", json.dumps({"compact": turns}).encode())
         return rid
 
     def run(self, rid: str, transcriber: Transcriber, attempt: int = 1) -> str:
-        work = make_work(lambda: transcriber, preprocess_version="v1")
+        work = make_work(lambda: transcriber, "v1", self.transcript_deps)
         return self.runner.run(TRANSCRIBE, work, "t1", rid, attempt=attempt).result
 
     def doc(self, rid: str) -> dict[str, Any]:
@@ -138,11 +152,17 @@ def test_the_stage_writes_compact_words_and_cost_inputs(stage: Stage) -> None:
     meta = run["meta"]
     assert (meta["requests"], meta["audio_s"], meta["provider"], meta["fallback"]) == (3, 50.0, "fake", False)
     assert meta["sent_audio_s"] == 50.5  # the 0.5 s overlap at the split is sent twice
+    # P3.6/P3.7: roles and the transcript on the original timeline, then ANALYZING.
+    assert stage.artefacts.exists(f"t1/{rid}/transcribe@v1/transcript@v1.json")
+    (doc,) = stage.saved
+    assert doc.roles == {"S0": "teacher"} and doc.storage_key.endswith("transcript@v1.json")
+    assert meta["speakers"] == 1
 
 
 @pytest.mark.integration
 def test_a_retry_resumes_after_the_batches_already_done(stage: Stage) -> None:
-    long_map = SegmentMap((Segment(0, 12_000, 0),))  # 24 chunks of <= 1 s (0.5 s overlaps): batches of 10, 10, 4
+    # 40 chunks of <= 1 s (0.5 s overlaps): four batches of 10. 20 s of one voice is also a clear teacher.
+    long_map = SegmentMap((Segment(0, 20_000, 0),))
     rid = stage.recording(long_map)
     flaky = FlakyProvider(ProviderError("fake", "HTTP 503", retryable=True), fail_on=2, max_chunk_ms=1_000)
     assert stage.run(rid, Transcriber(flaky), attempt=1) == "retry"
@@ -150,8 +170,8 @@ def test_a_retry_resumes_after_the_batches_already_done(stage: Stage) -> None:
 
     again = FakeProvider(max_chunk_ms=1_000)
     assert stage.run(rid, Transcriber(again), attempt=2) == "done"
-    # Batch 1 was saved before batch 2 failed: the retry sends batches 2 and 3 only.
-    assert [len(call) for call in again.calls] == [BATCH_SIZE, 4]
+    # Batch 1 was saved before batch 2 failed: the retry sends batches 2, 3 and 4 only.
+    assert [len(call) for call in again.calls] == [BATCH_SIZE] * 3
     runs = sorted(stage.db.stage_runs.find({"recording_id": rid}), key=lambda r: r["attempt"])
     assert runs[0]["error_code"] == "asr_unavailable" and runs[1]["meta"]["batches_resumed"] == 1
 

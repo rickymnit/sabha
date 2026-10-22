@@ -46,7 +46,7 @@ Done when: real pilot lessons transcribe on staging with timestamps.
 
 ## P3.6 · Speaker role assignment
 
-> **Status (2026-10-17).** Already built: heuristic role assignment (`sabha_asr/roles.py`) with tests. Remaining: run it as a pipeline step that writes `roles@v1.json`, with the LLM tie-break and NEEDS_REVIEW path.
+> **Status (2026-10-22).** Built into the transcribe stage (`apps/workers/sabha_workers/stages/transcript.py`): roles from the recording's rubric with the heuristics, the small-LLM tie-breaker when unsure (`stages/roles_llm.py`, through the gateway, so text is redacted), `roles@v1.json`, and NEEDS_REVIEW `unclear_roles` when still unsure (the transcript is kept for the reviewer). Remaining: check role accuracy on gold files (eval/roles.py).
 
 Plan task 3.6.
 
@@ -70,7 +70,7 @@ Done when: roles are correct on most gold files and low-confidence cases are fla
 
 ## P3.7 · Transcript assembly
 
-> **Status (2026-10-17).** Already built: transcript assembly and validation (`sabha_asr/assembly.py`, `transcript.v1.schema.json`), including null confidence and `word_timing`. Remaining: run it in the transcribe stage, store `transcript@v1.json` and the `transcripts` record, and transition to ANALYZING.
+> **Status (2026-10-22).** Built into the transcribe stage: `transcript@v1.json` on the original timeline and a `transcripts` document (roles, language mix, rubric). Remaining: `GET /v1/recordings/{id}/transcript` (built with the analysis API, P5.7b), and text search.
 
 Plan task 3.7.
 

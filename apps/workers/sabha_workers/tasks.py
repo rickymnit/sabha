@@ -22,22 +22,30 @@ import boto3
 from botocore.config import Config
 from celery import Celery, Task
 from pymongo.database import Database
+from redis import Redis
 
 from sabha_asr.diarization import DEFAULT_MODEL_DIR as DEFAULT_PYANNOTE_DIR
 from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_asr.registry import build_transcriber
+from sabha_asr.roles import RoleTieBreaker
 from sabha_asr.transcriber import Transcriber
-from sabha_core.models import AudioInfo, Recording, utc_now
+from sabha_core.models import AudioInfo, Recording, Transcript, utc_now
 from sabha_core.mongo import open_sync
-from sabha_core.repo import SyncTenantRepo
+from sabha_core.repo import SyncTenantRepo, own_tenant
 from sabha_core.settings import Settings, get_settings
 from sabha_core.state import RecordingStatus
+from sabha_llm.errors import LlmConfigError
+from sabha_llm.factory import build_gateway
+from sabha_llm.gateway import Gateway
 from sabha_workers.dispatch import CeleryDispatcher
 from sabha_workers.maintenance import requeue_stuck
 from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
+from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages import diarize, preprocess, transcribe
+from sabha_workers.stages.roles_llm import LlmRoleTieBreaker
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
+from sabha_workers.stages.transcript import TranscriptDeps
 from sabha_workers.stages.vad import DEFAULT_MODEL_PATH, SileroVad
 from sabha_workers.upload_cleanup import abort_stale_uploads
 
@@ -139,10 +147,38 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
     def transcriber() -> Transcriber:  # built on the first transcribe task; bad ASR settings fail there, loudly
         return build_transcriber(settings)
 
+    @cache
+    def gateway() -> Gateway | None:  # the LLM gateway, built once; None (logged) when no LLM is configured
+        try:
+            return build_gateway(settings, database=db, redis=Redis.from_url(settings.redis_url.get_secret_value()))
+        except LlmConfigError as exc:
+            log.warning("no LLM configured; unclear speaker roles will go to review without a tie-break",
+                        extra={"reason": str(exc)})  # fmt: skip
+            return None
+
+    def tie_breaker(tenant_id: str, recording_id: str) -> RoleTieBreaker | None:
+        llm = gateway()
+        return None if llm is None else LlmRoleTieBreaker(llm, tenant_id, recording_id)
+
+    rubrics_dir = Path(settings.rubrics_dir)
+
+    def save_transcript(document: Transcript) -> None:
+        transcripts = SyncTenantRepo(db, "transcripts", document.tenant_id, Transcript)
+        transcripts.delete_many({"recording_id": document.recording_id, "version": document.version})
+        transcripts.insert_one(document)
+
+    transcript_deps = TranscriptDeps(
+        diarize_version=settings.artefact_version_diarize,
+        tenant=lambda tenant_id: own_tenant(db, tenant_id),
+        rubric=lambda tenant, kind: rubric_for(tenant, kind, rubrics_dir),
+        tie_breaker=tie_breaker,
+        save=save_transcript,
+    )
+
     built = {
         "preprocess": preprocess.make_work(originals, record_audio, vad, params),
         "diarize": diarize.make_work(diarizer, settings.artefact_version_preprocess, settings.diarization_device),
-        "transcribe": transcribe.make_work(transcriber, settings.artefact_version_preprocess),
+        "transcribe": transcribe.make_work(transcriber, settings.artefact_version_preprocess, transcript_deps),
     }
     return {name: built.get(name) or not_built(name) for name in SPECS}
 

@@ -27,6 +27,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
+# Rubric files: the role assignment (P3.6) and analyze (P5.7) steps read <RUBRICS_DIR>/<rubric id>.yaml.
+COPY --chown=sabha:sabha rubrics /app/rubrics
+ENV RUBRICS_DIR=/app/rubrics
 COPY --from=build --chown=sabha:sabha /app/models /app/models
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 VAD_MODEL_PATH=/app/models/silero_vad.onnx
 # onnxruntime's built-in Microsoft telemetry stays off (golden rule 12; sabha_workers/stages/vad.py).

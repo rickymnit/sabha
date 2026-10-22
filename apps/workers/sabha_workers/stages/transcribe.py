@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sabha_asr.assembly import WORD_TIMINGS, WordTiming
 from sabha_asr.chunking import Chunk, compact_joins, merge_chunk_words, plan_chunks
 from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError
 from sabha_asr.transcriber import Transcriber
@@ -43,6 +44,7 @@ from sabha_asr.words import Word
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext, TransientError, Work
+from sabha_workers.stages.transcript import AsrOutput, TranscriptDeps, finish_transcript
 
 log = logging.getLogger("sabha.workers.transcribe")
 
@@ -59,7 +61,7 @@ class Part:
 
     provider: str
     model_id: str
-    word_timing: str
+    word_timing: WordTiming
     compute_ms: int
     fallback_reason: str | None
     results: list[ChunkResult]
@@ -85,7 +87,10 @@ class Part:
             )
             for r in data["results"]
         ]  # fmt: skip
-        return cls(data["provider"], data["model_id"], data["word_timing"], data["compute_ms"],
+        timing = data["word_timing"]
+        if timing not in WORD_TIMINGS:
+            raise ValueError(f"saved part has an unknown word_timing {timing!r}")
+        return cls(data["provider"], data["model_id"], timing, data["compute_ms"],
                    data["fallback_reason"], results)  # fmt: skip
 
 
@@ -126,8 +131,11 @@ def _languages(chunks: Sequence[Chunk], results: Sequence[ChunkResult]) -> list[
     return spans
 
 
-def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str) -> Work:
-    """The transcribe `work` function for StageRunner. `transcriber` returns the (cached) configured Transcriber."""
+def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, transcript: TranscriptDeps) -> Work:
+    """The transcribe `work` function for StageRunner. `transcriber` returns the (cached) configured Transcriber.
+
+    After the words, sabha_workers.stages.transcript assigns speaker roles and writes the canonical transcript
+    (P3.6, P3.7), so one stage takes the recording from TRANSCRIBING to ANALYZING (or NEEDS_REVIEW)."""
 
     def work(ctx: StageContext) -> dict[str, Any]:
         source = artefact_prefix(ctx.tenant_id, ctx.recording.id, "preprocess", preprocess_version)
@@ -173,6 +181,7 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str) -
         providers = sorted({p.provider for p in parts})
         models = sorted({p.model_id for p in parts})
         fallbacks = sorted({p.fallback_reason for p in parts if p.fallback_reason})
+        languages = _languages(chunks, results)
         document = {
             "version": VERSION,
             "timeline": "compact",
@@ -182,7 +191,7 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str) -
             "fallback_reasons": fallbacks,
             "chunks": len(chunks),
             "words": [w.to_record() for w in words],
-            "languages": _languages(chunks, results),
+            "languages": languages,
         }
         ctx.artefacts.put(ctx.prefix + "asr@v1.json", json.dumps(document, ensure_ascii=False).encode(),
                           "application/json")  # fmt: skip
@@ -201,6 +210,7 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str) -
             "words": len(words),
         }
         log.info("transcribed", extra={"recording_id": ctx.recording.id, **meta})
-        return meta
+        asr_output = AsrOutput(words, "+".join(models), parts[0].word_timing, languages, segment_map)
+        return {**meta, **finish_transcript(ctx, asr_output, transcript)}
 
     return work

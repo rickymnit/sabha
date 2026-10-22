@@ -132,7 +132,7 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
         default_rubrics={  # only rubrics that exist in rubrics/
             _T.TEACHING: "teaching.school.v0.1",
             _T.COUNSELLING: None,
-            _T.RECEPTION: "reception.school.v0.1",
+            _T.RECEPTION: "reception.school.v0.2",  # reviewed and approved for the pilot (2026-10-20)
             _T.MEETING: None,
             _T.SALES: None,
         },

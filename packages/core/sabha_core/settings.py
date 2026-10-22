@@ -129,6 +129,10 @@ class Settings(BaseSettings):
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
 
+    # Rubric files (P3.6, P5.7): <rubrics_dir>/<rubric id>.yaml. Relative paths are from the working directory (the
+    # repo root in development); the worker images set /app/rubrics.
+    rubrics_dir: str = "rubrics"
+
     # Speaker diarization (P3.4). "fake" (a scripted diarizer) is only allowed when APP_ENV=test.
     diarizer: Literal["pyannote", "fake"] = "pyannote"
     diarization_device: str = Field(default="cpu", pattern=r"^(cpu|cuda(:[0-9]+)?)$")

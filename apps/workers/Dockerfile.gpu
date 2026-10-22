@@ -35,6 +35,9 @@ RUN apt-get update \
     && groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
 COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
+# Rubric files: the role assignment (P3.6) and analyze (P5.7) steps read <RUBRICS_DIR>/<rubric id>.yaml.
+COPY --chown=sabha:sabha rubrics /app/rubrics
+ENV RUBRICS_DIR=/app/rubrics
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER sabha
 # One task at a time per GPU (P2.4): run with --concurrency 1 on the gpu.speech queues.
