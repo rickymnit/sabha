@@ -180,7 +180,10 @@ def api(mongo_uri: str, seeded_db: str, fake_idp: Any, s3_storage: Any) -> Itera
     app = create_app(settings, resources=open_resources, token_verifier=fake_idp.verifier())
     artefacts = s3_storage.client()
     artefacts.put_object(Bucket="sabha-artefacts", Key=TRANSCRIPT_KEY, Body=b'{"utterances": []}')
-    artefacts.put_object(Bucket="sabha-artefacts", Key=REPORT_KEY, Body=b'{"version": "analysis@v1"}')
+    report = (
+        b'{"version": "analysis@v1", "overall": {"score": 3.6}, "dimensions": [], "metrics": [], "synthesis": null}'
+    )
+    artefacts.put_object(Bucket="sabha-artefacts", Key=REPORT_KEY, Body=report)
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield Api(test_client, fake_idp)
 

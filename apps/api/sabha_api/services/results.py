@@ -29,10 +29,12 @@ from pydantic import BaseModel
 
 from sabha_api.auth import Principal, Role
 from sabha_api.errors import BadRequestError, NotFoundError
-from sabha_core.models import Analysis, Person, Recording, Score, Transcript
+from sabha_core.models import Analysis, Person, Recording, Score, Transcript, Unit
+from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
 from sabha_core.settings import Settings
 from sabha_core.storage import artefact_prefix
+from sabha_core.timemap import SegmentMap
 
 VIEW_ALL = frozenset({Role.OWNER, Role.ADMIN})
 UNIT_SCOPED = frozenset({Role.MANAGER, Role.REVIEWER})
@@ -179,12 +181,6 @@ class AnalysisSummary(BaseModel):
     created_at: datetime
 
 
-class AnalysisOut(BaseModel):
-    recording_id: str
-    analysis: AnalysisSummary
-    report: dict[str, Any]
-
-
 class TrendPoint(BaseModel):
     recording_id: str
     analysis_id: str
@@ -268,14 +264,6 @@ async def transcript_for(
     )  # fmt: skip
 
 
-async def latest_analysis(recording: Recording, analyses: TenantRepo[Analysis], reader: ArtefactReader) -> AnalysisOut:
-    found = await analyses.find({"recording_id": recording.id}, sort=[("created_at", -1)], limit=1)
-    report = None if not found else await reader.json(found[0].report_key)
-    if not found or report is None:
-        raise NotFoundError("This recording has no analysis yet.")
-    return AnalysisOut(recording_id=recording.id, analysis=summary(found[0]), report=report)
-
-
 async def analysis_history(recording: Recording, analyses: TenantRepo[Analysis]) -> list[AnalysisSummary]:
     return [summary(a) for a in await analyses.find({"recording_id": recording.id}, sort=[("created_at", -1)])]
 
@@ -299,3 +287,155 @@ async def trend(
         points = [TrendPoint(recording_id=s.recording_id, analysis_id=s.analysis_id, created_at=s.created_at,
                              score=s.score, verified=s.verified) for s in found]  # fmt: skip
     return TrendOut(person_id=person.id, dimension=dimension, points=list(reversed(points)))  # oldest first
+
+
+# --- The report page's payloads (apps/web/src/features/report/types.ts, field for field) ---
+
+PROCESSING_STAGES = {
+    "CREATED": "uploaded", "UPLOADED": "uploaded", "PREPROCESSING": "preprocessing", "DIARIZING": "diarizing",
+    "TRANSCRIBING": "transcribing", "ANALYZING": "analyzing",
+}  # fmt: skip
+LANGUAGE_NAMES = {"hi": "Hindi", "en": "English", "mr": "Marathi", "ta": "Tamil", "te": "Telugu", "bn": "Bengali",
+                  "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam", "pa": "Punjabi", "or": "Odia"}  # fmt: skip
+STAFF_ROLE_WORDS = frozenset({"teacher", "receptionist"})
+
+
+def _reasons(codes: list[str]) -> list[dict[str, str]]:
+    return [{"code": code, "message": explain(code)} for code in codes]
+
+
+def metric_out(metric: dict[str, Any], person_label: str) -> dict[str, Any]:
+    """analysis@v1 metric -> the UI's Metric: display name in the tenant's words, and units the UI formats."""
+    words = metric["key"].split("_")
+    name = " ".join(person_label if w in STAFF_ROLE_WORDS else w for w in words)
+    value, unit = metric["value"], metric["unit"]
+    if unit == "s":
+        value, unit = (None if value is None else round(value * 1000)), "ms"
+    unit = {"words_per_minute": "wpm"}.get(unit, unit)
+    if unit not in ("ratio", "count", "wpm", "ms"):
+        unit = "count"
+    return {"key": metric["key"], "name": name[:1].upper() + name[1:], "value": value, "unit": unit,
+            "definition": metric["definition"]}  # fmt: skip
+
+
+def dimension_out(d: dict[str, Any]) -> dict[str, Any]:
+    base = {"key": d["key"], "name": d["name"], "weight": d["weight"]}
+    if not d["verified"]:
+        return {**base, "verified": False}  # nothing else from an unverified dimension (golden rule 5)
+    evidence = [{k: e[k] for k in ("quote", "utterance_id", "start_ms", "end_ms")} for e in d["evidence"]]
+    out = {**base, "verified": True, "score": d["score"], "rationale": d["rationale"], "evidence": evidence}
+    if d.get("not_applicable"):
+        out["not_applicable"] = True
+    return out
+
+
+def report_payload(
+    recording: Recording, analysis: Analysis | None, report: dict[str, Any] | None, *, person_label: str,
+    history: list[float],
+) -> dict[str, Any]:  # fmt: skip
+    """The AnalysisPayload for the recording's current state (processing, failed, needs_review, completed, partial)."""
+    status = recording.status.value
+    if status in PROCESSING_STAGES:
+        updated = recording.status_changed_at or recording.created_at
+        return {"status": "processing", "reasons": [], "recording_id": recording.id,
+                "stage": PROCESSING_STAGES[status], "progress": None, "updated_at": updated.isoformat()}  # fmt: skip
+    if status == "FAILED":
+        return {"status": "failed", "reasons": _reasons([recording.status_reason or "unknown"]),
+                "recording_id": recording.id, "reference": recording.id}  # fmt: skip
+    if status == "NEEDS_REVIEW" or analysis is None or report is None:
+        codes = analysis.review_reasons if analysis is not None and analysis.review_reasons else []
+        return {"status": "needs_review", "reasons": _reasons(codes or [recording.status_reason or "unknown"]),
+                "recording_id": recording.id}  # fmt: skip
+    dimensions = [dimension_out(d) for d in report["dimensions"]]
+    partial = any(not d["verified"] for d in dimensions)
+    synthesis = report.get("synthesis") or {}
+    return {
+        "status": "partial" if partial else "completed",
+        "reasons": _reasons(["unverified_dimensions"]) if partial else [],
+        "analysis_id": analysis.id,
+        "recording_id": recording.id,
+        "created_at": analysis.created_at.isoformat(),
+        "rubric": {
+            "id": analysis.rubric_id,
+            "version": analysis.rubric_version,
+            "name": recording.type.value.capitalize(),
+        },
+        "model": {"ids": analysis.model_ids, "prompt_hash": analysis.prompt_hashes.get("scoring.system")},
+        "overall": report["overall"]["score"],
+        "comparison": None,  # never invented (golden rule 6); needs real data across the tenant
+        "person_history": {"count": len(history), "min": min(history), "max": max(history)} if history else None,
+        "dimensions": dimensions,
+        "metrics": [metric_out(m, person_label) for m in report["metrics"]],
+        "summary": synthesis.get("summary", ""),
+        "strengths": synthesis.get("strengths", []),
+        "gaps": synthesis.get("gaps", []),
+        "suggestions": [
+            {"text": s["text"], "utterance_id": s["utterance_id"], "start_ms": s["start_ms"]}
+            for s in synthesis.get("suggestions", [])
+        ],
+        "phases": [
+            {"name": p["phase"], "start_ms": p["start_ms"], "end_ms": p["end_ms"]} for p in report.get("phases") or []
+        ]
+        or None,
+    }
+
+
+async def analysis_payload(
+    recording: Recording, analyses: TenantRepo[Analysis], reader: ArtefactReader, *, person_label: str
+) -> tuple[dict[str, Any], Analysis | None]:
+    found = await analyses.find({"recording_id": recording.id}, sort=[("created_at", -1)], limit=1)
+    analysis = found[0] if found else None
+    report = None if analysis is None else await reader.json(analysis.report_key)
+    history: list[float] = []
+    if analysis is not None and recording.person_id:
+        others = {"person_id": recording.person_id, "status": "COMPLETED", "recording_id": {"$ne": recording.id}}
+        earlier = await analyses.find(others, sort=[("created_at", -1)], limit=20)
+        history = [a.overall_score for a in earlier if a.overall_score is not None]
+    return report_payload(recording, analysis, report, person_label=person_label, history=history), analysis
+
+
+class Range(BaseModel):
+    start_ms: int
+    end_ms: int
+
+
+class RecordingDetail(RecordingOut):
+    """What the report header needs (ReportRecording in the web app), filled in as the pipeline produces it."""
+
+    title: str
+    type_label: str
+    unit_name: str | None
+    recorded_at: datetime
+    speech_ms: int | None  # after silence removal; None until preprocessing has run
+    languages: list[str]  # language names, from the transcript
+    removed_silence: list[Range]  # on the original timeline (golden rule 4)
+
+
+def silence_gaps(segment_map: SegmentMap, duration_ms: int | None) -> list[Range]:
+    gaps, cursor = [], 0
+    for segment in segment_map.segments:
+        if segment.orig_start_ms > cursor:
+            gaps.append(Range(start_ms=cursor, end_ms=segment.orig_start_ms))
+        cursor = segment.orig_end_ms
+    if duration_ms is not None and duration_ms > cursor:
+        gaps.append(Range(start_ms=cursor, end_ms=duration_ms))
+    return gaps
+
+
+async def recording_detail(
+    recording: Recording, base: RecordingOut, *, settings: Settings, units: TenantRepo[Unit],
+    transcripts: TenantRepo[Transcript], reader: ArtefactReader,
+) -> RecordingDetail:  # fmt: skip
+    unit = await units.find_one({"_id": recording.unit_id}) if recording.unit_id else None
+    transcript = await transcripts.find_one({"recording_id": recording.id})
+    languages = sorted({LANGUAGE_NAMES.get(code.split("-")[0], code) for code in (transcript.language_mix if transcript
+                        else {}) if code != "unknown"})  # fmt: skip
+    pre = artefact_prefix(recording.tenant_id, recording.id, "preprocess", settings.artefact_version_preprocess)
+    segments = await reader.json(pre + "segments@v1.json")
+    segment_map = None if segments is None else SegmentMap.from_records(segments)
+    return RecordingDetail(
+        **base.model_dump(), title=recording.file_name or base.id, type_label=recording.type.value.capitalize(),
+        unit_name=unit.name if unit else None, recorded_at=recording.recorded_at or recording.created_at,
+        speech_ms=None if segment_map is None else segment_map.compact_length_ms, languages=languages,
+        removed_silence=[] if segment_map is None else silence_gaps(segment_map, recording.duration_ms),
+    )  # fmt: skip
