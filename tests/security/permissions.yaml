@@ -103,3 +103,67 @@ routes:
     staff_uploader: 200
     staff_colleague: 404
     other_tenant: 404
+
+  GET /v1/recordings:
+    # The caller's visible recordings (P5.7b); each caller gets a list, filtered (tested in apps/api/tests).
+    anonymous: 401
+    others: 200
+
+  GET /v1/recordings/{recording_id}:
+    # Reads (P5.7b): owners and admins all; managers and reviewers their units; staff their own (2026-10-19).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # managers and reviewers see their units only
+    reviewer_unit: 200
+    staff_uploader: 200  # staff see their own person's recordings
+    staff_colleague: 404
+    other_tenant: 404
+
+  GET /v1/recordings/{recording_id}/transcript:
+    # Same rule; issuing the playback URL is audited (recording.play).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # managers and reviewers see their units only
+    reviewer_unit: 200
+    staff_uploader: 200  # staff see their own person's recordings
+    staff_colleague: 404
+    other_tenant: 404
+
+  GET /v1/recordings/{recording_id}/analysis:
+    # Same rule; audited (analysis.view). Evidence is redacted for everyone (2026-10-19).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # managers and reviewers see their units only
+    reviewer_unit: 200
+    staff_uploader: 200  # staff see their own person's recordings
+    staff_colleague: 404
+    other_tenant: 404
+
+  GET /v1/recordings/{recording_id}/analyses:
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # managers and reviewers see their units only
+    reviewer_unit: 200
+    staff_uploader: 200  # staff see their own person's recordings
+    staff_colleague: 404
+    other_tenant: 404
+
+  GET /v1/people/{person_id}/trend:
+    # The target person is Asha (unit-1, linked to staff_uploader).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # managers and reviewers see their units only
+    reviewer_unit: 200
+    staff_uploader: 200  # staff see their own person's recordings
+    staff_colleague: 404
+    other_tenant: 404

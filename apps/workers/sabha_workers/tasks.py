@@ -1,7 +1,7 @@
 """Celery task definitions (plan task P2.4). Each pipeline stage task is a thin wrapper around StageRunner.
 
-preprocess (P3.2, P3.3), diarize (P3.4) and transcribe (P3.5) are in sabha_workers.stages. Stages not built yet
-(P5.7 analyze) fail honestly with
+Every pipeline stage is in sabha_workers.stages: preprocess (P3.2, P3.3), diarize (P3.4), transcribe with roles and
+the transcript (P3.5-P3.7) and analyze (P5.7). A stage that is not built fails honestly with
 `stage_not_built`: the recording goes to FAILED with a dead letter, so nothing silently stalls and the job can be
 replayed once the stage exists (P7.8). notify sends the status emails (P2.7, sabha_workers.notifications.notify);
 meter only logs until P8.6.
@@ -24,12 +24,13 @@ from celery import Celery, Task
 from pymongo.database import Database
 from redis import Redis
 
+from sabha_analytics.judge import GatewayJudge
 from sabha_asr.diarization import DEFAULT_MODEL_DIR as DEFAULT_PYANNOTE_DIR
 from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_asr.registry import build_transcriber
 from sabha_asr.roles import RoleTieBreaker
 from sabha_asr.transcriber import Transcriber
-from sabha_core.models import AudioInfo, Recording, Transcript, utc_now
+from sabha_core.models import Analysis, AudioInfo, LlmCall, Person, Recording, Score, Transcript, utc_now
 from sabha_core.mongo import open_sync
 from sabha_core.repo import SyncTenantRepo, own_tenant
 from sabha_core.settings import Settings, get_settings
@@ -42,7 +43,7 @@ from sabha_workers.maintenance import requeue_stuck
 from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
 from sabha_workers.rubrics import rubric_for
-from sabha_workers.stages import diarize, preprocess, transcribe
+from sabha_workers.stages import analyze, diarize, preprocess, transcribe
 from sabha_workers.stages.roles_llm import LlmRoleTieBreaker
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
 from sabha_workers.stages.transcript import TranscriptDeps
@@ -175,10 +176,50 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         save=save_transcript,
     )
 
+    def judge(tenant_id: str, recording_id: str) -> GatewayJudge:
+        llm = gateway()
+        if llm is None:
+            raise LlmConfigError("no LLM provider is configured (set OPENAI_API_KEY)")
+        return GatewayJudge(llm, tenant_id=tenant_id, recording_id=recording_id)
+
+    def save_analysis(tenant_id: str, analysis: Analysis, scores: list[Score]) -> None:
+        analyses = SyncTenantRepo(db, "analyses", tenant_id, Analysis)
+        score_rows = SyncTenantRepo(db, "scores", tenant_id, Score)
+        with db.client.start_session() as session, session.start_transaction():
+            previous = analyses.find({"recording_id": analysis.recording_id, "version": analysis.version},
+                                     session=session)  # fmt: skip
+            for old in previous:
+                score_rows.delete_many({"analysis_id": old.id}, session=session)
+            analyses.delete_many({"recording_id": analysis.recording_id, "version": analysis.version},
+                                 session=session)  # fmt: skip
+            analyses.insert_one(analysis, session=session)
+            if scores:
+                score_rows.insert_many(scores, session=session)
+
+    def llm_cost(tenant_id: str, recording_id: str) -> float | None:
+        calls = SyncTenantRepo(db, "llm_calls", tenant_id, LlmCall).find({"recording_id": recording_id})
+        costs = [call.cost_usd for call in calls]
+        return None if any(cost is None for cost in costs) else round(sum(c for c in costs if c is not None), 6)
+
+    analyze_deps = analyze.AnalyzeDeps(
+        preprocess_version=settings.artefact_version_preprocess,
+        transcribe_version=settings.artefact_version_transcribe,
+        analysis_version=settings.artefact_version_analyze,
+        tenant=lambda tenant_id: own_tenant(db, tenant_id),
+        person=lambda tenant_id, person_id: SyncTenantRepo(db, "people", tenant_id, Person).find_one(
+            {"_id": person_id}
+        ),
+        rubric=lambda tenant, kind: rubric_for(tenant, kind, rubrics_dir),
+        judge=judge,
+        save=save_analysis,
+        llm_cost=llm_cost,
+    )
+
     built = {
         "preprocess": preprocess.make_work(originals, record_audio, vad, params),
         "diarize": diarize.make_work(diarizer, settings.artefact_version_preprocess, settings.diarization_device),
         "transcribe": transcribe.make_work(transcriber, settings.artefact_version_preprocess, transcript_deps),
+        "analyze": analyze.make_work(analyze_deps),
     }
     return {name: built.get(name) or not_built(name) for name in SPECS}
 

@@ -84,6 +84,8 @@ REASONS: dict[str, dict[str, str]] = {
         "no_speakers": "We could not tell who was speaking.",
         "no_transcript": "Speech was found but no words could be recognised.",
         "no_rubric": "There is no rubric for this kind of conversation yet.",
+        "analysis_failed": "The feedback could not be produced; an administrator can retry it.",
+        "ticket_failed": "The call ticket could not be written.",
     },
     "hi": {
         "unclear_roles": "बोलने वालों को ठीक से अलग नहीं पहचाना जा सका।",
@@ -95,6 +97,8 @@ REASONS: dict[str, dict[str, str]] = {
         "no_speakers": "यह पता नहीं चल सका कि कौन बोल रहा था।",
         "no_transcript": "बोली मिली, लेकिन कोई शब्द पहचाने नहीं जा सके।",
         "no_rubric": "इस तरह की बातचीत के लिए अभी कोई रूब्रिक नहीं है।",
+        "analysis_failed": "फ़ीडबैक नहीं बन सका; व्यवस्थापक इसे दोबारा चला सकते हैं।",
+        "ticket_failed": "कॉल का टिकट नहीं लिखा जा सका।",
     },
 }
 

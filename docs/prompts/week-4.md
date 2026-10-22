@@ -37,7 +37,7 @@ Done when: a planted fake quote never reaches the stored analysis.
 
 ## P5.7 · Synthesis, schema validation and storage
 
-> **Status (2026-10-19).** Already built: synthesis, `analysis@v1` schema validation, the report builder, and LLM calls through the gateway (`sabha_analytics.judge.GatewayJudge`, P5.1). Remaining: storing analyses and scores through TenantRepo and the analyze stage's `work` function. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError).
+> **Status (2026-10-22).** Built: `apps/workers/sabha_workers/stages/analyze.py` runs the analysis through the gateway, stores `analysis@v1.json`, an `analyses` document (rubric, model ids, prompt hashes, tokens, cost from llm_calls) and one `scores` document per dimension in one transaction, keyed by (recording, stage version). COMPLETED, or NEEDS_REVIEW with the report's reason. Remaining: a real lesson end to end on staging.
 
 Plan task 5.7.
 
@@ -61,6 +61,8 @@ Done when: a real lesson on staging reaches COMPLETED with a full report.
 ---
 
 ## P5.7b · Analysis API
+
+> **Status (2026-10-22).** Built: `apps/api/sabha_api/routers/results.py` and `services/results.py`: list (cursor paging), detail, transcript with a presigned playback URL (audited recording.play), latest analysis (audited analysis.view), analysis history and person trends. Visibility: owners/admins all, managers and reviewers their units, staff their own; else 404. Evidence stays redacted for everyone (decided 2026-10-19), so no un-redaction. All routes are in tests/security/permissions.yaml.
 
 Implied by tasks 5.7 and 6.6.
 

@@ -70,7 +70,7 @@ Done when: roles are correct on most gold files and low-confidence cases are fla
 
 ## P3.7 · Transcript assembly
 
-> **Status (2026-10-22).** Built into the transcribe stage: `transcript@v1.json` on the original timeline and a `transcripts` document (roles, language mix, rubric). Remaining: `GET /v1/recordings/{id}/transcript` (built with the analysis API, P5.7b), and text search.
+> **Status (2026-10-22).** Built into the transcribe stage: `transcript@v1.json` on the original timeline and a `transcripts` document (roles, language mix, rubric). `GET /v1/recordings/{id}/transcript` is built (P5.7b). Remaining: text search.
 
 Plan task 3.7.
 
