@@ -304,3 +304,15 @@ def test_a_trend_of_the_overall_score_and_of_one_dimension(api: Api) -> None:
     one = api.get("manager", "/v1/people/p-asha/trend?dimension=concept_clarity&limit=2").json()
     assert [p["score"] for p in one["points"]] == [3, 4]  # the latest two, oldest first
     assert api.get("asha", "/v1/people/p-ravi/trend").json()["code"] == "not_found"  # not her
+
+
+def test_people_lists_whom_each_caller_may_upload_for(api: Api) -> None:
+    def names(sub: str) -> list[str]:
+        response = api.get(sub, "/v1/people")
+        assert response.status_code == 200, response.text
+        return [p["name"] for p in response.json()]
+
+    assert names("owner") == ["Asha", "Ravi"]
+    assert names("manager") == ["Asha"]  # unit-1 only
+    assert names("asha") == ["Asha"]  # staff upload only for themselves
+    assert names("nobody") == []

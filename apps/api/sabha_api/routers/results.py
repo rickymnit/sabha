@@ -106,6 +106,13 @@ async def list_analyses(
     return await service.analysis_history(recording, analyses)
 
 
+@people_router.get("", response_model=list[service.PersonOut])
+async def list_people(principal: Caller, people: People) -> list[service.PersonOut]:
+    """The people you may see and upload for, by name: everyone (owners, admins), your units (managers, reviewers)
+    or yourself (staff)."""
+    return await service.visible_people(principal, people)
+
+
 @people_router.get("/{person_id}/trend", response_model=service.TrendOut)
 async def person_trend(
     person_id: str, principal: Caller, people: People, analyses: Analyses, scores: Scores,

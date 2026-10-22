@@ -167,3 +167,8 @@ routes:
     staff_uploader: 200  # staff see their own person's recordings
     staff_colleague: 404
     other_tenant: 404
+
+  GET /v1/people:
+    # The people each caller may see and upload for (filtered; tested in apps/api/tests/test_results.py).
+    anonymous: 401
+    others: 200
