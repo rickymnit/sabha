@@ -172,15 +172,18 @@ def test_onnxruntime_telemetry_is_forced_off_before_import() -> None:
     assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"  # set when sabha_workers.stages.vad is imported
 
 
-def test_only_the_vad_module_imports_onnxruntime() -> None:
-    # Any other import could run before vad.py sets ORT_DISABLE_TELEMETRY, and telemetry would be on.
+def test_every_module_that_loads_onnxruntime_turns_its_telemetry_off_first() -> None:
+    # onnxruntime is loaded by our VAD and, through pyannote's speaker embeddings, by diarization (strace found
+    # Microsoft connections from the latter). Each of our modules that imports onnxruntime or pyannote must set
+    # ORT_DISABLE_TELEMETRY at module level, before that import can run.
     root = Path(__file__).resolve().parents[3]
-    offenders = [
-        str(path.relative_to(root))
-        for folder in ("apps", "packages")
-        for path in (root / folder).rglob("*.py")
-        if "onnxruntime" in path.read_text(encoding="utf-8")
-        and path.name not in ("vad.py", "test_vad.py")
-        and ".venv" not in path.parts
-    ]
+    loads = ("import onnxruntime", "from onnxruntime", "import pyannote", "from pyannote")
+    offenders = []
+    for folder in ("apps", "packages"):
+        for path in (root / folder).rglob("*.py"):
+            if ".venv" in path.parts or path.parent.name == "tests":
+                continue
+            text = path.read_text(encoding="utf-8")
+            if any(load in text for load in loads) and 'os.environ["ORT_DISABLE_TELEMETRY"] = "1"' not in text:
+                offenders.append(str(path.relative_to(root)))
     assert offenders == []

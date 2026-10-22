@@ -112,7 +112,7 @@ Done when: 5 real files have segment maps that round-trip exactly.
 
 ## P3.4a · Diarization (first pass)
 
-> **Status (2026-10-19).** Not built. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError).
+> **Status (2026-10-21).** Built for CPU: `sabha_asr/diarization.py` (pyannote community-1, pinned revision; `ScriptedDiarizer` for tests) and `apps/workers/sabha_workers/stages/diarize.py`, which writes `diarization@v1.json` on both timelines. `make setup-speech` installs pyannote + CPU PyTorch and fetches the model (HF_TOKEN). Measured on this dev machine (CPU, 8 threads): 5 minutes of interview speech took 433 s (1.44x real time), 1.15 GB peak memory at batch size 8, 3 speakers; no network connections (strace). Telemetry off: docs/security/findings.md #7 and #8. Remaining: NeMo Sortformer and the GPU image's CUDA build (Dockerfile.gpu header) once a GPU exists; running on gold-set files.
 
 Plan task 3.4 (continues in week 3).
 

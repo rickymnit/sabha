@@ -245,6 +245,28 @@ class Recording(TenantDoc):
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
+class Transcript(TenantDoc):
+    """A recording's canonical transcript (P3.7): the file is `storage_key` (transcript@v1.json, ORIGINAL timeline).
+
+    `roles` maps the diarizer's anonymous speaker labels to rubric roles (teacher/students, receptionist/caller);
+    no student is identified (golden rule 10). `roles_need_review` is True while a person must confirm them.
+    """
+
+    recording_id: str = Field(min_length=1)
+    version: str = Field(min_length=1)  # "transcript@v1"
+    storage_key: str = Field(min_length=1)
+    asr_model: str = Field(min_length=1)
+    word_timing: Literal["word", "approximate"]
+    word_count: int = Field(ge=0)
+    utterance_count: int = Field(ge=0)
+    language_mix: dict[str, float] = Field(default_factory=dict)  # share of the audio per language code
+    roles: dict[str, str] = Field(default_factory=dict)
+    roles_method: str = ""
+    roles_need_review: bool = False
+    rubric_id: str = Field(min_length=1)
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
 class StageRun(TenantDoc):
     """One attempt of one pipeline stage for one recording (plan task P2.3); cost inputs go in `meta`."""
 

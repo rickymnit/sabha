@@ -81,6 +81,9 @@ REASONS: dict[str, dict[str, str]] = {
         "invalid_audio": "The audio file could not be read.",
         "uncertain_type": "We could not tell what kind of conversation this is.",
         "no_speech": "No speech was found in the recording.",
+        "no_speakers": "We could not tell who was speaking.",
+        "no_transcript": "Speech was found but no words could be recognised.",
+        "no_rubric": "There is no rubric for this kind of conversation yet.",
     },
     "hi": {
         "unclear_roles": "बोलने वालों को ठीक से अलग नहीं पहचाना जा सका।",
@@ -89,6 +92,9 @@ REASONS: dict[str, dict[str, str]] = {
         "invalid_audio": "ऑडियो फ़ाइल पढ़ी नहीं जा सकी।",
         "uncertain_type": "यह किस तरह की बातचीत है, यह तय नहीं हो सका।",
         "no_speech": "रिकॉर्डिंग में कोई बोली नहीं मिली।",
+        "no_speakers": "यह पता नहीं चल सका कि कौन बोल रहा था।",
+        "no_transcript": "बोली मिली, लेकिन कोई शब्द पहचाने नहीं जा सके।",
+        "no_rubric": "इस तरह की बातचीत के लिए अभी कोई रूब्रिक नहीं है।",
     },
 }
 

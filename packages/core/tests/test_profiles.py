@@ -48,7 +48,7 @@ def test_school_defaults() -> None:
     assert school.default_rubrics == {
         T.TEACHING: "teaching.school.v0.1",
         T.COUNSELLING: None,
-        T.RECEPTION: "reception.school.v0.1",
+        T.RECEPTION: "reception.school.v0.2",
         T.MEETING: None,
         T.SALES: None,
     }

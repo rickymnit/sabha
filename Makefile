@@ -11,7 +11,7 @@ PY_APPS := apps/api apps/workers scripts
 MYPY := $(UV) run mypy --config-file $(CURDIR)/pyproject.toml
 
 .DEFAULT_GOAL := help
-.PHONY: workers beat relay help env setup models dev api down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
+.PHONY: workers beat relay help env setup models setup-speech models-speech dev api down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
 
 help: ## List the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -31,6 +31,13 @@ setup: env ## Install Python and web dependencies, the git hooks and the VAD mod
 
 models: ## Fetch the pinned Silero VAD model into ~/.cache/sabha/models (checksum verified; P3.3)
 	$(UV) run python -m sabha_workers.stages.vad fetch
+
+setup-speech: ## Install pyannote + CPU PyTorch for speaker diarization and fetch its model (needs HF_TOKEN; P3.4)
+	$(UV) sync --extra speech
+	$(MAKE) models-speech
+
+models-speech: ## Fetch the pinned pyannote diarization model (HF_TOKEN in .env, model conditions accepted)
+	$(UV) run --extra speech python -m sabha_asr.diarization fetch
 
 dev: env ## Start Mongo (replica set), Redis and RustFS, then create the buckets
 	$(COMPOSE) up -d --wait

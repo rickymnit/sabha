@@ -87,6 +87,14 @@ class ArtefactStore(Protocol):
         """Upload a file from disk (in parts when large, so it is never held in memory)."""
         ...
 
+    def get(self, key: str) -> bytes:
+        """A small artefact's bytes (JSON); FileNotFoundError when it is not there."""
+        ...
+
+    def download(self, key: str, path: Path) -> None:
+        """A large artefact to disk; FileNotFoundError when it is not there."""
+        ...
+
 
 class S3Artefacts:
     """The artefacts bucket through a boto3 client."""
@@ -109,6 +117,21 @@ class S3Artefacts:
 
     def put_file(self, key: str, path: Path, content_type: str) -> None:
         self._s3.upload_file(str(path), self._bucket, key, ExtraArgs={"ContentType": content_type})
+
+    def get(self, key: str) -> bytes:
+        try:
+            body: bytes = self._s3.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+        except self._s3.exceptions.NoSuchKey as exc:
+            raise FileNotFoundError(key) from exc
+        return body
+
+    def download(self, key: str, path: Path) -> None:
+        try:
+            self._s3.download_file(self._bucket, key, str(path))
+        except self._s3.exceptions.ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                raise FileNotFoundError(key) from exc
+            raise
 
 
 @dataclass(frozen=True, slots=True)

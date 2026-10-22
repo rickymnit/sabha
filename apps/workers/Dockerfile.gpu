@@ -3,8 +3,12 @@
 #   docker build -f apps/workers/Dockerfile.gpu -t sabha-workers-gpu .
 # Run with the NVIDIA container runtime (`--gpus all`, or `runtime: nvidia` in compose).
 #
-# CUDA 12.8 runtime: the L4 (Ada Lovelace) is supported, and PyTorch publishes cu128 wheels. The model libraries
-# themselves (torch, pyannote/NeMo, the ASR providers) are added to sabha-asr in P3.1 and P3.4.
+# CUDA 12.8 runtime: the L4 (Ada Lovelace) is supported, and PyTorch publishes cu128 wheels.
+#
+# Not ready for diarization yet (P3.4a, 2026-10-20): pyannote is the optional `speech` extra, locked against
+# PyTorch's CPU index for dev machines without a GPU. When a GPU arrives: add a cu128 variant of the extra
+# (uv `conflicts` between a cpu and a cu128 extra), sync it here, fetch the pyannote model at build time with
+# HF_TOKEN as a build secret, and set DIARIZATION_DEVICE=cuda, HF_HUB_OFFLINE=1 and PYANNOTE_METRICS_ENABLED=false.
 
 FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04 AS build
 COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /usr/local/bin/uv
@@ -31,6 +35,9 @@ RUN apt-get update \
     && groupadd --system --gid 10001 sabha && useradd --system --uid 10001 --gid sabha --no-create-home sabha
 COPY --from=build /opt/python /opt/python
 COPY --from=build --chown=sabha:sabha /app/.venv /app/.venv
+# Rubric files: the role assignment (P3.6) and analyze (P5.7) steps read <RUBRICS_DIR>/<rubric id>.yaml.
+COPY --chown=sabha:sabha rubrics /app/rubrics
+ENV RUBRICS_DIR=/app/rubrics
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER sabha
 # One task at a time per GPU (P2.4): run with --concurrency 1 on the gpu.speech queues.
