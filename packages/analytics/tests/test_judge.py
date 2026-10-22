@@ -65,3 +65,31 @@ def test_unknown_roles_are_refused() -> None:
             json_schema=SCHEMA,
             cache_prefix=None,
         )
+
+
+def test_a_redacted_transcript_and_the_real_prompts_go_through_the_real_gateway(lesson: Any, rubric: Any,
+                                                                                  answers: Any) -> None:  # fmt: skip
+    # Found in the first end-to-end run: the gateway's own redaction refused text that was already redacted (the
+    # transcript's [STUDENT_1]) and prompts that explain placeholders. Only the provider is fake here.
+    import json
+
+    from sabha_analytics.report import analyse
+
+    synthesis = {
+        "summary": "A clear lesson on photosynthesis with a short recap at the end.",
+        "strengths": ["Defines key terms in plain words.", "Links ideas to everyday experience."],
+        "gaps": ["Few checks that students understood.", "The recap is brief."],
+        "suggestions": [
+            {"text": "Ask a student to explain photosynthesis back in their own words.", "utterance_id": "u0001"},
+            {"text": "Pause after defining chlorophyll and ask why leaves are green.", "utterance_id": "u0003"},
+            {"text": "Let students state the two key ideas in the recap.", "utterance_id": "u0004"},
+        ],
+    }
+    model, provider, _ = judge([json.dumps({"dimensions": [answers.good_concept, answers.good_recap]}),
+                                json.dumps(synthesis)])  # fmt: skip
+    metrics = [{"key": "teacher_talk_share", "value": 0.82, "unit": "ratio", "definition": "Teacher talk share."}]
+    result = analyse(rubric=rubric, transcript=lesson, metrics=metrics, model=model, analysed_roles={"teacher"})
+    assert result.report["overall"]["score"] == 3.6
+    sent = " ".join(m.content for request in provider.requests for m in request.messages)
+    assert "[STUDENT_1]" in sent  # the caller's placeholder, unchanged, so grounding can still map it
+    assert "Aman" not in sent and "9876543210" not in sent
