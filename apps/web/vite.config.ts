@@ -8,6 +8,9 @@ const api = "http://localhost:8000"; // `make api`
 export default defineConfig({
   plugins: [react()],
   server: {
+    // 5180, not Vite's default 5173, so Sabha never collides with other projects' dev servers.
+    port: 5180,
+    strictPort: true,
     proxy: {
       "/v1": api,
       "/dev-idp": api,

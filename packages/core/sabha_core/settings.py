@@ -125,7 +125,7 @@ class Settings(BaseSettings):
     # Email (Amazon SES). Without SES_SENDER no email is sent (the notify task logs that and skips).
     ses_region: str = INDIA_REGION
     ses_sender: str | None = None
-    web_base_url: str = "http://localhost:5173"  # links in emails point here
+    web_base_url: str = "http://localhost:5180"  # links in emails point here (the web dev server, vite.config.ts)
 
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)

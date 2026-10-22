@@ -8,12 +8,12 @@ Until Auth0 is set up (last), the app signs in through the API's local dev sign-
 APP_ENV=local only):
 
 1. In the repo's `.env`: `APP_ENV=local`, `DEV_LOGIN=true`, `OIDC_ISSUER=http://localhost:8000/dev-idp`,
-   `OIDC_AUDIENCE=sabha-local`, `OIDC_CLIENT_ID=sabha-web`, `CORS_ORIGINS=http://localhost:5173` (storage CORS for
+   `OIDC_AUDIENCE=sabha-local`, `OIDC_CLIENT_ID=sabha-web`, `CORS_ORIGINS=http://localhost:5180` (storage CORS for
    direct uploads).
 2. `make dev` (MongoDB, Redis, RustFS and the buckets), then `uv run python scripts/admin/dev_seed.py` once.
 3. `make api`, `make workers` and `make relay` in three terminals (the pipeline needs `make models`, and
    `make setup-speech` for diarization).
-4. In `apps/web/.env.local`: `VITE_AUTH_MODE=dev`; then `pnpm -C apps/web dev` and open http://localhost:5173.
+4. In `apps/web/.env.local`: `VITE_AUTH_MODE=dev`; then `pnpm -C apps/web dev` and open http://localhost:5180.
    Pick someone on the sign-in page. Vite forwards `/v1` and `/dev-idp` to the API on port 8000.
 
 Pages today: recordings (status refreshes while processing), a recording's report and transcript with playback,
