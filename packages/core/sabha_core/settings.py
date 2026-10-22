@@ -130,6 +130,9 @@ class Settings(BaseSettings):
     # Speech workers
     gpu_device_id: int | None = Field(default=None, ge=0)
 
+    # Local dev sign-in (sabha_api.auth.dev_idp) while Auth0 is not set up: APP_ENV=local only, refused elsewhere.
+    dev_login: bool = False
+
     # Rubric files (P3.6, P5.7): <rubrics_dir>/<rubric id>.yaml. Relative paths are from the working directory (the
     # repo root in development); the worker images set /app/rubrics.
     rubrics_dir: str = "rubrics"
@@ -247,6 +250,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_combinations(self) -> Settings:
+        if self.dev_login and self.app_env != "local":
+            raise ValueError("DEV_LOGIN is for local development only (APP_ENV=local)")
         if self.diarizer == "fake" and self.app_env != "test":
             raise ValueError("DIARIZER=fake is for tests only (APP_ENV=test)")
         if (self.langfuse_public_key is None) != (self.langfuse_secret_key is None):
