@@ -22,9 +22,11 @@ from pymongo import MongoClient
 from sabha_api.main import create_app
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import IdentityLink, Person, Role, Tenant, Unit, User
+from sabha_core.models import Analysis, IdentityLink, Person, Recording, Role, Score, Tenant, Transcript, Unit, User
+from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.settings import Settings
+from sabha_core.state import RecordingStatus
 
 MATRIX_FILE = Path(__file__).with_name("permissions.yaml")
 STATUSES = {200, 201, 401, 403, 404, 422, 503}
@@ -98,6 +100,9 @@ CALLERS: dict[str, tuple[str, Role, list[str]]] = {  # caller -> (tenant, role, 
 }
 ISSUER = "https://auth.example.com"
 FILE = b"0123456789"
+DONE = "rec-done"
+TRANSCRIPT_KEY = f"tenant-a/{DONE}/transcribe@v1/transcript@v1.json"
+REPORT_KEY = f"tenant-a/{DONE}/analyze@v1/analysis@v1.json"
 
 
 @pytest.fixture(scope="module")
@@ -122,6 +127,22 @@ def seeded_db(mongo_replica_set: MongoClient[dict[str, Any]]) -> Iterator[str]:
         Person(id="p-colleague", tenant_id="tenant-a", name="Bina", unit_id="unit-1", user_id="u-staff_colleague"),
     ):
         db.people.insert_one(person.model_dump(by_alias=True))
+    # A finished recording of Asha with its transcript and analysis, for the read routes (P5.7b).
+    for doc in (
+        Recording(id=DONE, tenant_id="tenant-a", type=ConversationType.TEACHING, status=RecordingStatus.COMPLETED,
+                  consent_ref="c", person_id="p-asha", unit_id="unit-1", created_by="u-staff_uploader"),
+        Transcript(tenant_id="tenant-a", recording_id=DONE, version="transcript@v1", storage_key=TRANSCRIPT_KEY,
+                   asr_model="fake", word_timing="approximate", word_count=0, utterance_count=0,
+                   roles={"S0": "teacher"}, rubric_id="teaching.school.v0.1"),
+        Analysis(id="an-done", tenant_id="tenant-a", recording_id=DONE, version="v1", person_id="p-asha",
+                 unit_id="unit-1", conversation_type=ConversationType.TEACHING, rubric_id="teaching.school.v0.1",
+                 rubric_version="0.1", rubric_hash="h", report_key=REPORT_KEY, status="COMPLETED", overall_score=3.6,
+                 verified_share=1.0),
+        Score(tenant_id="tenant-a", analysis_id="an-done", recording_id=DONE, person_id="p-asha",
+              dimension="concept_clarity", name="Concept clarity", weight=0.6, score=4, verified=True),
+    ):  # fmt: skip
+        db[{"Recording": "recordings", "Transcript": "transcripts", "Analysis": "analyses",
+            "Score": "scores"}[type(doc).__name__]].insert_one(doc.model_dump(by_alias=True))  # fmt: skip
     yield name
     mongo_replica_set.drop_database(name)
 
@@ -157,6 +178,9 @@ def api(mongo_uri: str, seeded_db: str, fake_idp: Any, s3_storage: Any) -> Itera
     }
     settings = Settings(_env_file=None, **values)  # type: ignore[call-arg]  # pydantic-settings
     app = create_app(settings, resources=open_resources, token_verifier=fake_idp.verifier())
+    artefacts = s3_storage.client()
+    artefacts.put_object(Bucket="sabha-artefacts", Key=TRANSCRIPT_KEY, Body=b'{"utterances": []}')
+    artefacts.put_object(Bucket="sabha-artefacts", Key=REPORT_KEY, Body=b'{"version": "analysis@v1"}')
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield Api(test_client, fake_idp)
 
@@ -212,6 +236,18 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "POST /v1/recordings": create_recording,
     "POST /v1/recordings/{recording_id}/parts": parts,
     "POST /v1/recordings/{recording_id}/complete": complete,
+    "GET /v1/recordings": lambda a, who: a.client.get("/v1/recordings", headers=a.headers(who)),
+    "GET /v1/recordings/{recording_id}": lambda a, who: a.client.get(f"/v1/recordings/{DONE}", headers=a.headers(who)),
+    "GET /v1/recordings/{recording_id}/transcript": lambda a, who: a.client.get(
+        f"/v1/recordings/{DONE}/transcript", headers=a.headers(who)
+    ),
+    "GET /v1/recordings/{recording_id}/analysis": lambda a, who: a.client.get(
+        f"/v1/recordings/{DONE}/analysis", headers=a.headers(who)
+    ),
+    "GET /v1/recordings/{recording_id}/analyses": lambda a, who: a.client.get(
+        f"/v1/recordings/{DONE}/analyses", headers=a.headers(who)
+    ),
+    "GET /v1/people/{person_id}/trend": lambda a, who: a.client.get("/v1/people/p-asha/trend", headers=a.headers(who)),
 }
 
 

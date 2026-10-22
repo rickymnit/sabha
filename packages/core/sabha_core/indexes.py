@@ -43,6 +43,9 @@ INDEXES: dict[str, list[IndexModel]] = {
         _ix("tenant_status_created", (T, ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)),
         _ix("tenant_person_created", (T, ASCENDING), ("person_id", ASCENDING), ("created_at", DESCENDING)),
         _ix("tenant_sha256", (T, ASCENDING), ("sha256", ASCENDING)),  # duplicate detection (P2.2)
+        # Listing, newest first, for everyone and for unit-scoped callers (P5.7b, cursor on created_at then _id).
+        _ix("tenant_created", (T, ASCENDING), ("created_at", DESCENDING), ("_id", DESCENDING)),
+        _ix("tenant_unit_created", (T, ASCENDING), ("unit_id", ASCENDING), ("created_at", DESCENDING)),
     ],
     "stage_runs": [
         _ix(
@@ -64,7 +67,8 @@ INDEXES: dict[str, list[IndexModel]] = {
             ("recording_id", ASCENDING),
             ("version", ASCENDING),
             unique=True,
-        )
+        ),
+        _ix("tenant_person_created", (T, ASCENDING), ("person_id", ASCENDING), ("created_at", DESCENDING)),  # trends
     ],
     "scores": [
         _ix("tenant_analysis", (T, ASCENDING), ("analysis_id", ASCENDING)),

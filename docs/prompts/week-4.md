@@ -62,6 +62,8 @@ Done when: a real lesson on staging reaches COMPLETED with a full report.
 
 ## P5.7b · Analysis API
 
+> **Status (2026-10-22).** Built: `apps/api/sabha_api/routers/results.py` and `services/results.py`: list (cursor paging), detail, transcript with a presigned playback URL (audited recording.play), latest analysis (audited analysis.view), analysis history and person trends. Visibility: owners/admins all, managers and reviewers their units, staff their own; else 404. Evidence stays redacted for everyone (decided 2026-10-19), so no un-redaction. All routes are in tests/security/permissions.yaml.
+
 Implied by tasks 5.7 and 6.6.
 
 ```text
