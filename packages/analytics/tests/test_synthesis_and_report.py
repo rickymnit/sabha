@@ -201,3 +201,14 @@ def test_check_report_refuses_a_malformed_not_applicable_dimension(
     recap.update(tamper)
     with pytest.raises(InvalidReport, match="not-applicable dimension needs no score"):
         check_report(report, lesson)
+
+
+def test_a_suggestion_naming_an_utterance_id_is_reasked(rubric: Rubric, lesson: PreparedTranscript, fake_judge: Any,
+                                                        answers: Any) -> None:  # fmt: skip
+    # Found in the first real run: "At utterance u0000, try pausing longer..." People read this text.
+    with_id = good_synthesis(suggestions=[{"text": "At utterance u0001, ask a student to explain it back.",
+                                           "utterance_id": "u0001"}, *good_synthesis()["suggestions"][1:]])  # fmt: skip
+    model = fake_judge([scoring_answer(answers), with_id, good_synthesis()])
+    result = run(rubric, lesson, model)
+    assert "mentions u0001" in model.calls[2]["messages"][0]["content"]
+    assert "u0001," not in json.dumps(result.report["synthesis"])

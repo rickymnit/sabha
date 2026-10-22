@@ -330,7 +330,7 @@ def metric_out(metric: dict[str, Any], person_label: str) -> dict[str, Any]:
     value, unit = metric["value"], metric["unit"]
     if unit == "s":
         value, unit = (None if value is None else round(value * 1000)), "ms"
-    unit = {"words_per_minute": "wpm"}.get(unit, unit)
+    unit = {"words/min": "wpm", "words_per_minute": "wpm"}.get(unit, unit)
     if unit not in ("ratio", "count", "wpm", "ms"):
         unit = "count"
     return {"key": metric["key"], "name": name[:1].upper() + name[1:], "value": value, "unit": unit,

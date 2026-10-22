@@ -114,7 +114,7 @@ DIMENSIONS: list[dict[str, Any]] = [
 METRICS = [
     {"key": "teacher_talk_share", "value": 0.82, "unit": "ratio", "definition": "Share of talk time."},
     {"key": "longest_monologue_s", "value": 95.5, "unit": "s", "definition": "Longest stretch of talk."},
-    {"key": "teacher_words_per_minute", "value": 120, "unit": "words_per_minute", "definition": "Speaking pace."},
+    {"key": "words_per_minute", "value": 120, "unit": "words/min", "definition": "Speaking pace."},
 ]
 SYNTHESIS = {"summary": "A clear lesson.", "strengths": ["Plain words."], "gaps": ["Few checks."],
              "suggestions": [{"text": "Ask a student to explain.", "utterance_id": "u0001", "start_ms": 9_000,
@@ -228,7 +228,7 @@ def test_the_report_payload_for_a_completed_lesson(api: Api) -> None:
     metrics = {m["key"]: m for m in body["metrics"]}
     assert metrics["teacher_talk_share"]["name"] == "Teacher talk share"  # the tenant's word for a teacher
     assert (metrics["longest_monologue_s"]["unit"], metrics["longest_monologue_s"]["value"]) == ("ms", 95_500)
-    assert metrics["teacher_words_per_minute"]["unit"] == "wpm"
+    assert metrics["words_per_minute"]["unit"] == "wpm"
     assert body["dimensions"][0]["evidence"][0] == DIMENSIONS[0]["evidence"][0]
     assert body["suggestions"] == [{"text": "Ask a student to explain.", "utterance_id": "u0001", "start_ms": 9_000}]
     assert body["phases"] == [{"name": "introduction", "start_ms": 0, "end_ms": 8_000}]
