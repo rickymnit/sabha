@@ -163,8 +163,8 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
 
     rubrics_dir = Path(settings.rubrics_dir)
 
-    def save_transcript(document: Transcript) -> None:
-        transcripts = SyncTenantRepo(db, "transcripts", document.tenant_id, Transcript)
+    def save_transcript(tenant_id: str, document: Transcript) -> None:
+        transcripts = SyncTenantRepo(db, "transcripts", tenant_id, Transcript)
         transcripts.delete_many({"recording_id": document.recording_id, "version": document.version})
         transcripts.insert_one(document)
 
