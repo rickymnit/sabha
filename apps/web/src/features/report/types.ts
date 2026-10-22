@@ -72,7 +72,20 @@ export interface UnverifiedDimension extends DimensionBase {
   verified: false;
 }
 
-export type Dimension = VerifiedDimension | UnverifiedDimension;
+/**
+ * A dimension the rubric allows to be "not applicable" (rubric `not_applicable_when`, for example escalation on a
+ * call with nothing to escalate), verified as such: no score, left out of the overall score, with the reason and
+ * the quotes that show it. Shown as a note, never as a score.
+ */
+export interface NotApplicableDimension extends DimensionBase {
+  verified: true;
+  not_applicable: true;
+  score: null;
+  rationale: string;
+  evidence: EvidenceQuote[];
+}
+
+export type Dimension = VerifiedDimension | UnverifiedDimension | NotApplicableDimension;
 
 /** How a metric value is formatted: ratio 0.16 → "16%", ms 440000 → "7 min 20 s". */
 export type MetricUnit = "ratio" | "count" | "wpm" | "ms";

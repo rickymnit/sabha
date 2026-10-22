@@ -23,7 +23,7 @@ import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
 import { ReportTimeline } from "./ReportTimeline";
 import { DimensionDetail, RubricScoreList } from "./RubricPanels";
 import { evidenceLines } from "./timeline";
-import { visibleDimensions } from "./visibility";
+import { notApplicableDimensions, visibleDimensions } from "./visibility";
 import { DisputeDialog } from "../disputes/DisputeDialog";
 import type { DisputeDraft } from "../disputes/types";
 import {
@@ -118,7 +118,10 @@ function ReportBody({
 }: ReportBodyProps) {
   const [disputeOpen, setDisputeOpen] = useState(false);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
-  const hidden = analysis.dimensions.filter((d) => !dimensions.includes(d as VerifiedDimension));
+  const notApplicable = notApplicableDimensions(analysis.dimensions);
+  const hidden = analysis.dimensions.filter(
+    (d) => !dimensions.includes(d as VerifiedDimension) && !notApplicable.some((n) => n.key === d.key),
+  );
   const utterances = useMemo(() => transcript?.utterances ?? [], [transcript]);
 
   const [chosenKey, setChosenKey] = useState<string | null>(null);
@@ -185,6 +188,17 @@ function ReportBody({
       </section>
 
       {analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
+
+      {notApplicable.length > 0 && (
+        <Card as="section" aria-label="Not applicable" data-testid="not-applicable-note">
+          <p className="m-0 text-sm font-semibold text-ink">Not applicable to this {labels.recording.toLowerCase()}</p>
+          {notApplicable.map((d) => (
+            <p key={d.key} className="m-0 text-ink-2">
+              <span className="font-semibold">{d.name}:</span> {d.rationale} It is left out of the overall score.
+            </p>
+          ))}
+        </Card>
+      )}
 
       {viewerRole === "admin" && hidden.length > 0 && (
         <Card as="section" tone="warning" aria-label="Hidden dimensions" data-testid="admin-hidden-note">

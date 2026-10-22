@@ -134,6 +134,8 @@ Done when: diarization runs on staging GPU for gold-set files.
 
 ## P6.3 · Upload screen
 
+> **Status (2026-10-22).** First version built (`src/pages/UploadPage.tsx`, `pages/upload/upload.ts`): one file up to 512 MB, type and person, consent reference, SHA-256, Idempotency-Key, 3 parts in parallel with retries, duplicate confirmation. Remaining: drag-and-drop and several files, hashing in a Web Worker, resume after reload (IndexedDB + POST /parts), plan-hours panel, Playwright network-drop test.
+
 Plan task 6.3. Read first: `docs/design/03-upload.png`, `docs/design/source/Upload.dc.html`.
 
 ```text
