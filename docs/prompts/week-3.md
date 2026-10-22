@@ -22,7 +22,7 @@ Done when: the chosen diarizer runs reliably on all gold files.
 
 ## P3.5 · Speech-to-text with batching
 
-> **Status (2026-10-19).** Already built: chunk planning and merging, the batcher, and the ASR provider layer with Sarvam AI (P3.1, ADR 0006; there are no LIS baselines: ignore the prompt's references to them and to GPU batching, Sarvam is a hosted API with a 30 s request limit and phrase-level timestamps). Remaining: the transcribe stage's `work` function writing `asr@v1.json` and cost inputs in stage-run meta. The worker pipeline exists (P2.4/P2.5): `apps/workers/sabha_workers/tasks.py` registers this stage with a `stage_not_built` placeholder; replace it with a `work(ctx)` function. `StageRunner` already handles the status changes and outbox events, `_DONE` markers under `{tenant}/{recording}/{stage}@{version}/`, stage runs, retries (TransientError), dead letters (PermanentError) and NEEDS_REVIEW (NeedsReviewError).
+> **Status (2026-10-22).** Built: `apps/workers/sabha_workers/stages/transcribe.py` writes `asr@v1.json` (compact timeline) and cost inputs in stage-run meta, saving each batch of 10 chunks so a retry resumes. Checked live with synthetic speech through Sarvam (saaras:v4): word-perfect, en-IN, 0.6 s for 12 s. The cross-job GPU batcher is not used with a hosted API. Remaining: real pilot lessons on staging.
 
 Plan task 3.5. Read first: `eval/baselines/lis-baselines.md`.
 
