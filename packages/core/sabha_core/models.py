@@ -267,6 +267,55 @@ class Transcript(TenantDoc):
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
+class Analysis(TenantDoc):
+    """One stored analysis of a recording (P5.7): the report is the file at `report_key` (analysis@v1.json).
+
+    One per (recording, version), where version is the analyze stage's artefact version, so a retried stage
+    replaces its own result and a re-analysis under a new version keeps the history. `status` is the report's
+    outcome: COMPLETED, or NEEDS_REVIEW with `review_reasons`. `cost_usd` is the sum of this recording's LLM calls
+    from the published price table, or None when any call's model has no price there (golden rule 6).
+    """
+
+    recording_id: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    person_id: str | None = None
+    unit_id: str | None = None
+    conversation_type: ConversationType
+    rubric_id: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    rubric_hash: str = Field(min_length=1)
+    report_key: str = Field(min_length=1)
+    status: Literal["COMPLETED", "NEEDS_REVIEW"]
+    overall_score: float | None = None
+    verified_share: float = Field(ge=0, le=1)
+    review_reasons: list[str] = Field(default_factory=list)
+    model_ids: list[str] = Field(default_factory=list)
+    prompt_hashes: dict[str, str] = Field(default_factory=dict)
+    usage: dict[str, int] = Field(default_factory=dict)
+    cost_usd: float | None = None
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
+class Score(TenantDoc):
+    """One rubric dimension of one analysis, flattened for trends (P5.7). Staff only: never a student (rule 10).
+
+    Unverified dimensions have no score and no evidence (golden rule 5); not-applicable ones have no score but
+    keep their evidence of why.
+    """
+
+    analysis_id: str = Field(min_length=1)
+    recording_id: str = Field(min_length=1)
+    person_id: str | None = None
+    dimension: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    weight: float = Field(ge=0)
+    score: int | None = Field(default=None, ge=1, le=5)
+    verified: bool
+    not_applicable: bool = False
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
 class StageRun(TenantDoc):
     """One attempt of one pipeline stage for one recording (plan task P2.3); cost inputs go in `meta`."""
 
