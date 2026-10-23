@@ -5,7 +5,7 @@ import { useMemo, type MouseEvent, type ReactNode } from "react";
 
 import { cx } from "../../design";
 import { formatClock, type RoleLabels, type Utterance } from "../transcript";
-import { formatMinutes, formatPercent } from "./format";
+import { formatMinutes, formatPercent, sentenceCase } from "./format";
 import { buildBars, percentAt, talkShares, ticks, totalMs } from "./timeline";
 import type { EvidenceQuote, Phase, TimeRange } from "./types";
 
@@ -89,7 +89,7 @@ export function ReportTimeline({
               {phases.map((phase, i) => (
                 <li
                   key={`${phase.name}-${phase.start_ms}`}
-                  title={`${phase.name}, ${formatClock(phase.start_ms)} to ${formatClock(phase.end_ms)}`}
+                  title={`${sentenceCase(phase.name)}, ${formatClock(phase.start_ms)} to ${formatClock(phase.end_ms)}`}
                   className={cx(
                     "overflow-hidden whitespace-nowrap px-2 py-[5px]",
                     i % 2 ? "bg-fill-2" : "bg-fill",
@@ -98,7 +98,7 @@ export function ReportTimeline({
                   )}
                   style={{ width: `${percentAt(phase.end_ms - phase.start_ms, durationMs)}%` }}
                 >
-                  {phase.name}
+                  {sentenceCase(phase.name)}
                 </li>
               ))}
             </ol>

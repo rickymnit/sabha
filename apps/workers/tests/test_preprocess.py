@@ -29,6 +29,8 @@ from sabha_workers.stages.preprocess import (
     INVALID_AUDIO,
     MAX_DURATION_MS,
     TIMEOUT,
+    TOO_LONG,
+    TOO_SHORT,
     InvalidAudio,
     Probe,
     S3Originals,
@@ -104,7 +106,6 @@ def test_cover_art_and_video_are_ignored_streams(media: dict[str, Path]) -> None
     [
         ("random.mp3", None),  # any reason: what ffprobe makes of random bytes varies
         ("garbled.mp3", "the start of the file is damaged"),
-        ("short.mp3", "too short: 10.0 s; the minimum is 30 s"),
         ("silent_video.mp4", "no audio stream"),
     ],
 )
@@ -112,6 +113,15 @@ def test_bad_files_are_invalid_audio(media: dict[str, Path], name: str, reason: 
     with pytest.raises(InvalidAudio, match=reason) as caught:
         check(probe(media[name]))
     assert caught.value.code == INVALID_AUDIO
+
+
+def test_readable_audio_outside_the_limits_says_which_limit(media: dict[str, Path]) -> None:
+    with pytest.raises(InvalidAudio, match=r"too short: 10\.0 s; the minimum is 30 s") as short:
+        check(probe(media["short.mp3"]))
+    assert short.value.code == TOO_SHORT  # people read "too short", not "could not be read"
+    with pytest.raises(InvalidAudio, match="too long") as long:
+        check(probed(duration_ms=MAX_DURATION_MS + 1))
+    assert long.value.code == TOO_LONG
 
 
 def probed(**change: Any) -> Probe:
@@ -300,7 +310,7 @@ def test_a_recording_without_speech_asks_for_review(stage: Stage, media: dict[st
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize(("name", "code"), [("garbled.mp3", INVALID_AUDIO), ("short.mp3", INVALID_AUDIO),
+@pytest.mark.parametrize(("name", "code"), [("garbled.mp3", INVALID_AUDIO), ("short.mp3", TOO_SHORT),
                                             (None, "missing_original")])  # fmt: skip
 def test_bad_input_fails_at_once_with_a_dead_letter(stage: Stage, media: dict[str, Path], name: str | None,
                                                     code: str) -> None:  # fmt: skip

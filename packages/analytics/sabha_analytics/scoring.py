@@ -435,8 +435,12 @@ def word_count(text: str) -> int:
     return len(text.split())
 
 
+_ID_IN_TEXT = re.compile(r"\bu[0-9]{4,}\b")
+
+
 def _check_text(where: str, text: object, max_words: int) -> list[Problem]:
-    """Problems with one piece of model prose: blank, too long, or containing a placeholder (golden rule 10)."""
+    """Problems with one piece of model prose: blank, too long, containing a placeholder (golden rule 10), or
+    naming an internal utterance id such as u0042 (people read this text; the report links moments itself)."""
     if not isinstance(text, str) or not text.strip():
         return [Problem("invalid_shape", f"{where} must be a non-blank string.")]
     problems = []
@@ -446,6 +450,11 @@ def _check_text(where: str, text: object, max_words: int) -> list[Problem]:
     if PLACEHOLDER.search(text):
         problems.append(
             Problem("placeholder_in_text", f"{where} contains a placeholder such as [STUDENT_1]; say 'a student'.")
+        )
+    found = _ID_IN_TEXT.search(text)
+    if found:
+        problems.append(
+            Problem("id_in_text", f"{where} mentions {found.group()}; describe the moment in words, never by its id.")
         )
     return problems
 

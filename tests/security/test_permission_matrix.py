@@ -180,7 +180,10 @@ def api(mongo_uri: str, seeded_db: str, fake_idp: Any, s3_storage: Any) -> Itera
     app = create_app(settings, resources=open_resources, token_verifier=fake_idp.verifier())
     artefacts = s3_storage.client()
     artefacts.put_object(Bucket="sabha-artefacts", Key=TRANSCRIPT_KEY, Body=b'{"utterances": []}')
-    artefacts.put_object(Bucket="sabha-artefacts", Key=REPORT_KEY, Body=b'{"version": "analysis@v1"}')
+    report = (
+        b'{"version": "analysis@v1", "overall": {"score": 3.6}, "dimensions": [], "metrics": [], "synthesis": null}'
+    )
+    artefacts.put_object(Bucket="sabha-artefacts", Key=REPORT_KEY, Body=report)
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield Api(test_client, fake_idp)
 
@@ -246,6 +249,11 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     ),
     "GET /v1/recordings/{recording_id}/analyses": lambda a, who: a.client.get(
         f"/v1/recordings/{DONE}/analyses", headers=a.headers(who)
+    ),
+    "GET /v1/people": lambda a, who: a.client.get("/v1/people", headers=a.headers(who)),
+    "GET /v1/people/summary": lambda a, who: a.client.get("/v1/people/summary", headers=a.headers(who)),
+    "GET /v1/overview": lambda a, who: a.client.get(
+        "/v1/overview?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z", headers=a.headers(who)
     ),
     "GET /v1/people/{person_id}/trend": lambda a, who: a.client.get("/v1/people/p-asha/trend", headers=a.headers(who)),
 }

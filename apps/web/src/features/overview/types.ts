@@ -22,15 +22,24 @@ export interface CoachingItem {
   n: number;
 }
 
+/** What is in the pipeline right now, by stage (GET /v1/overview `in_progress`; stages with none are left out). */
+export interface StageCount {
+  stage: "uploading" | "queued" | "preparing" | "finding_speakers" | "transcribing" | "analysing" | "needs_review";
+  n: number;
+}
+
 export interface OverviewStats {
   /** Period as UTC instants, [from, to). */
   from: string;
   to: string;
   recordings_analysed: number;
   audio_hours: number;
-  silence_removed_hours: number;
+  /** Not served yet (it is in each recording's segment map, not the database); the foot is left out without it. */
+  silence_removed_hours?: number | null;
   median_overall_by_type: TypeMedian[];
-  open_disputes: number;
+  /** Not served until disputes are built; the tile is left out without it. */
+  open_disputes?: number | null;
   /** Lowest median verified dimension scores in the period, lowest first. */
   coaching: CoachingItem[];
+  in_progress?: StageCount[];
 }

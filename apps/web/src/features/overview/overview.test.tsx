@@ -115,3 +115,15 @@ describe("period picker", () => {
     expect(onRangeChange).toHaveBeenLastCalledWith("custom", { start: "2026-10-01", end: "2026-10-12" });
   });
 });
+
+describe("overview with what the API serves today", () => {
+  it("leaves out numbers the API does not send, and writes the tenant's capitalised words in lower case", () => {
+    const stats = { ...mockOverview(), silence_removed_hours: undefined, open_disputes: undefined };
+    const labels = { ...mockLabels, recording: "Lesson", recording_plural: "Lessons" };
+    renderPage(stats, { labels, rubricHref: undefined });
+    expect(screen.queryByText(/silence removed/)).toBeNull();
+    expect(screen.queryByText("Open disputes")).toBeNull();
+    expect(within(strip()).getByText("From 128 lessons")).toBeInTheDocument();
+    expect(screen.queryAllByRole("link")).toHaveLength(0); // no rubric page yet: dimension names are plain text
+  });
+});

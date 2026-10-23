@@ -554,3 +554,25 @@ def test_no_recognised_pii_survives_and_restore_is_exact(pieces: list[str]) -> N
         forms.setdefault(span.placeholder, set()).add(text[span.original_start : span.original_end])
     if all(len(written) == 1 for written in forms.values()):
         assert unredact(redacted, result.mapping) == text
+
+
+# --- redact_again: the gateway's safety net on text that may already be redacted ---
+
+
+def test_redact_again_is_redact_on_plain_text() -> None:
+    from sabha_llm.redact import redact_again
+
+    assert redact_again("call 9876543210 today") == redact("call 9876543210 today").redacted_text
+
+
+def test_redact_again_keeps_existing_placeholders_and_numbers_new_ones_after_them() -> None:
+    from sabha_llm.redact import redact_again
+
+    text = (
+        "[STUDENT_1] said [PHONE_1] earlier; now call 9876543210 or mail a.b@example.com. Placeholders like [NAME_1]."
+    )
+    out = redact_again(text)
+    assert "[STUDENT_1]" in out and "[NAME_1]" in out and out.count("[PHONE_1]") == 1
+    assert "9876543210" not in out and "a.b@example.com" not in out
+    assert "[PHONE_2]" in out and "[EMAIL_1]" in out  # never reuses [PHONE_1], which means something else here
+    assert redact_again(out) == out  # running it again changes nothing

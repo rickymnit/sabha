@@ -17,7 +17,7 @@ import {
 
 import { Button, Input, cx } from "../../design";
 import { ChevronDownIcon, ChevronUpIcon, SearchIcon } from "./icons";
-import { findMatches, formatClock, lineAt, segmentText, type Match } from "./text";
+import { findMatches, formatClock, lineAt, paragraphBreaks, segmentText, type Match } from "./text";
 import type { RoleLabels, Utterance } from "./types";
 
 export interface TranscriptListProps {
@@ -366,7 +366,12 @@ const Line = memo(function Line({
   onKeyDown,
 }: LineProps) {
   const lineMatches = matches ?? [];
-  const segments = segmentText(utterance.text, utterance.low_confidence_spans, lineMatches);
+  const segments = segmentText(
+    utterance.text,
+    utterance.low_confidence_spans,
+    lineMatches,
+    paragraphBreaks(utterance.text),
+  );
   const roleClass = !roleInfo ? "text-muted" : roleInfo.analysed ? "text-primary" : "text-warning";
 
   return (
@@ -431,7 +436,12 @@ const Line = memo(function Line({
               </mark>
             );
           }
-          return <span key={i}>{node}</span>;
+          return (
+            <span key={i}>
+              {segment.paragraphStart && <span aria-hidden="true" className="block h-2.5" />}
+              {node}
+            </span>
+          );
         })}
       </span>
     </div>

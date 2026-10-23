@@ -11,6 +11,8 @@ export interface TableColumn<Row> {
   render: (row: Row) => ReactNode;
   /** Extra classes for this column's body cells. */
   className?: string;
+  /** Hide the whole column on phones (below Tailwind's `md`, 768px) so the table fits without scrolling. */
+  hideOnPhone?: boolean;
 }
 
 type Naming =
@@ -25,6 +27,8 @@ export type TableProps<Row> = Naming & {
   minWidth?: number;
   /** Shown in a single full-width row when there are no rows. */
   empty?: ReactNode;
+  /** Extra classes for each body row, for example a hover tint when the row links somewhere. */
+  rowClassName?: string;
   className?: string;
 };
 
@@ -39,6 +43,7 @@ export function Table<Row>({
   rowKey,
   minWidth = 820,
   empty,
+  rowClassName,
   className,
   caption,
   captionHidden = false,
@@ -74,6 +79,7 @@ export function Table<Row>({
                   "border-b border-line-subtle py-2.5 font-medium",
                   edge(i, columns.length),
                   col.align === "right" ? "text-right" : "text-left",
+                  col.hideOnPhone && "hidden md:table-cell",
                 )}
               >
                 {col.hideHeader ? <span className="sr-only">{col.header}</span> : col.header}
@@ -90,7 +96,7 @@ export function Table<Row>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)}>
+              <tr key={rowKey(row)} className={rowClassName}>
                 {columns.map((col, i) => (
                   <td
                     key={col.key}
@@ -98,6 +104,7 @@ export function Table<Row>({
                       "border-b border-track py-3 text-ink-2",
                       edge(i, columns.length),
                       col.align === "right" && "text-right",
+                      col.hideOnPhone && "hidden md:table-cell",
                       col.className,
                     )}
                   >

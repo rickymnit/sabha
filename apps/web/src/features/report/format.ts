@@ -74,3 +74,18 @@ export function formatRange(range: { start_ms: number; end_ms: number }): string
 export function formatScore(score: number): string {
   return score.toFixed(1);
 }
+
+/** "introduction" -> "Introduction"; labels the model writes in lower case. */
+export function sentenceCase(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Under the overall score: how many rubric scores are backed by quotes the grounding check found. */
+export function checkedText(dimensions: readonly { verified: boolean }[]): string {
+  const checked = dimensions.filter((d) => d.verified).length;
+  if (dimensions.length === 0) return "";
+  if (checked === dimensions.length) {
+    return `All ${checked} scores are backed by quotes found in the transcript.`;
+  }
+  return `${checked} of ${dimensions.length} scores are backed by quotes found in the transcript.`;
+}

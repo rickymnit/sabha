@@ -132,10 +132,9 @@ describe("RecordingReport", () => {
 });
 
 describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
-  it("keeps the dispute button disabled, with a reason, for viewers who may not dispute", async () => {
+  it("shows no dispute button to viewers who may not dispute", async () => {
     await renderReport(mockReport(lesson, "completed"));
-    expect(screen.getByRole("button", { name: "Dispute this score" })).toBeDisabled();
-    expect(screen.getByText(/Only the person analysed or their manager/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dispute this score" })).toBeNull();
   });
 
   it("opens the dispute dialog for the person analysed", async () => {
@@ -175,5 +174,25 @@ describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
     await userEvent.setup().click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
     expect(within(scores).getByText("Reviewed")).toBeInTheDocument();
     expect(screen.getByTestId("override-note")).toHaveTextContent(`AI score was ${first!.score}`);
+  });
+
+  it("shows a not-applicable dimension as a note, never as a score or a hidden one", async () => {
+    const report = mockReport(lesson, "completed");
+    const [first] = visibleDimensions(report.dimensions);
+    const escalation: Dimension = {
+      key: "escalation_handling",
+      name: "Escalation handling",
+      weight: 0.1,
+      verified: true,
+      not_applicable: true,
+      score: null,
+      rationale: "The call had nothing to escalate.",
+      evidence: first!.evidence,
+    };
+    await renderReport({ ...report, dimensions: [...report.dimensions, escalation] }, "admin");
+    expect(screen.getByTestId("not-applicable-note")).toHaveTextContent("Escalation handling");
+    expect(screen.getByTestId("not-applicable-note")).toHaveTextContent("The call had nothing to escalate.");
+    expect(within(screen.getByRole("region", { name: "Rubric scores" })).queryByText("Escalation handling")).toBeNull();
+    expect(screen.queryByTestId("admin-hidden-note")?.textContent ?? "").not.toContain("Escalation handling");
   });
 });

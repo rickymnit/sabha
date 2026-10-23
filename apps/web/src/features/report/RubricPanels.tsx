@@ -75,7 +75,6 @@ export interface DimensionDetailProps {
 
 export function DimensionDetail({ dimension, speakers, onSeek, provenance, onDispute }: DimensionDetailProps) {
   const headingId = useId();
-  const disputeNoteId = useId();
   const override = dimension.override;
   return (
     <section
@@ -148,19 +147,11 @@ export function DimensionDetail({ dimension, speakers, onSeek, provenance, onDis
       )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-track pt-4">
-        {onDispute ? (
+        {/* Only people who may dispute see the button; a disabled one would read as broken. */}
+        {onDispute && (
           <Button variant="secondary" onClick={onDispute}>
             Dispute this score
           </Button>
-        ) : (
-          <>
-            <Button variant="secondary" disabled aria-describedby={disputeNoteId}>
-              Dispute this score
-            </Button>
-            <span id={disputeNoteId} className="text-small text-muted">
-              Only the person analysed or their manager can dispute a score.
-            </span>
-          </>
         )}
         <span className="text-small text-muted">{provenance}</span>
       </div>

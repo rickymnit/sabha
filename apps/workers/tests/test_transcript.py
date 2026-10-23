@@ -74,7 +74,7 @@ class Setup:
         self.store.put("t1/r1/diarize@v1/diarization@v1.json", json.dumps(diarization).encode())
         deps = TranscriptDeps(
             diarize_version="v1", tenant=lambda _: TENANT, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
-            tie_breaker=lambda *_: self.tie_breaker, save=self.saved.append,
+            tie_breaker=lambda *_: self.tie_breaker, save=lambda _, doc: self.saved.append(doc),
         )  # fmt: skip
         recording = Recording(id="r1", tenant_id="t1", type=self.kind)
         ctx = StageContext("t1", recording, "t1/r1/transcribe@v1/", self.store, 1)
@@ -158,7 +158,7 @@ def test_missing_diarization_fails_for_a_replay() -> None:
     setup = Setup([])
     ctx = StageContext("t1", Recording(id="r1", tenant_id="t1", type=ConversationType.TEACHING), "p/", Memory(), 1)
     deps = TranscriptDeps("v1", lambda _: TENANT, lambda t, k: rubric_for(t, k, RUBRICS), lambda *_: None,
-                          setup.saved.append)  # fmt: skip
+                          lambda _, doc: setup.saved.append(doc))  # fmt: skip
     with pytest.raises(PermanentError, match="diarization output not found"):
         finish_transcript(ctx, AsrOutput(LECTURE, "m", "approximate", [], MAP), deps)
 

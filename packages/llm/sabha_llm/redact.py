@@ -431,6 +431,38 @@ def redact(
     return RedactionResult("".join(pieces), mapping, tuple(spans), text)
 
 
+_SHIELD_OPEN, _SHIELD_CLOSE = "\ue000", "\ue001"  # private-use characters: never in speech, matched by no pattern
+
+
+def redact_again(text: str) -> str:
+    """The LLM gateway's safety net (golden rule 8): mask pattern PII in text that may already be redacted.
+
+    Callers redact first with the names they know and keep that mapping for grounding; their text (and our own
+    prompts, which explain placeholders such as [STUDENT_1] to the model) then holds placeholder-shaped tokens,
+    which `redact` refuses. Here those tokens are shielded and kept exactly as they are, the patterns run on the
+    rest, and any new placeholder is numbered after the highest existing one of its kind, so none is reused and
+    the caller's mapping stays unambiguous. The new mapping is not returned: nothing masked here is ever restored.
+    """
+    tokens = list(dict.fromkeys(_PLACEHOLDER_SHAPE.findall(text)))
+    if not tokens:
+        return redact(text).redacted_text
+    highest: dict[str, int] = {}
+    for token in tokens:
+        kind, number = token[1:-1].rsplit("_", 1)
+        highest[kind] = max(highest.get(kind, 0), int(number))
+    reserved = tuple(
+        MappingEntry(f"[{kind}_{n}]", kind, f"\x00reserved-{n}", "") for kind, top in highest.items()
+        for n in range(1, top + 1)
+    )  # fmt: skip
+    shielded = text
+    for index, token in enumerate(tokens):
+        shielded = shielded.replace(token, f"{_SHIELD_OPEN}{chr(0xE100 + index)}{_SHIELD_CLOSE}")
+    result = redact(shielded, extend=RedactionMapping(reserved)).redacted_text
+    for index, token in enumerate(tokens):
+        result = result.replace(f"{_SHIELD_OPEN}{chr(0xE100 + index)}{_SHIELD_CLOSE}", token)
+    return result
+
+
 def unredact(text: str, mapping: RedactionMapping) -> str:
     """Replace every placeholder in `text` that `mapping` knows with its value as first written.
 

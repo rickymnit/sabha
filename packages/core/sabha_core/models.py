@@ -144,6 +144,8 @@ class User(TenantDoc):
     email: Email
     name: str = Field(min_length=1)
     role: Role
+    # Job title shown in the app under the name ("Coordinator, Class 6"). Display only: the role decides access.
+    title: str | None = None
     unit_ids: list[str] = Field(default_factory=list)
     status: Literal["invited", "active", "disabled"] = "invited"
     # Notification preferences (P2.7)

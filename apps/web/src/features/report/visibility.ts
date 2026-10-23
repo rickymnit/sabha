@@ -1,4 +1,4 @@
-import type { Dimension, VerifiedDimension } from "./types";
+import type { Dimension, NotApplicableDimension, VerifiedDimension } from "./types";
 
 /**
  * The dimensions the report may show: verified, scored 1 to 5, with at least one quote. Payloads come from the
@@ -13,5 +13,13 @@ export function visibleDimensions(dimensions: readonly Dimension[]): VerifiedDim
       d.score <= 5 &&
       Array.isArray(d.evidence) &&
       d.evidence.length > 0,
+  );
+}
+
+/** Dimensions verified as not applying to this conversation: shown as a note with their reason, never scored. */
+export function notApplicableDimensions(dimensions: readonly Dimension[]): NotApplicableDimension[] {
+  return dimensions.filter(
+    (d): d is NotApplicableDimension =>
+      d.verified === true && "not_applicable" in d && d.not_applicable === true && typeof d.rationale === "string",
   );
 }

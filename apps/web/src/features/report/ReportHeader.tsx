@@ -1,8 +1,9 @@
-// Report header (Analysis.dc.html:78-96): breadcrumb, title, details list and the export and share actions.
+// Report header (Analysis.dc.html:78-96): breadcrumb, title, details list and any actions. The design's Export PDF
+// and Share buttons arrive with those features (export is audited, CLAUDE.md); until then there are none.
 
 import type { ReactNode } from "react";
 
-import { Button, PageHeader } from "../../design";
+import { PageHeader } from "../../design";
 import { formatClock } from "../transcript";
 import { formatIst, formatMinutes, joinList } from "./format";
 import type { Labels, ReportRecording, RubricRef } from "./types";
@@ -12,10 +13,10 @@ export interface ReportHeaderProps {
   labels: Labels;
   /** The rubric the analysis used; omitted while there is no analysis yet. */
   rubric?: RubricRef;
-  /** Link for the rubric version. Default /rubrics/{id}. */
+  /** Link for the rubric version; without it the rubric is plain text (there is no rubric page yet). */
   rubricHref?: (rubric: RubricRef) => string;
-  /** Show the Export PDF and Share placeholders (only when there is a report to export). */
-  showActions?: boolean;
+  /** Buttons on the right. */
+  actions?: ReactNode;
   /** Link for the breadcrumb's list page. Default /recordings. */
   listHref?: string;
 }
@@ -33,8 +34,8 @@ export function ReportHeader({
   recording,
   labels,
   rubric,
-  rubricHref = (r) => `/rubrics/${encodeURIComponent(r.id)}`,
-  showActions = false,
+  rubricHref,
+  actions,
   listHref = "/recordings",
 }: ReportHeaderProps) {
   const speech = [
@@ -57,26 +58,20 @@ export function ReportHeader({
           {speech.length > 0 && <Detail term="Speech">{speech.join(", ")}</Detail>}
           {rubric && (
             <Detail term="Rubric">
-              <a href={rubricHref(rubric)}>
-                {rubric.name} v{rubric.version}
-              </a>
+              {rubricHref ? (
+                <a href={rubricHref(rubric)}>
+                  {rubric.name} v{rubric.version}
+                </a>
+              ) : (
+                <>
+                  {rubric.name} v{rubric.version}
+                </>
+              )}
             </Detail>
           )}
         </dl>
       }
-      actions={
-        showActions && (
-          <>
-            {/* Placeholders: export (P7) and sharing are not built yet. */}
-            <Button variant="secondary" disabled title="Not available yet">
-              Export PDF
-            </Button>
-            <Button disabled title="Not available yet">
-              Share with {labels.person.toLowerCase()}
-            </Button>
-          </>
-        )
-      }
+      actions={actions}
     />
   );
 }

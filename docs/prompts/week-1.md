@@ -30,6 +30,8 @@ Done when: staging is reachable over HTTPS and `/health` responds.
 
 ## P6.2 · App shell, login and navigation
 
+> **Status (2026-10-22).** Built: React Router + TanStack Query app shell (`src/app`), sidebar in the tenant's words from /v1/me, problem+json toasts with request id, 401 signs out, protected routes, and the local dev sign-in page (VITE_AUTH_MODE=dev; Auth0 last). Recordings list and report page on the real API. Remaining: tenant switcher, nav counts, plan usage block, the lint rule against hard-coded nouns, Playwright smoke test.
+
 Plan task 6.2. Read first: `docs/design/01-overview.png` (sidebar), P1.5 output.
 
 ```text

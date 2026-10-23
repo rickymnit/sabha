@@ -30,9 +30,9 @@ Applications → Applications → Create Application → **Single Page Web Appli
 
 | Field | Dev value | Staging/production |
 | --- | --- | --- |
-| Allowed Callback URLs | `http://localhost:5173/` | `https://<web host>/` |
-| Allowed Logout URLs | `http://localhost:5173/` | `https://<web host>/` |
-| Allowed Web Origins | `http://localhost:5173` | `https://<web host>` |
+| Allowed Callback URLs | `http://localhost:5180/` | `https://<web host>/` |
+| Allowed Logout URLs | `http://localhost:5180/` | `https://<web host>/` |
+| Allowed Web Origins | `http://localhost:5180` | `https://<web host>` |
 | Refresh Token Rotation | On | On |
 
 Note its **Client ID**. A single-page app has no client secret.
@@ -81,7 +81,7 @@ blocks sign-in and token renewal.
 
 1. Create a tenant and invite yourself as its owner, with the email of the Google account you will sign in with:
    `uv run python scripts/admin/create_tenant.py --name "Test School" --owner-email you@example.com --owner-name "You"`.
-2. `make api` and `pnpm -C apps/web dev`, then open http://localhost:5173/. You should be sent to Auth0, sign in
+2. `make api` and `pnpm -C apps/web dev`, then open http://localhost:5180/. You should be sent to Auth0, sign in
    with Google, and come back to Sabha.
 3. `GET /v1/me` with your access token returns your role (owner) and your tenant's labels. Your first sign-in
    links the invite to your login and marks you active.

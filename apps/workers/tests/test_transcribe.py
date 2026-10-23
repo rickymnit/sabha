@@ -91,10 +91,16 @@ class Stage:
         self.saved: list[Transcript] = []
         self.transcript_deps = TranscriptDeps(
             diarize_version="v1", tenant=lambda _: TENANT, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
-            tie_breaker=lambda *_: None, save=self.saved.append,
+            tie_breaker=lambda *_: None, save=self.save_transcript,
         )  # fmt: skip
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"transcribe": "v1"}, worker="test",
                                   jitter=lambda: 0.0)  # fmt: skip
+
+    def save_transcript(self, tenant_id: str, document: Transcript) -> None:
+        # Through the real tenant-scoped repository: a missing tenant id must fail here, as in the worker.
+        transcripts = SyncTenantRepo(self.db, "transcripts", tenant_id, Transcript)
+        transcripts.insert_one(document)
+        self.saved.append(document)
 
     def recording(self, segment_map: SegmentMap = MAP, *, with_inputs: bool = True) -> str:
         recording = Recording(type=ConversationType.TEACHING, status=S.TRANSCRIBING, consent_ref="c")
@@ -157,6 +163,8 @@ def test_the_stage_writes_compact_words_and_cost_inputs(stage: Stage) -> None:
     (doc,) = stage.saved
     assert doc.roles == {"S0": "teacher"} and doc.storage_key.endswith("transcript@v1.json")
     assert meta["speakers"] == 1
+    stored = stage.db.transcripts.find_one({"recording_id": rid})
+    assert stored is not None and stored["tenant_id"] == "t1"
 
 
 @pytest.mark.integration

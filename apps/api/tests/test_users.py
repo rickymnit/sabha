@@ -309,16 +309,20 @@ def test_me_returns_the_user_role_and_tenant_labels(api: Api) -> None:
         "email": "u-admin-a@example.com",
         "name": "u-admin-a",
         "role": "admin",
+        "title": None,
         "unit_ids": [],
     }
     tenant = body["tenant"]
+    assert tenant["units"] == [{"id": "unit-a", "name": "Primary"}]
     assert (tenant["id"], tenant["name"], tenant["profile"]) == ("tenant-a", "Green Valley School", "school")
     assert {"person", "recording", "unit"} <= set(tenant["labels"])
     assert "teaching" in tenant["enabled_types"]
 
 
 def test_me_shows_only_the_callers_tenant(api: Api) -> None:
-    assert api.get("/v1/me", "google|owner-b").json()["tenant"]["id"] == "tenant-b"
+    tenant = api.get("/v1/me", "google|owner-b").json()["tenant"]
+    assert tenant["id"] == "tenant-b"
+    assert tenant["units"] == []  # tenant-a's unit names never appear
 
 
 def test_me_needs_a_signed_in_user(api: Api) -> None:

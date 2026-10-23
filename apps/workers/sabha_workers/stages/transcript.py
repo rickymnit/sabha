@@ -39,7 +39,7 @@ class TranscriptDeps:
     tenant: Callable[[str], Tenant | None]
     rubric: Callable[[Tenant, ConversationType], tuple[Rubric, str]]
     tie_breaker: Callable[[str, str], RoleTieBreaker | None]  # (tenant_id, recording_id) -> tie-breaker or None
-    save: Callable[[Transcript], None]
+    save: Callable[[str, Transcript], None]  # (tenant_id, transcript)
 
 
 @dataclass(frozen=True)
@@ -93,6 +93,7 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
     ctx.artefacts.put(key, json.dumps(transcript, ensure_ascii=False).encode(), "application/json")
     methods = sorted({speaker.method for speaker in assignment.speakers.values()})
     deps.save(
+        ctx.tenant_id,
         Transcript(
             recording_id=recording.id, version=transcript["version"], storage_key=key, asr_model=asr.model,
             word_timing=asr.word_timing, word_count=transcript["word_count"],

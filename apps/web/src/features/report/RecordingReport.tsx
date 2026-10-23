@@ -5,7 +5,7 @@
 
 import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Card } from "../../design";
+import { Card, ScoreBar } from "../../design";
 import {
   AudioPlayer,
   TranscriptList,
@@ -16,14 +16,14 @@ import {
   type RoleLabels,
   type Transcript,
 } from "../transcript";
-import { formatScore, joinList } from "./format";
+import { checkedText, formatScore, joinList } from "./format";
 import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
 import { ReportTimeline } from "./ReportTimeline";
 import { DimensionDetail, RubricScoreList } from "./RubricPanels";
 import { evidenceLines } from "./timeline";
-import { visibleDimensions } from "./visibility";
+import { notApplicableDimensions, visibleDimensions } from "./visibility";
 import { DisputeDialog } from "../disputes/DisputeDialog";
 import type { DisputeDraft } from "../disputes/types";
 import {
@@ -81,7 +81,6 @@ export function RecordingReport({
         labels={labels}
         rubric={isReport ? analysis.rubric : undefined}
         rubricHref={rubricHref}
-        showActions={isReport}
       />
       {analysis.status === "processing" && <ProcessingState analysis={analysis} labels={labels} />}
       {analysis.status === "failed" && <FailedState analysis={analysis} labels={labels} />}
@@ -118,7 +117,10 @@ function ReportBody({
 }: ReportBodyProps) {
   const [disputeOpen, setDisputeOpen] = useState(false);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
-  const hidden = analysis.dimensions.filter((d) => !dimensions.includes(d as VerifiedDimension));
+  const notApplicable = notApplicableDimensions(analysis.dimensions);
+  const hidden = analysis.dimensions.filter(
+    (d) => !dimensions.includes(d as VerifiedDimension) && !notApplicable.some((n) => n.key === d.key),
+  );
   const utterances = useMemo(() => transcript?.utterances ?? [], [transcript]);
 
   const [chosenKey, setChosenKey] = useState<string | null>(null);
@@ -186,6 +188,17 @@ function ReportBody({
 
       {analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
 
+      {notApplicable.length > 0 && (
+        <Card as="section" aria-label="Not applicable" data-testid="not-applicable-note">
+          <p className="m-0 text-sm font-semibold text-ink">Not applicable to this {labels.recording.toLowerCase()}</p>
+          {notApplicable.map((d) => (
+            <p key={d.key} className="m-0 text-ink-2">
+              <span className="font-semibold">{d.name}:</span> {d.rationale} It is left out of the overall score.
+            </p>
+          ))}
+        </Card>
+      )}
+
       {viewerRole === "admin" && hidden.length > 0 && (
         <Card as="section" tone="warning" aria-label="Hidden dimensions" data-testid="admin-hidden-note">
           <p className="m-0 text-sm font-semibold text-warning-ink">Visible to admins only</p>
@@ -209,7 +222,12 @@ function ReportBody({
             dimension={selected}
             speakers={speakers}
             onSeek={seek}
-            provenance={`Scored by model ${analysis.model.ids.join(", ")}, rubric ${rubricLabel}`}
+            provenance={
+              // The model id means nothing to most readers; administrators see it for support questions.
+              viewerRole === "admin"
+                ? `Scored against the ${rubricLabel} rubric by ${analysis.model.ids.join(", ")}`
+                : `Scored against the ${rubricLabel} rubric`
+            }
             onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
           />
         )}
@@ -301,7 +319,11 @@ function OverallPanel({
             </span>
           </span>
         )}
+        {overall !== null && <ScoreBar score={overall} hideValue className="mt-1" />}
         {comparisonText}
+        <span data-testid="overall-checked" className="text-small text-muted">
+          {checkedText(analysis.dimensions)}
+        </span>
         {history && history.count > 0 && (
           <span data-testid="overall-history" className="text-small text-muted">
             {recording.person.name}’s last {history.count} {labels.recording_plural.toLowerCase()}:{" "}

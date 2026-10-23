@@ -31,7 +31,9 @@ export function overviewMetrics(stats: OverviewStats, typeNames: TypeNames, labe
       label: "Audio processed",
       value: formatHours(stats.audio_hours),
       suffix: " h",
-      footText: `${formatHours(stats.silence_removed_hours)} h of silence removed`,
+      ...(typeof stats.silence_removed_hours === "number"
+        ? { footText: `${formatHours(stats.silence_removed_hours)} h of silence removed` }
+        : {}),
     },
   ];
   for (const t of stats.median_overall_by_type) {
@@ -41,16 +43,18 @@ export function overviewMetrics(stats: OverviewStats, typeNames: TypeNames, labe
       label: `Median ${typeNames[t.type].toLowerCase()} score`,
       value: t.median.toFixed(1),
       suffix: " / 5",
-      footText: `From ${t.n} ${t.n === 1 ? labels.recording : labels.recording_plural}`,
+      footText: `From ${t.n} ${(t.n === 1 ? labels.recording : labels.recording_plural).toLowerCase()}`,
     });
   }
-  metrics.push({
-    id: "disputes",
-    label: "Open disputes",
-    value: String(stats.open_disputes),
-    footText: "Review disputes",
-    footHref: "/reviews",
-  });
+  if (typeof stats.open_disputes === "number") {
+    metrics.push({
+      id: "disputes",
+      label: "Open disputes",
+      value: String(stats.open_disputes),
+      footText: "Review disputes",
+      footHref: "/reviews",
+    });
+  }
   return metrics;
 }
 

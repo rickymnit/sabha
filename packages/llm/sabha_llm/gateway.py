@@ -3,9 +3,9 @@
 `Gateway.complete(task=..., messages=..., tenant_id=...)`:
 
 1. Routing: the task's tier (sabha_llm.tasks) picks the model from settings; an unknown task is a config error.
-2. Redaction: every message is passed through sabha_llm.redact before it leaves our servers (golden rule 8). Callers
-   that know student names redact first with those names (to keep the mapping for grounding); running the
-   patterns again is harmless.
+2. Redaction: every message is passed through sabha_llm.redact.redact_again before it leaves our servers (golden
+   rule 8). Callers that know student names redact first with those names (to keep the mapping for grounding);
+   the patterns run again on the rest, and placeholders already in the text are kept as they are.
 3. Budget: today's tenant and global token budgets are checked (sabha_llm.budget).
 4. Call with retries: only retryable errors (429, 5xx, timeouts) are retried, up to LLM_MAX_RETRIES times with
    exponential backoff and full jitter. Other errors go straight to the next model.
@@ -37,7 +37,7 @@ from sabha_core.models import LlmCall
 from sabha_llm.budget import TokenBudget
 from sabha_llm.catalog import ModelSpec, cost_usd, spec_for
 from sabha_llm.errors import InvalidJsonError, LlmConfigError, ProviderError
-from sabha_llm.redact import redact
+from sabha_llm.redact import redact_again
 from sabha_llm.tasks import TASK_TIERS
 from sabha_llm.types import CompletionResult, Message, ProviderRequest, ProviderResponse, Tier, Usage
 from sabha_llm.usage import UsageSink
@@ -120,7 +120,7 @@ class Gateway:
         if tier is None:
             raise LlmConfigError(f"unknown LLM task {task!r}; add it to sabha_llm.tasks.TASK_TIERS")
         chain = [self._models[tier], *self._fallbacks.get(task, [])]
-        safe = tuple(Message(m.role, redact(m.content).redacted_text) for m in messages)
+        safe = tuple(Message(m.role, redact_again(m.content)) for m in messages)
         digest = prompt_hash(safe, json_schema)
         context = {"task": task, "tenant_id": tenant_id, "recording_id": recording_id, "prompt_hash": digest,
                    "prompt_version": prompt_version}  # fmt: skip

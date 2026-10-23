@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from string import Template
 from typing import Literal
 
+from sabha_core.reasons import REASONS
+
 EmailKind = Literal["report_ready", "needs_attention"]
 LANGUAGES = ("en", "hi")
 PROBLEM_STATUSES = frozenset({"FAILED", "NEEDS_REVIEW"})
@@ -72,35 +74,6 @@ class RenderedEmail:
     text: str
     html: str
 
-
-REASONS: dict[str, dict[str, str]] = {
-    "en": {
-        "unclear_roles": "We could not tell the speakers apart reliably.",
-        "low_verification": "Too few scores could be checked against the transcript.",
-        "synthesis_failed": "The written summary could not be produced.",
-        "invalid_audio": "The audio file could not be read.",
-        "uncertain_type": "We could not tell what kind of conversation this is.",
-        "no_speech": "No speech was found in the recording.",
-        "no_speakers": "We could not tell who was speaking.",
-        "no_transcript": "Speech was found but no words could be recognised.",
-        "no_rubric": "There is no rubric for this kind of conversation yet.",
-        "analysis_failed": "The feedback could not be produced; an administrator can retry it.",
-        "ticket_failed": "The call ticket could not be written.",
-    },
-    "hi": {
-        "unclear_roles": "बोलने वालों को ठीक से अलग नहीं पहचाना जा सका।",
-        "low_verification": "बहुत कम स्कोर ट्रांसक्रिप्ट से जाँचे जा सके।",
-        "synthesis_failed": "लिखित सारांश नहीं बन सका।",
-        "invalid_audio": "ऑडियो फ़ाइल पढ़ी नहीं जा सकी।",
-        "uncertain_type": "यह किस तरह की बातचीत है, यह तय नहीं हो सका।",
-        "no_speech": "रिकॉर्डिंग में कोई बोली नहीं मिली।",
-        "no_speakers": "यह पता नहीं चल सका कि कौन बोल रहा था।",
-        "no_transcript": "बोली मिली, लेकिन कोई शब्द पहचाने नहीं जा सके।",
-        "no_rubric": "इस तरह की बातचीत के लिए अभी कोई रूब्रिक नहीं है।",
-        "analysis_failed": "फ़ीडबैक नहीं बन सका; व्यवस्थापक इसे दोबारा चला सकते हैं।",
-        "ticket_failed": "कॉल का टिकट नहीं लिखा जा सका।",
-    },
-}
 
 _TEMPLATES: dict[tuple[str, str], tuple[str, str]] = {
     ("report_ready", "en"): (
