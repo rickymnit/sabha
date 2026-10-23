@@ -7,6 +7,8 @@ import { LoginPage } from "../pages/LoginPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { OverviewRoute } from "../pages/OverviewRoute";
 import { PeoplePage } from "../pages/PeoplePage";
+import { ReviewPage } from "../pages/ReviewPage";
+import { ReviewQueuePage } from "../pages/ReviewQueuePage";
 import { RecordingPage } from "../pages/RecordingPage";
 import { RecordingsPage } from "../pages/RecordingsPage";
 import { UploadPage } from "../pages/UploadPage";
@@ -28,6 +30,8 @@ export const routes: RouteObject[] = [
           { path: "/recordings/:id", element: <RecordingPage /> },
           { path: "/upload", element: <UploadPage /> },
           { path: "/people", element: <PeoplePage /> },
+          { path: "/reviews", element: <ReviewQueuePage /> },
+          { path: "/reviews/:id", element: <ReviewPage /> },
           { path: "*", element: <NotFoundPage /> },
         ],
       },

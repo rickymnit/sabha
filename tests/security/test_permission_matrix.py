@@ -151,6 +151,7 @@ def seeded_db(mongo_replica_set: MongoClient[dict[str, Any]]) -> Iterator[str]:
 class Api:
     client: TestClient
     idp: Any  # conftest.FakeIdp
+    db: Any  # the seeded database, for routes that change a recording (a fresh one per call)
 
     def headers(self, caller: str, *, create: bool = False) -> dict[str, str]:
         out = {} if caller == "anonymous" else {"Authorization": f"Bearer {self.idp.token(caller)}"}
@@ -160,7 +161,8 @@ class Api:
 
 
 @pytest.fixture
-def api(mongo_uri: str, seeded_db: str, fake_idp: Any, s3_storage: Any) -> Iterator[Api]:
+def api(mongo_uri: str, seeded_db: str, fake_idp: Any, s3_storage: Any,
+        mongo_replica_set: MongoClient[dict[str, Any]]) -> Iterator[Api]:  # fmt: skip
     values: dict[str, Any] = {
         "app_env": "test",
         "mongo_uri": f"{mongo_uri}&replicaSet=rs0",
@@ -185,7 +187,7 @@ def api(mongo_uri: str, seeded_db: str, fake_idp: Any, s3_storage: Any) -> Itera
     )
     artefacts.put_object(Bucket="sabha-artefacts", Key=REPORT_KEY, Body=report)
     with TestClient(app, raise_server_exceptions=False) as test_client:
-        yield Api(test_client, fake_idp)
+        yield Api(test_client, fake_idp, mongo_replica_set[seeded_db])
 
 
 def new_upload(api: Api) -> dict[str, Any]:
@@ -229,6 +231,23 @@ def complete(api: Api, caller: str) -> httpx.Response:
     return api.client.post(path, json=body, headers=api.headers(caller))
 
 
+def review(api: Api, caller: str) -> httpx.Response:
+    """Confirms the teacher of a fresh recording of Asha that needs review (unclear roles)."""
+    rid = f"rec-review-{uuid.uuid4().hex[:8]}"
+    for collection, doc in (
+        ("recordings", Recording(id=rid, tenant_id="tenant-a", type=ConversationType.TEACHING, consent_ref="c",
+                                 status=RecordingStatus.NEEDS_REVIEW, status_reason="unclear_roles",
+                                 person_id="p-asha", unit_id="unit-1", created_by="u-staff_uploader")),
+        ("transcripts", Transcript(tenant_id="tenant-a", recording_id=rid, version="transcript@v1",
+                                   storage_key=TRANSCRIPT_KEY, asr_model="fake", word_timing="approximate",
+                                   word_count=0, utterance_count=0, roles={"S0": "teacher", "S1": "students"},
+                                   role_choices=["teacher", "students"], rubric_id="teaching.school.v0.1")),
+    ):  # fmt: skip
+        api.db[collection].insert_one(doc.model_dump(by_alias=True))
+    body = {"action": "confirm_roles", "staff_speaker": "S0"}
+    return api.client.post(f"/v1/recordings/{rid}/review", json=body, headers=api.headers(caller))
+
+
 CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /health": lambda a, who: a.client.get("/health", headers=a.headers(who)),
     "GET /ready": lambda a, who: a.client.get("/ready", headers=a.headers(who)),
@@ -252,6 +271,11 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     ),
     "GET /v1/people": lambda a, who: a.client.get("/v1/people", headers=a.headers(who)),
     "GET /v1/people/summary": lambda a, who: a.client.get("/v1/people/summary", headers=a.headers(who)),
+    "GET /v1/reviews": lambda a, who: a.client.get("/v1/reviews", headers=a.headers(who)),
+    "GET /v1/recordings/{recording_id}/speakers": lambda a, who: a.client.get(
+        f"/v1/recordings/{DONE}/speakers", headers=a.headers(who)
+    ),
+    "POST /v1/recordings/{recording_id}/review": review,
     "GET /v1/overview": lambda a, who: a.client.get(
         "/v1/overview?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z", headers=a.headers(who)
     ),

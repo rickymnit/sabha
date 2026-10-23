@@ -6,12 +6,12 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useMe } from "../api/hooks";
+import { useMe, useReviews } from "../api/hooks";
 import type { Me } from "../api/types";
 import { Avatar, Button, EmptyState, Icon, Logo, NavItem, Skeleton, SkeletonGroup } from "../design";
 import { useSession } from "../session/session";
 import { capitalise, roleTitle, unitNames } from "./format";
-import { navItems } from "./nav";
+import { RESOLVERS, navItems } from "./nav";
 
 /** A sidebar link that changes page without reloading (keeps cmd/ctrl-click for a new tab). */
 function Link({
@@ -43,6 +43,8 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   const labels = me.tenant.labels;
   const type = params.get("type");
   const units = unitNames(me);
+  const reviews = useReviews(RESOLVERS.includes(me.user.role));
+  const waiting = reviews.data?.items.length ?? 0;
   return (
     <nav id={id} aria-label="Main" className="flex h-full flex-col gap-6 px-3.5 py-5">
       <div className="hidden px-2 md:block">
@@ -59,6 +61,7 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
             to={item.to}
             icon={<Icon name={item.icon} />}
             current={item.match(pathname) && !(item.to === "/recordings" && type)}
+            {...(item.to === "/reviews" && waiting > 0 ? { badge: waiting, badgeLabel: `${waiting} waiting` } : {})}
           >
             {item.label}
           </Link>

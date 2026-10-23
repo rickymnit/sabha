@@ -3,19 +3,21 @@
 // playback URL. While the recording is processing, the page refreshes itself (api/hooks.ts).
 
 import { useCallback } from "react";
-import { useOutletContext, useParams } from "react-router-dom";
+import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
 import { useAnalysis, useApi, useRecording, useTranscript } from "../api/hooks";
 import type { Me, TranscriptResponse } from "../api/types";
-import { EmptyState, Skeleton, SkeletonGroup } from "../design";
+import { Button, EmptyState, Skeleton, SkeletonGroup } from "../design";
 import { RecordingReport } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
 import { viewerRole } from "../app/format";
+import { RESOLVERS } from "../app/nav";
 import { reportRecording, roleLabels } from "./recordingView";
 
 export function RecordingPage() {
   const me = useOutletContext<Me>();
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const api = useApi();
   const recording = useRecording(id);
   const analysis = useAnalysis(id);
@@ -48,15 +50,26 @@ export function RecordingPage() {
     );
   }
   const data = transcript.data ?? null;
+  const canReview = recording.data.status === "NEEDS_REVIEW" && RESOLVERS.includes(me.user.role);
   return (
-    <RecordingReport
-      recording={reportRecording(recording.data)}
-      analysis={analysis.data}
-      transcript={data?.transcript ?? null}
-      labels={me.tenant.labels}
-      roles={roleLabels(data?.roles ?? {}, me.tenant.labels.person)}
-      viewerRole={viewerRole(me.user.role)}
-      getPlaybackUrl={getPlaybackUrl}
-    />
+    <div className="flex flex-col gap-4">
+      {canReview && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning-border bg-warning-surface px-4 py-3">
+          <span className="text-ink-2">
+            This {me.tenant.labels.recording.toLowerCase()} is waiting for your review.
+          </span>
+          <Button onClick={() => navigate(`/reviews/${id}`)}>Review it</Button>
+        </div>
+      )}
+      <RecordingReport
+        recording={reportRecording(recording.data)}
+        analysis={analysis.data}
+        transcript={data?.transcript ?? null}
+        labels={me.tenant.labels}
+        roles={roleLabels(data?.roles ?? {}, me.tenant.labels.person)}
+        viewerRole={viewerRole(me.user.role)}
+        getPlaybackUrl={getPlaybackUrl}
+      />
+    </div>
   );
 }

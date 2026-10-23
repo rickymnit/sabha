@@ -12,6 +12,10 @@
    the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it.
 5. Roles still unclear: the transcript is kept (with the best guess, for the reviewer) and NeedsReviewError
    `unclear_roles` stops the pipeline. A guess is never analysed (golden rule 5).
+
+When a reviewer has confirmed the roles (`recording.confirmed_roles`, ADR 0007), step 3 uses them as they are
+(method "reviewer", confidence 1) and asks neither the heuristics nor the LLM. Confirmed roles that do not fit the
+speakers or the rubric go back for review rather than being guessed around.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from typing import Any
 
 from sabha_analytics.rubric import Rubric
 from sabha_asr.assembly import WordTiming, assemble_transcript
-from sabha_asr.roles import RoleTieBreaker, assign_roles
+from sabha_asr.roles import RoleAssignment, RoleTieBreaker, SpeakerRole, assign_roles
 from sabha_asr.words import Turn, Word
 from sabha_core.models import Tenant, Transcript
 from sabha_core.profiles import ConversationType
@@ -61,6 +65,18 @@ def language_mix(spans: Sequence[dict[str, Any]]) -> dict[str, float]:
     return {name: round(ms / whole, 4) for name, ms in sorted(totals.items())} if whole else {}
 
 
+def confirmed_assignment(confirmed: dict[str, str], turns: Sequence[Turn], roles: tuple[str, str]) -> RoleAssignment:
+    """A reviewer's roles as an assignment, or NeedsReviewError when they do not fit: every speaker must have one of
+    the rubric's two roles, and exactly one speaker the staff role (roles[0])."""
+    labels = {turn.speaker_label for turn in turns}
+    staff = [label for label, role in confirmed.items() if role == roles[0]]
+    if set(confirmed) != labels or not set(confirmed.values()) <= set(roles) or len(staff) != 1:
+        raise NeedsReviewError(
+            "unclear_roles", f"the confirmed roles {confirmed} do not fit speakers {sorted(labels)} and roles {roles}"
+        )
+    return RoleAssignment({label: SpeakerRole(role, 1.0, "reviewer") for label, role in confirmed.items()})
+
+
 def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -> dict[str, Any]:
     recording = ctx.recording
     source = artefact_prefix(ctx.tenant_id, recording.id, "diarize", deps.diarize_version)
@@ -80,10 +96,13 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
     if len(rubric.roles) < 2:
         raise PermanentError("no_rubric", f"rubric {rubric.id} names fewer than two roles")
 
-    assignment = assign_roles(
-        turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=[tenant.name],
-        tie_breaker=deps.tie_breaker(ctx.tenant_id, recording.id),
-    )  # fmt: skip
+    if recording.confirmed_roles is not None:
+        assignment = confirmed_assignment(recording.confirmed_roles, turns, (rubric.roles[0], rubric.roles[1]))
+    else:
+        assignment = assign_roles(
+            turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=[tenant.name],
+            tie_breaker=deps.tie_breaker(ctx.tenant_id, recording.id),
+        )  # fmt: skip
     ctx.artefacts.put(ctx.prefix + "roles@v1.json", assignment.to_json().encode(), "application/json")
 
     roles = assignment.role_by_speaker()
@@ -98,7 +117,7 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
             recording_id=recording.id, version=transcript["version"], storage_key=key, asr_model=asr.model,
             word_timing=asr.word_timing, word_count=transcript["word_count"],
             utterance_count=len(transcript["utterances"]), language_mix=language_mix(asr.languages),
-            roles=roles, roles_method=",".join(methods), rubric_id=rubric.id,
+            roles=roles, roles_method=",".join(methods), rubric_id=rubric.id, role_choices=list(rubric.roles[:2]),
             roles_need_review=assignment.needs_review_reason is not None,
         )
     )  # fmt: skip

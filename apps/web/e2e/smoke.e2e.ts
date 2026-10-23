@@ -99,7 +99,13 @@ test("a teacher uploads a recording straight to storage and it appears in their 
   await page.getByRole("checkbox", { name: /Consent is on file/ }).check();
   await page.getByRole("textbox", { name: "Consent form or notice" }).fill("E2E test notice");
   await page.getByRole("button", { name: "Upload 1 lesson" }).click();
-  await expect(page.getByText("Uploaded. Sabha is processing it now.")).toBeVisible({ timeout: 30_000 });
+  // The fixture is the same file every run, so an earlier run's copy may still be in E2E School: then the page
+  // asks before uploading a duplicate, which is the behaviour to check too.
+  const uploaded = page.getByText("Uploaded. Sabha is processing it now.");
+  const duplicate = page.getByText("This file has been uploaded before.");
+  await expect(uploaded.or(duplicate)).toBeVisible({ timeout: 30_000 });
+  if (await duplicate.isVisible()) await page.getByRole("button", { name: "Upload it again" }).click();
+  await expect(uploaded).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole("button", { name: "Go to lessons" }).click();
   await expect(page.getByRole("link", { name: "E2E silence" }).first()).toBeVisible();

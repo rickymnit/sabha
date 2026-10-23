@@ -35,6 +35,7 @@ from sabha_core.profiles import ConversationType
 from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
 from sabha_core.settings import Settings
+from sabha_core.state import RecordingStatus
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
 
@@ -315,6 +316,7 @@ async def list_recordings(
     analyses: TenantRepo[Analysis],
     person_id: str | None = None,
     type: ConversationType | None = None,
+    status: RecordingStatus | None = None,
 ) -> RecordingPage:
     # Every condition is AND-ed with the visibility filter, so the narrowing filters can never widen it.
     conditions: list[dict[str, Any]] = [await visible_filter(principal, people), after_cursor(cursor)]
@@ -322,6 +324,8 @@ async def list_recordings(
         conditions.append({"person_id": person_id})
     if type is not None:
         conditions.append({"type": type.value})
+    if status is not None:
+        conditions.append({"status": status.value})
     kept = [c for c in conditions if c]  # owners see everything: their visibility filter is {}
     query = {"$and": kept} if kept else {}
     found = await recordings.find(query, sort=[("created_at", -1), ("_id", -1)], limit=limit + 1)

@@ -66,6 +66,7 @@ class Setup:
     turns: list[tuple[str, int, int]]
     kind: ConversationType = ConversationType.TEACHING
     tie_breaker: Any = None
+    confirmed_roles: dict[str, str] | None = None  # a reviewer's answer (ADR 0007)
     saved: list[Transcript] = field(default_factory=list)
     store: Memory = field(default_factory=Memory)
 
@@ -76,7 +77,7 @@ class Setup:
             diarize_version="v1", tenant=lambda _: TENANT, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
             tie_breaker=lambda *_: self.tie_breaker, save=lambda _, doc: self.saved.append(doc),
         )  # fmt: skip
-        recording = Recording(id="r1", tenant_id="t1", type=self.kind)
+        recording = Recording(id="r1", tenant_id="t1", type=self.kind, confirmed_roles=self.confirmed_roles)
         ctx = StageContext("t1", recording, "t1/r1/transcribe@v1/", self.store, 1)
         spans = [{"start_ms": 0, "end_ms": 45_000, "language": "hi-IN"},
                  {"start_ms": 45_000, "end_ms": 60_000, "language": "en-IN"}]  # fmt: skip
@@ -123,7 +124,37 @@ def test_unclear_roles_keep_the_transcript_and_ask_for_review() -> None:
         setup.run(LECTURE)
     assert caught.value.code == "unclear_roles"
     assert setup.saved[0].roles_need_review is True  # stored for the reviewer, with the best guess
+    assert setup.saved[0].role_choices == ["teacher", "students"]  # what the reviewer chooses between
     assert setup.transcript()["utterances"]
+
+
+def test_roles_a_reviewer_confirmed_are_used_without_guessing() -> None:
+    setup = even_split()
+    setup.confirmed_roles = {"S0": "students", "S1": "teacher"}
+    setup.tie_breaker = lambda _: pytest.fail("the tie-breaker must not be asked")
+    meta = setup.run(LECTURE)  # no NeedsReviewError: the reviewer settled it
+    roles = json.loads(setup.store.get("t1/r1/transcribe@v1/roles@v1.json"))
+    assert roles == {"S0": {"role": "students", "confidence": 1.0, "method": "reviewer"},
+                     "S1": {"role": "teacher", "confidence": 1.0, "method": "reviewer"}}  # fmt: skip
+    (doc,) = setup.saved
+    assert (doc.roles, doc.roles_method, doc.roles_need_review) == (setup.confirmed_roles, "reviewer", False)
+    assert meta["roles_method"] == "reviewer"
+
+
+@pytest.mark.parametrize(
+    "confirmed",
+    [
+        {"S0": "teacher"},  # a speaker left out
+        {"S0": "teacher", "S1": "teacher"},  # nobody is the students
+        {"S0": "teacher", "S1": "principal"},  # not a role of this rubric
+    ],
+)
+def test_confirmed_roles_that_do_not_fit_send_it_back_for_review(confirmed: dict[str, str]) -> None:
+    setup = even_split()
+    setup.confirmed_roles = confirmed
+    with pytest.raises(NeedsReviewError) as caught:
+        setup.run(LECTURE)
+    assert caught.value.code == "unclear_roles"
 
 
 def test_a_confident_tie_break_settles_unclear_roles() -> None:

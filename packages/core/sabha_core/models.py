@@ -244,6 +244,9 @@ class Recording(TenantDoc):
     # lanes (P7.2) and billing (P8.6) read duration_ms.
     duration_ms: int | None = Field(default=None, ge=0)
     audio: AudioInfo | None = None
+    # Review (ADR 0007): speaker label -> role, as a reviewer confirmed them for an "unclear_roles" recording. The
+    # transcript stage uses them instead of guessing.
+    confirmed_roles: dict[str, str] | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
@@ -265,6 +268,8 @@ class Transcript(TenantDoc):
     roles: dict[str, str] = Field(default_factory=dict)
     roles_method: str = ""
     roles_need_review: bool = False
+    # The rubric's two roles, staff first ("teacher", "students"): what a reviewer chooses between (ADR 0007).
+    role_choices: list[str] = Field(default_factory=list)
     rubric_id: str = Field(min_length=1)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 

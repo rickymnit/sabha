@@ -59,6 +59,9 @@ class Api:
     def get(self, sub: str, path: str) -> httpx.Response:
         return self.client.get(path, headers={"Authorization": f"Bearer {self.idp.token(sub)}"})
 
+    def post(self, sub: str, path: str, body: dict[str, Any]) -> httpx.Response:
+        return self.client.post(path, json=body, headers={"Authorization": f"Bearer {self.idp.token(sub)}"})
+
 
 @pytest.fixture(scope="module")
 def shared_db(mongo_replica_set: MongoClient[dict[str, Any]]) -> Iterator[str]:
@@ -270,6 +273,95 @@ def test_the_overview_period_is_checked(api: Api) -> None:
            {"from": (end - timedelta(days=400)).isoformat(), "to": end.isoformat()}]  # fmt: skip
     for params in bad:
         assert api.get("owner", f"/v1/overview?{urlencode(params)}").status_code == 400
+
+
+# --- Reviews (ADR 0007) ---
+
+
+def in_review(api: Api, rid: str, reason: str = "unclear_roles", person: str = "p-asha", unit: str = "unit-1") -> None:
+    """A recording waiting for review, with a two-speaker transcript where Sabha guessed S0 is the teacher."""
+    recording(api, rid, person, unit, 5, RecordingStatus.NEEDS_REVIEW)
+    api.db.recordings.update_one({"_id": rid}, {"$set": {"status_reason": reason}})
+    key = f"{T}/{rid}/transcribe@v1/transcript@v1.json"
+    utterances = [
+        {"speaker_label": "S0", "role": "teacher", "start_ms": 0, "end_ms": 9_000, "text": "Aaj fractions padhenge."},
+        {"speaker_label": "S1", "role": "students", "start_ms": 9_500, "end_ms": 21_000, "text": "Ma'am, " * 60},
+        {"speaker_label": "S0", "role": "teacher", "start_ms": 22_000, "end_ms": 24_000, "text": "Haan, batao."},
+    ]  # fmt: skip
+    api.s3.put_object(Bucket="sabha-artefacts", Key=key,
+                      Body=json.dumps({"version": "transcript@v1", "utterances": utterances}).encode())  # fmt: skip
+    insert(api.db, "transcripts", Transcript(
+        tenant_id=T, recording_id=rid, version="transcript@v1", storage_key=key, asr_model="sarvam/saaras:v4",
+        word_timing="approximate", word_count=40, utterance_count=3, roles={"S0": "teacher", "S1": "students"},
+        roles_need_review=True, role_choices=["teacher", "students"], rubric_id="teaching.school.v0.1",
+    ))  # fmt: skip
+
+
+def test_the_review_queue_is_needs_review_only_for_those_who_resolve(api: Api) -> None:
+    in_review(api, "r-review")
+    in_review(api, "r-ravi", person="p-ravi", unit="unit-2")
+    recording(api, "r-done", "p-asha", "unit-1", 3)
+    assert ids(api.get("owner", "/v1/reviews")) == ["r-ravi", "r-review"]
+    assert ids(api.get("manager", "/v1/reviews")) == ["r-review"]  # their unit only
+    (item,) = api.get("manager", "/v1/reviews").json()["items"]
+    assert item["status_note"] == "We could not tell the speakers apart reliably."
+    assert api.get("asha", "/v1/reviews").status_code == 403  # staff never resolve their own
+
+
+def test_speakers_show_talk_time_guess_and_samples(api: Api) -> None:
+    in_review(api, "r-review")
+    body = api.get("manager", "/v1/recordings/r-review/speakers").json()
+    assert (body["reason"], body["choices"]) == ("unclear_roles", ["teacher", "students"])
+    first, second = body["speakers"]
+    assert (first["label"], first["guess"], first["talk_ms"]) == ("S1", "students", 11_500)  # most talk first
+    assert second["label"] == "S0" and [s["start_ms"] for s in second["samples"]] == [0, 22_000]  # time order
+    assert len(first["samples"][0]["text"]) <= 240 and first["samples"][0]["text"].endswith("…")
+    assert api.get("asha", "/v1/recordings/r-review/speakers").status_code == 403
+
+
+def test_confirming_the_teacher_rebuilds_the_transcript_then_scores(api: Api) -> None:
+    in_review(api, "r-review")
+    response = api.post("manager", "/v1/recordings/r-review/review", {"action": "confirm_roles", "staff_speaker": "S1"})
+    assert response.json() == {"recording_id": "r-review", "status": "TRANSCRIBING"}
+    saved = api.db.recordings.find_one({"_id": "r-review"})
+    assert saved is not None
+    assert (saved["status"], saved["status_reason"]) == ("TRANSCRIBING", "roles_confirmed")
+    assert saved["confirmed_roles"] == {"S0": "students", "S1": "teacher"}  # the reviewer overrode the guess
+    (event,) = api.db.outbox.find({"payload.recording_id": "r-review"})
+    assert event["type"] == "recording.transcribing"  # the relay starts the transcribe stage again
+    (entry,) = api.db.audit_log.find({"action": "recording.review"})
+    assert (entry["actor_user_id"], entry["meta"]["decision"]) == ("u-manager", "confirm_roles")
+    again = api.post("owner", "/v1/recordings/r-review/review", {"action": "confirm_roles", "staff_speaker": "S0"})
+    assert (again.status_code, again.json()["code"]) == (409, "not_in_review")
+
+
+def test_roles_can_be_confirmed_only_for_unclear_roles_and_known_speakers(api: Api) -> None:
+    in_review(api, "r-quotes", reason="low_verification")
+    wrong = api.post("owner", "/v1/recordings/r-quotes/review", {"action": "confirm_roles", "staff_speaker": "S0"})
+    assert (wrong.status_code, wrong.json()["code"]) == (409, "not_a_roles_review")
+    in_review(api, "r-roles")
+    nobody = api.post("owner", "/v1/recordings/r-roles/review", {"action": "confirm_roles", "staff_speaker": "S9"})
+    assert (nobody.status_code, nobody.json()["code"]) == (400, "unknown_speaker")
+    assert api.db.recordings.find_one({"_id": "r-roles"})["status"] == "NEEDS_REVIEW"  # type: ignore[index]
+
+
+def test_closing_needs_a_note_and_says_why_in_plain_words(api: Api) -> None:
+    in_review(api, "r-review", reason="no_speech")
+    assert api.post("manager", "/v1/recordings/r-review/review", {"action": "close"}).status_code == 400
+    closed = api.post("manager", "/v1/recordings/r-review/review", {"action": "close", "note": "Blank recording"})
+    assert closed.json()["status"] == "FAILED"
+    (item,) = api.get("owner", "/v1/recordings").json()["items"]
+    assert item["status_note"] == "A reviewer closed this recording as not usable."
+    (entry,) = api.db.audit_log.find({"action": "recording.review"})
+    assert entry["meta"] == {"decision": "close", "note": "Blank recording", "review_reason": "no_speech"}
+
+
+def test_who_may_resolve(api: Api) -> None:
+    in_review(api, "r-ravi", person="p-ravi", unit="unit-2")
+    body = {"action": "close", "note": "x"}
+    assert api.post("manager", "/v1/recordings/r-ravi/review", body).status_code == 404  # not their unit
+    in_review(api, "r-asha")
+    assert api.post("asha", "/v1/recordings/r-asha/review", body).status_code == 403  # her own: never
 
 
 # --- Transcript and analysis ---

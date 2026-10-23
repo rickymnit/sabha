@@ -130,6 +130,18 @@ def test_reanalysis_needs_the_flag(db: Database[dict[str, Any]]) -> None:
     assert status_of(db, recording_id) == "ANALYZING"
 
 
+def test_a_review_outcome_needs_the_flag(db: Database[dict[str, Any]]) -> None:
+    confirmed = make(db, S.NEEDS_REVIEW)
+    with pytest.raises(InvalidTransition):
+        transition(recordings(db), confirmed, S.NEEDS_REVIEW, S.TRANSCRIBING, reason="roles_confirmed", now=NOW)
+    event = transition(recordings(db), confirmed, S.NEEDS_REVIEW, S.TRANSCRIBING, reason="roles_confirmed",
+                       review=True, now=NOW)  # fmt: skip
+    assert (status_of(db, confirmed), event.type) == ("TRANSCRIBING", "recording.transcribing")
+    closed = make(db, S.NEEDS_REVIEW)
+    transition(recordings(db), closed, S.NEEDS_REVIEW, S.FAILED, reason="closed_by_reviewer", review=True, now=NOW)
+    assert status_of(db, closed) == "FAILED"
+
+
 # --- Consent first (golden rule 9) ---
 
 

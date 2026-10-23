@@ -94,6 +94,35 @@ export interface PersonSummary extends PersonItem {
   last_analysed_at: string | null;
 }
 
+/** GET /v1/recordings/{id}/speakers: who spoke how much, for a reviewer to say who is who (ADR 0007). */
+export interface SpeakerSample {
+  start_ms: number;
+  end_ms: number;
+  text: string;
+}
+
+export interface ReviewSpeaker {
+  /** As diarization named them: "S0", "S1". */
+  label: string;
+  /** Sabha's best guess at their role. */
+  guess: string | null;
+  talk_ms: number;
+  /** Share of all speech, 0 to 1. */
+  share: number;
+  samples: SpeakerSample[];
+}
+
+export interface SpeakersResponse {
+  recording_id: string;
+  reason: string | null;
+  /** The rubric's two roles, staff first ("teacher", "students"). */
+  choices: string[];
+  /** Most talk first. */
+  speakers: ReviewSpeaker[];
+}
+
+export type ReviewDecision = { action: "confirm_roles"; staff_speaker: string } | { action: "close"; note: string };
+
 export interface UploadPart {
   part_number: number;
   url: string;
