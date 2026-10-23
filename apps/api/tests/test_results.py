@@ -9,6 +9,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Literal
+from urllib.parse import urlencode
 
 import httpx
 import pytest
@@ -223,6 +224,52 @@ def test_the_people_summary_counts_real_analyses_for_the_people_you_may_see(api:
     )
     assert [p["id"] for p in api.get("manager", "/v1/people/summary").json()] == ["p-asha"]  # unit-1 only
     assert [p["id"] for p in api.get("asha", "/v1/people/summary").json()] == ["p-asha"]  # herself
+
+
+# --- Overview ---
+
+
+def overview(api: Api, who: str, days: int = 7) -> dict[str, Any]:
+    end = utc_now() + timedelta(minutes=1)
+    params = {"from": (end - timedelta(days=days)).isoformat(), "to": end.isoformat()}
+    response = api.get(who, f"/v1/overview?{urlencode(params)}")
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+def test_the_overview_counts_real_results_once_each(api: Api) -> None:
+    recording(api, "r-1", "p-asha", "unit-1", 60)
+    recording(api, "r-2", "p-asha", "unit-1", 50)
+    recording(api, "r-ravi", "p-ravi", "unit-2", 40)
+    recording(api, "r-busy", "p-asha", "unit-1", 5, RecordingStatus.TRANSCRIBING)
+    recording(api, "r-stuck", "p-asha", "unit-1", 5, RecordingStatus.NEEDS_REVIEW)
+    api.db.recordings.update_many({"_id": {"$in": ["r-1", "r-2", "r-ravi"]}}, {"$set": {"duration_ms": 1_800_000}})
+    analysis(api, "r-1", "v1", 2.0, 55)
+    analysis(api, "r-1", "v2", 3.0, 30)  # re-analysed: r-1 counts once, with 3.0
+    analysis(api, "r-2", "v1", 4.0, 45)
+    analysis(api, "r-ravi", "v1", 5.0, 35, person="p-ravi")
+    analysis(api, "r-busy", "v1", 1.0, 3, status="NEEDS_REVIEW")  # never counted (golden rule 5)
+
+    owner = overview(api, "owner")
+    assert (owner["recordings_analysed"], owner["audio_hours"]) == (3, 1.5)
+    assert owner["median_overall_by_type"] == [{"type": "teaching", "median": 4.0, "n": 3}]
+    (clarity,) = owner["coaching"]  # concept_clarity, round(score) of each newest analysis: 3, 4, 5
+    assert (clarity["dimension_key"], clarity["median"], clarity["n"]) == ("concept_clarity", 4.0, 3)
+    assert {s["stage"]: s["n"] for s in owner["in_progress"]} == {"transcribing": 1, "needs_review": 1}
+
+    manager = overview(api, "manager")  # unit-1 only: Ravi's recording is not theirs
+    assert (manager["recordings_analysed"], manager["median_overall_by_type"][0]["median"]) == (2, 3.5)
+    assert overview(api, "asha")["recordings_analysed"] == 2  # her own
+
+
+def test_the_overview_period_is_checked(api: Api) -> None:
+    assert overview(api, "owner", days=1)["recordings_analysed"] == 0  # an empty period is not an error
+    end = utc_now()
+    bad = [{"from": end.isoformat(), "to": (end - timedelta(days=1)).isoformat()},
+           {"from": (end - timedelta(days=400)).isoformat(), "to": end.isoformat()}]  # fmt: skip
+    for params in bad:
+        assert api.get("owner", f"/v1/overview?{urlencode(params)}").status_code == 400
 
 
 # --- Transcript and analysis ---

@@ -19,6 +19,13 @@ export function navItems(me: Me): NavEntry[] {
   const labels = me.tenant.labels;
   const entries: (NavEntry & { roles: Role[] })[] = [
     {
+      to: "/overview",
+      label: "Overview",
+      icon: "overview",
+      roles: ["owner", "admin", "manager", "reviewer"],
+      match: (path) => path === "/overview",
+    },
+    {
       to: "/recordings",
       label: capitalise(labels.recording_plural),
       icon: "recordings",

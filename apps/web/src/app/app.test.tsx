@@ -184,6 +184,35 @@ describe("the people page", () => {
   });
 });
 
+describe("the overview", () => {
+  const OWNER = { ...ME, user: { ...ME.user, name: "Priya Sharma", role: "owner", title: "Principal", unit_ids: [] } };
+  const STATS = {
+    from: "2026-09-23T18:30:00Z", to: "2026-10-23T18:30:00Z", recordings_analysed: 3, audio_hours: 1.5,
+    median_overall_by_type: [{ type: "teaching", median: 3.5, n: 3 }],
+    coaching: [{ rubric_id: "teaching.school.v0.1", dimension_key: "recap", dimension_name: "Recap and closure",
+                 type: "teaching", median: 2.0, n: 3 }],
+    in_progress: [{ stage: "transcribing", n: 2 }, { stage: "needs_review", n: 1 }],
+  }; // prettier-ignore
+
+  it("is where a principal lands, with the period's numbers, what is processing and recent lessons", async () => {
+    stubApi({ "/v1/me": OWNER, "/v1/overview": STATS, "/v1/recordings": PAGE });
+    renderAt("/", signedIn);
+    expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
+    expect(await screen.findByText("From 3 lessons")).toBeInTheDocument();
+    const processing = screen.getByRole("region", { name: "Processing now" });
+    expect(within(processing).getByText("Transcribing").parentElement).toHaveTextContent("2");
+    expect(within(processing).getByRole("button", { name: /Needs review/ })).toBeInTheDocument();
+    expect(screen.getByText("Recap and closure")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Fractions" })).toBeInTheDocument();
+  });
+
+  it("is not a teacher's home", async () => {
+    stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
+    renderAt("/", signedIn);
+    expect(await screen.findByRole("heading", { name: "Lessons" })).toBeInTheDocument();
+  });
+});
+
 describe("the dev session", () => {
   it("keeps the token for the tab after signing in", async () => {
     stubApi({ "/dev-idp/token": { access_token: "tok-1" } });

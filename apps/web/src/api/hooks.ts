@@ -3,6 +3,7 @@
 
 import { useInfiniteQuery, useQuery, type UseQueryResult } from "@tanstack/react-query";
 
+import type { OverviewStats } from "../features/overview/types";
 import type { AnalysisPayload } from "../features/report/types";
 import { useSession } from "../session/session";
 import { ApiError, apiFetch } from "./client";
@@ -117,6 +118,18 @@ export function usePeopleSummary(enabled = true): UseQueryResult<PersonSummary[]
     queryKey: ["people-summary", token],
     queryFn: () => apiFetch<PersonSummary[]>("/v1/people/summary", { token }),
     enabled: enabled && Boolean(token),
+  });
+}
+
+/** The Overview numbers for a period; refreshed while something is being processed, so "Processing now" moves. */
+export function useOverview(period: { from: string; to: string }): UseQueryResult<OverviewStats, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["overview", period.from, period.to, token],
+    queryFn: () => apiFetch<OverviewStats>(`/v1/overview?${new URLSearchParams(period)}`, { token }),
+    enabled: Boolean(token),
+    refetchInterval: (query) =>
+      query.state.data?.in_progress?.some((s) => s.stage !== "needs_review") ? REFRESH_MS : false,
   });
 }
 

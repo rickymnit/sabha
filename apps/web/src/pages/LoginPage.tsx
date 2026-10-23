@@ -120,7 +120,7 @@ export function LoginPage() {
   const session = useSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/recordings";
+  const from = (location.state as { from?: string } | null)?.from ?? "/";
   const dev = session.mode === "dev";
   const people = useDevUsers(dev && !session.token);
   const [error, setError] = useState<string | null>(null);

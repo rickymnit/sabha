@@ -252,6 +252,9 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     ),
     "GET /v1/people": lambda a, who: a.client.get("/v1/people", headers=a.headers(who)),
     "GET /v1/people/summary": lambda a, who: a.client.get("/v1/people/summary", headers=a.headers(who)),
+    "GET /v1/overview": lambda a, who: a.client.get(
+        "/v1/overview?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z", headers=a.headers(who)
+    ),
     "GET /v1/people/{person_id}/trend": lambda a, who: a.client.get("/v1/people/p-asha/trend", headers=a.headers(who)),
 }
 

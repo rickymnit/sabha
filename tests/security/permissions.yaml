@@ -173,6 +173,11 @@ routes:
     anonymous: 401
     others: 200
 
+  GET /v1/overview:
+    # Numbers for the recordings each caller may see (filtered; tested in apps/api/tests/test_results.py).
+    anonymous: 401
+    others: 200
+
   GET /v1/people/summary:
     # The People page: the same people as GET /v1/people, with counts and scores (filtered; test_results.py).
     anonymous: 401
