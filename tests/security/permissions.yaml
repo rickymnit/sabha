@@ -172,3 +172,8 @@ routes:
     # The people each caller may see and upload for (filtered; tested in apps/api/tests/test_results.py).
     anonymous: 401
     others: 200
+
+  GET /v1/people/summary:
+    # The People page: the same people as GET /v1/people, with counts and scores (filtered; test_results.py).
+    anonymous: 401
+    others: 200

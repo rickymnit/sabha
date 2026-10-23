@@ -161,6 +161,17 @@ def test_each_caller_lists_only_what_they_may_see(api: Api) -> None:
     assert ids(api.get("nobody", "/v1/recordings")) == []  # no person: nothing, not an error
 
 
+def test_the_list_narrows_by_person_and_type_but_never_widens(api: Api) -> None:
+    recording(api, "r-asha", "p-asha", "unit-1", 3)
+    recording(api, "r-ravi", "p-ravi", "unit-2", 2)
+    assert ids(api.get("owner", "/v1/recordings?person_id=p-ravi")) == ["r-ravi"]
+    assert ids(api.get("owner", "/v1/recordings?type=teaching")) == ["r-ravi", "r-asha"]
+    assert ids(api.get("owner", "/v1/recordings?type=reception")) == []
+    assert ids(api.get("manager", "/v1/recordings?person_id=p-ravi")) == []  # not in the manager's unit
+    assert ids(api.get("asha", "/v1/recordings?person_id=p-ravi")) == []  # not her own
+    assert api.get("owner", "/v1/recordings?type=karaoke").status_code == 422
+
+
 def test_the_list_pages_with_a_cursor(api: Api) -> None:
     for minutes in range(5):
         recording(api, f"r{minutes}", "p-asha", "unit-1", minutes)
@@ -191,6 +202,27 @@ def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:
     api.db.recordings.update_one({"_id": "r-2"}, {"$set": {"status_reason": "unexpected_ValueError"}})
     notes = {i["id"]: i["status_note"] for i in api.get("owner", "/v1/recordings").json()["items"]}
     assert notes == {"r-1": "No speech was found in the recording.", "r-2": explain("unexpected_ValueError")}
+
+
+def test_the_people_summary_counts_real_analyses_for_the_people_you_may_see(api: Api) -> None:
+    for rid, minutes in (("r-1", 50), ("r-2", 40), ("r-3", 30)):
+        recording(api, rid, "p-asha", "unit-1", minutes)
+    analysis(api, "r-1", "v1", 2.5, 45)
+    analysis(api, "r-2", "v1", 3.0, 35)
+    analysis(api, "r-2", "v2", 3.4, 25)  # a re-analysis replaces r-2's score, it is not a new recording
+    analysis(api, "r-3", "v1", 4.9, 20, status="NEEDS_REVIEW")  # never shown (golden rule 5)
+    rows = {p["id"]: p for p in api.get("owner", "/v1/people/summary").json()}
+    assert set(rows) == {"p-asha", "p-ravi"}
+    asha = rows["p-asha"]
+    assert (asha["analysed"], asha["latest_score"], asha["recent_scores"]) == (2, 3.4, [2.5, 3.4])
+    assert asha["last_analysed_at"] is not None
+    assert (rows["p-ravi"]["analysed"], rows["p-ravi"]["latest_score"], rows["p-ravi"]["recent_scores"]) == (
+        0,
+        None,
+        [],
+    )
+    assert [p["id"] for p in api.get("manager", "/v1/people/summary").json()] == ["p-asha"]  # unit-1 only
+    assert [p["id"] for p in api.get("asha", "/v1/people/summary").json()] == ["p-asha"]  # herself
 
 
 # --- Transcript and analysis ---

@@ -84,6 +84,16 @@ export interface PersonItem {
   unit_id: string | null;
 }
 
+/** A row of the People page (GET /v1/people/summary): real counts and scores only. */
+export interface PersonSummary extends PersonItem {
+  /** Recordings with a completed analysis. */
+  analysed: number;
+  latest_score: number | null;
+  /** Overall scores of the last 10 analysed recordings, oldest first. */
+  recent_scores: number[];
+  last_analysed_at: string | null;
+}
+
 export interface UploadPart {
   part_number: number;
   url: string;

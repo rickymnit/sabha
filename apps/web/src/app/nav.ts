@@ -26,6 +26,13 @@ export function navItems(me: Me): NavEntry[] {
       match: (path) => path === "/recordings" || path.startsWith("/recordings/"),
     },
     {
+      to: "/people",
+      label: capitalise(labels.person_plural),
+      icon: "people",
+      roles: ["owner", "admin", "manager", "reviewer"], // staff see only themselves: no list to show
+      match: (path) => path === "/people",
+    },
+    {
       to: "/upload",
       label: "Upload",
       icon: "upload",

@@ -16,6 +16,7 @@ from sabha_api.deps import tenant_repo
 from sabha_api.errors import NotReadyError
 from sabha_api.services import results as service
 from sabha_core.models import Analysis, AuditEntry, Person, Recording, Score, Transcript, Unit
+from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
 
 recordings_router = APIRouter(prefix="/v1/recordings", tags=["recordings"])
@@ -46,11 +47,12 @@ Reader = Annotated[service.ArtefactReader, Depends(artefact_reader)]
 @recordings_router.get("", response_model=service.RecordingPage)
 async def list_recordings(
     principal: Caller, recordings: Recordings, people: People, analyses: Analyses,
-    cursor: str | None = None, limit: Limit = 20,
+    cursor: str | None = None, limit: Limit = 20, person_id: str | None = None, type: ConversationType | None = None,
 ) -> service.RecordingPage:  # fmt: skip
-    """The recordings you may see, newest first, with each one's status and latest overall score."""
+    """The recordings you may see, newest first, with each one's status and latest overall score. `person_id` and
+    `type` narrow the list; they never show more than you may see."""
     return await service.list_recordings(principal, cursor=cursor, limit=limit, recordings=recordings, people=people,
-                                         analyses=analyses)  # fmt: skip
+                                         analyses=analyses, person_id=person_id, type=type)  # fmt: skip
 
 
 @recordings_router.get("/{recording_id}", response_model=service.RecordingDetail)
@@ -111,6 +113,13 @@ async def list_people(principal: Caller, people: People) -> list[service.PersonO
     """The people you may see and upload for, by name: everyone (owners, admins), your units (managers, reviewers)
     or yourself (staff)."""
     return await service.visible_people(principal, people)
+
+
+@people_router.get("/summary", response_model=list[service.PersonSummary])
+async def people_summary(principal: Caller, people: People, analyses: Analyses) -> list[service.PersonSummary]:
+    """The People page: the people you may see (as GET /v1/people), each with their number of analysed recordings
+    and recent overall scores, oldest first."""
+    return await service.people_summary(principal, people, analyses)
 
 
 @people_router.get("/{person_id}/trend", response_model=service.TrendOut)

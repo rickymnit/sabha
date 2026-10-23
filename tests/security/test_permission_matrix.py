@@ -251,6 +251,7 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
         f"/v1/recordings/{DONE}/analyses", headers=a.headers(who)
     ),
     "GET /v1/people": lambda a, who: a.client.get("/v1/people", headers=a.headers(who)),
+    "GET /v1/people/summary": lambda a, who: a.client.get("/v1/people/summary", headers=a.headers(who)),
     "GET /v1/people/{person_id}/trend": lambda a, who: a.client.get("/v1/people/p-asha/trend", headers=a.headers(who)),
 }
 

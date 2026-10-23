@@ -44,23 +44,32 @@ export function RecordingsPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
-  const recordings = useRecordings();
+  const personParam = params.get("person");
   const units = new Map(me.tenant.units.map((u) => [u.id, u.name]));
 
   const types = me.tenant.enabled_types;
   const typeParam = params.get("type");
   const type = typeParam && types.includes(typeParam as never) ? typeParam : "all";
-  const setType = (value: string) =>
-    setParams(value === "all" ? {} : { type: value }, { replace: true, preventScrollReset: true });
+  const setFilters = (next: { type?: string; person?: string | null }) => {
+    const nextType = next.type ?? type;
+    const nextPerson = next.person === undefined ? personParam : next.person;
+    setParams(
+      { ...(nextType !== "all" ? { type: nextType } : {}), ...(nextPerson ? { person: nextPerson } : {}) },
+      { replace: true, preventScrollReset: true },
+    );
+  };
+  const setType = (value: string) => setFilters({ type: value });
+  // Type and person are narrowed by the API, so they hold across pages; search filters the loaded rows.
+  const recordings = useRecordings({ type: type === "all" ? null : type, personId: personParam });
+  const personName = recordings.data?.pages[0]?.items[0]?.person?.name;
 
   const all = recordings.data?.pages.flatMap((page) => page.items) ?? [];
   const needle = query.trim().toLowerCase();
   const rows = all.filter(
     (r) =>
-      (type === "all" || r.type === type) &&
-      (!needle || r.title.toLowerCase().includes(needle) || (r.person?.name.toLowerCase().includes(needle) ?? false)),
+      !needle || r.title.toLowerCase().includes(needle) || (r.person?.name.toLowerCase().includes(needle) ?? false),
   );
-  const filtered = type !== "all" || needle !== "";
+  const filtered = type !== "all" || needle !== "" || personParam !== null;
   const things = labels.recording_plural.toLowerCase();
 
   const open = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -74,7 +83,7 @@ export function RecordingsPage() {
     </Button>
   );
 
-  if (recordings.isSuccess && all.length === 0) {
+  if (recordings.isSuccess && all.length === 0 && !filtered) {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader title={capitalise(labels.recording_plural)} description={scope(me)} />
@@ -93,7 +102,27 @@ export function RecordingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={capitalise(labels.recording_plural)} description={scope(me)} actions={upload} />
+      <PageHeader
+        title={capitalise(labels.recording_plural)}
+        description={personParam && personName ? `${personName}’s ${things}, newest first.` : scope(me)}
+        actions={upload}
+      />
+      {personParam && (
+        <div className="-mt-2 flex">
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-3 pr-1 text-sm">
+            {personName ?? capitalise(labels.person)}
+            <Button
+              variant="ghost"
+              aria-label="Show everyone"
+              title="Show everyone"
+              onClick={() => setFilters({ person: null })}
+              className="min-h-0 min-w-0 rounded-full p-1"
+            >
+              <Icon name="close" size={14} />
+            </Button>
+          </span>
+        </div>
+      )}
       {recordings.isError ? (
         <Panel>
           <EmptyState
@@ -179,7 +208,7 @@ export function RecordingsPage() {
                         variant="secondary"
                         onClick={() => {
                           setQuery("");
-                          setType("all");
+                          setFilters({ type: "all", person: null });
                         }}
                       >
                         Clear filters

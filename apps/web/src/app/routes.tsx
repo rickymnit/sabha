@@ -5,6 +5,7 @@ import { Navigate, type RouteObject } from "react-router-dom";
 
 import { LoginPage } from "../pages/LoginPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
+import { PeoplePage } from "../pages/PeoplePage";
 import { RecordingPage } from "../pages/RecordingPage";
 import { RecordingsPage } from "../pages/RecordingsPage";
 import { UploadPage } from "../pages/UploadPage";
@@ -23,6 +24,7 @@ export const routes: RouteObject[] = [
           { path: "/recordings", element: <RecordingsPage /> },
           { path: "/recordings/:id", element: <RecordingPage /> },
           { path: "/upload", element: <UploadPage /> },
+          { path: "/people", element: <PeoplePage /> },
           { path: "*", element: <NotFoundPage /> },
         ],
       },

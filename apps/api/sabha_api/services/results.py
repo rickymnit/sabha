@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from sabha_api.auth import Principal, Role
 from sabha_api.errors import BadRequestError, NotFoundError
 from sabha_core.models import Analysis, Person, Recording, Score, Transcript, Unit
+from sabha_core.profiles import ConversationType
 from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
 from sabha_core.settings import Settings
@@ -125,6 +126,42 @@ async def visible_people(principal: Principal, people: TenantRepo[Person]) -> li
         query = {"user_id": principal.user_id}
     found = await people.find(query, sort=[("name", 1)])
     return [PersonOut(id=p.id, name=p.name, unit_id=p.unit_id) for p in found]
+
+
+RECENT_SCORES = 10
+
+
+class PersonSummary(PersonOut):
+    """A row of the People page: real counts and scores only (golden rule 6), nothing estimated."""
+
+    analysed: int  # recordings with a completed analysis
+    latest_score: float | None  # the overall score of the most recently analysed recording
+    recent_scores: list[float]  # overall scores of the last RECENT_SCORES analysed recordings, oldest first
+    last_analysed_at: datetime | None
+
+
+async def people_summary(
+    principal: Principal, people: TenantRepo[Person], analyses: TenantRepo[Analysis]
+) -> list[PersonSummary]:
+    """visible_people, each with how many of their recordings are analysed and their recent overall scores. A
+    re-analysed recording counts once, with its newest result."""
+    visible = await visible_people(principal, people)
+    ids = [p.id for p in visible]
+    found = (
+        await analyses.find({"person_id": {"$in": ids}, "status": "COMPLETED"}, sort=[("created_at", 1)]) if ids else []
+    )
+    newest: dict[str, dict[str, Analysis]] = {}  # person -> recording -> its newest analysis
+    for analysis in found:
+        newest.setdefault(analysis.person_id or "", {})[analysis.recording_id] = analysis
+    out = []
+    for person in visible:
+        mine = sorted(newest.get(person.id, {}).values(), key=lambda a: a.created_at)
+        scored = [a.overall_score for a in mine if a.overall_score is not None]
+        out.append(PersonSummary(
+            **person.model_dump(), analysed=len(mine), latest_score=scored[-1] if scored else None,
+            recent_scores=scored[-RECENT_SCORES:], last_analysed_at=mine[-1].created_at if mine else None,
+        ))  # fmt: skip
+    return out
 
 
 # --- Cursor pagination ---
@@ -276,11 +313,18 @@ async def list_recordings(
     recordings: TenantRepo[Recording],
     people: TenantRepo[Person],
     analyses: TenantRepo[Analysis],
+    person_id: str | None = None,
+    type: ConversationType | None = None,
 ) -> RecordingPage:
-    query = {**await visible_filter(principal, people)}
-    page_filter = after_cursor(cursor)
-    found = await recordings.find({"$and": [query, page_filter]} if page_filter else query,
-                                  sort=[("created_at", -1), ("_id", -1)], limit=limit + 1)  # fmt: skip
+    # Every condition is AND-ed with the visibility filter, so the narrowing filters can never widen it.
+    conditions: list[dict[str, Any]] = [await visible_filter(principal, people), after_cursor(cursor)]
+    if person_id is not None:
+        conditions.append({"person_id": person_id})
+    if type is not None:
+        conditions.append({"type": type.value})
+    kept = [c for c in conditions if c]  # owners see everything: their visibility filter is {}
+    query = {"$and": kept} if kept else {}
+    found = await recordings.find(query, sort=[("created_at", -1), ("_id", -1)], limit=limit + 1)
     items, more = found[:limit], len(found) > limit
     next_cursor = encode_cursor(items[-1].created_at, items[-1].id) if more and items else None
     return RecordingPage(items=await recording_out(items, people, analyses), next_cursor=next_cursor)

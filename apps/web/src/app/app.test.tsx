@@ -103,7 +103,7 @@ describe("the app shell", () => {
 
 describe("the list's filters", () => {
   it("searches titles and filters by type", async () => {
-    stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
+    const fetchMock = stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
     renderAt("/recordings", signedIn);
     await screen.findByRole("link", { name: "Fractions" });
     await userEvent.type(screen.getByRole("searchbox", { name: "Search lessons" }), "deci");
@@ -111,8 +111,8 @@ describe("the list's filters", () => {
     expect(screen.queryByRole("link", { name: "Fractions" })).toBeNull();
     await userEvent.clear(screen.getByRole("searchbox", { name: "Search lessons" }));
     await userEvent.click(screen.getByRole("button", { name: "Reception" }));
-    expect(screen.getByRole("link", { name: "Silent test" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Decimals" })).toBeNull();
+    // The type is narrowed by the API (so it holds across pages), not by hiding loaded rows.
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.includes("type=reception"))).toBe(true));
   });
 
   it("offers to clear filters that match nothing", async () => {
@@ -151,6 +151,36 @@ describe("the menu", () => {
     expect(await screen.findByRole("heading", { name: "We couldn't find that page" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Go to lessons" })).toBeInTheDocument();
     expect(screen.queryByText(/later step of the build/i)).toBeNull();
+  });
+});
+
+describe("the people page", () => {
+  const MANAGER = { ...ME, user: { ...ME.user, name: "Meena Iyer", role: "manager", title: "Coordinator, Class 6" } };
+  const SUMMARY = [
+    { id: "p-asha", name: "Asha Rao", unit_id: "unit-6", analysed: 3, latest_score: 3.4, recent_scores: [2.5, 3.0, 3.4],
+      last_analysed_at: "2026-10-22T05:50:00Z" }, // prettier-ignore
+    { id: "p-new", name: "New Teacher", unit_id: "unit-6", analysed: 0, latest_score: null, recent_scores: [],
+      last_analysed_at: null }, // prettier-ignore
+  ];
+
+  it("is in a manager's menu but not a teacher's", async () => {
+    stubApi({ "/v1/me": MANAGER, "/v1/recordings": PAGE });
+    renderAt("/recordings", signedIn);
+    const menu = await screen.findByRole("navigation", { name: "Main" });
+    expect(await within(menu).findByRole("link", { name: "Teachers" })).toBeInTheDocument();
+  });
+
+  it("lists each person with real counts, latest score and trend, and opens their lessons", async () => {
+    const fetchMock = stubApi({ "/v1/me": MANAGER, "/v1/people/summary": SUMMARY, "/v1/recordings": PAGE });
+    renderAt("/people", signedIn);
+    expect(await screen.findByRole("heading", { name: "Teachers" })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "Last 3 lessons: 2.5 to 3.4, latest 3.4" })).toBeInTheDocument();
+    expect(screen.getByText("3.4")).toBeInTheDocument();
+    expect(screen.getByText("No scores yet")).toBeInTheDocument(); // nothing invented for someone new
+    await userEvent.click(screen.getByRole("link", { name: "Asha Rao" }));
+    expect(await screen.findByRole("button", { name: "Show everyone" })).toBeInTheDocument();
+    const listCall = fetchMock.mock.calls.map(([path]) => path).find((path) => path.includes("person_id="));
+    expect(listCall).toContain("person_id=p-asha"); // the API narrows the list, so it holds across pages
   });
 });
 

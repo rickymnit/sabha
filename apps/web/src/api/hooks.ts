@@ -11,6 +11,7 @@ import {
   type DevUser,
   type Me,
   type PersonItem,
+  type PersonSummary,
   type RecordingDetail,
   type RecordingPage,
   type TranscriptResponse,
@@ -34,13 +35,23 @@ export function useMe(): UseQueryResult<Me, ApiError> {
   });
 }
 
-export function useRecordings(pageSize = 20) {
+/** Narrowing filters for the list; the API applies them on top of what the caller may see. */
+export interface RecordingFilters {
+  type?: string | null;
+  personId?: string | null;
+}
+
+export function useRecordings(filters: RecordingFilters = {}, pageSize = 20) {
   const { token } = useSession();
+  const { type = null, personId = null } = filters;
   return useInfiniteQuery({
-    queryKey: ["recordings", pageSize, token],
+    queryKey: ["recordings", pageSize, type, personId, token],
     queryFn: ({ pageParam }) => {
-      const cursor = pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : "";
-      return apiFetch<RecordingPage>(`/v1/recordings?limit=${pageSize}${cursor}`, { token });
+      const params = new URLSearchParams({ limit: String(pageSize) });
+      if (pageParam) params.set("cursor", pageParam);
+      if (type) params.set("type", type);
+      if (personId) params.set("person_id", personId);
+      return apiFetch<RecordingPage>(`/v1/recordings?${params}`, { token });
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
@@ -97,6 +108,15 @@ export function usePeople(): UseQueryResult<PersonItem[], ApiError> {
     queryFn: () => apiFetch<PersonItem[]>("/v1/people", { token }),
     enabled: Boolean(token),
     staleTime: 5 * 60_000,
+  });
+}
+
+export function usePeopleSummary(enabled = true): UseQueryResult<PersonSummary[], ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["people-summary", token],
+    queryFn: () => apiFetch<PersonSummary[]>("/v1/people/summary", { token }),
+    enabled: enabled && Boolean(token),
   });
 }
 
