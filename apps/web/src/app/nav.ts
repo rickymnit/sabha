@@ -14,6 +14,8 @@ export interface NavEntry {
 }
 
 const EVERYONE: Role[] = ["owner", "admin", "manager", "reviewer", "staff"];
+/** Who resolves reviews (ADR 0007): never staff, not even for their own recordings. */
+export const RESOLVERS: Role[] = ["owner", "admin", "manager", "reviewer"];
 
 export function navItems(me: Me): NavEntry[] {
   const labels = me.tenant.labels;
@@ -31,6 +33,13 @@ export function navItems(me: Me): NavEntry[] {
       icon: "recordings",
       roles: EVERYONE,
       match: (path) => path === "/recordings" || path.startsWith("/recordings/"),
+    },
+    {
+      to: "/reviews",
+      label: "Reviews",
+      icon: "reviews",
+      roles: RESOLVERS,
+      match: (path) => path === "/reviews" || path.startsWith("/reviews/"),
     },
     {
       to: "/people",

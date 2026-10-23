@@ -1,7 +1,7 @@
 // TanStack Query hooks for the API (P6.2). Every request carries the session's token; recordings still moving
 // through the pipeline are refetched every REFRESH_MS so statuses update without a reload (SSE comes with P2.6).
 
-import { useInfiniteQuery, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 
 import type { OverviewStats } from "../features/overview/types";
 import type { AnalysisPayload } from "../features/report/types";
@@ -9,12 +9,15 @@ import { useSession } from "../session/session";
 import { ApiError, apiFetch } from "./client";
 import {
   IN_PROGRESS,
+  type ApiStatus,
   type DevUser,
   type Me,
   type PersonItem,
   type PersonSummary,
   type RecordingDetail,
   type RecordingPage,
+  type ReviewDecision,
+  type SpeakersResponse,
   type TranscriptResponse,
 } from "./types";
 
@@ -130,6 +133,47 @@ export function useOverview(period: { from: string; to: string }): UseQueryResul
     enabled: Boolean(token),
     refetchInterval: (query) =>
       query.state.data?.in_progress?.some((s) => s.stage !== "needs_review") ? REFRESH_MS : false,
+  });
+}
+
+/** Recordings waiting for a reviewer's decision (owners, admins, managers, reviewers; ADR 0007). */
+export function useReviews(enabled = true): UseQueryResult<RecordingPage, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["reviews", token],
+    queryFn: () => apiFetch<RecordingPage>("/v1/reviews?limit=100", { token }),
+    enabled: enabled && Boolean(token),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSpeakers(id: string, enabled = true): UseQueryResult<SpeakersResponse, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["speakers", id, token],
+    queryFn: () => apiFetch<SpeakersResponse>(`/v1/recordings/${encodeURIComponent(id)}/speakers`, { token }),
+    enabled: enabled && Boolean(token),
+  });
+}
+
+/** POST /v1/recordings/{id}/review; refreshes the queue, the lists and the recording afterwards. */
+export function useResolveReview(id: string) {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: ReviewDecision) =>
+      apiFetch<{ recording_id: string; status: ApiStatus }>(`/v1/recordings/${encodeURIComponent(id)}/review`, {
+        method: "POST",
+        token,
+        body: decision,
+      }),
+    onSuccess: async () => {
+      await Promise.all(
+        ["reviews", "recordings", "recording", "analysis", "overview"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
   });
 }
 
