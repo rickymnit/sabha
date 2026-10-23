@@ -8,6 +8,9 @@ without it). It is a tiny identity provider inside the API:
   `scripts/admin/dev_seed.py`), with their tenant, role and name, for the web app's "Sign in as..." list;
 - `POST /dev-idp/token {subject}`: a signed access token for one of them (8 hours).
 
+Tenants whose id starts with HIDDEN_TENANT_PREFIX (the browser tests' "E2E School") are left out of the list, so
+the demo sign-in page shows only the demo school; their people can still get a token by subject.
+
 Tokens are checked by the normal TokenVerifier (signature, issuer, audience, expiry) through `fetch`, which serves
 the discovery document and JWKS from memory, so nothing about authorisation is bypassed: the API still finds the
 user, tenant and role from its own records. The routes are left out of the OpenAPI document.
@@ -33,6 +36,7 @@ from sabha_core.models import IdentityLink, Tenant, User
 from sabha_core.repo import SystemRepo, TenantRepo
 
 TOKEN_TTL_S = 8 * 3600
+HIDDEN_TENANT_PREFIX = "e2e-"
 KID = "dev-1"
 
 
@@ -110,6 +114,7 @@ async def users(request: Request, db: Db) -> list[DevUser]:
         DevUser(subject=link.subject or "", name=user.name, title=user.title, email=user.email, role=user.role,
                 tenant_id=tenant.id, tenant_name=tenant.name)
         for link, user, tenant in await _users(db, idp.issuer)
+        if not tenant.id.startswith(HIDDEN_TENANT_PREFIX)
     ]  # fmt: skip
 
 

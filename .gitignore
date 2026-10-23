@@ -33,3 +33,7 @@ requirements-audit.txt
 # Rater kit (P4.4): filled sheets and imported scores are about real staff.
 eval/raters/sheets/
 eval/raters/scores/
+
+# Playwright output (apps/web/e2e)
+test-results/
+playwright-report/

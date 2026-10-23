@@ -95,8 +95,9 @@ fmt: ## Fix formatting and autofixable lint
 	$(UV) run ruff format
 	$(PNPM) -C apps/web format
 
-e2e: ## Playwright against the dev stack
-	@echo "e2e: not implemented yet (P6.2)"
+e2e: ## Playwright browser smoke tests against the running stack (make dev, make api; apps/web/README.md)
+	$(UV) run python scripts/admin/dev_seed.py
+	$(PNPM) -C apps/web e2e
 
 eval-wer: ## WER and role accuracy on the hold-out set: make eval-wer HYP_DIR=<dir of transcript@v1 files>
 	@test -n "$(HYP_DIR)" || { echo "set HYP_DIR to a folder of system transcripts (<recording_id>.json)"; exit 2; }

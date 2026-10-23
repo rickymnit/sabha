@@ -16,8 +16,18 @@ APP_ENV=local only):
 4. In `apps/web/.env.local`: `VITE_AUTH_MODE=dev`; then `pnpm -C apps/web dev` and open http://localhost:5180.
    Pick someone on the sign-in page. Vite forwards `/v1` and `/dev-idp` to the API on port 8000.
 
-Pages today: recordings (status refreshes while processing), a recording's report and transcript with playback,
-and upload (one file, up to 512 MB; resuming after a reload and hashing in a worker come with the rest of P6.3).
+Pages today (only finished pages are in the menu, `src/app/nav.ts`): Overview (owners, admins, managers,
+reviewers; it is their home page), recordings (filters by type and person; status refreshes while processing), a
+recording's report and transcript with playback, people with their trend, and upload (several files, up to 512 MB
+each; resuming after a reload and hashing in a worker come with the rest of P6.3).
+
+## Browser smoke tests (Playwright)
+
+`make e2e` runs `e2e/*.e2e.ts` in Chromium at desktop (1440 px) and phone (Pixel 7) widths against the running
+stack above (it reseeds first and starts the web dev server if it is not running). Reading tests use the demo
+school's accounts and change nothing; the upload test signs in to the hidden "E2E School" (`dev_seed.py`; not on
+the sign-in page), so test files never appear in the demo. First time only: `pnpm -C apps/web exec playwright
+install chromium`. On failure, the screenshot and trace are in `apps/web/test-results/`.
 
 ## Audit exceptions
 

@@ -77,7 +77,7 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
         s3_secret_access_key=s3_storage.secret_access_key,
     )  # fmt: skip
     people = client.get("/dev-idp/users").json()
-    assert {p["subject"] for p in people} == {f"dev-{u[0]}" for u in seed.USERS}
+    assert {p["subject"] for p in people} == {f"dev-{u[0]}" for u in seed.USERS}  # E2E School is not listed
     assert {p["tenant_name"] for p in people} == {"Demo School"}
     assert {(p["name"], p["title"]) for p in people if p["subject"] == "dev-asha"} == {("Asha Rao", "Teacher, Class 6")}
 
@@ -88,6 +88,9 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     assert me.json()["user"]["title"] == "Teacher, Class 6"
     assert me.json()["tenant"]["units"] == [{"id": "unit-6", "name": "Class 6"}, {"id": "unit-7", "name": "Class 7"}]
     assert client.post("/dev-idp/token", json={"subject": "dev-nobody"}).status_code == 404
+    hidden = client.post("/dev-idp/token", json={"subject": "e2e-teacher"}).json()["access_token"]
+    e2e_me = client.get("/v1/me", headers={"Authorization": f"Bearer {hidden}"}).json()  # still signs in by subject
+    assert (e2e_me["tenant"]["id"], e2e_me["user"]["name"]) == ("e2e-school", "Test Teacher")
     forged = token[:-4] + ("AAAA" if not token.endswith("AAAA") else "BBBB")
     assert client.get("/v1/me", headers={"Authorization": f"Bearer {forged}"}).status_code == 401
     assert not any(path.startswith("/dev-idp") for path in client.get("/openapi.json").json()["paths"])
