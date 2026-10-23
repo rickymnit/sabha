@@ -173,6 +173,37 @@ routes:
     anonymous: 401
     others: 200
 
+  GET /v1/reviews:
+    # Recordings waiting for a person's decision (ADR 0007); filtered like the recordings list.
+    anonymous: 401
+    staff_uploader: 403  # staff never resolve reviews, not even their own
+    staff_colleague: 403
+    others: 200
+
+  GET /v1/recordings/{recording_id}/speakers:
+    # Who spoke how much, with sample lines, for a reviewer to say who is who.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # not their unit
+    reviewer_unit: 200
+    staff_uploader: 403  # staff never resolve reviews
+    staff_colleague: 403
+    other_tenant: 404
+
+  POST /v1/recordings/{recording_id}/review:
+    # Confirm the roles (then it is scored) or close as not usable; a fresh recording in review per call. Audited.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404
+    reviewer_unit: 200
+    staff_uploader: 403  # never their own
+    staff_colleague: 403
+    other_tenant: 404
+
   GET /v1/overview:
     # Numbers for the recordings each caller may see (filtered; tested in apps/api/tests/test_results.py).
     anonymous: 401
