@@ -62,6 +62,9 @@ ALLOWED_CODECS = frozenset(
 )  # fmt: skip
 PROBE_TIMEOUT_S = 60.0
 INVALID_AUDIO = "invalid_audio"
+# Readable audio outside the length limits gets its own code, so people are told "too short", not "unreadable".
+TOO_SHORT = "too_short"
+TOO_LONG = "too_long"
 TIMEOUT = "preprocess_timeout"
 _SAFE = ["-protocol_whitelist", "file"]  # input option: local files only
 
@@ -88,8 +91,8 @@ class Probe:
 
 
 class InvalidAudio(PermanentError):
-    def __init__(self, detail: str) -> None:
-        super().__init__(INVALID_AUDIO, detail)
+    def __init__(self, detail: str, code: str = INVALID_AUDIO) -> None:
+        super().__init__(code, detail)
 
 
 def _seconds(value: object) -> float | None:
@@ -131,10 +134,11 @@ def check(probe: Probe) -> None:
     if probe.codec not in ALLOWED_CODECS:
         raise InvalidAudio(f"unsupported audio codec {probe.codec or 'unknown'!r}")
     if probe.duration_ms < MIN_DURATION_MS:
-        raise InvalidAudio(f"too short: {probe.duration_ms / 1000:.1f} s; the minimum is {MIN_DURATION_MS // 1000} s")
+        minimum = MIN_DURATION_MS // 1000
+        raise InvalidAudio(f"too short: {probe.duration_ms / 1000:.1f} s; the minimum is {minimum} s", TOO_SHORT)
     if probe.duration_ms > MAX_DURATION_MS:
         hours = MAX_DURATION_MS // 3_600_000
-        raise InvalidAudio(f"too long: {probe.duration_ms / 3_600_000:.2f} h; the maximum is {hours} h")
+        raise InvalidAudio(f"too long: {probe.duration_ms / 3_600_000:.2f} h; the maximum is {hours} h", TOO_LONG)
 
 
 Runner = Callable[[Sequence[str], float], "subprocess.CompletedProcess[bytes]"]
