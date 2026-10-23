@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findMatches, formatClock, formatSpoken, lineAt, segmentText, toUtf16Range } from "./text";
+import { findMatches, formatClock, formatSpoken, lineAt, paragraphBreaks, segmentText, toUtf16Range } from "./text";
 import type { Utterance } from "./types";
 
 const u = (start_ms: number, text = "x", extra: Partial<Utterance> = {}): Utterance => ({
@@ -84,5 +84,32 @@ describe("segmentText", () => {
       { text: "ajh ", lowConfidence: span },
       { text: "aaya?" },
     ]);
+  });
+});
+
+describe("paragraphBreaks", () => {
+  const sentence = (n: number) => `Sentence ${n} has a few words in it to make it longer than short. `;
+
+  it("leaves short turns alone", () => {
+    expect(paragraphBreaks("Sab samajh aaya? Okay, good.")).toEqual([]);
+  });
+
+  it("starts a new paragraph after a sentence end once a paragraph is long enough", () => {
+    const text = Array.from({ length: 12 }, (_, i) => sentence(i)).join("");
+    const breaks = paragraphBreaks(text, 200, 60);
+    expect(breaks.length).toBeGreaterThan(1);
+    for (const at of breaks) expect(text.slice(at - 2, at)).toBe(". ");
+    expect(text.length - (breaks.at(-1) ?? 0)).toBeGreaterThanOrEqual(60); // no short last paragraph
+  });
+
+  it("knows the Hindi full stop", () => {
+    const text = `${"क".repeat(30)}। ${"ख".repeat(30)}`;
+    expect(paragraphBreaks(text, 20, 10)).toEqual([32]);
+  });
+
+  it("marks the first run of each paragraph without changing the text", () => {
+    const segments = segmentText("One. Two. Three.", [], [], [5, 10]);
+    expect(segments.map((s) => s.text).join("")).toBe("One. Two. Three.");
+    expect(segments.filter((s) => s.paragraphStart).map((s) => s.text)).toEqual(["Two. ", "Three."]);
   });
 });

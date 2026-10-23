@@ -17,6 +17,7 @@ from pymongo import MongoClient
 from pymongo.database import Database
 
 from sabha_api.resources import open_resources
+from sabha_api.services.results import metric_name, recording_title, without_ids
 from sabha_core.indexes import ensure_indexes
 from sabha_core.models import (
     Analysis,
@@ -33,6 +34,7 @@ from sabha_core.models import (
 )  # fmt: skip
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
+from sabha_core.reasons import explain
 from sabha_core.repo import COLLECTIONS
 from sabha_core.state import RecordingStatus
 
@@ -178,7 +180,17 @@ def test_the_list_shows_the_person_and_latest_score(api: Api) -> None:
     analysis(api, "r-asha", "v2", 3.8, 10)  # a re-analysis
     (item,) = api.get("owner", "/v1/recordings").json()["items"]
     assert item["person"] == {"id": "p-asha", "name": "Asha"} and item["overall_score"] == 3.8
-    assert item["status"] == "COMPLETED"
+    assert item["status"] == "COMPLETED" and item["status_note"] is None
+    assert item["title"] == "r-asha"
+
+
+def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:
+    recording(api, "r-1", "p-asha", "unit-1", 30, RecordingStatus.FAILED)
+    api.db.recordings.update_one({"_id": "r-1"}, {"$set": {"status_reason": "no_speech"}})
+    recording(api, "r-2", "p-asha", "unit-1", 20, RecordingStatus.FAILED)
+    api.db.recordings.update_one({"_id": "r-2"}, {"$set": {"status_reason": "unexpected_ValueError"}})
+    notes = {i["id"]: i["status_note"] for i in api.get("owner", "/v1/recordings").json()["items"]}
+    assert notes == {"r-1": "No speech was found in the recording.", "r-2": explain("unexpected_ValueError")}
 
 
 # --- Transcript and analysis ---
@@ -226,7 +238,7 @@ def test_the_report_payload_for_a_completed_lesson(api: Api) -> None:
     assert body["person_history"] == {"count": 1, "min": 2.9, "max": 2.9}  # her other lesson, real data only
     assert body["comparison"] is None
     metrics = {m["key"]: m for m in body["metrics"]}
-    assert metrics["teacher_talk_share"]["name"] == "Teacher talk share"  # the tenant's word for a teacher
+    assert metrics["teacher_talk_share"]["name"] == "Teacher talk time"  # the tenant's word for a teacher
     assert (metrics["longest_monologue_s"]["unit"], metrics["longest_monologue_s"]["value"]) == ("ms", 95_500)
     assert metrics["words_per_minute"]["unit"] == "wpm"
     assert body["dimensions"][0]["evidence"][0] == DIMENSIONS[0]["evidence"][0]
@@ -286,7 +298,7 @@ def test_the_recording_detail_has_what_the_report_header_needs(api: Api) -> None
     )  # fmt: skip
     insert(api.db, "transcripts", doc)
     body = api.get("asha", "/v1/recordings/r-asha").json()
-    assert (body["title"], body["type_label"], body["unit_name"]) == ("r-asha.mp3", "Teaching", "unit-1")
+    assert (body["title"], body["type_label"], body["unit_name"]) == ("r-asha", "Teaching", "unit-1")
     assert body["speech_ms"] == 55_000 and body["languages"] == ["English", "Hindi"]
     assert body["removed_silence"] == [{"start_ms": 0, "end_ms": 1_000}, {"start_ms": 31_000, "end_ms": 40_000},
                                        {"start_ms": 65_000, "end_ms": 70_000}]  # fmt: skip
@@ -316,3 +328,48 @@ def test_people_lists_whom_each_caller_may_upload_for(api: Api) -> None:
     assert names("manager") == ["Asha"]  # unit-1 only
     assert names("asha") == ["Asha"]  # staff upload only for themselves
     assert names("nobody") == []
+
+
+@pytest.mark.parametrize(
+    ("file_name", "title"),
+    [
+        ("Class 7B.mp3", "Class 7B"),
+        ("Fractions, 13 Oct.final.m4a", "Fractions, 13 Oct.final"),
+        ("no extension", "no extension"),
+        (".mp3", ".mp3"),
+        ("Talk by Dr. A. Rao", "Talk by Dr. A. Rao"),  # " Rao" is not an extension
+        (None, "r-1"),
+    ],
+)
+def test_the_title_is_the_file_name_without_its_extension(file_name: str | None, title: str) -> None:
+    assert recording_title(file_name, "r-1") == title
+
+
+@pytest.mark.parametrize(
+    ("key", "person", "name"),
+    [
+        ("teacher_talk_share", "Faculty member", "Faculty member talk time"),
+        ("students_talk_share", "Teacher", "Student talk time"),
+        ("teacher_question_count", "Teacher", "Questions asked by teacher"),
+        ("receptionist_talk_share", "Receptionist", "Receptionist talk time"),
+        ("caller_talk_share", "Receptionist", "Caller talk time"),
+        ("longest_silence_s", "Teacher", "Longest silence"),
+        ("longest_monologue_s", "Teacher", "Longest uninterrupted talk"),
+        ("words_per_minute", "Teacher", "Speaking pace"),
+        ("new_thing_ms", "Teacher", "New thing"),  # a metric added later: its key without the unit
+    ],
+)
+def test_metric_names_are_plain_words(key: str, person: str, name: str) -> None:
+    assert metric_name(key, person) == name
+
+
+@pytest.mark.parametrize(
+    ("text", "clean"),
+    [
+        ("At utterance u0000, try pausing longer.", "Try pausing longer."),
+        ("In utterance u0003 the analogy works well.", "The analogy works well."),
+        ("Ask three students before the worksheet.", "Ask three students before the worksheet."),
+    ],
+)
+def test_old_reports_lose_utterance_ids(text: str, clean: str) -> None:
+    assert without_ids(text) == clean

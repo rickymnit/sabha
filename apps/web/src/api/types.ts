@@ -7,7 +7,8 @@ import type { Labels, TimeRange } from "../features/report/types";
 export type Role = "owner" | "admin" | "manager" | "reviewer" | "staff";
 
 export interface Me {
-  user: { id: string; email: string; name: string; role: Role; unit_ids: string[] };
+  /** `title` is the job title shown under the name ("Coordinator, Class 6"); display only. */
+  user: { id: string; email: string; name: string; role: Role; title: string | null; unit_ids: string[] };
   tenant: {
     id: string;
     name: string;
@@ -15,6 +16,8 @@ export interface Me {
     /** The UI's nouns (CLAUDE.md: never hard-code "Teacher" or "Lesson"). */
     labels: Labels & Record<string, string>;
     enabled_types: ConversationType[];
+    /** Every unit's name, so lists can say "Class 6" rather than an id. */
+    units: { id: string; name: string }[];
   };
 }
 
@@ -32,9 +35,13 @@ export type ApiStatus =
 
 export interface RecordingItem {
   id: string;
+  /** The file name without its extension. */
+  title: string;
   type: ConversationType;
   status: ApiStatus;
   status_reason: string | null;
+  /** Why it failed or needs review, in plain words; null otherwise. */
+  status_note: string | null;
   person: { id: string; name: string } | null;
   unit_id: string | null;
   file_name: string | null;
@@ -53,7 +60,6 @@ export interface RecordingPage {
 }
 
 export interface RecordingDetail extends RecordingItem {
-  title: string;
   type_label: string;
   unit_name: string | null;
   recorded_at: string;
@@ -95,6 +101,7 @@ export interface UploadStarted {
 export interface DevUser {
   subject: string;
   name: string;
+  title: string | null;
   email: string;
   role: Role;
   tenant_id: string;

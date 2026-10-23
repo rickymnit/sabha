@@ -132,10 +132,9 @@ describe("RecordingReport", () => {
 });
 
 describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
-  it("keeps the dispute button disabled, with a reason, for viewers who may not dispute", async () => {
+  it("shows no dispute button to viewers who may not dispute", async () => {
     await renderReport(mockReport(lesson, "completed"));
-    expect(screen.getByRole("button", { name: "Dispute this score" })).toBeDisabled();
-    expect(screen.getByText(/Only the person analysed or their manager/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dispute this score" })).toBeNull();
   });
 
   it("opens the dispute dialog for the person analysed", async () => {

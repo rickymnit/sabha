@@ -63,6 +63,7 @@ class DevIdp:
 class DevUser(BaseModel):
     subject: str
     name: str
+    title: str | None
     email: str
     role: str
     tenant_id: str
@@ -106,8 +107,8 @@ async def _users(db: AsyncDatabase[dict[str, Any]], issuer: str) -> list[tuple[I
 async def users(request: Request, db: Db) -> list[DevUser]:
     idp = _idp(request)
     return [
-        DevUser(subject=link.subject or "", name=user.name, email=user.email, role=user.role, tenant_id=tenant.id,
-                tenant_name=tenant.name)
+        DevUser(subject=link.subject or "", name=user.name, title=user.title, email=user.email, role=user.role,
+                tenant_id=tenant.id, tenant_name=tenant.name)
         for link, user, tenant in await _users(db, idp.issuer)
     ]  # fmt: skip
 

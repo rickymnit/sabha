@@ -111,8 +111,26 @@ function MetricCell({ metric, onSeek }: { metric: Metric; onSeek: (ms: number) =
   );
 }
 
+// Full class names so Tailwind can see them.
+const WIDE_COLUMNS: Record<number, string> = {
+  1: "lg:grid-cols-1",
+  2: "lg:grid-cols-2",
+  3: "lg:grid-cols-3",
+  4: "lg:grid-cols-4",
+  5: "lg:grid-cols-5",
+};
+
+/** At most 5 per row on wide screens, in rows as even as possible: 7 metrics -> 4 + 3, not 5 + 2 or 6 + 1. */
+function metricLayout(count: number): { columns: number; pad: number } {
+  if (count === 0) return { columns: 1, pad: 0 };
+  const rows = Math.ceil(count / 5);
+  const columns = Math.ceil(count / rows);
+  return { columns, pad: rows * columns - count };
+}
+
 export function ReportMetrics({ metrics, onSeek }: ReportMetricsProps) {
   const headingId = useId();
+  const layout = metricLayout(metrics.length);
   return (
     <section aria-labelledby={headingId} className="rounded-panel border border-line bg-surface">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3.5">
@@ -123,10 +141,15 @@ export function ReportMetrics({ metrics, onSeek }: ReportMetricsProps) {
       </div>
       {/* Dividers on every cell's top and left edge; the outer ones sit outside this wrapper and are clipped. */}
       <div className="overflow-hidden rounded-b-panel border-t border-line-subtle">
-        <dl className="-ml-px -mt-px mb-0 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))]">
+        <dl className={`-ml-px -mt-px mb-0 grid grid-cols-2 ${WIDE_COLUMNS[layout.columns]}`}>
           {metrics.map((metric) => (
             <MetricCell key={metric.key} metric={metric} onSeek={onSeek} />
           ))}
+          {/* Empty cells finish the last row, so no metric sits alone on a row of blank space. */}
+          {Array.from({ length: layout.pad }, (_, i) => (
+            <div key={`pad-${i}`} aria-hidden="true" className="hidden border-l border-t border-track lg:block" />
+          ))}
+          {metrics.length % 2 === 1 && <div aria-hidden="true" className="border-l border-t border-track lg:hidden" />}
         </dl>
       </div>
     </section>

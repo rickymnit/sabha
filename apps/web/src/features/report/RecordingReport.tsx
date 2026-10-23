@@ -5,7 +5,7 @@
 
 import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Card } from "../../design";
+import { Card, ScoreBar } from "../../design";
 import {
   AudioPlayer,
   TranscriptList,
@@ -16,7 +16,7 @@ import {
   type RoleLabels,
   type Transcript,
 } from "../transcript";
-import { formatScore, joinList } from "./format";
+import { checkedText, formatScore, joinList } from "./format";
 import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
@@ -81,7 +81,6 @@ export function RecordingReport({
         labels={labels}
         rubric={isReport ? analysis.rubric : undefined}
         rubricHref={rubricHref}
-        showActions={isReport}
       />
       {analysis.status === "processing" && <ProcessingState analysis={analysis} labels={labels} />}
       {analysis.status === "failed" && <FailedState analysis={analysis} labels={labels} />}
@@ -223,7 +222,12 @@ function ReportBody({
             dimension={selected}
             speakers={speakers}
             onSeek={seek}
-            provenance={`Scored by model ${analysis.model.ids.join(", ")}, rubric ${rubricLabel}`}
+            provenance={
+              // The model id means nothing to most readers; administrators see it for support questions.
+              viewerRole === "admin"
+                ? `Scored against the ${rubricLabel} rubric by ${analysis.model.ids.join(", ")}`
+                : `Scored against the ${rubricLabel} rubric`
+            }
             onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
           />
         )}
@@ -315,7 +319,11 @@ function OverallPanel({
             </span>
           </span>
         )}
+        {overall !== null && <ScoreBar score={overall} hideValue className="mt-1" />}
         {comparisonText}
+        <span data-testid="overall-checked" className="text-small text-muted">
+          {checkedText(analysis.dimensions)}
+        </span>
         {history && history.count > 0 && (
           <span data-testid="overall-history" className="text-small text-muted">
             {recording.person.name}’s last {history.count} {labels.recording_plural.toLowerCase()}:{" "}

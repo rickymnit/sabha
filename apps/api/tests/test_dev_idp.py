@@ -66,6 +66,9 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     seed = _seed_module()
     assert seed.seed(db, ISSUER) > 0
     assert seed.seed(db, ISSUER) == 0  # running it again changes nothing
+    old_style = {"$set": {"name": "Asha Rao (Teacher, Class 6)"}, "$unset": {"title": ""}}
+    db.users.update_one({"_id": "u-dev-asha"}, old_style)
+    assert seed.seed(db, ISSUER) == 1  # an older seed's name is split into name and job title
 
     client = make_client(
         resources=open_resources, app_env="local", dev_login=True, oidc_issuer=ISSUER, oidc_audience="sabha-local",
@@ -76,11 +79,14 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     people = client.get("/dev-idp/users").json()
     assert {p["subject"] for p in people} == {f"dev-{u[0]}" for u in seed.USERS}
     assert {p["tenant_name"] for p in people} == {"Demo School"}
+    assert {(p["name"], p["title"]) for p in people if p["subject"] == "dev-asha"} == {("Asha Rao", "Teacher, Class 6")}
 
     token = client.post("/dev-idp/token", json={"subject": "dev-asha"}).json()["access_token"]
     me = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200, me.text
     assert me.json()["user"]["role"] == "staff"  # role and tenant come from our own records, as with Auth0
+    assert me.json()["user"]["title"] == "Teacher, Class 6"
+    assert me.json()["tenant"]["units"] == [{"id": "unit-6", "name": "Class 6"}, {"id": "unit-7", "name": "Class 7"}]
     assert client.post("/dev-idp/token", json={"subject": "dev-nobody"}).status_code == 404
     forged = token[:-4] + ("AAAA" if not token.endswith("AAAA") else "BBBB")
     assert client.get("/v1/me", headers={"Authorization": f"Bearer {forged}"}).status_code == 401

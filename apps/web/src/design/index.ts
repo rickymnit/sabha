@@ -26,3 +26,6 @@ export { Toast, ToastProvider, type ToastProps, type ToastProviderProps } from "
 export { useToast, type ToastApi, type ToastOptions, type ToastTone } from "./toastContext";
 export { TypeDot, type TypeDotProps } from "./TypeDot";
 export type { ConversationType, RecordingStatus } from "./types";
+export { Icon, type IconName, type IconProps } from "./icons";
+export { initials } from "./initials";
+export { Avatar, Logo, type AvatarProps, type LogoProps } from "./Logo";

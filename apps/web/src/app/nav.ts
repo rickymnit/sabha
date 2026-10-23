@@ -1,0 +1,37 @@
+// The main menu. Only pages that are finished go in here: a menu item that opens a placeholder makes the whole
+// product look unfinished. Add a page here in the same change that builds it.
+
+import type { Me, Role } from "../api/types";
+import type { IconName } from "../design";
+import { capitalise } from "./format";
+
+export interface NavEntry {
+  to: string;
+  label: string;
+  icon: IconName;
+  /** Whether this entry is the current page. */
+  match: (pathname: string) => boolean;
+}
+
+const EVERYONE: Role[] = ["owner", "admin", "manager", "reviewer", "staff"];
+
+export function navItems(me: Me): NavEntry[] {
+  const labels = me.tenant.labels;
+  const entries: (NavEntry & { roles: Role[] })[] = [
+    {
+      to: "/recordings",
+      label: capitalise(labels.recording_plural),
+      icon: "recordings",
+      roles: EVERYONE,
+      match: (path) => path === "/recordings" || path.startsWith("/recordings/"),
+    },
+    {
+      to: "/upload",
+      label: "Upload",
+      icon: "upload",
+      roles: EVERYONE,
+      match: (path) => path === "/upload",
+    },
+  ];
+  return entries.filter((entry) => entry.roles.includes(me.user.role));
+}

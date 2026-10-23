@@ -27,13 +27,13 @@ from sabha_core.settings import load_settings
 
 TENANT_ID = "demo-school"
 UNITS = {"unit-6": "Class 6", "unit-7": "Class 7"}
-USERS = [  # (subject suffix, name, role, units, person id)
-    ("owner", "Priya Sharma (Principal)", Role.OWNER, [], None),
-    ("admin", "Office Admin", Role.ADMIN, [], None),
-    ("manager", "Meena Iyer (Coordinator, Class 6)", Role.MANAGER, ["unit-6"], None),
-    ("reviewer", "Rahul Verma (Reviewer, Class 6)", Role.REVIEWER, ["unit-6"], None),
-    ("asha", "Asha Rao (Teacher, Class 6)", Role.STAFF, ["unit-6"], "p-asha"),
-    ("ravi", "Ravi Kumar (Teacher, Class 7)", Role.STAFF, ["unit-7"], "p-ravi"),
+USERS = [  # (subject suffix, name, job title, role, units, person id)
+    ("owner", "Priya Sharma", "Principal", Role.OWNER, [], None),
+    ("admin", "Neha Joshi", "School office", Role.ADMIN, [], None),
+    ("manager", "Meena Iyer", "Coordinator, Class 6", Role.MANAGER, ["unit-6"], None),
+    ("reviewer", "Rahul Verma", "Senior teacher, Class 6", Role.REVIEWER, ["unit-6"], None),
+    ("asha", "Asha Rao", "Teacher, Class 6", Role.STAFF, ["unit-6"], "p-asha"),
+    ("ravi", "Ravi Kumar", "Teacher, Class 7", Role.STAFF, ["unit-7"], "p-ravi"),
 ]
 
 
@@ -53,17 +53,21 @@ def seed(db: Database[dict[str, Any]], issuer: str) -> int:
         if units.find_one({"_id": unit_id}) is None:
             units.insert_one(Unit(id=unit_id, name=name))
             written += 1
-    for suffix, name, role, unit_ids, person_id in USERS:
+    for suffix, name, title, role, unit_ids, person_id in USERS:
         user_id, email, subject = f"u-dev-{suffix}", f"{suffix}@demo-school.example", f"dev-{suffix}"
-        if users.find_one({"_id": user_id}) is None:
-            users.insert_one(User(id=user_id, email=email, name=name, role=role, unit_ids=unit_ids, status="active"))
+        existing = users.find_one({"_id": user_id})
+        if existing is None:
+            users.insert_one(User(id=user_id, email=email, name=name, title=title, role=role, unit_ids=unit_ids,
+                                  status="active"))  # fmt: skip
             written += 1
+        elif (existing.name, existing.title) != (name, title):  # older seeds put the title in the name
+            written += users.update_one({"_id": user_id}, {"$set": {"name": name, "title": title}})
         if identities.find_one({"issuer": issuer, "subject": subject}) is None:
             identities.insert_one(IdentityLink(tenant_id=TENANT_ID, issuer=issuer, subject=subject, email=email,
                                                user_id=user_id))  # fmt: skip
             written += 1
         if person_id and people.find_one({"_id": person_id}) is None:
-            people.insert_one(Person(id=person_id, name=name.split(" (")[0], unit_id=unit_ids[0], user_id=user_id))
+            people.insert_one(Person(id=person_id, name=name, unit_id=unit_ids[0], user_id=user_id))
             written += 1
     return written
 

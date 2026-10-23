@@ -91,6 +91,26 @@ export function findMatches(utterances: readonly Utterance[], query: string): Ma
   return matches;
 }
 
+const SENTENCE_END = /[.?!।]["')\]]?\s+/g;
+
+/**
+ * Where to start new paragraphs in a long utterance, so a 3-minute turn reads as paragraphs, not a wall of text.
+ * Breaks fall after a sentence end once a paragraph has at least `minChars`, never leaving a short last paragraph.
+ * Display only: the text and its offsets are unchanged.
+ */
+export function paragraphBreaks(text: string, minChars = 320, minLast = 120): number[] {
+  const breaks: number[] = [];
+  let since = 0;
+  for (const hit of text.matchAll(SENTENCE_END)) {
+    const next = hit.index + hit[0].length;
+    if (next - since >= minChars && text.length - next >= minLast) {
+      breaks.push(next);
+      since = next;
+    }
+  }
+  return breaks;
+}
+
 /** A run of text with the same styling. */
 export interface Segment {
   text: string;
@@ -98,6 +118,8 @@ export interface Segment {
   lowConfidence?: LowConfidenceSpan;
   /** Index into the line's matches when the run is a search hit. */
   match?: number;
+  /** Set on the first run of a new paragraph (see paragraphBreaks). */
+  paragraphStart?: boolean;
 }
 
 /**
@@ -108,6 +130,7 @@ export function segmentText(
   text: string,
   spans: readonly LowConfidenceSpan[],
   matches: readonly { start: number; end: number }[],
+  breaks: readonly number[] = [],
 ): Segment[] {
   const low = spans
     .map((span) => {
@@ -115,9 +138,10 @@ export function segmentText(
       return { start: Math.max(0, start), end: Math.min(text.length, end), span };
     })
     .filter((s) => s.end > s.start);
-  if (low.length === 0 && matches.length === 0) return [{ text }];
+  const paragraphs = new Set(breaks.filter((b) => b > 0 && b < text.length));
+  if (low.length === 0 && matches.length === 0 && paragraphs.size === 0) return [{ text }];
 
-  const cuts = new Set<number>([0, text.length]);
+  const cuts = new Set<number>([0, text.length, ...paragraphs]);
   for (const s of low) cuts.add(s.start).add(s.end);
   for (const m of matches) cuts.add(m.start).add(m.end);
   const points = [...cuts].filter((p) => p >= 0 && p <= text.length).sort((a, b) => a - b);
@@ -133,6 +157,7 @@ export function segmentText(
       text: text.slice(from, to),
       ...(lowConfidence ? { lowConfidence } : {}),
       ...(matchIndex >= 0 ? { match: matchIndex } : {}),
+      ...(paragraphs.has(from) ? { paragraphStart: true } : {}),
     });
   }
   return segments;

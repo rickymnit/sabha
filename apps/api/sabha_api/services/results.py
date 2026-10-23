@@ -22,6 +22,7 @@ import asyncio
 import base64
 import binascii
 import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -157,11 +158,21 @@ class PersonRef(BaseModel):
     name: str
 
 
+def recording_title(file_name: str | None, recording_id: str) -> str:
+    """What people call the recording: its file name without the extension ("Class 7B.mp3" -> "Class 7B")."""
+    if not file_name:
+        return recording_id
+    stem, dot, extension = file_name.rpartition(".")
+    return stem if dot and stem.strip() and extension.isalnum() and len(extension) <= 5 else file_name
+
+
 class RecordingOut(BaseModel):
     id: str
+    title: str
     type: str
     status: str
     status_reason: str | None
+    status_note: str | None  # why it failed or needs review, in plain words (sabha_core.reasons); else None
     person: PersonRef | None
     unit_id: str | None
     file_name: str | None
@@ -222,6 +233,12 @@ def summary(analysis: Analysis) -> AnalysisSummary:
     )  # fmt: skip
 
 
+def status_note(recording: Recording) -> str | None:
+    if recording.status.value not in ("FAILED", "NEEDS_REVIEW"):
+        return None
+    return explain(recording.status_reason)
+
+
 async def _latest_analyses(analyses: TenantRepo[Analysis], recording_ids: list[str]) -> dict[str, Analysis]:
     latest: dict[str, Analysis] = {}
     for item in await analyses.find({"recording_id": {"$in": recording_ids}}, sort=[("created_at", 1)]):
@@ -237,7 +254,8 @@ async def recording_out(
     latest = await _latest_analyses(analyses, [r.id for r in recordings]) if recordings else {}
     return [
         RecordingOut(
-            id=r.id, type=r.type.value, status=r.status.value, status_reason=r.status_reason,
+            id=r.id, title=recording_title(r.file_name, r.id), type=r.type.value, status=r.status.value,
+            status_reason=r.status_reason, status_note=status_note(r),
             person=PersonRef(id=r.person_id, name=names[r.person_id]) if r.person_id in names else None,
             unit_id=r.unit_id, file_name=r.file_name, duration_ms=r.duration_ms, created_at=r.created_at,
             status_changed_at=r.status_changed_at, completed_at=r.completed_at,
@@ -323,18 +341,62 @@ def _reasons(codes: list[str]) -> list[dict[str, str]]:
     return [{"code": code, "message": explain(code)} for code in codes]
 
 
+# Display names for the computed metrics (sabha_analytics.metrics). "{person}" is the tenant's word for the staff
+# member ("Teacher", "Receptionist" in a school; "Sales rep" in a company); other roles are named as below.
+METRIC_NAMES = {
+    "duration_s": "Length",
+    "call_duration_s": "Call length",
+    "silence_share": "Silence",
+    "longest_silence_s": "Longest silence",
+    "long_silence_count": "Long pauses or holds",
+    "hold_gap_count": "Holds",
+    "open_question_count": "Open questions asked",
+    "open_question_ratio": "Open questions",
+    "words_per_minute": "Speaking pace",
+    "longest_monologue_s": "Longest uninterrupted talk",
+}
+ROLE_METRIC_NAMES = {"talk_share": "{role} talk time", "turn_count": "Turns by {role_lower}",
+                     "question_count": "Questions asked by {role_lower}"}  # fmt: skip
+OTHER_ROLE_WORDS = {"students": "Student", "caller": "Caller", "customer": "Customer"}
+
+
+def metric_name(key: str, person_label: str) -> str:
+    """A metric's name in plain words: "teacher_talk_share" -> "Teacher talk time" (in the tenant's own word)."""
+    if key in METRIC_NAMES:
+        return METRIC_NAMES[key]
+    for suffix, pattern in ROLE_METRIC_NAMES.items():
+        role = key.removesuffix("_" + suffix)
+        if role != key:
+            word = person_label if role in STAFF_ROLE_WORDS else OTHER_ROLE_WORDS.get(role, role.replace("_", " "))
+            word = word[:1].upper() + word[1:]
+            return pattern.format(role=word, role_lower=word.lower())
+    words = [w for w in key.split("_") if w not in ("s", "ms")]  # a metric added later: its key, minus the unit
+    name = " ".join(person_label if w in STAFF_ROLE_WORDS else w for w in words)
+    return name[:1].upper() + name[1:]
+
+
 def metric_out(metric: dict[str, Any], person_label: str) -> dict[str, Any]:
     """analysis@v1 metric -> the UI's Metric: display name in the tenant's words, and units the UI formats."""
-    words = metric["key"].split("_")
-    name = " ".join(person_label if w in STAFF_ROLE_WORDS else w for w in words)
+    name = metric_name(metric["key"], person_label)
     value, unit = metric["value"], metric["unit"]
     if unit == "s":
         value, unit = (None if value is None else round(value * 1000)), "ms"
     unit = {"words/min": "wpm", "words_per_minute": "wpm"}.get(unit, unit)
     if unit not in ("ratio", "count", "wpm", "ms"):
         unit = "count"
-    return {"key": metric["key"], "name": name[:1].upper() + name[1:], "value": value, "unit": unit,
+    return {"key": metric["key"], "name": name, "value": value, "unit": unit,
             "definition": metric["definition"]}  # fmt: skip
+
+
+# Analyses made before synthesis prompt v2 can name utterance ids ("At utterance u0000, try ..."). The id means
+# nothing to a reader and the time is shown next to the text, so the phrase is dropped when the report is served.
+_UTTERANCE_REF = re.compile(r"\b(?:at|in)?\s*(?:utterance|line)\s+u\d{4,}\b[,:]?\s*", re.IGNORECASE)
+
+
+def without_ids(text: str) -> str:
+    cleaned = _UTTERANCE_REF.sub(" ", text).strip()
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned[:1].upper() + cleaned[1:] if cleaned != text else text
 
 
 def dimension_out(d: dict[str, Any]) -> dict[str, Any]:
@@ -385,11 +447,11 @@ def report_payload(
         "person_history": {"count": len(history), "min": min(history), "max": max(history)} if history else None,
         "dimensions": dimensions,
         "metrics": [metric_out(m, person_label) for m in report["metrics"]],
-        "summary": synthesis.get("summary", ""),
+        "summary": without_ids(synthesis.get("summary", "")),
         "strengths": synthesis.get("strengths", []),
         "gaps": synthesis.get("gaps", []),
         "suggestions": [
-            {"text": s["text"], "utterance_id": s["utterance_id"], "start_ms": s["start_ms"]}
+            {"text": without_ids(s["text"]), "utterance_id": s["utterance_id"], "start_ms": s["start_ms"]}
             for s in synthesis.get("suggestions", [])
         ],
         "phases": [
@@ -421,7 +483,6 @@ class Range(BaseModel):
 class RecordingDetail(RecordingOut):
     """What the report header needs (ReportRecording in the web app), filled in as the pipeline produces it."""
 
-    title: str
     type_label: str
     unit_name: str | None
     recorded_at: datetime
@@ -453,7 +514,7 @@ async def recording_detail(
     segments = await reader.json(pre + "segments@v1.json")
     segment_map = None if segments is None else SegmentMap.from_records(segments)
     return RecordingDetail(
-        **base.model_dump(), title=recording.file_name or base.id, type_label=recording.type.value.capitalize(),
+        **base.model_dump(), type_label=recording.type.value.capitalize(),
         unit_name=unit.name if unit else None, recorded_at=recording.recorded_at or recording.created_at,
         speech_ms=None if segment_map is None else segment_map.compact_length_ms, languages=languages,
         removed_silence=[] if segment_map is None else silence_gaps(segment_map, recording.duration_ms),
