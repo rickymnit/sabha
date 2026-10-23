@@ -22,7 +22,7 @@ from sabha_core.models import Recording, Tenant, Transcript
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.repo import SyncTenantRepo
-from sabha_core.state import RecordingStatus
+from sabha_core.state import RecordingStatus, transition
 from sabha_core.timemap import Segment, SegmentMap
 from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
@@ -99,6 +99,7 @@ class Stage:
     def save_transcript(self, tenant_id: str, document: Transcript) -> None:
         # Through the real tenant-scoped repository: a missing tenant id must fail here, as in the worker.
         transcripts = SyncTenantRepo(self.db, "transcripts", tenant_id, Transcript)
+        transcripts.delete_many({"recording_id": document.recording_id, "version": document.version})  # as tasks.py
         transcripts.insert_one(document)
         self.saved.append(document)
 
@@ -209,6 +210,30 @@ def test_no_words_at_all_asks_for_review(stage: Stage) -> None:
     rid = stage.recording()
     assert stage.run(rid, Transcriber(SilentProvider())) == "needs_review"
     assert (stage.doc(rid)["status"], stage.doc(rid)["status_reason"]) == ("NEEDS_REVIEW", "no_transcript")
+
+
+@pytest.mark.integration
+def test_after_a_reviewer_confirms_the_roles_it_goes_on_to_scoring_without_asking_the_asr_again(stage: Stage) -> None:
+    rid = stage.recording()
+    # Two voices taking equal turns: the heuristics cannot tell who teaches.
+    turns = [{"speaker_label": f"S{i % 2}", "start_ms": i * 5_000, "end_ms": i * 5_000 + 4_500} for i in range(10)]
+    stage.artefacts.put(f"t1/{rid}/diarize@v1/diarization@v1.json", json.dumps({"compact": turns}).encode())
+    provider = FakeProvider(max_chunk_ms=30_000)
+    assert stage.run(rid, Transcriber(provider)) == "needs_review"
+    assert stage.doc(rid)["status_reason"] == "unclear_roles"
+
+    # What POST /v1/recordings/{id}/review does (in one transaction there, with its outbox event).
+    recordings = SyncTenantRepo(stage.db, "recordings", "t1", Recording)
+    recordings.update_one({"_id": rid}, {"$set": {"confirmed_roles": {"S0": "students", "S1": "teacher"}}})
+    transition(recordings, rid, S.NEEDS_REVIEW, S.TRANSCRIBING, reason="roles_confirmed", review=True)
+
+    assert stage.run(rid, Transcriber(provider), attempt=1) == "done"
+    assert stage.doc(rid)["status"] == "ANALYZING"
+    assert len(provider.calls) == 1  # the words were saved the first time: nothing is sent (or billed) again
+    (doc,) = stage.db.transcripts.find({"recording_id": rid})  # replaced, not a second transcript
+    assert (doc["roles"], doc["roles_method"], doc["roles_need_review"]) == (
+        {"S0": "students", "S1": "teacher"}, "reviewer", False,
+    )  # fmt: skip
 
 
 @pytest.mark.integration

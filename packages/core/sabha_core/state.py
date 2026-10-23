@@ -4,7 +4,10 @@
 
 Each worker stage (PREPROCESSING, DIARIZING, TRANSCRIBING, ANALYZING) can also move to FAILED or NEEDS_REVIEW.
 COMPLETED -> ANALYZING is allowed only for re-analysis, and only when the caller says so (`reanalysis=True`).
-Nothing leaves FAILED or NEEDS_REVIEW: retries and review outcomes are not defined yet, so they are not here.
+NEEDS_REVIEW has two ways out, both a reviewer's decision and allowed only with `review=True` (ADR 0007):
+NEEDS_REVIEW -> TRANSCRIBING once the speaker roles are confirmed (the transcript is rebuilt with them, then
+scored), and NEEDS_REVIEW -> FAILED when the reviewer closes the recording as not usable. Nothing leaves FAILED:
+retries are not defined yet.
 
 `transition()` (sync, for workers) and `transition_async()` (for the API) apply a change through the
 tenant-scoped repository with a conditional update: the recording must still be in `from_status`, so of two
@@ -70,6 +73,11 @@ ALLOWED_TRANSITIONS: Mapping[RecordingStatus, frozenset[RecordingStatus]] = Mapp
 REANALYSIS_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset({(_S.COMPLETED, _S.ANALYZING)})
 """Transitions allowed only for re-analysis (`reanalysis=True`), as (from, to) pairs."""
 
+REVIEW_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset(
+    {(_S.NEEDS_REVIEW, _S.TRANSCRIBING), (_S.NEEDS_REVIEW, _S.FAILED)}
+)
+"""A reviewer's outcomes (`review=True`): roles confirmed, or closed as not usable. As (from, to) pairs."""
+
 
 class TransitionError(Exception):
     """A recording's status change was refused."""
@@ -96,33 +104,42 @@ class RecordingNotFound(TransitionError):
     """No recording with this id in the repository's tenant."""
 
 
-def next_statuses(from_status: RecordingStatus | str, *, reanalysis: bool = False) -> frozenset[RecordingStatus]:
+def next_statuses(
+    from_status: RecordingStatus | str, *, reanalysis: bool = False, review: bool = False
+) -> frozenset[RecordingStatus]:
     """The statuses a recording may move to from `from_status`. Raises ValueError for an unknown status."""
     source = RecordingStatus(from_status)
     allowed = ALLOWED_TRANSITIONS[source]
     if reanalysis:
         allowed = allowed | {target for start, target in REANALYSIS_TRANSITIONS if start is source}
+    if review:
+        allowed = allowed | {target for start, target in REVIEW_TRANSITIONS if start is source}
     return allowed
 
 
 def check_transition(
-    from_status: RecordingStatus | str, to_status: RecordingStatus | str, *, reanalysis: bool = False
-) -> None:
+    from_status: RecordingStatus | str, to_status: RecordingStatus | str, *, reanalysis: bool = False,
+    review: bool = False,
+) -> None:  # fmt: skip
     """Raise InvalidTransition unless the table allows `from_status -> to_status`; otherwise return None.
 
-    `reanalysis=True` allows COMPLETED -> ANALYZING and nothing else. Plain strings (as stored in MongoDB) are
-    accepted; an unknown status raises ValueError.
+    `reanalysis=True` allows COMPLETED -> ANALYZING and nothing else; `review=True` allows only REVIEW_TRANSITIONS.
+    Plain strings (as stored in MongoDB) are accepted; an unknown status raises ValueError.
     """
     source, target = RecordingStatus(from_status), RecordingStatus(to_status)
-    allowed = next_statuses(source, reanalysis=reanalysis)
+    allowed = next_statuses(source, reanalysis=reanalysis, review=review)
     if target in allowed:
         return
     if (source, target) in REANALYSIS_TRANSITIONS:
         message = f"{source} -> {target} is allowed only for re-analysis (reanalysis=True)"
+    elif (source, target) in REVIEW_TRANSITIONS:
+        message = f"{source} -> {target} is allowed only as a review outcome (review=True)"
     elif not allowed:
         message = f"cannot move a recording from {source} to {target}: there are no transitions out of {source}"
         if any(start is source for start, _ in REANALYSIS_TRANSITIONS):
             message += " except re-analysis (reanalysis=True)"
+        if any(start is source for start, _ in REVIEW_TRANSITIONS):
+            message += " except a review outcome (review=True)"
     else:
         names = ", ".join(status for status in RecordingStatus if status in allowed)
         message = f"cannot move a recording from {source} to {target}; allowed next: {names}"
@@ -143,11 +160,12 @@ def _plan(
     reason: str,
     meta: Mapping[str, Any] | None,
     reanalysis: bool,
+    review: bool,
     now: datetime | None,
 ) -> tuple[dict[str, Any], dict[str, Any], OutboxEvent]:
     from sabha_core.models import OutboxEvent, utc_now
 
-    check_transition(from_status, to_status, reanalysis=reanalysis)
+    check_transition(from_status, to_status, reanalysis=reanalysis, review=review)
     source, target = RecordingStatus(from_status), RecordingStatus(to_status)
     at = now or utc_now()
     filter: dict[str, Any] = {"_id": recording_id, "status": source.value}
@@ -186,6 +204,7 @@ def transition(
     reason: str,
     meta: Mapping[str, Any] | None = None,
     reanalysis: bool = False,
+    review: bool = False,
     session: ClientSession | None = None,
     now: datetime | None = None,
 ) -> OutboxEvent:
@@ -196,7 +215,7 @@ def transition(
     """
     filter, update, event = _plan(
         recording_id, from_status, to_status,
-        tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, now=now,
+        tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, review=review, now=now,
     )  # fmt: skip
     if recordings.update_one(filter, update, session=session) == 1:
         return event
@@ -213,13 +232,14 @@ async def transition_async(
     reason: str,
     meta: Mapping[str, Any] | None = None,
     reanalysis: bool = False,
+    review: bool = False,
     session: AsyncClientSession | None = None,
     now: datetime | None = None,
 ) -> OutboxEvent:
     """`transition` for the API's async repository."""
     filter, update, event = _plan(
         recording_id, from_status, to_status,
-        tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, now=now,
+        tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, review=review, now=now,
     )  # fmt: skip
     if await recordings.update_one(filter, update, session=session) == 1:
         return event

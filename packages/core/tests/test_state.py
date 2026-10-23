@@ -95,6 +95,30 @@ def test_reanalysis_unlocks_only_completed_to_analyzing(
             check_transition(from_status, to_status, reanalysis=True)
 
 
+REVIEW = {(S.NEEDS_REVIEW, S.TRANSCRIBING), (S.NEEDS_REVIEW, S.FAILED)}
+
+
+@pytest.mark.parametrize(("from_status", "to_status"), ALL_PAIRS, ids=str)
+def test_a_review_outcome_unlocks_only_its_two_ways_out_of_needs_review(
+    from_status: RecordingStatus, to_status: RecordingStatus
+) -> None:
+    if (from_status, to_status) in EXPECTED or (from_status, to_status) in REVIEW:
+        check_transition(from_status, to_status, review=True)  # must not raise
+    else:
+        with pytest.raises(InvalidTransition):
+            check_transition(from_status, to_status, review=True)
+
+
+def test_leaving_needs_review_needs_the_review_flag() -> None:
+    for target in (S.TRANSCRIBING, S.FAILED):
+        with pytest.raises(InvalidTransition, match="review outcome"):
+            check_transition(S.NEEDS_REVIEW, target)
+        check_transition(S.NEEDS_REVIEW, target, review=True)  # must not raise
+    with pytest.raises(InvalidTransition):  # the flags do not combine into other ways out
+        check_transition(S.NEEDS_REVIEW, S.ANALYZING, review=True, reanalysis=True)
+    assert next_statuses(S.NEEDS_REVIEW, review=True) == frozenset({S.TRANSCRIBING, S.FAILED})
+
+
 def test_completed_to_analyzing_needs_the_reanalysis_flag() -> None:
     with pytest.raises(InvalidTransition, match="re-analysis"):
         check_transition(S.COMPLETED, S.ANALYZING)

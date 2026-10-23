@@ -37,10 +37,11 @@ def record_transition(
     reason: str,
     meta: Mapping[str, Any] | None = None,
     reanalysis: bool = False,
+    review: bool = False,
 ) -> OutboxEvent:
     event = transition(
         recordings, recording_id, from_status, to_status, reason=reason, meta=meta, reanalysis=reanalysis,
-        session=session,
+        review=review, session=session,
     )  # fmt: skip
     return outbox.insert_one(event, session=session)
 
@@ -56,10 +57,11 @@ async def record_transition_async(
     reason: str,
     meta: Mapping[str, Any] | None = None,
     reanalysis: bool = False,
+    review: bool = False,
 ) -> OutboxEvent:
     event = await transition_async(
         recordings, recording_id, from_status, to_status, reason=reason, meta=meta, reanalysis=reanalysis,
-        session=session,
+        review=review, session=session,
     )  # fmt: skip
     return await outbox.insert_one(event, session=session)
 

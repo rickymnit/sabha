@@ -21,6 +21,7 @@ REASONS: dict[str, dict[str, str]] = {
         "analysis_failed": "The feedback could not be produced; an administrator can retry it.",
         "ticket_failed": "The call ticket could not be written.",
         "unverified_dimensions": "Some parts could not be checked against the transcript and are left out.",
+        "closed_by_reviewer": "A reviewer closed this recording as not usable.",
     },
     "hi": {
         "unclear_roles": "बोलने वालों को ठीक से अलग नहीं पहचाना जा सका।",
@@ -36,6 +37,7 @@ REASONS: dict[str, dict[str, str]] = {
         "no_rubric": "इस तरह की बातचीत के लिए अभी कोई रूब्रिक नहीं है।",
         "analysis_failed": "फ़ीडबैक नहीं बन सका; व्यवस्थापक इसे दोबारा चला सकते हैं।",
         "ticket_failed": "कॉल का टिकट नहीं लिखा जा सका।",
+        "closed_by_reviewer": "एक समीक्षक ने इस रिकॉर्डिंग को उपयोग योग्य नहीं मानकर बंद कर दिया।",
         "unverified_dimensions": "कुछ हिस्से ट्रांसक्रिप्ट से जाँचे नहीं जा सके, इसलिए वे शामिल नहीं हैं।",
     },
 }
