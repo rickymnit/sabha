@@ -7,7 +7,7 @@ dependencies = [
   "boto3>=1.35",
   "fastapi>=0.142,<0.142.3",
   "httpx>=0.28",
-  "opentelemetry-instrumentation-fastapi==0.66b0",
+  "opentelemetry-instrumentation-fastapi==0.66b1",
   "pyjwt[crypto]>=2.10",
   "pymongo>=4.9",
   "redis>=5.0",

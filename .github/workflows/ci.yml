@@ -23,7 +23,9 @@ jobs:
   python:
     name: Python (ruff, mypy, pytest)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # 25, not 15: on 2026-10-23 installing ffmpeg from Ubuntu's mirrors alone took 13 minutes and the tests were
+    # cancelled before they ran.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: astral-sh/setup-uv@v10.2.0
