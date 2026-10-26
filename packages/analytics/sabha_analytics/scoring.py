@@ -114,6 +114,31 @@ class RubricSpec(Protocol):
     def dimensions(self) -> Sequence[DimensionSpec]: ...
     @property
     def output_values(self) -> Mapping[str, Sequence[str]] | None: ...
+    @property
+    def roles(self) -> Sequence[str]: ...
+
+
+# What each conversation type is called in the prompts. The rubric's first role is the person analysed; the second
+# names everyone else, who are context only (golden rule 10 for students; the same care for callers and customers).
+CONVERSATION_KINDS = {
+    "teaching": "school lesson",
+    "reception": "front-desk call",
+    "sales": "sales meeting",
+    "meeting": "team meeting",
+    "counselling": "counselling session",
+}
+
+
+def prompt_roles(rubric_id: str, roles: Sequence[str]) -> dict[str, str]:
+    """$conversation, $staff_role and $others for the system prompts, from the rubric."""
+    kind = rubric_id.split(".", 1)[0]
+    staff = roles[0] if roles else "staff member"
+    others = roles[1] if len(roles) > 1 else "others"
+    return {
+        "conversation": CONVERSATION_KINDS.get(kind, "conversation"),
+        "staff_role": staff.replace("_", " "),
+        "others": others.replace("_", " "),
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -744,7 +769,7 @@ def score_dimensions(
         metrics=render_metrics(metric_records),
         transcript=transcript.render(),
     )
-    system = prompts.system.render()
+    system = prompts.system.render(**prompt_roles(rubric.id, rubric.roles))
     calls: list[CallRecord] = []
     results: dict[str, DimensionResult] = {}
 

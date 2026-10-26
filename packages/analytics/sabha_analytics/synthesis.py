@@ -52,6 +52,7 @@ from sabha_analytics.scoring import (
     feedback_text,
     load_prompt,
     normalise_metrics,
+    prompt_roles,
     render_metrics,
 )
 from sabha_analytics.scoring import _check_text as check_text
@@ -297,9 +298,11 @@ def synthesise(
     transcript: PreparedTranscript,
     model: JudgeModel,
     analysed_roles: Collection[str],
+    rubric_roles: Sequence[str] = ("teacher", "students"),
     prompts_dir: Path = PROMPTS_DIR,
 ) -> SynthesisOutcome:
-    """Ask for the summary, strengths, gaps and suggestions from verified results only (module docstring)."""
+    """Ask for the summary, strengths, gaps and suggestions from verified results only (module docstring).
+    `rubric_roles`: the rubric's (analysed, others) roles, which the system prompt names."""
     roles = frozenset(analysed_roles)
     verified = [d for d in dimensions if d.verified and not d.not_applicable]  # not-applicable ones have no score
     if not verified:
@@ -309,7 +312,7 @@ def synthesise(
         return SynthesisOutcome(None, 0, ("no_moments",), (), ())
     system_prompt = load_prompt("synthesis.system", prompts_dir)
     request_prompt = load_prompt("synthesis.request", prompts_dir)
-    system = system_prompt.render()
+    system = system_prompt.render(**prompt_roles(rubric_id, rubric_roles))
     prefix = request_prompt.render(
         rubric_id=rubric_id,
         rubric_version=rubric_version,

@@ -97,7 +97,7 @@ def ticket_schema(values: TicketValues) -> dict[str, Any]:
         "properties": {
             "category": {"enum": list(values.categories)},
             "status": {"enum": list(values.statuses)},
-            "follow_up": {"oneOf": [{"type": "null"}, follow_up]},
+            "follow_up": {"anyOf": [{"type": "null"}, follow_up]},  # strict structured outputs allow anyOf, not oneOf
             "summary": {"type": "string", "minLength": 1},
         },
     }
