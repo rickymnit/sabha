@@ -256,6 +256,20 @@ def test_the_tie_breaker_names_one_staff_member() -> None:
     assert "S0: aaj hum padhenge" in call["messages"][1].content
 
 
+def test_the_tie_breaker_is_told_a_walk_in_is_a_visit_at_the_desk() -> None:
+    from sabha_asr.roles import RoleAssignment, SpeakerRole
+
+    low = "heuristic_low_confidence"
+    speakers = {"S0": SpeakerRole("receptionist", 0.5, low), "S1": SpeakerRole("visitor", 0.5, low)}
+    walk_in = TieBreakRequest("reception", ("receptionist", "visitor"), RoleAssignment(speakers, "unclear_roles"),
+                              (("S1", "accounts kahan hai"), ("S0", "third floor")))  # fmt: skip
+    gateway = FakeGateway({"staff_speaker": "S0", "confidence": 0.9})
+    answer = LlmRoleTieBreaker(gateway, "t1", "r1")(walk_in)  # type: ignore[arg-type]  # a fake gateway
+    assert answer is not None and answer.role_by_speaker() == {"S0": "receptionist", "S1": "visitor"}
+    system = gateway.calls[0]["messages"][0].content
+    assert "front-desk conversation with a walk-in visitor" in system and "phone call" not in system
+
+
 @pytest.mark.parametrize(
     "gateway",
     [

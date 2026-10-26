@@ -11,7 +11,8 @@ units and one active user per role, each linked to the dev issuer as subject "de
 recordings can be uploaded for them. Everything is made up; never point this at a real database.
 
 It also seeds "Brightpath Software" (tenant demo-company, company profile): a fictional software company whose sales
-reps record in-person sales meetings. Only the conversation types Sabha can analyse are switched on (sales for now).
+reps record in-person sales meetings, team meetings, and walk-in visitors at its front desk (Pooja, the
+receptionist).
 
 And "E2E School" (tenant e2e-school) for the browser tests (apps/web/e2e): an owner and a teacher whose
 uploads stay out of the demo school. The dev sign-in page does not list it (dev_idp.HIDDEN_TENANT_PREFIX).
@@ -44,16 +45,15 @@ USERS = [  # (subject suffix, name, job title, role, units, person id)
     ("ravi", "Ravi Kumar", "Teacher, Class 7", Role.STAFF, ["unit-7"], "p-ravi"),
 ]
 COMPANY_TENANT_ID, COMPANY_NAME = "demo-company", "Brightpath Software"
-COMPANY_UNITS = {"team-north": "North team", "team-south": "South team"}
+COMPANY_UNITS = {"team-north": "North team", "team-south": "South team", "front-desk": "Front desk"}
 COMPANY_USERS = [  # (subject suffix, name, job title, role, units, person id)
     ("kabir", "Kabir Mehta", "Founder and CEO", Role.OWNER, [], None),
     ("ananya", "Ananya Rao", "Sales head, North", Role.MANAGER, ["team-north"], None),
     ("rohit", "Rohit Sharma", "Sales rep, North", Role.STAFF, ["team-north"], "p-rohit"),
     ("neha", "Neha Gupta", "Sales rep, South", Role.STAFF, ["team-south"], "p-neha"),
+    ("pooja", "Pooja Nair", "Receptionist", Role.STAFF, ["front-desk"], "p-pooja"),
 ]
-COMPANY_TYPES = [ConversationType.SALES, ConversationType.MEETING]  # reception follows when its analysis is built
-# How the speech recogniser writes the name when it is said inside Hindi speech.
-COMPANY_NAME_VARIANTS = ["Brightpath", "ब्राइट पाथ सॉफ्टवेयर", "ब्राइट पाथ", "ब्राइटपाथ"]
+COMPANY_TYPES = [ConversationType.RECEPTION, ConversationType.SALES, ConversationType.MEETING]
 # How the speech recogniser writes the name when it is said inside Hindi speech.
 COMPANY_NAME_VARIANTS = ["Brightpath", "ब्राइट पाथ सॉफ्टवेयर", "ब्राइट पाथ", "ब्राइटपाथ"]
 E2E_TENANT_ID, E2E_TENANT_NAME = "e2e-school", "E2E School"

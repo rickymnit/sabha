@@ -423,3 +423,95 @@ def test_a_company_name_written_in_devanagari_is_recognised_through_its_variants
     assert roles_of(found)["SPEAKER_00"] == "sales_rep"
     latin_only = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=variants[:2])
     assert roles_of(latin_only)["SPEAKER_00"] == "customer"  # without the variant, talk time alone misleads
+
+
+# --- reception, walk-in (a visitor at a business's front desk) -----------------------------------------------------
+
+WALK_IN_ROLES = ("receptionist", "visitor")
+OFFICE = ("Brightpath Software", "Brightpath")
+
+
+def test_walk_in_visitor_speaks_first_and_the_receptionist_is_found_by_desk_phrases() -> None:
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "Excuse me, mujhe Mr. Mehta se milna hai."),
+            ("SPEAKER_00", 4_000, "Ji, aapka naam? Appointment hai aapka?"),
+            ("SPEAKER_01", 3_000, "Haan, gyarah baje ka."),
+            ("SPEAKER_00", 5_000, "Theek hai, please baithiye, main unko inform kar deti hoon."),
+        ]
+    )
+    result = assign_roles(turns, words, "reception", WALK_IN_ROLES, tenant_name_variants=OFFICE)
+    assert roles_of(result) == {"SPEAKER_00": "receptionist", "SPEAKER_01": "visitor"}
+    assert result.needs_review_reason is None
+    assert result.speakers["SPEAKER_00"].method == METHOD_HEURISTIC
+    assert result.speakers["SPEAKER_00"].confidence == 0.75  # two desk phrases (counted up to 2), margin 2 of 4
+
+
+def test_walk_in_welcome_with_the_company_name_is_strong_evidence() -> None:
+    turns, words = script(
+        [
+            ("SPEAKER_00", 4_000, "Good morning, welcome to Brightpath. How can I help you?"),
+            ("SPEAKER_01", 4_000, "I have a delivery for the accounts team."),
+            ("SPEAKER_00", 3_000, "Sure, I will sign for it."),
+        ]
+    )
+    result = assign_roles(turns, words, "reception", WALK_IN_ROLES, tenant_name_variants=OFFICE)
+    assert roles_of(result) == {"SPEAKER_00": "receptionist", "SPEAKER_01": "visitor"}
+    assert result.speakers["SPEAKER_00"].confidence == 1.0  # 2 (greets with name) + 2 (welcome to, how can I help)
+
+
+def test_walk_in_two_visitors_share_one_role() -> None:
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "Hello, hum interview ke liye aaye hain."),
+            ("SPEAKER_02", 2_000, "Haan, dono."),
+            ("SPEAKER_00", 5_000, "Ji, aapka naam bataiye. Aap log wahan baithiye."),
+        ]
+    )
+    result = assign_roles(turns, words, "reception", WALK_IN_ROLES, tenant_name_variants=OFFICE)
+    assert roles_of(result) == {"SPEAKER_00": "receptionist", "SPEAKER_01": "visitor", "SPEAKER_02": "visitor"}
+
+
+def test_walk_in_with_one_desk_phrase_only_is_not_confident() -> None:
+    # One phrase is a lead, not proof: it goes to the tie-breaker or to review, never analysed on a guess.
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "Accounts kahan hai?"),
+            ("SPEAKER_00", 3_000, "Third floor, please baithiye nahi toh lift le lijiye."),
+        ]
+    )
+    result = assign_roles(turns, words, "reception", WALK_IN_ROLES, tenant_name_variants=OFFICE)
+    assert result.needs_review_reason == REASON_UNCLEAR_ROLES
+    assert roles_of(result) == {"SPEAKER_00": "receptionist", "SPEAKER_01": "visitor"}  # the best guess, kept
+    assert result.speakers["SPEAKER_00"].confidence == 0.625
+
+
+def test_walk_in_without_any_evidence_needs_review_and_speaking_first_does_not_count() -> None:
+    turns, words = script([("SPEAKER_00", 3_000, "Haan ji."), ("SPEAKER_01", 3_000, "Theek hai.")])
+    result = assign_roles(turns, words, "reception", WALK_IN_ROLES, tenant_name_variants=OFFICE)
+    assert result.needs_review_reason == REASON_UNCLEAR_ROLES
+    assert result.speakers["SPEAKER_00"].confidence == 0.5
+
+
+def test_walk_in_desk_phrases_in_devanagari() -> None:
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "नमस्ते, मुझे मेहता जी से मिलना है।"),
+            ("SPEAKER_00", 4_000, "जी, आपका नाम? आप बैठिए, मैं बताती हूँ।"),
+        ]
+    )
+    result = assign_roles(turns, words, "reception", WALK_IN_ROLES, tenant_name_variants=OFFICE)
+    assert roles_of(result) == {"SPEAKER_00": "receptionist", "SPEAKER_01": "visitor"}
+    assert result.needs_review_reason is None
+
+
+def test_phone_reception_rules_are_unchanged_for_callers() -> None:
+    # The same words with the school's caller roles still follow the call rules: nobody greeted with the name.
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "Excuse me, mujhe Mr. Mehta se milna hai."),
+            ("SPEAKER_00", 4_000, "Ji, aapka naam? Appointment hai aapka?"),
+        ]
+    )
+    result = assign_roles(turns, words, "reception", RECEPTION_ROLES, tenant_name_variants=SCHOOL_NAMES)
+    assert result.needs_review_reason == REASON_UNCLEAR_ROLES

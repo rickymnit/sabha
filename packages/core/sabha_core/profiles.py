@@ -186,6 +186,8 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             **dict.fromkeys(ConversationType),
             # Draft built on the client's sales training (2026-10-26), for review: in-person sales meetings.
             _T.SALES: "sales.company.v0.2",
+            # Draft for review (2026-10-26): walk-in visitors at the front desk, one visitor per recording.
+            _T.RECEPTION: "reception.company.v0.1",
             _T.MEETING: "meeting.company.v0.1",  # draft for review (2026-10-26): the meeting is scored, never a person
         },
         consent=ConsentDefaults(

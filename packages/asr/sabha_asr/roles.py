@@ -31,7 +31,19 @@ Reception (the first speaker who greets with the school or company name is the r
 - The receptionist is the first speaker, in order of first speech, who greets with the name. Confidence is
   0.5 + 0.5 * max(0, margin) / 4, where margin is that speaker's points minus the most points of any other speaker.
   If nobody greets with the name, the first speaker is recorded as the best guess with confidence 0.5.
-- Sales, in person (one rep with one or more people from the customer side; the rep introduces the company):
+Reception, walk-in (the rubric's other role is "visitor": a visitor at the front desk of a business, one visit per
+recording, owner's decision 2026-10-26):
+
+- At a desk the visitor often speaks first ("Excuse me...") and the receptionist rarely says the company's name, so
+  speaking first is NOT evidence. Only words in the first `intro_window_ms` (90 s) of speech count.
+- Per speaker: greets_with_name as for calls (a greeting, or "welcome to", with a name variant); desk_phrases = how
+  many different DESK_PHRASES occur ("how can I help", "kisse milna hai", "aapka naam", "please baithiye", ...),
+  counted up to 2. Evidence points = 2 * greets_with_name + desk_phrases (at most 4).
+- The receptionist is the speaker with the most points, if one speaker has strictly the most and at least 1;
+  confidence 0.5 + 0.5 * margin / 4. So two different desk phrases and nothing from anyone else is confident (0.75);
+  one alone goes to the tie-breaker. Without any evidence, the first speaker is the best guess with confidence 0.5.
+
+Sales, in person (one rep with one or more people from the customer side; the rep introduces the company):
 
 - Only words in the first `intro_window_ms` (90 s) of speech count for the introduction, as for reception.
 - Per speaker: introduces_company = the company name (a tenant name variant) with an introduction ("<name> se",
@@ -72,6 +84,8 @@ TEACHING = "teaching"
 RECEPTION = "reception"
 SALES = "sales"
 RECORDING_TYPES = frozenset({TEACHING, RECEPTION, SALES})
+VISITOR = "visitor"
+"""The other role of a walk-in reception rubric (reception.company): a visitor at the desk, not a caller."""
 
 METHOD_HEURISTIC = "heuristic"
 METHOD_CHANNEL = "channel"
@@ -132,6 +146,41 @@ SELF_INTRODUCTIONS: tuple[str, ...] = (
 """Phrases a receptionist uses to introduce herself or the office. "<name> se" is added per tenant name."""
 
 _EVIDENCE_MAX = 4  # reception: 2 (greets with name) + 1 (introduces herself) + 1 (spoke first); sales: see docstring
+
+DESK_PHRASES: tuple[str, ...] = (
+    "how can i help",
+    "how may i help",
+    "kaise madad",
+    "kya madad",
+    "kya help",
+    "kisse milna",
+    "kis se milna",
+    "kisko milna",
+    "kinse milna",
+    "whom do you want to meet",
+    "who are you here to meet",
+    "aapka naam",
+    "your name",
+    "appointment hai",
+    "do you have an appointment",
+    "baithiye",
+    "baith jaiye",
+    "have a seat",
+    "please sit",
+    "wait kijiye",
+    "inform kar",
+    "bula deti",
+    "bula deta",
+    "welcome to",
+    "किससे मिलना",
+    "किसको मिलना",
+    "आपका नाम",
+    "बैठिए",
+    "बैठिये",
+    "बैठ जाइए",
+)
+"""Phrases a receptionist uses with a walk-in visitor, normalised. Matched as whole words; counted up to 2."""
+_DESK_PHRASES_COUNTED = 2
 
 SALES_INTRODUCTIONS: tuple[str, ...] = ("main", "mera naam", "my name", "i am", "im", "मैं", "मेरा नाम")
 """Words a sales rep introduces themselves with, besides SELF_INTRODUCTIONS; counted only with the company name."""
@@ -338,6 +387,31 @@ def _reception_guess(
     return candidate, 0.5 + 0.5 * max(0, margin) / _EVIDENCE_MAX, True
 
 
+def _walk_in_guess(
+    turns: Sequence[Turn], words: Sequence[Word], name_variants: Sequence[str], params: RoleParams
+) -> tuple[str, float, bool]:
+    """(receptionist label, confidence, some speaker gave evidence) for a visitor at the desk."""
+    order = list(dict.fromkeys(t.speaker_label for t in sorted(turns, key=lambda t: (t.start_ms, t.end_ms))))
+    texts: dict[str, list[str]] = {label: [] for label in order}
+    for label, text in _speaker_runs(turns, words, params.intro_window_ms):
+        texts[label].append(text)
+    names = [name for name in (normalise_text(v) for v in name_variants) if name]
+
+    points: dict[str, int] = {}
+    for label in order:
+        text = normalise_text(" ".join(texts[label]))
+        greets = any(_contains(text, g) for g in GREETINGS) or _contains(text, "welcome to")
+        greets_with_name = greets and any(_contains(text, n) for n in names)
+        phrases = sum(_contains(text, phrase) for phrase in DESK_PHRASES)
+        points[label] = 2 * greets_with_name + min(phrases, _DESK_PHRASES_COUNTED)
+
+    leader = _unique_leader({label: float(p) for label, p in points.items()})
+    if leader is None:
+        return order[0], 0.5, False
+    margin = points[leader] - max((p for label, p in points.items() if label != leader), default=0)
+    return leader, 0.5 + 0.5 * margin / _EVIDENCE_MAX, True
+
+
 def _sales_guess(
     turns: Sequence[Turn], words: Sequence[Word], name_variants: Sequence[str], params: RoleParams
 ) -> tuple[str, float, bool]:
@@ -428,6 +502,8 @@ def assign_roles(
         staff, confidence, agree = _teaching_guess(turns, params)
     elif recording_type == SALES:
         staff, confidence, agree = _sales_guess(turns, words, tenant_name_variants, params)
+    elif role_pair[1] == VISITOR:
+        staff, confidence, agree = _walk_in_guess(turns, words, tenant_name_variants, params)
     else:
         staff, confidence, agree = _reception_guess(turns, words, tenant_name_variants, params)
     confidence = round(confidence, 3)

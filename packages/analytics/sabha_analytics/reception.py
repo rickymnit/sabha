@@ -1,4 +1,4 @@
-"""The ticket for a front-desk call (plan task P5.8, reception output).
+"""The ticket for a front-desk conversation: a school's phone call or a business's walk-in visitor (plan task P5.8).
 
 From the redacted transcript the model writes: category, resolution status, follow-up (what still has to happen and
 the role of the person who should do it, or null when nothing is left) and a ticket summary of at most 60 words.
@@ -29,6 +29,7 @@ from sabha_analytics.scoring import (
     Problem,
     Prompt,
     call_model,
+    conversation_kind,
     feedback_text,
     load_prompt,
     word_count,
@@ -153,9 +154,19 @@ def validate_ticket(data: object, values: TicketValues) -> tuple[Ticket | None, 
 
 
 def write_ticket(
-    transcript: PreparedTranscript, *, values: TicketValues, model: JudgeModel, prompts_dir: Path = PROMPTS_DIR
+    transcript: PreparedTranscript,
+    *,
+    values: TicketValues,
+    model: JudgeModel,
+    rubric_id: str,
+    rubric_roles: Sequence[str],
+    prompts_dir: Path = PROMPTS_DIR,
 ) -> TicketOutcome:
-    """Ask for the call's ticket (module docstring)."""
+    """Ask for the conversation's ticket (module docstring). The prompt names the conversation and the other role
+    ("caller", "visitor") from the rubric."""
+    if len(rubric_roles) < 2:
+        raise ValueError("a reception rubric needs two roles: the receptionist and the caller or visitor")
+    names = {"conversation": conversation_kind(rubric_id, rubric_roles), "other_role": rubric_roles[1]}
     system_p, request_p = load_prompt("reception.system", prompts_dir), load_prompt("reception.request", prompts_dir)
     prefix = request_p.render(
         categories=", ".join(values.categories), statuses=", ".join(values.statuses), transcript=transcript.render()
@@ -166,7 +177,7 @@ def write_ticket(
         data = call_model(
             model,
             task=TASK_SYNTHESIS,
-            system=system_p.render(),
+            system=system_p.render(**names),
             prefix=prefix,
             request=feedback_text(problems) if problems else "",
             json_schema=ticket_schema(values),

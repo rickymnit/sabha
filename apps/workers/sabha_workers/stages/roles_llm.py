@@ -15,7 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sabha_asr.roles import RoleAssignment, SpeakerRole, TieBreakRequest
+from sabha_analytics.scoring import WALK_IN_KIND
+from sabha_asr.roles import VISITOR, RoleAssignment, SpeakerRole, TieBreakRequest
 from sabha_llm.errors import LlmError
 from sabha_llm.gateway import Gateway
 from sabha_llm.types import Message
@@ -63,8 +64,8 @@ class LlmRoleTieBreaker:
                 "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             },
         }
-        system = SYSTEM.format(kind=KINDS.get(request.recording_type, "conversation"), staff=staff_role,
-                               other=other_role)  # fmt: skip
+        kind = WALK_IN_KIND if other_role == VISITOR else KINDS.get(request.recording_type, "conversation")
+        system = SYSTEM.format(kind=kind, staff=staff_role, other=other_role)
         user = (
             f"Speakers: {', '.join(labels)}.\nOpening, one line per stretch of one speaker:\n\n{_opening(request)}\n\n"
             f'Which speaker is the {staff_role}? Give staff_speaker (a label, or "{UNSURE}") and your confidence.'

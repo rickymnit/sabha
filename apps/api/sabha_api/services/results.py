@@ -408,7 +408,7 @@ METRIC_NAMES = {
 }
 ROLE_METRIC_NAMES = {"talk_share": "{role} talk time", "turn_count": "Turns by {role_lower}",
                      "question_count": "Questions asked by {role_lower}"}  # fmt: skip
-OTHER_ROLE_WORDS = {"students": "Student", "caller": "Caller", "customer": "Customer"}
+OTHER_ROLE_WORDS = {"students": "Student", "caller": "Caller", "customer": "Customer", "visitor": "Visitor"}
 
 
 def metric_name(key: str, person_label: str) -> str:

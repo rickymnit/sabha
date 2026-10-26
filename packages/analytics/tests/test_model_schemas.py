@@ -68,3 +68,13 @@ def test_prompts_protect_whoever_is_not_analysed() -> None:
     meeting = prompt_roles("meeting.company.v0.1", ["participant"])
     assert meeting["conversation"] == "team meeting" and meeting["staff_role"] == "participants"
     assert "Never score, rank, praise or criticise an individual participant" in meeting["people_rule"]
+
+
+def test_a_walk_in_is_named_as_a_visit_and_a_school_call_as_a_call() -> None:
+    from sabha_analytics.scoring import prompt_roles
+
+    walk_in = prompt_roles("reception.company.v0.1", ["receptionist", "visitor"])
+    assert walk_in["conversation"] == "front-desk conversation with a walk-in visitor"
+    assert "Everyone else (visitor) is context only" in walk_in["people_rule"]
+    call = prompt_roles("reception.school.v0.2", ["receptionist", "caller"])
+    assert call["conversation"] == "front-desk call"

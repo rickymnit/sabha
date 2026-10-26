@@ -101,6 +101,7 @@ def test_company_defaults() -> None:
     }
     assert company.default_rubrics == {
         **dict.fromkeys(ConversationType),
+        T.RECEPTION: "reception.company.v0.1",
         T.SALES: "sales.company.v0.2",
         T.MEETING: "meeting.company.v0.1",
     }

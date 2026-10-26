@@ -84,7 +84,7 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     assert (
         company is not None
         and company["profile"] == "company"
-        and set(company["enabled_types"]) == {"meeting", "sales"}
+        and set(company["enabled_types"]) == {"reception", "meeting", "sales"}
     )
     assert "ब्राइट पाथ सॉफ्टवेयर" in company["name_variants"]  # how the recogniser writes it inside Hindi
     assert {(p["name"], p["title"]) for p in people if p["subject"] == "dev-asha"} == {("Asha Rao", "Teacher, Class 6")}

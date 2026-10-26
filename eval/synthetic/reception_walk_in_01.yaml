@@ -1,0 +1,28 @@
+# A fictional walk-in visitor at a business's front desk, voiced with Sarvam text-to-speech
+# (scripts/dev/synthetic_audio.py) to test the company reception pipeline without real recordings. Every person,
+# company and figure here is made up. Not for any quality figure (golden rule 6): it tests the pipeline, not the
+# scoring's accuracy.
+#
+# A visitor walks up to Brightpath Software's front desk for a meeting and also asks about an unpaid invoice. The
+# visitor speaks first, as at most desks. The receptionist is good but not perfect: the meeting is handled well, but
+# the invoice question gets a vague answer with no one named to confirm it.
+title: "Visitor for a meeting, Brightpath front desk (sample)"
+language_code: hi-IN
+speakers:
+  receptionist: {voice: priya, role: receptionist}  # Pooja Nair, front desk
+  visitor: {voice: rohan, role: visitor}            # a supplier's account manager
+lines:
+  - [visitor, "Excuse me, hello."]
+  - [receptionist, "Good morning, welcome to Brightpath Software. बताइए, मैं आपकी क्या help कर सकती हूँ?"]
+  - [visitor, "मुझे मेहता सर से मिलना है, ग्यारह बजे की meeting है।"]
+  - [receptionist, "जी, आपका नाम? और आप किस company से आए हैं?"]
+  - [visitor, "मैं विकास, Sunline Printers से।"]
+  - [receptionist, "ठीक है विकास जी, तो आप ग्यारह बजे की meeting के लिए मेहता सर से मिलने आए हैं। मैं उन्हें अभी inform कर देती हूँ। Please बैठिए।"]
+  - [receptionist, "Hello सर, Sunline Printers से विकास जी आए हैं, ग्यारह बजे की meeting के लिए। ... जी, ठीक है।"]
+  - [receptionist, "विकास जी, सर दस मिनट में नीचे आ रहे हैं। तब तक आप पानी लेंगे?"]
+  - [visitor, "नहीं, thank you. एक और बात थी, हमारा पिछले महीने का invoice अभी तक pay नहीं हुआ है, किससे पूछूँ?"]
+  - [receptionist, "Invoice का तो accounts वाले देखते हैं, शायद अगले हफ्ते तक हो जाएगा।"]
+  - [visitor, "अगले हफ्ते पक्का? पहले भी दो बार यही बोला गया था।"]
+  - [receptionist, "पक्का तो नहीं पता सर, आप मेहता सर से बात कर लीजिए, वो बता देंगे।"]
+  - [visitor, "ठीक है।"]
+  - [receptionist, "सर आ रहे हैं। Thank you विकास जी, आपका दिन अच्छा हो।"]

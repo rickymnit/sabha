@@ -127,11 +127,20 @@ CONVERSATION_KINDS = {
     "meeting": "team meeting",
     "counselling": "counselling session",
 }
+WALK_IN_KIND = "front-desk conversation with a walk-in visitor"
+"""A reception rubric whose other role is "visitor" (reception.company) is a visit to the desk, not a call."""
+
+
+def conversation_kind(rubric_id: str, roles: Sequence[str]) -> str:
+    """What the conversation is called in the prompts, from the rubric's type and roles."""
+    kind = rubric_id.split(".", 1)[0]
+    if kind == "reception" and len(roles) > 1 and roles[1] == "visitor":
+        return WALK_IN_KIND
+    return CONVERSATION_KINDS.get(kind, "conversation")
 
 
 def prompt_roles(rubric_id: str, roles: Sequence[str]) -> dict[str, str]:
     """$conversation, $staff_role and $people_rule for the system prompts, from the rubric."""
-    kind = rubric_id.split(".", 1)[0]
     staff = (roles[0] if roles else "staff member").replace("_", " ")
     if len(roles) > 1:
         others = roles[1].replace("_", " ")
@@ -145,7 +154,7 @@ def prompt_roles(rubric_id: str, roles: Sequence[str]) -> dict[str, str]:
             "The meeting is judged as a whole. Never score, rank, praise or criticise an individual participant; "
             "speak of the meeting or the team."
         )
-    return {"conversation": CONVERSATION_KINDS.get(kind, "conversation"), "staff_role": staff, "people_rule": rule}
+    return {"conversation": conversation_kind(rubric_id, roles), "staff_role": staff, "people_rule": rule}
 
 
 @dataclass(frozen=True, slots=True)

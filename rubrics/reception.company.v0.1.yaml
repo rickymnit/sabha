@@ -1,0 +1,153 @@
+# Reception rubric for businesses, v0.1: DRAFT for the owner's review (2026-10-26).
+#
+# Owner's decisions (2026-10-26): walk-in visitors at the front desk of any kind of business (offices, clinics,
+# showrooms, service centres), one visitor per recording (the receptionist starts and stops it), and ticket
+# categories of its own rather than the school ones. reception.school.v0.2 stays the rubric for school phone calls.
+#
+# Rules:
+# - Anchors describe only what the receptionist says that a rater can point to in the transcript or audio. The
+#   recording is audio only: smiles, eye contact and body language cannot be judged and are not asked for. No
+#   guesses about intentions or feelings.
+# - Visitors are never scored. What a visitor says appears only as evidence of what the receptionist did.
+# - Example utterances are illustrative Hinglish. All names, amounts, places and times in them are fictional.
+#   "[company name]" stands in for the business's own name.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: reception.company.v0.1
+segment: company
+version: "0.1"
+roles: [receptionist, visitor]  # receptionist is the person analysed; visitor is context only
+
+dimensions:
+  - key: welcome
+    name: Welcome
+    weight: 0.15
+    definition: "The receptionist greets the visitor, offers help, and acknowledges any wait before the visitor is attended to."
+    min_quotes: 1
+    anchors:
+      1: "The receptionist does not greet the visitor or offer help; the first thing they say is a demand such as 'kya hai' or 'haan bolo'."
+      2: "The receptionist answers the visitor without a greeting, or greets only after the visitor has asked twice for attention."
+      3: "The receptionist greets the visitor but does not offer help, or keeps the visitor waiting without saying anything about the wait."
+      4: "The receptionist greets the visitor, offers help, and, if the visitor had to wait, says sorry for the wait or asks them to wait for a stated reason."
+      5: "The receptionist greets the visitor with the business's name, offers help, acknowledges any wait in words, and offers a seat or water where the visitor has to wait."
+    examples:
+      1: "Haan, kya kaam hai? ... Line mein lagiye pehle."
+      5: "Good morning, welcome to [company name]. Main aapki kya help kar sakti hoon? Sorry, aapko thoda wait karna pada, please baithiye."
+
+  - key: need_understood
+    name: Need understood
+    weight: 0.20
+    definition: "The receptionist finds out and confirms why the visitor has come, including whom they are here to meet and whether they have an appointment, before acting."
+    min_quotes: 1
+    anchors:
+      1: "The receptionist does not ask why the visitor has come and sends them somewhere or answers a different question from the one asked."
+      2: "The receptionist acts on the first thing the visitor says without asking any follow-up question."
+      3: "The receptionist asks at least one follow-up question (for example whom they are meeting, or which product or service) but does not repeat the request back."
+      4: "The receptionist asks follow-up questions for the details needed (the visitor's name, whom they are meeting or what they need, and whether they have an appointment) and repeats the main request back."
+      5: "The receptionist asks for all the details needed, repeats the full request back in their own words, and asks whether the visitor needs anything else before closing."
+    examples:
+      1: "Upar chale jaiye, second floor pe sab milenge."
+      5: "Toh aap Mr. Mehta se 11 baje ki meeting ke liye aaye hain, aur unke liye yeh documents bhi dene hain. Sahi samjha maine? Aur kuch chahiye aapko?"
+
+  # Raters may not know the business's facts (prices, timings, floors, policies). Until the business gives raters a
+  # fact sheet, these anchors are judged only on what is heard: specific vs vague, consistent vs contradictory, and
+  # checking vs guessing.
+  - key: information_and_directions
+    name: Information and directions
+    weight: 0.20
+    definition: "The receptionist gives specific, consistent information and directions, and offers to check rather than guess when unsure."
+    min_quotes: 1
+    not_applicable_when: "The visitor asks for no information or directions, for example a delivery that is simply received or a visitor who is only checked in for a meeting."
+    anchors:
+      1: "The receptionist gives information or directions that contradict themselves within the conversation, or guesses with words like 'shayad' or 'lagta hai' without offering to check."
+      2: "The receptionist gives some specific details but leaves key details vague ('udhar kahin', 'thoda time lagega') and does not offer to check."
+      3: "The receptionist gives specific details for the main request but is vague on at least one follow-up detail and does not say whether it will be checked."
+      4: "The receptionist gives specific details (floor, room, person, timing, amount, document) that stay consistent, and offers to check any detail they cannot give on the spot."
+      5: "The receptionist gives specific, consistent details, checks any open detail during the visit (for example by calling the team) or names who will confirm it and when, and repeats the key details back at the end."
+    examples:
+      1: "Service centre? Shayad teesri manzil pe hai... ya basement mein, pata nahi, poochh lijiye kisi se."
+      5: "Accounts third floor pe hai, lift se right side, room 304. Refund ka status main abhi accounts se check karke batati hoon. ... Haan, unhone confirm kiya, cheque kal 4 baje tak ready hoga."
+
+  - key: courtesy
+    name: Courtesy
+    weight: 0.15
+    definition: "The receptionist uses polite, respectful language throughout and lets the visitor finish speaking."
+    min_quotes: 2
+    anchors:
+      1: "The receptionist uses dismissive or rude language (for example 'pata nahi' and turning away), or interrupts the visitor repeatedly."
+      2: "The receptionist gives curt replies, interrupts the visitor more than once, or ends the conversation without any closing."
+      3: "The receptionist is polite at the start and end but gives curt replies or interrupts the visitor at least once."
+      4: "The receptionist uses polite forms ('ji', 'aap', 'please') throughout, lets the visitor finish speaking, and closes politely."
+      5: "The receptionist uses polite forms throughout, lets the visitor finish speaking, acknowledges any concern or complaint in words before answering, and thanks the visitor at the close."
+    examples:
+      1: "Arre bataya na, abhi nahi milenge. Baad mein aana."
+      5: "Ji bilkul, aapki baat samajh gayi, yeh pareshani wali baat hai. Main abhi dekhti hoon. ... Thank you for coming, aapka din achha ho."
+
+  - key: resolution_or_handover
+    name: Resolution or handover
+    weight: 0.20
+    definition: "The visitor's need is met at the desk, or the receptionist hands the visitor to a named person or place and says what happens next and how long it will take."
+    min_quotes: 1
+    anchors:
+      1: "The conversation ends with the visitor's need neither met nor passed to anyone, and no next step given."
+      2: "The receptionist gives a vague next step such as 'wait kar lijiye' or 'baad mein aana' with no person, place or time named."
+      3: "The receptionist meets the need or names a next step, but leaves out who will act, where to go or how long it will take."
+      4: "The receptionist meets the need, or names who will see the visitor (or where to go) and how long it will take."
+      5: "The receptionist meets the need, or informs the person the visitor is here to see, tells the visitor who will come and how long it will take, and says what to do if the wait runs longer."
+    examples:
+      1: "Pata nahi kab free honge. ... Theek hai, dekh lijiye aap."
+      5: "Maine Mr. Mehta ko inform kar diya hai, woh 10 minute mein neeche aa rahe hain. Tab tak aap yahan baithiye, agar 15 minute se zyada ho jaye toh mujhe bata dijiyega."
+
+  - key: escalation_handling
+    name: Escalation handling
+    weight: 0.10
+    definition: "When a visitor brings a complaint, an urgent matter or a request outside the receptionist's authority, the receptionist passes it to the right person or team in a way the visitor can follow up on."
+    min_quotes: 1
+    not_applicable_when: "The visit contains no complaint, no urgent matter and no request outside the receptionist's authority, so there is nothing to escalate."
+    anchors:
+      1: "The receptionist argues with or dismisses a complaint or out-of-scope request, or sends the visitor away without saying where the request is going."
+      2: "The receptionist says someone else will handle it but does not name the person, role or team, or how the visitor will hear back."
+      3: "The receptionist names the person, role or team that will handle it but does not note the details or say when the visitor will hear back."
+      4: "The receptionist names the person, role or team, notes the key details, and tells the visitor when they will hear back or be seen."
+      5: "The receptionist acknowledges the issue in words, names the person, role or team, repeats the details that will be passed on, says when and how the visitor will hear back, and gives a way to follow up if they do not."
+    examples:
+      1: "Complaint hai toh email kar do, yahan kuch nahi hota."
+      5: "Aapka product teen baar repair hone ke baad bhi kharab hai, yeh sach mein galat hai. Main service manager ko abhi bula rahi hoon, aapka job card number note kar liya hai. Woh 15 minute mein aapse milenge, aur aaj shaam tak aapko call bhi aayega."
+
+# Numbers computed in code from the transcript and audio (CLAUDE.md golden rule 5), shown next to the scores and
+# never produced by the LLM. No targets or thresholds are set.
+computed_metrics:
+  - duration_s                # length of the visit, in seconds
+  - receptionist_talk_share   # share of speech time spoken by the receptionist
+  - visitor_talk_share        # share of speech time spoken by the visitor (or visitors, as one role)
+  - silence_share             # share of the visit with no speech (includes waits)
+  - longest_silence_s         # longest stretch with no speech, such as a wait while someone is called, in seconds
+  - long_silence_count        # number of long gaps; the gap length is defined and documented in the metrics code
+
+output:
+  - summary      # short ticket-style summary of the visit
+  - strengths
+  - gaps
+  - suggestions
+  - category     # one value from output_values.category
+  - status       # one value from output_values.status
+  - follow_up    # what needs to happen next and which role owns it; empty if nothing
+
+# Allowed values: a draft for the owner's review, for a mix of businesses.
+output_values:
+  category:
+    - appointment_or_meeting    # here to meet someone, or for a booked appointment
+    - enquiry                   # products, services, prices, timings
+    - delivery_or_pickup        # couriers, documents, orders, repaired items
+    - payment_or_billing        # paying, invoices, refunds
+    - complaint
+    - interview_or_vendor       # job candidates, suppliers, other businesses' sales visits
+    - other
+  status:
+    - resolved
+    - follow_up_needed
+    - escalated
+
+# Scores from this rubric stay hidden from users until agreement between the model and human raters, measured by
+# eval/kappa.py on real annotated recordings, reaches this value. No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}

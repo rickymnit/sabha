@@ -11,7 +11,7 @@ import pytest
 from sabha_analytics.classify import UNCERTAIN_TYPE, classify, needs_classification
 from sabha_analytics.grounding import PreparedTranscript, prepare_transcript
 from sabha_analytics.phases import DEFAULT_PHASES, segment_phases
-from sabha_analytics.reception import TICKET_FAILED, TicketValues, ticket_values, validate_ticket
+from sabha_analytics.reception import TICKET_FAILED, TicketValues, ticket_values, validate_ticket, write_ticket
 from sabha_analytics.report import analyse, load_report_schema
 from sabha_analytics.rubric import Rubric, load_rubric
 from sabha_core.state import RecordingStatus
@@ -286,6 +286,33 @@ def test_the_ticket_lists_come_from_the_rubric(reception_rubric: Rubric, call: P
     ticket_call = model.calls[-1]
     assert ticket_call["json_schema"]["properties"]["status"]["enum"] == list(values.statuses)
     assert "Allowed categories: admission_enquiry, fee_query, transport" in ticket_call["messages"][0]["content"]
+
+
+def test_the_ticket_prompt_names_the_conversation_and_the_other_role(call: PreparedTranscript,
+                                                                    fake_judge: Any) -> None:  # fmt: skip
+    walk_in, _ = load_rubric(Path(__file__).resolve().parents[3] / "rubrics" / "reception.company.v0.1.yaml")
+    values = ticket_values(walk_in.output_values)
+    model = fake_judge([{**TICKET, "category": "appointment_or_meeting"}])
+    outcome = write_ticket(call, values=values, model=model, rubric_id=walk_in.id, rubric_roles=walk_in.roles)
+    assert outcome.ticket is not None and outcome.ticket.category == "appointment_or_meeting"
+    system = model.calls[0]["system"]
+    assert "front-desk conversation with a walk-in visitor" in system and 'say "the visitor"' in system
+    assert "caller" not in system and "school" not in system
+
+    school = fake_judge([TICKET])
+    write_ticket(call, values=ticket_values(load_rubric(Path(__file__).resolve().parents[3] / "rubrics"
+                                                        / "reception.school.v0.2.yaml")[0].output_values),
+                 model=school, rubric_id="reception.school.v0.2", rubric_roles=("receptionist", "caller"))  # fmt: skip
+    assert "a front-desk call" in school.calls[0]["system"] and 'say "the caller"' in school.calls[0]["system"]
+
+
+def test_the_company_walk_in_rubric_has_its_own_ticket_categories() -> None:
+    rubric, _ = load_rubric(Path(__file__).resolve().parents[3] / "rubrics" / "reception.company.v0.1.yaml")
+    values = ticket_values(rubric.output_values)
+    assert values.categories == ("appointment_or_meeting", "enquiry", "delivery_or_pickup", "payment_or_billing",
+                                 "complaint", "interview_or_vendor", "other")  # fmt: skip
+    assert values.statuses == ("resolved", "follow_up_needed", "escalated")
+    assert tuple(rubric.roles) == ("receptionist", "visitor")
 
 
 def test_the_approved_school_rubric_makes_tickets() -> None:

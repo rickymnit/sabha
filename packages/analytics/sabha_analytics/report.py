@@ -328,7 +328,11 @@ def analyse(
             rubric_roles=tuple(rubric.roles),
         )
     phases = segment_phases(transcript, model=model, phase_names=phase_names) if phase_names else None
-    ticket = write_ticket(transcript, values=values, model=model) if values is not None else None
+    ticket = (
+        write_ticket(transcript, values=values, model=model, rubric_id=rubric.id, rubric_roles=tuple(rubric.roles))
+        if values is not None
+        else None
+    )
     card = write_deal_card(transcript, interest=interest, model=model) if interest is not None else None
     notes = write_meeting_notes(transcript, model=model) if meeting else None
     steps = [step for step in (classification, synthesis, phases, ticket, card, notes) if step is not None]
