@@ -31,8 +31,6 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 
 | Task | File | What remains |
 | --- | --- | --- |
-| P6.9 consent (partly built) | `week-6.md` | Consent records (scope, validity), releasing recordings awaiting consent, the admin UI and the upload selector |
-| P2.6 live status | `week-2.md` | Not started (server-sent events for the recordings list and overview) |
 | P6.8 role views | `week-6.md` | Not started; includes the workspace setup, rubric editor and plans pages in `docs/design/` |
 | P6.2 app shell (partly built) | `week-1.md` | Tenant switcher, nav counts, plan usage block, lint rule against hard-coded nouns |
 | P1.7 profiles and labels (partly built) | `week-2.md` | `POST /v1/admin/tenants`, `PATCH /v1/settings`, `useLabels()`, blocking disabled types |
@@ -90,6 +88,8 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | Company reception: walk-in visitors (`reception.company.v0.1`), the ticket on the report with verified quotes | Draft rubric for the owner's review; a full run on audio once Sarvam has credit |
 | P6.7 disputes: raise, the Disputes tab in Reviews, decide, email; the reviewer's score counts in the overall and trends | Calibration records are stored on each dispute; reading them into the calibration loop is P5.9 |
 | P2.8 re-analysis: one recording or many (count first, 100 per request), every version kept, numbers from the latest only | Re-analysis with a chosen rubric version is in the API only (the app always uses the current rubric) |
+| P2.6 live status: GET /v1/events and pages that update themselves, polling only as a fallback | Remaining from the prompt: none |
+| P6.9 consent (partly built) | Parked for the owner's law team (2026-10-26); golden rule 9 stays enforced at upload |
 
 ## Coverage check
 
