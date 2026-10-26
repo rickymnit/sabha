@@ -1,0 +1,37 @@
+# A fictional in-person sales meeting, voiced with Sarvam text-to-speech (scripts/dev/synthetic_audio.py) to test the
+# sales pipeline without real recordings. Every person, school, company and figure here is made up. Not for any
+# quality figure (golden rule 6): it tests the pipeline, not the scoring's accuracy.
+#
+# Brightpath Software (the demo company's own name, so the rep's introduction can be recognised) visits a school to
+# sell fee-management software. The rep is good but not perfect: no agenda or time check, one objection answered
+# loosely, and a next step with a day but no owner said back.
+title: "Fees software demo, Green Valley School (sample)"
+language_code: hi-IN
+speakers:
+  rep: {voice: rohan, role: sales_rep}        # Rohit Sharma, Brightpath Software
+  principal: {voice: priya, role: customer}  # the school principal
+  accounts: {voice: amit, role: customer}    # the school's accounts head
+lines:
+  - [principal, "नमस्ते, आइए बैठिए। आप Brightpath Software से हैं ना?"]
+  - [rep, "जी मैडम, नमस्ते। मैं रोहित शर्मा, Brightpath Software से। Thank you आपने time दिया। आज मैं हमारा fee management software दिखाने आया हूँ।"]
+  - [principal, "हाँ, हमारे accounts head सुरेश जी भी साथ हैं, fees का सारा काम वही देखते हैं।"]
+  - [rep, "बहुत बढ़िया। सुरेश जी, अभी आप fees का हिसाब कैसे रखते हैं? Collection और reconciliation का process क्या है?"]
+  - [accounts, "अभी सब Excel में होता है। Parents bank transfer करते हैं, फिर हर महीने बैंक statement से एक एक entry match करनी पड़ती है। उसमें दो दिन लग जाते हैं।"]
+  - [rep, "दो दिन हर महीने, और late fee वालों को reminder कैसे जाता है?"]
+  - [accounts, "Reminder भी manually जाता है, WhatsApp पर एक एक parent को। कई बार कोई छूट भी जाता है।"]
+  - [principal, "और parents शिकायत करते हैं कि receipt late मिलती है।"]
+  - [rep, "समझ गया। तो तीन चीज़ें हैं: reconciliation में दो दिन, manual reminders, और receipts में देरी। सही समझा मैंने?"]
+  - [accounts, "हाँ, बिल्कुल यही।"]
+  - [rep, "तो मैं आपको ये auto-match screen दिखाता हूँ। आप बैंक statement upload करेंगे और software खुद हर payment को सही student की fee से match कर देगा। जो match नहीं होंगे, सिर्फ वो यहाँ दिखेंगे। आपके दो दिन का काम लगभग एक घंटे में हो जाएगा।"]
+  - [rep, "और reminders के लिए, due date के तीन दिन पहले और बाद में अपने आप SMS और WhatsApp चला जाता है। Payment होते ही receipt भी तुरंत parent के phone पर पहुँच जाती है।"]
+  - [principal, "ये तो काम का है। लेकिन price क्या होगा? पिछले साल एक company ने बहुत ज़्यादा quote किया था।"]
+  - [rep, "आपके बारह सौ students के लिए yearly cost अड़तालीस हज़ार रुपये है, यानी करीब चालीस रुपये per student per year।"]
+  - [accounts, "हमारे budget के हिसाब से ये थोड़ा ज़्यादा है, इस quarter में तो मुश्किल है।"]
+  - [rep, "Budget की बात समझ सकता हूँ। हम quarterly billing दे सकते हैं, पहला instalment April में। क्या इससे इस quarter वाली problem solve होगी?"]
+  - [accounts, "हाँ, quarterly हो जाए तो चल जाएगा।"]
+  - [principal, "एक और डर है। हमारा पाँच साल का पुराना data Excel में है, वो सब shift करना पड़ेगा, उसमें गड़बड़ हो गई तो?"]
+  - [rep, "नहीं मैडम, उसकी चिंता मत कीजिए, हमारी team सब कर देती है।"]
+  - [principal, "ठीक है। तो आगे क्या करना है?"]
+  - [rep, "मैं कल तक quotation और दो schools के reference भेज देता हूँ। फिर Thursday चार बजे सुरेश जी के साथ बीस मिनट का call रख लेते हैं, data migration का plan दिखा दूँगा।"]
+  - [accounts, "Thursday चार बजे ठीक है।"]
+  - [principal, "ठीक है रोहित जी, quotation भेज दीजिए, फिर देखते हैं।"]

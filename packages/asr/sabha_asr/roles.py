@@ -31,7 +31,18 @@ Reception (the first speaker who greets with the school or company name is the r
 - The receptionist is the first speaker, in order of first speech, who greets with the name. Confidence is
   0.5 + 0.5 * max(0, margin) / 4, where margin is that speaker's points minus the most points of any other speaker.
   If nobody greets with the name, the first speaker is recorded as the best guess with confidence 0.5.
-- A stereo channel hint (`receptionist_channel_speaker`, the speaker label heard on the receptionist's channel) is
+- Sales, in person (one rep with one or more people from the customer side; the rep introduces the company):
+
+- Only words in the first `intro_window_ms` (90 s) of speech count for the introduction, as for reception.
+- Per speaker: introduces_company = the company name (a tenant name variant) with an introduction ("<name> se",
+  "from <name>", "main", "mera naam", "my name", "I am" or a reception introduction). Evidence points =
+  2 * introduces_company + 1 * talk-share leader + 1 * long-turn leader (at most 4).
+- The rep is the first speaker, in order of first speech, who introduces the company; confidence as for reception,
+  0.5 + 0.5 * max(0, margin) / 4. If nobody introduces the company, the teaching rule decides (the rep runs the
+  pitch and the demo: largest talk share AND most long turns). The customer side often speaks first, in its own
+  office, so speaking first is not evidence here.
+
+A stereo channel hint (`receptionist_channel_speaker`, the speaker label heard on the receptionist's channel) is
   configuration, not inference: when given it wins, with confidence 1.0 and method "channel".
 
 Low confidence: when the heuristics disagree or confidence < `min_confidence` (0.7), every speaker's method is
@@ -59,7 +70,8 @@ from sabha_core.state import RecordingStatus
 
 TEACHING = "teaching"
 RECEPTION = "reception"
-RECORDING_TYPES = frozenset({TEACHING, RECEPTION})
+SALES = "sales"
+RECORDING_TYPES = frozenset({TEACHING, RECEPTION, SALES})
 
 METHOD_HEURISTIC = "heuristic"
 METHOD_CHANNEL = "channel"
@@ -70,6 +82,7 @@ DEFAULT_LONG_TURN_MS = 15_000
 DEFAULT_TURN_JOIN_GAP_MS = 1_000
 DEFAULT_SHARE_MARGIN_FULL = 0.30
 DEFAULT_GREETING_WINDOW_MS = 30_000
+DEFAULT_INTRO_WINDOW_MS = 90_000
 DEFAULT_TIE_BREAK_WINDOW_MS = 120_000
 DEFAULT_MIN_CONFIDENCE = 0.7
 
@@ -118,7 +131,10 @@ SELF_INTRODUCTIONS: tuple[str, ...] = (
 )
 """Phrases a receptionist uses to introduce herself or the office. "<name> se" is added per tenant name."""
 
-_EVIDENCE_MAX = 4  # 2 (greets with name) + 1 (introduces herself) + 1 (spoke first)
+_EVIDENCE_MAX = 4  # reception: 2 (greets with name) + 1 (introduces herself) + 1 (spoke first); sales: see docstring
+
+SALES_INTRODUCTIONS: tuple[str, ...] = ("main", "mera naam", "my name", "i am", "im", "मैं", "मेरा नाम")
+"""Words a sales rep introduces themselves with, besides SELF_INTRODUCTIONS; counted only with the company name."""
 
 
 class SpeakerRoleRecord(TypedDict):
@@ -135,11 +151,18 @@ class RoleParams:
     turn_join_gap_ms: int = DEFAULT_TURN_JOIN_GAP_MS
     share_margin_full: float = DEFAULT_SHARE_MARGIN_FULL
     greeting_window_ms: int = DEFAULT_GREETING_WINDOW_MS
+    intro_window_ms: int = DEFAULT_INTRO_WINDOW_MS
     tie_break_window_ms: int = DEFAULT_TIE_BREAK_WINDOW_MS
     min_confidence: float = DEFAULT_MIN_CONFIDENCE
 
     def __post_init__(self) -> None:
-        for name in ("long_turn_ms", "turn_join_gap_ms", "greeting_window_ms", "tie_break_window_ms"):
+        for name in (
+            "long_turn_ms",
+            "turn_join_gap_ms",
+            "greeting_window_ms",
+            "intro_window_ms",
+            "tie_break_window_ms",
+        ):
             if operator.index(getattr(self, name)) < 0:
                 raise ValueError(f"{name} cannot be negative")
         if not self.share_margin_full > 0:
@@ -315,6 +338,40 @@ def _reception_guess(
     return candidate, 0.5 + 0.5 * max(0, margin) / _EVIDENCE_MAX, True
 
 
+def _sales_guess(
+    turns: Sequence[Turn], words: Sequence[Word], name_variants: Sequence[str], params: RoleParams
+) -> tuple[str, float, bool]:
+    """(sales rep label, confidence, the evidence agrees)."""
+    order = list(dict.fromkeys(t.speaker_label for t in sorted(turns, key=lambda t: (t.start_ms, t.end_ms))))
+    texts: dict[str, list[str]] = {label: [] for label in order}
+    for label, text in _speaker_runs(turns, words, params.intro_window_ms):
+        texts[label].append(text)
+    names = [name for name in (normalise_text(v) for v in name_variants) if name]
+    intros = [*SELF_INTRODUCTIONS, *SALES_INTRODUCTIONS]
+
+    def introduces_company(label: str) -> bool:
+        text = normalise_text(" ".join(texts[label]))
+        if any(_contains(text, f"{name} se") or _contains(text, f"from {name}") for name in names):
+            return True
+        return any(_contains(text, n) for n in names) and any(_contains(text, phrase) for phrase in intros)
+
+    introducing = {label: introduces_company(label) for label in order}
+    candidate = next((label for label in order if introducing[label]), None)
+    if candidate is None:
+        return _teaching_guess(turns, params)
+
+    talk = _talk_ms(turns)
+    long_turns: dict[str, int] = dict.fromkeys(talk, 0)
+    for turn in _joined_turns(turns, params.turn_join_gap_ms):
+        if turn.duration_ms >= params.long_turn_ms:
+            long_turns[turn.speaker_label] += 1
+    share_leader = _unique_leader({label: float(ms) for label, ms in talk.items()})
+    long_leader = _unique_leader({label: float(n) for label, n in long_turns.items()})
+    points = {label: 2 * introducing[label] + (label == share_leader) + (label == long_leader) for label in order}
+    margin = points[candidate] - max((p for label, p in points.items() if label != candidate), default=0)
+    return candidate, 0.5 + 0.5 * max(0, margin) / _EVIDENCE_MAX, True
+
+
 def _build(
     labels: Sequence[str], staff_label: str, roles: tuple[str, str], confidence: float, method: str
 ) -> dict[str, SpeakerRole]:
@@ -369,6 +426,8 @@ def assign_roles(
 
     if recording_type == TEACHING:
         staff, confidence, agree = _teaching_guess(turns, params)
+    elif recording_type == SALES:
+        staff, confidence, agree = _sales_guess(turns, words, tenant_name_variants, params)
     else:
         staff, confidence, agree = _reception_guess(turns, words, tenant_name_variants, params)
     confidence = round(confidence, 3)

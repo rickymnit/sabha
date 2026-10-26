@@ -5,7 +5,8 @@
 1. Reads the diarize stage's turns (compact timeline). Missing: PermanentError `missing_input`.
 2. Finds the recording's rubric (sabha_workers.rubrics; none: PermanentError `no_rubric`). Its first two roles are
    (staff, other): teacher/students or receptionist/caller.
-3. Assigns roles with sabha_asr.roles (heuristics; the tenant's name is the reception greeting to look for). When
+3. Assigns roles with sabha_asr.roles (heuristics; the tenant's name and its `name_variants` are what a receptionist
+   greets with and a sales rep introduces). When
    the heuristics are unsure it asks the LLM tie-breaker if one is configured (sabha_workers.stages.roles_llm).
    Writes `roles@v1.json`.
 4. Assembles `transcript@v1.json` with sabha_asr.assembly: utterances with role, speaker label, text and times on
@@ -99,8 +100,9 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
     if recording.confirmed_roles is not None:
         assignment = confirmed_assignment(recording.confirmed_roles, turns, (rubric.roles[0], rubric.roles[1]))
     else:
+        names = [tenant.name, *tenant.name_variants]
         assignment = assign_roles(
-            turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=[tenant.name],
+            turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=names,
             tie_breaker=deps.tie_breaker(ctx.tenant_id, recording.id),
         )  # fmt: skip
     ctx.artefacts.put(ctx.prefix + "roles@v1.json", assignment.to_json().encode(), "application/json")

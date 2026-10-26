@@ -66,6 +66,28 @@
         }
       }]
     },
+    "deal_card": {
+      "description": "Sales meetings only: the deal card, verified items only (sabha_analytics.sales).",
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false,
+        "required": ["customer_needs", "objections", "interest_level", "next_step", "left_out"],
+        "properties": {
+          "customer_needs": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,
+            "required": ["need", "evidence"], "properties": {"need": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "objections": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,
+            "required": ["objection", "response", "settled", "evidence"],
+            "properties": {"objection": {"type": "string", "minLength": 1}, "response": {"type": "string", "minLength": 1},
+                           "settled": {"enum": ["yes", "no", "unclear"]}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "interest_level": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["value", "evidence"],
+            "properties": {"value": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", "description": "One of the rubric's output_values.interest_level."},
+                           "evidence": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/card_evidence"}]}}}]},
+          "next_step": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["action", "owner", "due", "evidence"],
+            "properties": {"action": {"type": "string", "minLength": 1}, "owner": {"enum": ["sales_rep", "customer", "both"]},
+                           "due": {"type": ["string", "null"]}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
+          "left_out": {"type": "integer", "minimum": 0, "description": "Items left out because their quote was not found in the transcript."}
+        }
+      }]
+    },
     "model_ids": {"type": "array", "items": {"type": "string"}},
     "prompts": {
       "type": "object",
@@ -77,6 +99,11 @@
     "usage": {"type": "object", "required": ["total", "calls"]}
   },
   "$defs": {
+    "card_evidence": {
+      "type": "object", "additionalProperties": false, "required": ["quote", "utterance_id", "start_ms", "end_ms"],
+      "properties": {"quote": {"type": "string", "minLength": 1}, "utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},
+                     "start_ms": {"type": "integer", "minimum": 0}, "end_ms": {"type": "integer", "minimum": 1}}
+    },
     "evidence": {
       "type": "object", "additionalProperties": false, "required": ["quote", "utterance_id", "start_ms", "end_ms"],
       "properties": {

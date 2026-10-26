@@ -382,7 +382,7 @@ PROCESSING_STAGES = {
 }  # fmt: skip
 LANGUAGE_NAMES = {"hi": "Hindi", "en": "English", "mr": "Marathi", "ta": "Tamil", "te": "Telugu", "bn": "Bengali",
                   "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam", "pa": "Punjabi", "or": "Odia"}  # fmt: skip
-STAFF_ROLE_WORDS = frozenset({"teacher", "receptionist"})
+STAFF_ROLE_WORDS = frozenset({"teacher", "receptionist", "sales_rep"})
 
 
 def _reasons(codes: list[str]) -> list[dict[str, str]]:
@@ -506,6 +506,7 @@ def report_payload(
             {"name": p["phase"], "start_ms": p["start_ms"], "end_ms": p["end_ms"]} for p in report.get("phases") or []
         ]
         or None,
+        "deal_card": report.get("deal_card"),  # sales meetings: verified items only (sabha_analytics.sales)
     }
 
 

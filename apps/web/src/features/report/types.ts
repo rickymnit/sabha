@@ -148,6 +148,29 @@ export interface StatusReason {
 export type PipelineStage = "uploaded" | "preprocessing" | "diarizing" | "transcribing" | "analyzing";
 
 /** The report's content, present when the status is completed or partial. */
+/** A deal card quote: the transcript's own words, with that line's times (verified like rubric evidence). */
+export interface CardEvidence {
+  quote: string;
+  utterance_id: string;
+  start_ms: number;
+  end_ms: number;
+}
+
+/** Sales meetings: what the customer needs, their objections, interest and the agreed next step (verified only). */
+export interface DealCard {
+  customer_needs: { need: string; evidence: CardEvidence }[];
+  objections: { objection: string; response: string; settled: "yes" | "no" | "unclear"; evidence: CardEvidence }[];
+  interest_level: { value: string; evidence: CardEvidence | null } | null;
+  next_step: {
+    action: string;
+    owner: "sales_rep" | "customer" | "both";
+    due: string | null;
+    evidence: CardEvidence;
+  } | null;
+  /** Items left out because their quote was not found in the transcript. */
+  left_out: number;
+}
+
 export interface AnalysisReport {
   status: "completed" | "partial";
   /** Empty when completed; for partial, why some dimensions are missing. */
@@ -173,6 +196,8 @@ export interface AnalysisReport {
   /** Exactly three. */
   suggestions: Suggestion[];
   phases?: Phase[] | null;
+  /** Sales meetings only. */
+  deal_card?: DealCard | null;
 }
 
 export interface AnalysisProcessing {

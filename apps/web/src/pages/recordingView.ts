@@ -7,7 +7,7 @@ import { capitalise } from "../app/format";
 
 /** The roles in a transcript, labelled in the tenant's words: the analysed staff role gets labels.person. */
 export function roleLabels(roles: Record<string, string>, personLabel: string): RoleLabels {
-  const staff = new Set(["teacher", "receptionist"]);
+  const staff = new Set(["teacher", "receptionist", "sales_rep"]);
   const out: Record<string, { label: string; analysed?: boolean }> = {};
   for (const role of new Set(Object.values(roles))) {
     out[role] = staff.has(role) ? { label: personLabel, analysed: true } : { label: capitalise(role) };

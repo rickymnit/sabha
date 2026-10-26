@@ -17,6 +17,7 @@ import {
   type Transcript,
 } from "../transcript";
 import { checkedText, formatScore, joinList } from "./format";
+import { DealCardPanel } from "./DealCardPanel";
 import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
@@ -153,6 +154,8 @@ function ReportBody({
   return (
     <>
       <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+
+      {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
 
       <section
         aria-labelledby={timelineHeadingId}

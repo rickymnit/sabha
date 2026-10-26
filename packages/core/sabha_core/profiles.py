@@ -175,12 +175,17 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
         labels=Labels(  # Setup.dc.html:164
             person="Sales rep",
             person_plural="Team",
-            recording="Call",
-            recording_plural="Calls",
+            # "Conversation", not the design's "Call" (Setup.dc.html:164): in-person sales meetings and team meetings
+            # are not calls (owner's decision on sales, 2026-10-24). A tenant can rename it.
+            recording="Conversation",
+            recording_plural="Conversations",
             unit="Team or branch",
             manager="Sales manager",
         ),
-        default_rubrics=dict.fromkeys(ConversationType),  # no company rubrics exist yet
+        default_rubrics={
+            **dict.fromkeys(ConversationType),
+            _T.SALES: "sales.company.v0.1",  # draft for the owner's review (2026-10-26): in-person sales meetings
+        },
         consent=ConsentDefaults(
             parental_consent_types=frozenset(),
             parental_consent_for_minors=True,  # proposal: the design is silent; kept as strict as the others

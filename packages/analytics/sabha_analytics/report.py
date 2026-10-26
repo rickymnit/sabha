@@ -31,6 +31,7 @@ from sabha_analytics.classify import UNCERTAIN_TYPE, Classification
 from sabha_analytics.grounding import PreparedTranscript
 from sabha_analytics.phases import PhaseOutcome, segment_phases
 from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, ticket_values, write_ticket
+from sabha_analytics.sales import DealCardOutcome, interest_values, write_deal_card
 from sabha_analytics.scoring import (
     CallRecord,
     DimensionResult,
@@ -126,6 +127,7 @@ def build_report(
     classification: Classification | None = None,
     phases: PhaseOutcome | None = None,
     ticket: TicketOutcome | None = None,
+    deal_card: DealCardOutcome | None = None,
 ) -> AnalysisResult:
     """Assemble and check an analysis@v1 report (module docstring)."""
     reasons: list[str] = []
@@ -198,6 +200,8 @@ def build_report(
             else {"text": ticket.ticket.follow_up.text, "owner_role": ticket.ticket.follow_up.owner_role},
             "summary": ticket.ticket.summary,
         },
+        # Sales: verified items only (sabha_analytics.sales). No card is not a reason for review.
+        "deal_card": None if deal_card is None or deal_card.card is None else deal_card.card.to_record(),
     }
     check_report(report, transcript)
     return AnalysisResult(report, status)
@@ -234,6 +238,19 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
         for uid in (phase["start_utterance_id"], phase["end_utterance_id"]):
             if transcript.get(uid) is None:
                 problems.append(f"phase {phase['phase']} points at unknown utterance {uid!r}")
+    card = report.get("deal_card") or {}
+    evidence = [
+        *(item["evidence"] for item in card.get("customer_needs", [])),
+        *(item["evidence"] for item in card.get("objections", [])),
+        *([card["next_step"]["evidence"]] if card.get("next_step") else []),
+        *([card["interest_level"]["evidence"]] if (card.get("interest_level") or {}).get("evidence") else []),
+    ]
+    for item in evidence:
+        utterance = transcript.get(item["utterance_id"])
+        if utterance is None or item["quote"] not in utterance.text:
+            problems.append(f"deal card quote is not the transcript's own wording: {item['quote']!r}")
+        elif (item["start_ms"], item["end_ms"]) != (utterance.start_ms, utterance.end_ms):
+            problems.append("deal card evidence times differ from the transcript")
     if report["overall"]["score"] is None and report["next_status"] != RecordingStatus.NEEDS_REVIEW.value:
         problems.append("no overall score, but the report does not ask for review")
     if problems:
@@ -257,12 +274,15 @@ def analyse(
     classification: Classification | None = None,
     phase_names: Sequence[str] | None = None,
     reception: bool = False,
+    sales: bool = False,
 ) -> AnalysisResult:
     """Score, compute the overall score, synthesise when there is one, and assemble the report.
 
     `classification`: the result of classify.classify when the type had to be inferred. If it asks for review
     ("uncertain_type"), nothing is scored, because the rubric itself is in doubt. `phase_names`: split the
-    conversation into these phases for the timeline. `reception`: also write the call's ticket, with the categories
+    conversation into these phases for the timeline. `sales`: also write the meeting's deal card, with the interest
+    levels of the rubric's `output_values.interest_level` (ValueError before any model call if it has none).
+    `reception`: also write the call's ticket, with the categories
     and statuses of the rubric's `output_values` (ValueError before any model call if the rubric has none).
     """
     if classification is not None and classification.needs_review_reason == UNCERTAIN_TYPE:
@@ -279,6 +299,7 @@ def analyse(
             classification=classification,
         )
     values = ticket_values(rubric.output_values) if reception else None
+    interest = interest_values(rubric.output_values) if sales else None
     scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model)
     overall = compute_overall(scoring.dimensions)
     synthesis = None
@@ -291,10 +312,12 @@ def analyse(
             transcript=transcript,
             model=model,
             analysed_roles=analysed_roles,
+            rubric_roles=tuple(rubric.roles),
         )
     phases = segment_phases(transcript, model=model, phase_names=phase_names) if phase_names else None
     ticket = write_ticket(transcript, values=values, model=model) if values is not None else None
-    steps = [step for step in (classification, synthesis, phases, ticket) if step is not None]
+    card = write_deal_card(transcript, interest=interest, model=model) if interest is not None else None
+    steps = [step for step in (classification, synthesis, phases, ticket, card) if step is not None]
     prompts = (*scoring.prompts, *(p for step in steps for p in step.prompts))
     return build_report(
         rubric=rubric,
@@ -312,4 +335,5 @@ def analyse(
         classification=classification,
         phases=phases,
         ticket=ticket,
+        deal_card=card,
     )

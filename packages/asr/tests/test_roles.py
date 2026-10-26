@@ -345,3 +345,81 @@ def test_tie_breaker_answer_is_checked() -> None:
     turns, words = two_adults()
     with pytest.raises(ValueError, match="exactly one"):
         assign_roles(turns, words, "teaching", TEACHING_ROLES, tie_breaker=two_teachers)
+
+
+# --- Sales meetings (in person: one rep, one or more customers) ---
+
+SALES_ROLES = ("sales_rep", "customer")
+COMPANY = ("Brightpath Software", "Brightpath")
+PITCH = (
+    "Yeh dashboard dekhiye, fees reconciliation automatic ho jaata hai aur parents ko reminder bhi chala jaata hai. "
+)
+
+
+def test_sales_rep_introduces_the_company_and_leads_the_talk() -> None:
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "Aaiye baithiye, bataiye."),  # the customer speaks first: it is their office
+            ("SPEAKER_00", 5_000, "Thank you sir, main Rohit, Brightpath se. Aaj aapka process samajhna hai."),
+            ("SPEAKER_01", 6_000, "Abhi sab Excel mein hota hai, do din lagte hain."),
+            ("SPEAKER_00", 40_000, PITCH * 4),
+            ("SPEAKER_02", 4_000, "Iska price kya hoga?"),  # a second person from the customer side
+            ("SPEAKER_00", 20_000, PITCH * 2),
+        ]
+    )
+    result = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=COMPANY)
+    assert roles_of(result) == {"SPEAKER_00": "sales_rep", "SPEAKER_01": "customer", "SPEAKER_02": "customer"}
+    assert result.needs_review_reason is None and result.speakers["SPEAKER_00"].method == METHOD_HEURISTIC
+
+
+def test_sales_rep_who_never_names_the_company_is_still_found_by_talk_and_long_turns() -> None:
+    turns, words = script(
+        [
+            ("SPEAKER_01", 3_000, "Haan bataiye."),
+            ("SPEAKER_00", 45_000, PITCH * 5),
+            ("SPEAKER_01", 3_000, "Accha."),
+            ("SPEAKER_00", 30_000, PITCH * 3),
+        ]
+    )
+    result = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=COMPANY)
+    assert roles_of(result) == {"SPEAKER_00": "sales_rep", "SPEAKER_01": "customer"}
+    assert result.needs_review_reason is None
+
+
+def test_a_sales_meeting_with_no_clear_rep_needs_review() -> None:
+    # Two people talk equally in short turns and nobody names the company: a guess is never analysed.
+    turns, words = script([("SPEAKER_00" if i % 2 == 0 else "SPEAKER_01", 4_000, "haan theek hai") for i in range(10)])
+    result = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=COMPANY)
+    assert result.needs_review_reason == REASON_UNCLEAR_ROLES
+    assert all(s.method == METHOD_LOW_CONFIDENCE for s in result.speakers.values())
+
+
+def test_the_rep_named_by_company_wins_over_a_customer_who_talks_more() -> None:
+    # The customer explains their problem at length; the rep introduced themselves with the company name.
+    turns, words = script(
+        [
+            ("SPEAKER_00", 5_000, "Namaste, main Rohit Brightpath Software se, aapse milke accha laga."),
+            ("SPEAKER_01", 50_000, "Dekhiye hamara problem yeh hai ki " * 12),
+            ("SPEAKER_00", 20_000, PITCH * 2),
+            ("SPEAKER_01", 30_000, "Aur ek baat, " * 10),
+        ]
+    )
+    result = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=COMPANY)
+    assert roles_of(result)["SPEAKER_00"] == "sales_rep"
+
+
+def test_a_company_name_written_in_devanagari_is_recognised_through_its_variants() -> None:
+    # The recogniser writes "Brightpath Software" inside Hindi speech as "ब्राइट पाथ सॉफ्टवेयर" (seen 2026-10-26).
+    turns, words = script(
+        [
+            ("SPEAKER_01", 4_000, "नमस्ते, आइए बैठिए। आप कहाँ से हैं?"),
+            ("SPEAKER_00", 6_000, "जी नमस्ते। मैं रोहित शर्मा, ब्राइट पाथ सॉफ्टवेयर से।"),
+            ("SPEAKER_01", 20_000, "अच्छा, हमारे यहाँ fees का बहुत काम है, " * 4),  # the customer talks at length
+            ("SPEAKER_00", 10_000, "समझ गया, मैं दिखाता हूँ।"),
+        ]
+    )
+    variants = ("Brightpath Software", "Brightpath", "ब्राइट पाथ सॉफ्टवेयर")
+    found = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=variants)
+    assert roles_of(found)["SPEAKER_00"] == "sales_rep"
+    latin_only = assign_roles(turns, words, "sales", SALES_ROLES, tenant_name_variants=variants[:2])
+    assert roles_of(latin_only)["SPEAKER_00"] == "customer"  # without the variant, talk time alone misleads

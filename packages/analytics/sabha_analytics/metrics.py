@@ -400,24 +400,25 @@ def compute_metrics(
         ),
     ]
     for role in resolved:
+        who = role.replace("_", " ")  # "sales_rep" reads "sales rep" in the definitions
         metrics += [
             Metric(
                 f"{role}_talk_share",
                 _ratio(talk_ms[role], all_talk_ms),
                 "ratio",
-                f"Share of all speaking time spoken by the {role} role; overlapping speech counts for each role.",
+                f"Share of all speaking time spoken by the {who} role; overlapping speech counts for each role.",
             ),
             Metric(
                 f"{role}_turn_count",
                 sum(1 for turn in turns if turn.role == role),
                 "count",
-                f"Number of turns by the {role} role; pauses under {TURN_GAP_MS // 1000} s do not end a turn.",
+                f"Number of turns by the {who} role; pauses under {TURN_GAP_MS // 1000} s do not end a turn.",
             ),
             Metric(
                 f"{role}_question_count",
                 question_counts[role][0],
                 "count",
-                f"Questions asked by the {role} role: sentences ending in '?' or using a question word such as kya, "
+                f"Questions asked by the {who} role: sentences ending in '?' or using a question word such as kya, "
                 "kyun or kaise.",
             ),
         ]

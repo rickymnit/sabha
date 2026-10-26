@@ -94,12 +94,12 @@ def test_company_defaults() -> None:
     assert company.labels.model_dump() == {
         "person": "Sales rep",
         "person_plural": "Team",
-        "recording": "Call",
-        "recording_plural": "Calls",
+        "recording": "Conversation",
+        "recording_plural": "Conversations",
         "unit": "Team or branch",
         "manager": "Sales manager",
     }
-    assert company.default_rubrics == dict.fromkeys(ConversationType)
+    assert company.default_rubrics == {**dict.fromkeys(ConversationType), T.SALES: "sales.company.v0.1"}
     assert company.consent == ConsentDefaults(
         consent_ref_required=True,
         parental_consent_types=frozenset(),
@@ -111,10 +111,11 @@ def test_company_defaults() -> None:
 
 
 def test_company_uses_sales_words() -> None:
-    # P1.7 done-when: switching a tenant to `company` changes the UI words to Sales rep, Call, Team.
+    # P1.7 done-when: switching a tenant to `company` changes the UI words to Sales rep, Conversation, Team
+    # ("Conversation" rather than the plan's "Call" since 2026-10-26: in-person sales meetings are not calls).
     labels = get_profile(ProfileName.COMPANY).labels
 
-    assert (labels.person, labels.recording, labels.person_plural) == ("Sales rep", "Call", "Team")
+    assert (labels.person, labels.recording, labels.person_plural) == ("Sales rep", "Conversation", "Team")
 
 
 @pytest.mark.parametrize("name", ALL_PROFILES)

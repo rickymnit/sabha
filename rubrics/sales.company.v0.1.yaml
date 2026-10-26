@@ -1,0 +1,124 @@
+# Sales rubric v0.1: DRAFT for the product owner's review (2026-10-26). In-person sales meetings and product
+# demos: a sales rep with one or more people from the customer's side, recorded on a phone.
+#
+# Rules (as for the school rubrics):
+# - Anchors describe only what the sales rep says or does that a rater can point to in the transcript or audio.
+#   No guesses about intentions, feelings or whether the deal will close.
+# - Customers are never scored. What they say appears only as evidence of what the rep did, and in the deal card.
+# - Example utterances are illustrative Hinglish. All names, amounts, companies and dates in them are fictional.
+#   "[company]" stands in for the rep's company and "[product]" for what they sell.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: sales.company.v0.1
+segment: company
+version: "0.1"
+roles: [sales_rep, customer]  # sales_rep is the person analysed; customer (one or more people) is context only
+
+dimensions:
+  - key: opening_and_agenda
+    name: Opening and agenda
+    weight: 0.10
+    definition: "The rep introduces themselves and [company], states the purpose of the meeting and agrees how the time will be used before going into the product."
+    min_quotes: 1
+    anchors:
+      1: "The rep starts showing or describing the product without introducing themselves, [company] or the purpose of the meeting."
+      2: "The rep introduces themselves or [company] but does not say what the meeting is for."
+      3: "The rep introduces themselves and [company] and states the purpose, but does not say how the meeting will run or check the customer's time."
+      4: "The rep introduces themselves and [company], states the purpose and outlines what will happen in the meeting."
+      5: "The rep introduces themselves and [company], states the purpose, outlines the meeting, checks how much time the customer has and asks what the customer wants to get out of it."
+    examples:
+      1: "Toh sir, yeh dekhiye hamara dashboard, isme sab kuch hai..."
+      5: "Namaste sir, main Rohit, [company] se. Aaj ka idea hai ki pehle aapki team ka current process samjhein, phir 15 minute ka demo. Aapke paas kitna time hai? Aur aaj ke meeting se aap kya nikaalna chahenge?"
+
+  - key: discovery
+    name: Discovering needs
+    weight: 0.25
+    definition: "The rep asks questions about the customer's situation, problems, current way of working and how they decide, and confirms what they heard."
+    min_quotes: 2
+    anchors:
+      1: "The rep asks no questions about the customer's situation or needs."
+      2: "The rep asks only closed or yes/no questions ('aapko chahiye na?') and does not follow up on the answers."
+      3: "The rep asks at least one open question about the customer's situation or problem but does not follow up on the answer."
+      4: "The rep asks open questions about the customer's situation and problem, follows up on at least one answer, and repeats a need back to the customer."
+      5: "The rep asks open questions about the situation, the problem, the current way of working and who decides, follows up on the answers, and summarises the customer's needs back to them before presenting."
+    examples:
+      1: "Aapko yeh software toh chahiye hi hoga, sab schools le rahe hain."
+      5: "Abhi aap fees ka hisaab kaise rakhte hain? ... Toh har mahine reconciliation mein do din lag jaate hain aur parents ko reminder manually jaata hai. Final decision aap lenge ya accounts head bhi involved hain?"
+
+  - key: tailored_pitch
+    name: Pitch tailored to needs
+    weight: 0.20
+    definition: "The rep presents the parts of [product] that answer the needs the customer stated, and links each one to that need in words."
+    min_quotes: 2
+    anchors:
+      1: "The rep lists features or reads from a brochure with no reference to anything the customer said."
+      2: "The rep presents many features and mentions the customer's situation only in passing."
+      3: "The rep links at least one feature to a need the customer stated but presents the rest generically."
+      4: "The rep links most of what they present to needs the customer stated, using the customer's own words or examples."
+      5: "The rep presents only what answers the customer's stated needs, links each part to that need in the customer's words, and checks after each part whether it fits ('kya yeh aapke case mein kaam karega?')."
+    examples:
+      1: "Isme 40 modules hain: attendance, library, transport, hostel, payroll, sab kuch."
+      5: "Aapne kaha tha reconciliation mein do din lagte hain. Yeh auto-match screen bank statement se direct match karti hai. Aapke hisaab se isse woh do din bachenge?"
+
+  - key: objection_handling
+    name: Handling objections
+    weight: 0.20
+    definition: "When the customer raises a concern (price, timing, a competitor, risk), the rep acknowledges it, finds out more about it, answers it specifically and checks whether the answer settles it."
+    min_quotes: 1
+    not_applicable_when: "The customer raises no concern, doubt or objection during the meeting, so there is nothing to handle."
+    anchors:
+      1: "The rep ignores the concern, argues with the customer or dismisses it ('aisa kuch nahi hota')."
+      2: "The rep answers the concern with a general reassurance and moves on without finding out more."
+      3: "The rep acknowledges the concern and gives a specific answer, but does not ask about it or check whether it settled it."
+      4: "The rep acknowledges the concern, asks at least one question to understand it, and gives a specific answer (a figure, an example or an option)."
+      5: "The rep acknowledges the concern in words, asks questions to understand it, gives a specific answer, and asks whether the answer settles it or what else would be needed."
+    examples:
+      1: "Price toh market mein sabse kam hai sir, isse sasta kahin nahi milega."
+      5: "Samajh sakta hoon, budget is quarter mein tight hai. Kya concern total amount ka hai ya ek saath payment ka? ... Toh quarterly billing ho sakti hai, pehla instalment April mein. Kya isse budget wali problem solve hoti hai?"
+
+  - key: next_step_commitment
+    name: Agreed next step
+    weight: 0.25
+    definition: "The meeting ends with a specific next step that both sides agree to, saying who will do what and by when."
+    min_quotes: 1
+    anchors:
+      1: "The meeting ends with no next step mentioned."
+      2: "The rep mentions a vague next step ('touch mein rehte hain', 'sochke bataiye') with no action, person or date."
+      3: "The rep proposes a next step with an action, but no date, or the customer does not respond to it."
+      4: "The rep proposes a specific next step with an action and a date, and the customer agrees to it."
+      5: "The rep proposes a specific next step with an action, who does it and a date, the customer agrees, and the rep repeats it back and confirms how they will follow up."
+    examples:
+      1: "Theek hai sir, aap dekh lijiye, phir baat karte hain."
+      5: "Toh final: main kal tak quotation aur do reference schools ke naam bhejta hoon, aap Thursday 4 baje accounts head ke saath 20 minute ka call fix kar dijiye. Main Wednesday shaam ko WhatsApp pe reminder bhej dunga. Theek hai?"
+
+# Numbers computed in code from the transcript and audio (CLAUDE.md golden rule 5), shown next to the scores and
+# never produced by the LLM. No targets or thresholds are set.
+computed_metrics:
+  - duration_s               # length of the meeting, in seconds
+  - sales_rep_talk_share     # share of speech time spoken by the rep
+  - customer_talk_share      # share of speech time spoken by the customer side
+  - sales_rep_question_count # number of questions the rep asks
+  - open_question_ratio      # share of the rep's questions classed as open (what, how, why, tell me)
+  - longest_monologue_s      # longest uninterrupted stretch of the rep talking, in seconds
+
+output:
+  - summary         # what the meeting was about and where the deal stands
+  - strengths
+  - gaps
+  - suggestions
+  - customer_needs  # deal card: the needs the customer stated, each with a quote
+  - objections      # deal card: concerns the customer raised, how the rep answered, and whether it seemed settled
+  - interest_level  # deal card: one value from output_values.interest_level, with the quote it rests on
+  - next_step       # deal card: the agreed action, who does it and the date said, or null when none was agreed
+
+# Allowed values. Interest is judged only from what the customer says, and "unclear" is always allowed.
+output_values:
+  interest_level:
+    - high       # the customer asks about price, timelines or next steps, or names people to involve
+    - medium     # the customer engages with questions but commits to nothing
+    - low        # the customer says it is not a priority or not a fit
+    - unclear    # too little from the customer to tell
+
+# Scores from this rubric stay hidden from users until agreement between the model and human raters, measured by
+# eval/kappa.py on real annotated recordings, reaches this value. No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}

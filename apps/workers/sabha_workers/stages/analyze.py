@@ -110,6 +110,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 model=deps.judge(ctx.tenant_id, recording.id), analysed_roles={rubric.primary_role},
                 phase_names=DEFAULT_PHASES.get(recording.type.value),
                 reception=recording.type is ConversationType.RECEPTION,
+                sales=recording.type is ConversationType.SALES,
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:
             retryable = isinstance(exc, BudgetUnavailableError) or exc.retryable

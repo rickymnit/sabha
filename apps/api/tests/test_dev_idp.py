@@ -77,8 +77,12 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
         s3_secret_access_key=s3_storage.secret_access_key,
     )  # fmt: skip
     people = client.get("/dev-idp/users").json()
-    assert {p["subject"] for p in people} == {f"dev-{u[0]}" for u in seed.USERS}  # E2E School is not listed
-    assert {p["tenant_name"] for p in people} == {"Demo School"}
+    listed = {f"dev-{u[0]}" for u in (*seed.USERS, *seed.COMPANY_USERS)}
+    assert {p["subject"] for p in people} == listed  # E2E School is not listed
+    assert {p["tenant_name"] for p in people} == {"Demo School", "Brightpath Software"}
+    company = db.tenants.find_one({"_id": "demo-company"})
+    assert company is not None and company["profile"] == "company" and company["enabled_types"] == ["sales"]
+    assert "ब्राइट पाथ सॉफ्टवेयर" in company["name_variants"]  # how the recogniser writes it inside Hindi
     assert {(p["name"], p["title"]) for p in people if p["subject"] == "dev-asha"} == {("Asha Rao", "Teacher, Class 6")}
 
     token = client.post("/dev-idp/token", json={"subject": "dev-asha"}).json()["access_token"]

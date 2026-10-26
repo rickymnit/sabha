@@ -81,6 +81,9 @@ class TenantDoc(Document):
 
 class Tenant(Document):
     name: str = Field(min_length=1)
+    # Other ways the name is said or transcribed, for recognising a greeting or a sales rep's introduction: the
+    # speech recogniser often writes English names in Devanagari ("ब्राइट पाथ सॉफ्टवेयर" for "Brightpath Software").
+    name_variants: list[str] = Field(default_factory=list)
     profile: ProfileName
     enabled_types: list[ConversationType] = Field(min_length=1)
     labels: Labels

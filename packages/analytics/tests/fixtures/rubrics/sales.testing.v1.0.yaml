@@ -1,0 +1,45 @@
+# Test fixture only: a small, valid sales rubric for the deal card tests. Not a real rubric; the wording is fictional.
+id: sales.testing.v1.0
+segment: testing
+version: "1.0"
+roles: [sales_rep, customer]
+
+dimensions:
+  - key: discovery
+    name: Discovering needs
+    weight: 0.5
+    definition: "The rep asks about the customer's situation and says it back."
+    min_quotes: 1
+    anchors:
+      1: "No questions."
+      2: "Only yes/no questions."
+      3: "One open question."
+      4: "Open questions and a need said back."
+      5: "Open questions, follow-ups and a summary of needs."
+    examples:
+      1: "Aapko chahiye na?"
+      5: "Abhi aap fees ka hisaab kaise rakhte hain?"
+
+  - key: next_step_commitment
+    name: Agreed next step
+    weight: 0.5
+    definition: "The meeting ends with an agreed action, owner and date."
+    min_quotes: 1
+    anchors:
+      1: "No next step."
+      2: "A vague next step."
+      3: "An action without a date."
+      4: "An action with a date, agreed."
+      5: "An action, owner and date, agreed and repeated back."
+    examples:
+      1: "Phir baat karte hain."
+      5: "Main kal tak quotation bhejta hoon, Thursday 4 baje call."
+
+computed_metrics: [sales_rep_talk_share, customer_talk_share]
+
+output: [summary, strengths, gaps, suggestions, customer_needs, objections, interest_level, next_step]
+
+output_values:
+  interest_level: [high, medium, low, unclear]
+
+visibility_gate: {metric: cohens_kappa, min: 0.60}

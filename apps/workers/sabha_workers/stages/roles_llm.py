@@ -33,7 +33,8 @@ SYSTEM = (
     "Speakers are anonymous labels. Placeholders such as [NAME_1] hide private details. Answer with JSON only. "
     'If the text does not make it clear, answer "unsure" rather than guess.'
 )
-KINDS = {"teaching": "classroom lesson", "reception": "front-desk phone call"}
+KINDS = {"teaching": "classroom lesson", "reception": "front-desk phone call",
+         "sales": "in-person sales meeting or product demo"}  # fmt: skip
 
 
 def _opening(request: TieBreakRequest) -> str:

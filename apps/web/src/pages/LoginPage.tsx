@@ -155,13 +155,18 @@ export function LoginPage() {
     }
   };
 
-  const tenant = people.data?.[0]?.tenant_name;
-  const accounts = [...(people.data ?? [])].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+  // One group per organisation (a school, a company), each with its head first.
+  const groups = new Map<string, DevUser[]>();
+  for (const person of [...(people.data ?? [])].sort(
+    (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role),
+  )) {
+    groups.set(person.tenant_name, [...(groups.get(person.tenant_name) ?? []), person]);
+  }
   return (
     <Shell>
       <div className="flex flex-col gap-1">
         <h1 className="m-0 text-title font-bold">Welcome</h1>
-        <p className="m-0 text-muted">Choose an account to explore Sabha{tenant ? ` as someone at ${tenant}` : ""}.</p>
+        <p className="m-0 text-muted">Choose an account to explore Sabha.</p>
       </div>
       {error && (
         <p role="alert" className="m-0 rounded border border-danger-tint bg-danger-tint px-3 py-2 text-sm text-danger">
@@ -190,18 +195,25 @@ export function LoginPage() {
         </p>
       )}
       {people.data && people.data.length > 0 && (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Accounts">
-          {accounts.map((person) => (
-            <li key={person.subject}>
-              <AccountRow
-                person={person}
-                busy={busy === person.subject}
-                disabled={busy !== null}
-                onPick={() => void signIn(person.subject)}
-              />
-            </li>
+        <div className="flex flex-col gap-5">
+          {[...groups].map(([organisation, accounts]) => (
+            <section key={organisation} aria-label={organisation} className="flex flex-col gap-2">
+              <h2 className="m-0 text-small font-semibold uppercase tracking-wide text-muted-2">{organisation}</h2>
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {accounts.map((person) => (
+                  <li key={person.subject}>
+                    <AccountRow
+                      person={person}
+                      busy={busy === person.subject}
+                      disabled={busy !== null}
+                      onPick={() => void signIn(person.subject)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
       <p className="m-0 text-caption text-muted-2">Demo accounts for trying Sabha.</p>
     </Shell>
