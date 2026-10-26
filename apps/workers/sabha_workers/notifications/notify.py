@@ -1,6 +1,7 @@
 """The notify step (plan task P2.7): emails about a recording's status change, once per recipient.
 
-Started by the relay for recording.completed, recording.failed and recording.needs_review events. It reads the
+Started by the relay for recording.completed, recording.failed and recording.needs_review events, and for
+dispute.resolved (P6.7), which emails whoever raised the dispute and the person analysed. It reads the
 event (new status and reason), finds the recipients through the tenant-scoped repositories, plans who gets what
 (sabha_workers.notifications.emails.plan_emails), renders each email in the recipient's language with the tenant's
 own words for its nouns, and sends each one once (delivery log in `deliveries`).
@@ -20,13 +21,20 @@ from typing import Any
 
 from pymongo.database import Database
 
-from sabha_core.models import Delivery, OutboxEvent, Person, Recording, User
+from sabha_core.models import Delivery, Dispute, OutboxEvent, Person, Recording, User
 from sabha_core.repo import SyncTenantRepo, own_tenant
 from sabha_workers.notifications.delivery_log import MongoDeliveryLog
-from sabha_workers.notifications.emails import Recipient, plan_emails, render_email
+from sabha_workers.notifications.emails import (
+    PlannedEmail,
+    Recipient,
+    plan_dispute_emails,
+    plan_emails,
+    render_email,
+)
 from sabha_workers.notifications.ses import EmailSender, PermanentSendError, deliver
 
 log = logging.getLogger("sabha.workers.notify")
+DISPUTE_RESOLVED = "dispute.resolved"
 
 
 @dataclass(frozen=True)
@@ -48,7 +56,10 @@ def _recipient(user: User, *, is_subject: bool = False) -> Recipient:
     )
 
 
-def recipients(db: Database[dict[str, Any]], tenant_id: str, recording: Recording) -> list[Recipient]:
+def recipients(
+    db: Database[dict[str, Any]], tenant_id: str, recording: Recording, *, also: str | None = None
+) -> list[Recipient]:
+    """The person analysed, their unit's managers, the admins and owners, and `also` (a user id) if active."""
     users = SyncTenantRepo(db, "users", tenant_id, User)
     people = SyncTenantRepo(db, "people", tenant_id, Person)
     active = {"status": {"$ne": "disabled"}}
@@ -63,6 +74,10 @@ def recipients(db: Database[dict[str, Any]], tenant_id: str, recording: Recordin
             found.setdefault(manager.id, _recipient(manager))
     for admin in users.find({"role": {"$in": ["admin", "owner"]}, **active}):
         found.setdefault(admin.id, _recipient(admin))
+    if also is not None and also not in found:
+        extra = users.find_one({"_id": also, **active})
+        if extra is not None:
+            found[extra.id] = _recipient(extra)
     return list(found.values())
 
 
@@ -84,7 +99,18 @@ def notify(
         log.warning("nothing to notify about", extra={"event_id": event_id, "recording_id": recording_id})
         return NotifyResult()
     status, reason = event.payload.get("to_status"), event.payload.get("reason")
-    planned = plan_emails(event_id, str(status), recipients(db, tenant_id, recording))
+    decision = None
+    planned: list[PlannedEmail]
+    if event.type == DISPUTE_RESOLVED:
+        dispute = SyncTenantRepo(db, "disputes", tenant_id, Dispute).find_one({"_id": event.payload["dispute_id"]})
+        if dispute is None or dispute.status == "open":
+            log.warning("no decided dispute to notify about", extra={"event_id": event_id})
+            return NotifyResult()
+        decision = dispute.status
+        planned = plan_dispute_emails(event_id, dispute.raised_by, recipients(db, tenant_id, recording,
+                                                                              also=dispute.raised_by))  # fmt: skip
+    else:
+        planned = plan_emails(event_id, str(status), recipients(db, tenant_id, recording))
     if not planned:
         return NotifyResult()
     if sender is None:
@@ -106,6 +132,7 @@ def notify(
             link=link,
             recording_title=title,
             reason=str(reason) if item.kind == "needs_attention" else None,
+            decision=decision,
         )
         try:
             if deliver(item, email, sender=sender, delivery_log=delivery_log):

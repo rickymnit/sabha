@@ -7,14 +7,14 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from pymongo import MongoClient
 from pymongo.database import Database
 
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import Delivery, OutboxEvent, Person, Recording, Role, Tenant, User, utc_now
+from sabha_core.models import Delivery, Dispute, OutboxEvent, Person, Recording, Role, Tenant, User, utc_now
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.repo import SyncTenantRepo
@@ -55,7 +55,7 @@ def repo(db: Database[dict[str, Any]], collection: str, model: type[Any], tenant
 @pytest.fixture
 def db(mongo_replica_set: MongoClient[dict[str, Any]], shared_db: str) -> Database[dict[str, Any]]:
     database = mongo_replica_set[shared_db]
-    for collection in ("tenants", "users", "people", "recordings", "outbox", "deliveries"):
+    for collection in ("tenants", "users", "people", "recordings", "outbox", "deliveries", "disputes"):
         database[collection].delete_many({})
     for tenant_id in ("t1", "t2"):
         tenant = Tenant.from_profile("school", name=tenant_id, plan=Plan.PILOT, id=tenant_id)
@@ -182,3 +182,45 @@ def test_a_dead_workers_claim_is_taken_over_once_stale(db: Database[dict[str, An
     log.mark_sent("k", "msg-1")
     clock[0] += timedelta(hours=1)
     assert not log.claim("k") and log.status("k") == "sent"
+
+
+# --- A decided dispute (P6.7) ---
+
+
+def decided_dispute(
+    db: Database[dict[str, Any]], raised_by: str, status: Literal["open", "accepted", "rejected"] = "accepted"
+) -> tuple[str, str]:
+    rid, _ = recording(db, RecordingStatus.COMPLETED)
+    dispute = Dispute(analysis_id="an-1", recording_id=rid, person_id="p-teacher", unit_id="unit-1",
+                      dimension="concept_clarity", dimension_name="Concept clarity", ai_score=4, current_score=4,
+                      proposed_score=2, comment="The explanation was wrong.", raised_by=raised_by, status=status,
+                      final_score=2 if status == "accepted" else None, resolution_note="Agreed.")  # fmt: skip
+    did = repo(db, "disputes", Dispute).insert_one(dispute).id
+    event = OutboxEvent(type="dispute.resolved", payload={"dispute_id": did, "recording_id": rid, "decision": status})
+    return rid, repo(db, "outbox", OutboxEvent).insert_one(event).id
+
+
+def test_a_decided_dispute_emails_who_raised_it_and_the_person_analysed(db: Database[dict[str, Any]]) -> None:
+    rid, event_id = decided_dispute(db, raised_by="u-manager")
+    sender = FakeSender()
+    assert run(db, rid, event_id, sender).sent == 2
+    by_address = {to: email for to, email in sender.sent}
+    assert set(by_address) == {"manager@example.com", "teacher@example.com"}  # not the admin
+    manager = by_address["manager@example.com"]
+    assert "accepted and the score was changed" in manager.text and f"{BASE_URL}/recordings/{rid}" in manager.text
+    assert "2" not in manager.text.replace(f"{BASE_URL}/recordings/{rid}", "")  # never the score itself
+    assert by_address["teacher@example.com"].language == "hi"
+    assert run(db, rid, event_id, FakeSender()).sent == 0  # a retried event never emails twice
+
+
+def test_a_rejected_dispute_says_the_score_stays(db: Database[dict[str, Any]]) -> None:
+    rid, event_id = decided_dispute(db, raised_by="u-admin", status="rejected")
+    sender = FakeSender()
+    run(db, rid, event_id, sender)
+    admin = {to: email for to, email in sender.sent}["admin@example.com"]
+    assert "not accepted; the score stays as it was" in admin.text
+
+
+def test_an_open_dispute_sends_nothing(db: Database[dict[str, Any]]) -> None:
+    rid, event_id = decided_dispute(db, raised_by="u-manager", status="open")
+    assert run(db, rid, event_id, FakeSender()).planned == 0

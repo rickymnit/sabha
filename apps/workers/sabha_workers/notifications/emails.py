@@ -6,6 +6,8 @@ Rules:
   the report is ready and links to it. It never carries a score, a quote or any transcript text: those stay behind
   login and the audit log. `render_email` has no parameter for them, so they cannot be passed by mistake.
 - FAILED and NEEDS_REVIEW: the tenant's admins and owners, with the reason code and a plain explanation.
+- A decided dispute (P6.7): the person who raised it, and the person analysed if they keep report emails on. The
+  email says whether the score was changed and links to the report; never the score itself.
 - Nothing else is emailed.
 - Each planned email has a delivery key derived from (event_id, recipient), so a retried event never sends the same
   email twice (the notify task records sent keys).
@@ -24,7 +26,8 @@ from typing import Literal
 
 from sabha_core.reasons import REASONS
 
-EmailKind = Literal["report_ready", "needs_attention"]
+EmailKind = Literal["report_ready", "needs_attention", "dispute_decided"]
+Decision = Literal["accepted", "rejected"]
 LANGUAGES = ("en", "hi")
 PROBLEM_STATUSES = frozenset({"FAILED", "NEEDS_REVIEW"})
 ADMIN_ROLES = frozenset({"admin", "owner"})
@@ -67,6 +70,13 @@ def plan_emails(event_id: str, status: str, recipients: Sequence[Recipient]) -> 
     return [PlannedEmail(r, kind, delivery_key(event_id, r.user_id, kind)) for r in chosen]
 
 
+def plan_dispute_emails(event_id: str, raised_by: str, recipients: Sequence[Recipient]) -> list[PlannedEmail]:
+    """The emails for a decided dispute: whoever raised it, and the person analysed if they want report emails."""
+    chosen = [r for r in recipients if r.user_id == raised_by or (r.is_subject and r.wants_report_emails)]
+    kind: EmailKind = "dispute_decided"
+    return [PlannedEmail(r, kind, delivery_key(event_id, r.user_id, kind)) for r in chosen]
+
+
 @dataclass(frozen=True)
 class RenderedEmail:
     language: str
@@ -92,6 +102,21 @@ _TEMPLATES: dict[tuple[str, str], tuple[str, str]] = {
         "एक $recording पर ध्यान देना है: $title",
         '"$title" अपने-आप पूरी नहीं हो सकी।\n\nकारण ($reason): $explanation\n\nयहाँ देखें: $link',
     ),
+    ("dispute_decided", "en"): (
+        "A disputed score has been reviewed: $title",
+        'A reviewer has looked at the disputed score on the $recording "$title". $decision\n\n'
+        "See the decision and the reviewer's note here: $link",
+    ),
+    ("dispute_decided", "hi"): (
+        "विवादित स्कोर की समीक्षा हो गई: $title",
+        '"$title" ($recording) के विवादित स्कोर की समीक्षा हो गई है। $decision\n\nफ़ैसला और समीक्षक की टिप्पणी यहाँ देखें: $link',
+    ),
+}
+_DECISIONS: dict[tuple[str, str], str] = {
+    ("accepted", "en"): "The dispute was accepted and the score was changed.",
+    ("rejected", "en"): "The dispute was not accepted; the score stays as it was.",
+    ("accepted", "hi"): "विवाद स्वीकार हुआ और स्कोर बदल दिया गया।",
+    ("rejected", "hi"): "विवाद स्वीकार नहीं हुआ; स्कोर पहले जैसा है।",
 }
 
 
@@ -103,6 +128,7 @@ def render_email(
     link: str,
     recording_title: str,
     reason: str | None = None,
+    decision: Decision | None = None,
 ) -> RenderedEmail:
     """Subject, plain text and HTML for one email. There is deliberately no way to pass a score or a quote."""
     lang = language if language in LANGUAGES else "en"
@@ -117,6 +143,7 @@ def render_email(
         "reason": reason or "unknown",
         "explanation": REASONS[lang].get(reason or "")
         or ("See the recording for details." if lang == "en" else "विवरण रिकॉर्डिंग में देखें।"),
+        "decision": _DECISIONS.get((decision or "", lang), ""),
     }
     subject = Template(subject_t).substitute(values)
     text = Template(body_t).substitute(values)

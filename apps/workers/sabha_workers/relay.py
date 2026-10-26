@@ -49,6 +49,7 @@ ROUTES: dict[str, tuple[str, ...]] = {
     "recording.completed": ("notify", "meter"),
     "recording.failed": ("notify",),
     "recording.needs_review": ("notify",),
+    "dispute.resolved": ("notify",),  # emails whoever raised the dispute (P6.7)
 }
 
 
