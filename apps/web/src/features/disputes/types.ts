@@ -1,4 +1,4 @@
-// Dispute and review payloads (P6.7). The API (P6.7 backend) will be built to match these shapes.
+// Dispute and review payloads (P6.7), as the API sends them (sabha_api.services.disputes).
 
 /** What the dialog sends: POST /v1/analyses/{id}/disputes. */
 export interface DisputeDraft {
@@ -22,10 +22,14 @@ export type ReviewItem =
       dimension_key: string;
       dimension_name: string;
       ai_score: number;
+      /** The score shown when the dispute was raised: a reviewer's, after an earlier accepted dispute. */
+      current_score?: number;
       proposed_score: number;
       comment: string;
       evidence: { quote: string; start_ms: number }[];
       status: DisputeStatus;
+      /** The viewer raised it, so someone else decides it. */
+      raised_by_me?: boolean;
       /** ISO 8601 UTC. */
       created_at: string;
     }
@@ -51,3 +55,9 @@ export interface Resolution {
 
 export const COMMENT_MIN = 10;
 export const COMMENT_MAX = 500;
+
+/** GET /v1/disputes. */
+export interface DisputePage {
+  items: Extract<ReviewItem, { kind: "dispute" }>[];
+  next_cursor: string | null;
+}

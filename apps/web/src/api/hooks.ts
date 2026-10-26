@@ -3,6 +3,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 
+import type { DisputeDraft, DisputePage, Resolution } from "../features/disputes/types";
 import type { OverviewStats } from "../features/overview/types";
 import type { AnalysisPayload } from "../features/report/types";
 import { useSession } from "../session/session";
@@ -170,6 +171,54 @@ export function useResolveReview(id: string) {
     onSuccess: async () => {
       await Promise.all(
         ["reviews", "recordings", "recording", "analysis", "overview"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
+  });
+}
+
+/** Disputes a reviewer may decide (GET /v1/disputes; owners, admins, managers, reviewers; P6.7). */
+export function useDisputes(enabled = true): UseQueryResult<DisputePage, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["disputes", token],
+    queryFn: () => apiFetch<DisputePage>("/v1/disputes?limit=100", { token }),
+    enabled: enabled && Boolean(token),
+    refetchInterval: 30_000,
+  });
+}
+
+/** POST /v1/analyses/{id}/disputes, with an Idempotency-Key so a retry never raises it twice. */
+export function useRaiseDispute(recordingId: string) {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ analysisId, draft }: { analysisId: string; draft: DisputeDraft }) =>
+      apiFetch(`/v1/analyses/${encodeURIComponent(analysisId)}/disputes`, {
+        method: "POST",
+        token,
+        body: draft,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      }),
+    onSuccess: async () => {
+      await Promise.all(
+        [["analysis", recordingId], ["disputes"]].map((key) => queryClient.invalidateQueries({ queryKey: key })),
+      );
+    },
+  });
+}
+
+/** POST /v1/disputes/{id}/resolve; refreshes the queue and every report and number it can change. */
+export function useResolveDispute() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, resolution }: { id: string; resolution: Resolution }) =>
+      apiFetch(`/v1/disputes/${encodeURIComponent(id)}/resolve`, { method: "POST", token, body: resolution }),
+    onSuccess: async () => {
+      await Promise.all(
+        ["disputes", "analysis", "recordings", "overview", "people-summary"].map((key) =>
           queryClient.invalidateQueries({ queryKey: [key] }),
         ),
       );

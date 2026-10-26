@@ -135,6 +135,7 @@ class DisputeItem(BaseModel):
     comment: str
     evidence: list[Quote]
     status: Literal["open", "accepted", "rejected"]
+    raised_by_me: bool  # then someone else decides it
     created_at: datetime
 
 
@@ -247,7 +248,8 @@ async def dispute_queue(
             id=d.id, recording_id=d.recording_id, recording_title=title, person_name=names.get(d.person_id or ""),
             unit=unit_names.get(d.unit_id or ""), dimension_key=d.dimension, dimension_name=d.dimension_name,
             ai_score=d.ai_score, current_score=d.current_score, proposed_score=d.proposed_score, comment=d.comment,
-            evidence=quotes.get((d.analysis_id, d.dimension), []), status=d.status, created_at=d.created_at,
+            evidence=quotes.get((d.analysis_id, d.dimension), []), status=d.status,
+            raised_by_me=d.raised_by == principal.user_id, created_at=d.created_at,
         ))  # fmt: skip
     next_cursor = encode_cursor(page[-1].created_at, page[-1].id) if more and page else None
     return DisputePage(items=items, next_cursor=next_cursor)

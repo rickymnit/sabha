@@ -90,8 +90,9 @@ export function DimensionDetail({ dimension, speakers, onSeek, provenance, onDis
           <ScoreBar score={displayedScore(dimension)} />
           {override && (
             <p className="m-0 text-small text-ink-2" data-testid="override-note">
-              <span className="font-semibold">Reviewed:</span> score set to {override.score} by a{" "}
-              {override.reviewer_role} (AI score was {dimension.score}). {override.note}
+              <span className="font-semibold">Reviewed:</span> score set to {override.score} by{" "}
+              {/^[aeiou]/i.test(override.reviewer_role) ? "an" : "a"} {override.reviewer_role} (AI score was{" "}
+              {dimension.score}). {override.note}
             </p>
           )}
         </div>
@@ -148,10 +149,16 @@ export function DimensionDetail({ dimension, speakers, onSeek, provenance, onDis
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-track pt-4">
         {/* Only people who may dispute see the button; a disabled one would read as broken. */}
-        {onDispute && (
-          <Button variant="secondary" onClick={onDispute}>
-            Dispute this score
-          </Button>
+        {dimension.dispute_open ? (
+          <span className="rounded-full bg-warning-tint px-2.5 py-0.5 text-small font-semibold text-warning-ink">
+            Dispute waiting for a reviewer
+          </span>
+        ) : (
+          onDispute && (
+            <Button variant="secondary" onClick={onDispute}>
+              Dispute this score
+            </Button>
+          )
         )}
         <span className="text-small text-muted">{provenance}</span>
       </div>

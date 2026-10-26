@@ -157,6 +157,48 @@ describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
     expect(screen.getByRole("dialog", { name: "Dispute a score" })).toBeInTheDocument();
   });
 
+  it("shows an open dispute instead of the button, and leaves that score out of the dialog", async () => {
+    const report = mockReport(lesson, "completed");
+    const [first, second] = visibleDimensions(report.dimensions);
+    const dimensions = report.dimensions.map((d) => (d.key === first!.key ? { ...first!, dispute_open: true } : d));
+    render(
+      <RecordingReport
+        recording={lesson.recording}
+        analysis={{ ...report, dimensions }}
+        transcript={lesson.transcript}
+        labels={lesson.labels}
+        roles={lesson.roles}
+        viewerRole="staff"
+        getPlaybackUrl={getPlaybackUrl}
+        canDispute
+        onSubmitDispute={vi.fn(async () => {})}
+      />,
+    );
+    await act(async () => {});
+    const user = userEvent.setup();
+    const scores = screen.getByRole("region", { name: "Rubric scores" });
+    await user.click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
+    expect(screen.getByText("Dispute waiting for a reviewer")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dispute this score" })).toBeNull();
+    await user.click(within(scores).getByRole("button", { name: new RegExp(second!.name) }));
+    await user.click(screen.getByRole("button", { name: "Dispute this score" }));
+    const dialog = screen.getByRole("dialog", { name: "Dispute a score" });
+    expect(within(dialog).queryByRole("option", { name: new RegExp(first!.name) })).toBeNull();
+  });
+
+  it("names the reviewer's role with the right article", async () => {
+    const report = mockReport(lesson, "completed");
+    const [first] = visibleDimensions(report.dimensions);
+    const override = { score: 2, reviewer_role: "admin", note: "Checked.", resolved_at: "2026-10-26T05:00:00Z" };
+    await renderReport({
+      ...report,
+      dimensions: report.dimensions.map((d) => (d.key === first!.key ? { ...first!, override } : d)),
+    });
+    const scores = screen.getByRole("region", { name: "Rubric scores" });
+    await userEvent.setup().click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
+    expect(screen.getByTestId("override-note")).toHaveTextContent("score set to 2 by an admin");
+  });
+
   it("shows a reviewer's score with a marker and keeps the AI score as history", async () => {
     const report = mockReport(lesson, "completed");
     const [first] = visibleDimensions(report.dimensions);

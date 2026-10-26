@@ -236,6 +236,7 @@ def test_the_queue_shows_open_disputes_of_the_callers_units(api: Api) -> None:
     assert item["kind"] == "dispute" and item["person_name"] == "Asha" and item["unit"] == "Class 1"
     assert (item["dimension_name"], item["ai_score"], item["proposed_score"]) == ("Concept clarity", 4, 5)
     assert item["evidence"] == [{"quote": "Chlorophyll leaf ka green pigment hai", "start_ms": 34_000}]
+    assert item["raised_by_me"] is False
     assert body(api.get("other_manager", "/v1/disputes"))["items"] == []
     assert api.get("asha", "/v1/disputes").status_code == 403
     assert body(api.get("owner", "/v1/disputes?status=accepted"))["items"] == []
@@ -311,6 +312,7 @@ def test_a_dispute_is_decided_once(api: Api) -> None:
 
 def test_nobody_decides_a_dispute_they_raised(api: Api) -> None:
     dispute = body(api.dispute("manager", scored(api)), 201)
+    assert [i["raised_by_me"] for i in body(api.get("manager", "/v1/disputes"))["items"]] == [True]
     own = api.resolve("manager", dispute["id"], decision="accepted", final_score=5, note=NOTE)
     assert own.status_code == 403 and code(own) == "own_dispute"
     body(api.resolve("manager2", dispute["id"], decision="accepted", final_score=5, note=NOTE))

@@ -6,7 +6,7 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useMe, useReviews } from "../api/hooks";
+import { useDisputes, useMe, useReviews } from "../api/hooks";
 import type { Me } from "../api/types";
 import { Avatar, Button, EmptyState, Icon, Logo, NavItem, Skeleton, SkeletonGroup } from "../design";
 import { useSession } from "../session/session";
@@ -43,8 +43,10 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   const labels = me.tenant.labels;
   const type = params.get("type");
   const units = unitNames(me);
-  const reviews = useReviews(RESOLVERS.includes(me.user.role));
-  const waiting = reviews.data?.items.length ?? 0;
+  const resolver = RESOLVERS.includes(me.user.role);
+  const reviews = useReviews(resolver);
+  const disputes = useDisputes(resolver);
+  const waiting = (reviews.data?.items.length ?? 0) + (disputes.data?.items.filter((d) => !d.raised_by_me).length ?? 0);
   return (
     <nav id={id} aria-label="Main" className="flex h-full flex-col gap-6 px-3.5 py-5">
       <div className="hidden px-2 md:block">

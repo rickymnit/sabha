@@ -94,15 +94,14 @@ export function ReviewsPage({ items, onResolve, recordingHref }: ReviewsPageProp
   );
 }
 
-function ReviewDetail({
-  item,
-  onResolve,
-  recordingHref,
-}: {
+export interface ReviewDetailProps {
   item: ReviewItem;
   onResolve: ReviewsPageProps["onResolve"];
   recordingHref: ReviewsPageProps["recordingHref"];
-}) {
+}
+
+/** One dispute (or recording in review) with its evidence and, while open, the decision form. */
+export function ReviewDetail({ item, onResolve, recordingHref }: ReviewDetailProps) {
   const headingId = useId();
   const errorId = useId();
   const [finalScore, setFinalScore] = useState<number | null>(item.kind === "dispute" ? item.proposed_score : null);
@@ -122,8 +121,13 @@ function ReviewDetail({
         note: note.trim(),
         ...(decision === "accepted" && finalScore !== null ? { final_score: finalScore } : {}),
       });
-    } catch {
-      setError("The decision could not be saved. Please try again.");
+    } catch (caught) {
+      const own = caught instanceof Error && "code" in caught && caught.code === "own_dispute";
+      setError(
+        own
+          ? "You raised this dispute, so someone else decides it."
+          : "The decision could not be saved. Please try again.",
+      );
     } finally {
       setSending(false);
     }
@@ -151,6 +155,12 @@ function ReviewDetail({
             <dd className="m-0 font-semibold">{item.dimension_name}</dd>
             <dt className="text-muted">AI score</dt>
             <dd className="m-0">{item.ai_score}</dd>
+            {item.current_score !== undefined && item.current_score !== item.ai_score && (
+              <>
+                <dt className="text-muted">Score shown now</dt>
+                <dd className="m-0">{item.current_score} (set by a reviewer)</dd>
+              </>
+            )}
             <dt className="text-muted">Proposed score</dt>
             <dd className="m-0">{item.proposed_score}</dd>
             <dt className="text-muted">Reason given</dt>
@@ -167,7 +177,11 @@ function ReviewDetail({
               ))}
             </ol>
           </div>
-          {item.status === "open" ? (
+          {item.status === "open" && item.raised_by_me ? (
+            <p className="m-0 rounded-card border border-line-subtle bg-surface-subtle px-4 py-3 text-ink-2">
+              You raised this dispute, so another reviewer, manager or administrator decides it.
+            </p>
+          ) : item.status === "open" ? (
             <form onSubmit={(e) => void resolve("accepted", e)} noValidate className="flex flex-col gap-3">
               <fieldset className="m-0 border-0 p-0">
                 <legend className="mb-1.5 p-0 text-sm font-semibold">Final score if accepted</legend>

@@ -267,7 +267,9 @@ function ReportBody({
       {onSubmitDispute && (
         <DisputeDialog
           open={disputeOpen}
-          dimensions={dimensions.map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
+          dimensions={dimensions
+            .filter((d) => !d.dispute_open)
+            .map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
           initialKey={selected?.key}
           onSubmit={onSubmitDispute}
           onClose={() => setDisputeOpen(false)}

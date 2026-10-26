@@ -6,10 +6,11 @@ import { useCallback } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
-import { useAnalysis, useApi, useRecording, useTranscript } from "../api/hooks";
+import { useAnalysis, useApi, useRaiseDispute, useRecording, useTranscript } from "../api/hooks";
 import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
-import { Button, EmptyState, Skeleton, SkeletonGroup } from "../design";
+import { Button, EmptyState, Skeleton, SkeletonGroup, useToast } from "../design";
+import type { DisputeDraft } from "../features/disputes/types";
 import { RecordingReport } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
 import { viewerRole } from "../app/format";
@@ -26,6 +27,22 @@ export function RecordingPage() {
   const analysis = useAnalysis(id);
   const hasTranscript = analysis.data !== undefined && analysis.data.status !== "processing";
   const transcript = useTranscript(id, hasTranscript || recording.data?.status === "ANALYZING");
+  const raise = useRaiseDispute(id);
+  const toast = useToast();
+  const analysisId = analysis.data && "analysis_id" in analysis.data ? analysis.data.analysis_id : undefined;
+  const submitDispute = useCallback(
+    async (draft: DisputeDraft) => {
+      if (!analysisId) return;
+      await raise.mutateAsync({ analysisId, draft });
+      toast.show({
+        tone: "success",
+        title: "Dispute sent",
+        message: "A reviewer will look at this score. You will get an email when it is decided.",
+        duration: 6_000,
+      });
+    },
+    [analysisId, raise, toast],
+  );
 
   const getPlaybackUrl = useCallback(async (): Promise<PlaybackUrl> => {
     // A fresh URL each time: they expire after PLAYBACK_URL_EXPIRY_S, and issuing one is audited.
@@ -88,6 +105,8 @@ export function RecordingPage() {
         viewerRole={viewerRole(me.user.role)}
         getPlaybackUrl={getPlaybackUrl}
         meeting={meeting}
+        canDispute={"can_dispute" in analysis.data && analysis.data.can_dispute === true}
+        onSubmitDispute={submitDispute}
       />
     </div>
   );

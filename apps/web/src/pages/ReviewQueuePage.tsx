@@ -1,20 +1,38 @@
-// /reviews (ADR 0007): recordings Sabha stopped on because it should not guess, for owners, admins, managers and
-// reviewers. Each row says why in plain words and opens the review.
+// /reviews (ADR 0007, P6.7): for owners, admins, managers and reviewers, two tabs. "Needs review": recordings Sabha
+// stopped on because it should not guess; each row says why in plain words and opens the review. "Disputes": scores
+// someone asked a reviewer to look at again (DisputeQueue). The tab is kept in the address (?tab=disputes).
 
 import type { MouseEvent } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 
-import { useReviews } from "../api/hooks";
+import { useDisputes, useReviews } from "../api/hooks";
 import type { Me, RecordingItem } from "../api/types";
 import { capitalise, formatWhen } from "../app/format";
-import { Button, EmptyState, Icon, PageHeader, Panel, Skeleton, SkeletonGroup, Table } from "../design";
+import {
+  Button,
+  EmptyState,
+  Icon,
+  PageHeader,
+  Panel,
+  SegmentedControl,
+  Skeleton,
+  SkeletonGroup,
+  Table,
+} from "../design";
+import { DisputeQueue } from "./DisputeQueue";
+
+type Tab = "review" | "disputes";
 
 export function ReviewQueuePage() {
   const me = useOutletContext<Me>();
   const labels = me.tenant.labels;
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = params.get("tab") === "disputes" ? "disputes" : "review";
   const reviews = useReviews();
+  const disputes = useDisputes();
   const rows = reviews.data?.items ?? [];
+  const query = tab === "disputes" ? disputes : reviews;
   const units = new Map(me.tenant.units.map((u) => [u.id, u.name]));
   const open = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -26,24 +44,35 @@ export function ReviewQueuePage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Reviews"
-        description={`${capitalise(labels.recording_plural)} Sabha paused on rather than guess. Check each one so it can be scored, or close it.`}
+        description={`${capitalise(labels.recording_plural)} Sabha paused on rather than guess, and scores someone asked to have looked at again.`}
       />
-      {reviews.isError ? (
+      <SegmentedControl
+        label="Show"
+        value={tab}
+        onChange={(value) => setParams(value === "disputes" ? { tab: "disputes" } : {}, { replace: true })}
+        options={[
+          { value: "review", label: `Needs review${reviews.data ? ` (${rows.length})` : ""}` },
+          { value: "disputes", label: `Disputes${disputes.data ? ` (${disputes.data.items.length})` : ""}` },
+        ]}
+      />
+      {query.isError ? (
         <Panel>
           <EmptyState
             icon={<Icon name="alert" size={26} />}
             title="We couldn't load the reviews"
             description="Please try again in a moment."
-            action={<Button onClick={() => void reviews.refetch()}>Try again</Button>}
+            action={<Button onClick={() => void query.refetch()}>Try again</Button>}
           />
         </Panel>
-      ) : reviews.isPending ? (
+      ) : query.isPending ? (
         <Panel>
           <SkeletonGroup label="Loading reviews" className="flex flex-col gap-3">
             <Skeleton className="h-4 w-2/5" />
             <Skeleton className="h-4 w-1/3" />
           </SkeletonGroup>
         </Panel>
+      ) : tab === "disputes" && disputes.data ? (
+        <DisputeQueue page={disputes.data} personWord={labels.person} />
       ) : rows.length === 0 ? (
         <Panel>
           <EmptyState

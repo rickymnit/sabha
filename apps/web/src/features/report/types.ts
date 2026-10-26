@@ -46,6 +46,8 @@ export interface VerifiedDimension extends DimensionBase {
   suggestion?: string;
   /** A reviewer's score after an accepted dispute (P6.7). The AI score above stays as history. */
   override?: HumanOverride;
+  /** A dispute about this score is waiting for a reviewer. */
+  dispute_open?: boolean;
 }
 
 /** A person's score that replaces the AI score in the display; the AI score is kept and shown as history. */
@@ -227,6 +229,8 @@ export interface AnalysisReport {
   /** Exactly three. */
   suggestions: Suggestion[];
   phases?: Phase[] | null;
+  /** Whether this viewer may dispute the scores (the person analysed, their managers, owners and admins). */
+  can_dispute?: boolean;
   /** Reception only. */
   ticket?: Ticket | null;
   /** Sales meetings only. */
