@@ -6,7 +6,7 @@
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 
-import { useRecordings } from "../api/hooks";
+import { useBulkReanalyse, useRecordings } from "../api/hooks";
 import type { Me, RecordingItem } from "../api/types";
 import {
   Button,
@@ -22,7 +22,9 @@ import {
   StatusChip,
   Table,
   TypeDot,
+  useToast,
 } from "../design";
+import { BulkReanalyseDialog } from "../features/reanalysis";
 import { capitalise, formatWhen, statusChip } from "../app/format";
 import { formatClock } from "../features/transcript/text";
 
@@ -77,10 +79,44 @@ export function RecordingsPage() {
     event.preventDefault();
     navigate(`/recordings/${id}`);
   };
+  const toast = useToast();
+  const bulk = useBulkReanalyse();
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const isAdmin = me.user.role === "owner" || me.user.role === "admin";
   const upload = (
     <Button icon={<Icon name="upload" />} onClick={() => navigate("/upload")}>
       Upload
     </Button>
+  );
+  const actions = (
+    <span className="flex flex-wrap gap-2">
+      {isAdmin && (
+        <Button variant="secondary" onClick={() => setBulkOpen(true)}>
+          Re-analyse…
+        </Button>
+      )}
+      {upload}
+    </span>
+  );
+  const bulkDialog = bulkOpen && (
+    <BulkReanalyseDialog
+      types={types}
+      recordingsWord={labels.recording_plural.toLowerCase()}
+      typeLabel={capitalise}
+      run={bulk.mutateAsync}
+      onStarted={(result) =>
+        toast.show({
+          tone: "success",
+          title: `Re-analysing ${result.started}`,
+          message:
+            result.remaining > 0
+              ? `${result.remaining} more can be started with another click. New reports appear in a few minutes.`
+              : "New reports appear in a few minutes; earlier ones are kept.",
+          duration: 8_000,
+        })
+      }
+      onClose={() => setBulkOpen(false)}
+    />
   );
 
   if (recordings.isSuccess && all.length === 0 && !filtered) {
@@ -105,8 +141,9 @@ export function RecordingsPage() {
       <PageHeader
         title={capitalise(labels.recording_plural)}
         description={personParam && personName ? `${personName}’s ${things}, newest first.` : scope(me)}
-        actions={upload}
+        actions={actions}
       />
+      {bulkDialog}
       {personParam && (
         <div className="-mt-2 flex">
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-3 pr-1 text-sm">

@@ -158,3 +158,32 @@ export const IN_PROGRESS: ReadonlySet<ApiStatus> = new Set([
   "TRANSCRIBING",
   "ANALYZING",
 ]);
+
+/** One analysis of a recording (GET /v1/recordings/{id}/analyses), newest first. */
+export interface AnalysisVersion {
+  id: string;
+  version: string;
+  status: "COMPLETED" | "NEEDS_REVIEW";
+  overall_score: number | null;
+  rubric_id: string;
+  rubric_version: string;
+  /** A newer analysis of the recording exists. */
+  superseded: boolean;
+  /** ISO 8601 UTC. */
+  created_at: string;
+}
+
+/** POST /v1/reanalysis. */
+export interface BulkReanalysisRequest {
+  type: string;
+  reason: string;
+  dry_run: boolean;
+}
+
+export interface BulkReanalysisResult {
+  rubric_id: string;
+  /** Finished recordings of the type scored with another rubric. */
+  matching: number;
+  started: number;
+  remaining: number;
+}

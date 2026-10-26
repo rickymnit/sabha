@@ -229,6 +229,8 @@ export interface AnalysisReport {
   /** Exactly three. */
   suggestions: Suggestion[];
   phases?: Phase[] | null;
+  /** False for an earlier version of a re-analysed recording (shown as history). */
+  is_latest?: boolean;
   /** Whether this viewer may dispute the scores (the person analysed, their managers, owners and admins). */
   can_dispute?: boolean;
   /** Reception only. */

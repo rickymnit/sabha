@@ -2,15 +2,24 @@
 // recording's details, the report payload for its current state, and (once there is one) the transcript with a
 // playback URL. While the recording is processing, the page refreshes itself (api/hooks.ts).
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
-import { useAnalysis, useApi, useRaiseDispute, useRecording, useTranscript } from "../api/hooks";
+import {
+  useAnalysis,
+  useAnalysisHistory,
+  useApi,
+  useRaiseDispute,
+  useReanalyse,
+  useRecording,
+  useTranscript,
+} from "../api/hooks";
 import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
 import { Button, EmptyState, Skeleton, SkeletonGroup, useToast } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
+import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
 import { RecordingReport } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
 import { viewerRole } from "../app/format";
@@ -24,7 +33,11 @@ export function RecordingPage() {
   const api = useApi();
   const { token } = useSession();
   const recording = useRecording(id);
-  const analysis = useAnalysis(id);
+  const [version, setVersion] = useState<string | undefined>(undefined); // an earlier analysis, or the latest
+  const [reanalysing, setReanalysing] = useState(false);
+  const analysis = useAnalysis(id, version);
+  const history = useAnalysisHistory(id, recording.data?.status === "COMPLETED");
+  const reanalyse = useReanalyse(id);
   const hasTranscript = analysis.data !== undefined && analysis.data.status !== "processing";
   const transcript = useTranscript(id, hasTranscript || recording.data?.status === "ANALYZING");
   const raise = useRaiseDispute(id);
@@ -86,6 +99,11 @@ export function RecordingPage() {
   // A meeting has an organiser, not a person analysed (ADR 0008).
   const labels = isMeeting ? { ...me.tenant.labels, person: "Organiser" } : me.tenant.labels;
   const canReview = recording.data.status === "NEEDS_REVIEW" && RESOLVERS.includes(me.user.role);
+  const versions = history.data ?? [];
+  const shownVersion = version ? versions.find((v) => v.id === version) : undefined;
+  const isAdmin = me.user.role === "owner" || me.user.role === "admin";
+  const canReanalyse = isAdmin && recording.data.status === "COMPLETED" && !version;
+  const recordingWord = me.tenant.labels.recording.toLowerCase();
   return (
     <div className="flex flex-col gap-4">
       {canReview && (
@@ -95,6 +113,42 @@ export function RecordingPage() {
           </span>
           <Button onClick={() => navigate(`/reviews/${id}`)}>Review it</Button>
         </div>
+      )}
+      {(versions.length > 1 || canReanalyse) && (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <VersionPicker versions={versions} selected={version} onSelect={setVersion} />
+          {canReanalyse && (
+            <Button variant="secondary" onClick={() => setReanalysing(true)}>
+              Re-analyse
+            </Button>
+          )}
+        </div>
+      )}
+      {shownVersion && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line-subtle bg-surface-subtle px-4 py-3">
+          <span className="text-ink-2">
+            You are looking at an earlier analysis ({versionLabel(shownVersion, false)}). Its numbers no longer count in
+            trends.
+          </span>
+          <Button variant="secondary" onClick={() => setVersion(undefined)}>
+            Show the latest
+          </Button>
+        </div>
+      )}
+      {reanalysing && (
+        <ReanalyseDialog
+          recordingWord={recordingWord}
+          onSubmit={async (reason) => {
+            await reanalyse.mutateAsync(reason);
+            toast.show({
+              tone: "success",
+              title: "Re-analysis started",
+              message: `The new report will appear here in a few minutes. The current one stays as an earlier version.`,
+              duration: 6_000,
+            });
+          }}
+          onClose={() => setReanalysing(false)}
+        />
       )}
       <RecordingReport
         recording={reportRecording(recording.data)}

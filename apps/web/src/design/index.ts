@@ -5,6 +5,7 @@ export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, Panel, type CardProps, type CardTone, type PanelProps } from "./Panel";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { cx } from "./cx";
+export { Dialog, type DialogProps } from "./Dialog";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { Field, type FieldProps } from "./Field";
 export { Input, type InputProps } from "./Input";

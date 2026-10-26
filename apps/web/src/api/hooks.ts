@@ -10,7 +10,10 @@ import { useSession } from "../session/session";
 import { ApiError, apiFetch } from "./client";
 import {
   IN_PROGRESS,
+  type AnalysisVersion,
   type ApiStatus,
+  type BulkReanalysisRequest,
+  type BulkReanalysisResult,
   type DevUser,
   type Me,
   type PersonItem,
@@ -78,11 +81,13 @@ export function useRecording(id: string): UseQueryResult<RecordingDetail, ApiErr
   });
 }
 
-export function useAnalysis(id: string): UseQueryResult<AnalysisPayload, ApiError> {
+/** The report payload: the latest analysis, or an earlier version when `analysisId` is given (re-analysis). */
+export function useAnalysis(id: string, analysisId?: string): UseQueryResult<AnalysisPayload, ApiError> {
   const { token } = useSession();
+  const version = analysisId ? `?analysis_id=${encodeURIComponent(analysisId)}` : "";
   return useQuery({
-    queryKey: ["analysis", id, token],
-    queryFn: () => apiFetch<AnalysisPayload>(`/v1/recordings/${encodeURIComponent(id)}/analysis`, { token }),
+    queryKey: ["analysis", id, analysisId ?? "latest", token],
+    queryFn: () => apiFetch<AnalysisPayload>(`/v1/recordings/${encodeURIComponent(id)}/analysis${version}`, { token }),
     enabled: Boolean(token),
     refetchInterval: (query) => (query.state.data?.status === "processing" ? REFRESH_MS : false),
   });
@@ -222,6 +227,55 @@ export function useResolveDispute() {
           queryClient.invalidateQueries({ queryKey: [key] }),
         ),
       );
+    },
+  });
+}
+
+/** Every analysis of a recording, newest first (GET /v1/recordings/{id}/analyses; re-analysis keeps them all). */
+export function useAnalysisHistory(id: string, enabled = true): UseQueryResult<AnalysisVersion[], ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["analysis-history", id, token],
+    queryFn: () => apiFetch<AnalysisVersion[]>(`/v1/recordings/${encodeURIComponent(id)}/analyses`, { token }),
+    enabled: enabled && Boolean(token),
+  });
+}
+
+/** POST /v1/recordings/{id}/reanalyze (owners and admins), with an Idempotency-Key. */
+export function useReanalyse(recordingId: string) {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      apiFetch<{ recording_id: string; status: ApiStatus; analysis_run: number }>(
+        `/v1/recordings/${encodeURIComponent(recordingId)}/reanalyze`,
+        { method: "POST", token, body: { reason }, headers: { "Idempotency-Key": crypto.randomUUID() } },
+      ),
+    onSuccess: async () => {
+      await Promise.all(
+        ["recording", "analysis", "analysis-history", "recordings", "disputes"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
+  });
+}
+
+/** POST /v1/reanalysis: count (dry run) or start re-analysing a type's recordings scored with an older rubric. */
+export function useBulkReanalyse() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: BulkReanalysisRequest) =>
+      apiFetch<BulkReanalysisResult>("/v1/reanalysis", {
+        method: "POST",
+        token,
+        body: request,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      }),
+    onSuccess: async (_, request) => {
+      if (request.dry_run) return;
+      await Promise.all(["recordings", "overview"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
     },
   });
 }

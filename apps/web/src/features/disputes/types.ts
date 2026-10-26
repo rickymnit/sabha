@@ -8,7 +8,8 @@ export interface DisputeDraft {
   comment: string;
 }
 
-export type DisputeStatus = "open" | "accepted" | "rejected";
+/** "closed": the recording was re-analysed before anyone decided. */
+export type DisputeStatus = "open" | "accepted" | "rejected" | "closed";
 
 /** One item in the reviewer's queue: GET /v1/reviews. */
 export type ReviewItem =
