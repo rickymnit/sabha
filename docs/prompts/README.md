@@ -20,26 +20,57 @@ One prompt per task in the 8-week execution plan. Prompt IDs match the plan's su
 
 ## Order and files
 
-Only work that is not finished is listed (updated 2026-10-19). Tasks marked "partly built" carry a status note under
-their heading saying what exists and what remains. Removed prompts are in git history.
+Only work that is not finished is listed (updated 2026-10-26). Tasks marked "partly built" carry a status note under
+their heading saying what exists and what remains; some of those notes are older than the commits that followed, so
+check `git log` too. Removed prompts are in git history.
 
-| File | Week | Prompts still to do |
+Since 2026-10-24 the order is **product first**: more conversation types and the coaching loop in weeks 2–7, and all
+infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
+
+**1. Product (now)**
+
+| Task | File | What remains |
 | --- | --- | --- |
-| `week-1.md` | Foundations | P1.3 compose and Terraform, P6.2 app shell |
-| `week-2.md` | Orchestration and audio | P2.6 SSE, P1.7 labels and profiles (partly built), P1.8 audit log (partly built), P3.2 normalise, P3.3 VAD and segment map (partly built), P3.4a diarization, P6.3 upload screen, P6.4a overview shell, P7.1 monitoring (partly built) |
-| `week-3.md` | Speech and Gate 1 | P3.4b diarization finish, P3.5 ASR stage (partly built), P3.6 roles (partly built), P3.7 transcript assembly (partly built), P5.3 model bake-off, Gate 1 |
-| `week-4.md` | Scoring | P5.6 scoring and grounding (partly built), P5.7 synthesis and storage (partly built), P5.7b analysis API |
-| `week-5.md` | Reception and fairness | P5.8 classify, segment, reception rubric (partly built), P6.7 disputes and reviews (partly built), P7.2 limits, quotas and lanes (partly built), P2.7 notifications (partly built), P2.8 re-analysis, P6.4b overview with real data (partly built) |
-| `week-6.md` | Calibration and Gate 2 | P5.9 calibration loop, P4.7 CI eval gate, P7.3 backups, retention, erasure, P7.4 isolation tests (partly built), P6.8 role views, P6.9 consent (partly built), Gate 2 |
-| `week-7.md` | Hardening | P7.5 load and chaos, P7.6 security (started), P7.7 production and alerts, P7.8 admin ops (partly built), P8.4 onboarding pack, P8.6 usage export, Gate 3 |
-| `week-8.md` | Pilot | P8.8 go-live checklist, P8.9 daily health report, P8.7 feedback log, hotfix and retro templates |
+| Company reception | none yet | Rubric `reception.company`, company profile defaults, report and ticket for business front desks |
+| P6.7 disputes (partly built) | `week-5.md` | The dispute endpoints and `disputes` collection, score overrides with history, the resolution notification; the dialog is on mock data |
+| P2.8 re-analysis | `week-5.md` | Not started |
+| P6.9 consent (partly built) | `week-6.md` | Consent records (scope, validity), releasing recordings awaiting consent, the admin UI and the upload selector |
+| P2.6 live status | `week-2.md` | Not started (server-sent events for the recordings list and overview) |
+| P6.8 role views | `week-6.md` | Not started; includes the workspace setup, rubric editor and plans pages in `docs/design/` |
+| P6.2 app shell (partly built) | `week-1.md` | Tenant switcher, nav counts, plan usage block, lint rule against hard-coded nouns |
+| P1.7 profiles and labels (partly built) | `week-2.md` | `POST /v1/admin/tenants`, `PATCH /v1/settings`, `useLabels()`, blocking disabled types |
+| P1.8 audit log (partly built) | `week-2.md` | `GET /v1/audit` and the immutability tests |
+| P2.7 notifications (partly built) | `week-5.md` | Webhook settings and the delivery task (signing is built); emails are done |
+| P7.2 limits and quotas (partly built) | `week-5.md` | Limiter in the auth dependency, quota checks on upload, lane by duration, admission ETA |
+| P7.3 backups, retention, erasure | `week-6.md` | Not started |
+| P7.8 admin ops (partly built), P8.6 usage export | `week-7.md` | Admin endpoints and UI, replay and abandon, usage export for invoicing |
+
+**2. Quality (needs real, annotated recordings)**
+
+| Task | File | What remains |
+| --- | --- | --- |
+| P5.3 model bake-off | `week-3.md` | Not started |
+| P5.9 calibration, P4.7 CI eval gate | `week-6.md` | Not started; tools from P4.2–P4.6 are built |
+| P3.4b diarization finish | `week-3.md` | NeMo Sortformer and the GPU image, once a GPU exists |
+| Gates 1–3 | `week-3.md`, `week-6.md`, `week-7.md` | Reviews against real numbers |
+
+**3. Last week (infrastructure and go-live)**
+
+| Task | File | What remains |
+| --- | --- | --- |
+| P1.3 staging Compose and Terraform | `week-1.md` | Not started |
+| Auth0 tenant | `docs/setup/auth.md` | Code is built; the tenant replaces the local dev sign-in |
+| P7.1 monitoring (partly built) | `week-2.md` | Trace propagation through Celery, Prometheus, Grafana, Sentry |
+| P7.5 load and chaos, P7.6 security (started), P7.7 production and alerts | `week-7.md` | See each prompt |
+| P8.4 onboarding pack | `week-7.md` | Not started |
+| P8.8 go-live, P8.9 health report, P8.7 feedback log | `week-8.md` | Not started |
 
 ### Removed because they are done (or dropped)
 
 | Task | Follow-up still open |
 | --- | --- |
 | P0.2 dev setup and design spike, P0.5 env template, P0.8 rubric v0.1 drafts, P4.1 annotation tool, P1.1 monorepo, P1.4 API skeleton, P6.1 design system, P8.3 recording guide, P5.4 rubric schema, P5.5 computed metrics, P4.4 rater kit | None |
-| P0.6 LLM provider | OpenAI o3-mini chosen; availability, data residency terms and settings to confirm with OpenAI (`docs/llm-providers.md`) |
+| P0.6 LLM provider | OpenAI `gpt-6-luna` since 2026-10-24 (o3-mini was shut down); data residency terms and settings to confirm with OpenAI (`docs/llm-providers.md`) |
 | P0.7 LIS baselines | Dropped: there is no LIS codebase. ASR providers are compared on our own gold set instead |
 | P8.1 consent drafts | With the lawyer; sign-off is a people task (plan 8.5) |
 | P1.2 CI | The `images` job stays off until the repository variable `PUBLISH_IMAGES` is `true`; turn it on once the Celery app (P2.4) exists |
@@ -54,7 +85,11 @@ their heading saying what exists and what remains. Removed prompts are in git hi
 | P3.1 ASR provider layer (Sarvam AI, ADR 0006) | "Done when" needs a valid `SARVAM_API_KEY` (the current one is rejected with 403) and Sarvam's data terms in writing before real audio |
 | P4.2 gold-set tooling, P4.3 WER and role eval, P4.6 kappa and grounding eval | Tools built; run them on the real gold set and rater scores once those exist |
 | P5.2 PII redaction | Built with regular expressions; CLAUDE.md names Presidio. Decide whether to adopt Presidio |
-| P6.5 transcript view, P6.6 report page | Built on mock data; real data arrives with P6.2 and P5.7b |
+| P6.5 transcript view, P6.6 report page | None: on real data since P5.7b |
+| P3.2 normalise, P3.3 VAD and segment map, P3.4a diarization (CPU), P3.5 speech-to-text, P3.6 roles, P3.7 transcript | Run on more real files once recordings exist; tune `VAD_*`; transcript text search |
+| P5.6 scoring and grounding, P5.7 synthesis and storage, P5.7b analysis API, P5.8 reception | A real lesson and 10 real calls end to end on staging |
+| P6.3 upload screen, P6.4a/P6.4b overview, P7.4 permission tests | Add every new route to `tests/security/permissions.yaml` (the test enforces it) |
+| Sales meetings (rubric `sales.company.v0.2`, deal card), meetings (`meeting.company.v0.1`, ADR 0008) | Added 2026-10-24 to 2026-10-26; no prompt file |
 
 ## Coverage check
 
