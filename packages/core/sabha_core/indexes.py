@@ -77,6 +77,15 @@ INDEXES: dict[str, list[IndexModel]] = {
     "disputes": [
         _ix("tenant_status_created", (T, ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)),
         _ix("tenant_analysis", (T, ASCENDING), ("analysis_id", ASCENDING)),
+        # One open dispute per score (P6.7): a second one for the same dimension is a duplicate-key error.
+        _ix(
+            "tenant_open_per_dimension",
+            (T, ASCENDING),
+            ("analysis_id", ASCENDING),
+            ("dimension", ASCENDING),
+            unique=True,
+            partialFilterExpression={"status": "open"},
+        ),
     ],
     "usage_events": [_ix("tenant_occurred", (T, ASCENDING), ("occurred_at", ASCENDING))],
     "audit_log": [_ix("tenant_at", (T, ASCENDING), ("at", DESCENDING))],

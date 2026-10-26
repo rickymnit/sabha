@@ -370,7 +370,7 @@ async def trend(
         found = await scores.find({"person_id": person.id, "dimension": dimension}, sort=[("created_at", -1)],
                                   limit=limit)  # fmt: skip
         points = [TrendPoint(recording_id=s.recording_id, analysis_id=s.analysis_id, created_at=s.created_at,
-                             score=s.score, verified=s.verified) for s in found]  # fmt: skip
+                             score=s.shown_score, verified=s.verified) for s in found]  # fmt: skip
     return TrendOut(person_id=person.id, dimension=dimension, points=list(reversed(points)))  # oldest first
 
 

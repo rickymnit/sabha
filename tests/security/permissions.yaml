@@ -225,3 +225,36 @@ routes:
     # The People page: the same people as GET /v1/people, with counts and scores (filtered; test_results.py).
     anonymous: 401
     others: 200
+
+  POST /v1/analyses/{analysis_id}/disputes:
+    # Ask a reviewer to look at one score (P6.7, owner's decisions 2026-10-26): the person analysed, the managers of
+    # their unit, owners and admins. A fresh analysis of Asha's per call. Audited.
+    anonymous: 401
+    owner: 201
+    admin: 201
+    manager_unit: 201
+    manager_other_unit: 404  # cannot see it
+    reviewer_unit: 403  # sees it, but reviewers decide disputes rather than raise them
+    staff_uploader: 201  # her own score
+    staff_colleague: 404
+    other_tenant: 404
+
+  GET /v1/disputes:
+    # The reviewer's queue of disputes, filtered to the units each caller may see; staff never resolve.
+    anonymous: 401
+    staff_uploader: 403
+    staff_colleague: 403
+    others: 200
+
+  POST /v1/disputes/{dispute_id}/resolve:
+    # Accept (with the final score) or reject, with a note: reviewers and managers for their units, owners and admins
+    # for all, never a dispute you raised yourself. A fresh dispute raised by Asha per call. Audited.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404
+    reviewer_unit: 200
+    staff_uploader: 403  # she raised it, and staff never resolve
+    staff_colleague: 403
+    other_tenant: 404

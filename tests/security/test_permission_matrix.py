@@ -264,6 +264,43 @@ def name_voices(api: Api, caller: str) -> httpx.Response:
     return api.client.put(f"/v1/recordings/{rid}/voices", json={"names": {"S0": "Riya"}}, headers=api.headers(caller))
 
 
+def fresh_analysis(api: Api) -> str:
+    """A finished recording of Asha with an analysis of two verified scores; returns the analysis id."""
+    rid = f"rec-scored-{uuid.uuid4().hex[:8]}"
+    aid = f"an-{rid}"
+    for collection, doc in (
+        ("recordings", Recording(id=rid, tenant_id="tenant-a", type=ConversationType.TEACHING, consent_ref="c",
+                                 status=RecordingStatus.COMPLETED, person_id="p-asha", unit_id="unit-1",
+                                 created_by="u-staff_uploader")),
+        ("analyses", Analysis(id=aid, tenant_id="tenant-a", recording_id=rid, version="v1", person_id="p-asha",
+                              unit_id="unit-1", conversation_type=ConversationType.TEACHING,
+                              rubric_id="teaching.school.v0.1", rubric_version="0.1", rubric_hash="h",
+                              report_key=REPORT_KEY, status="COMPLETED", overall_score=3.6, verified_share=1.0)),
+        ("scores", Score(tenant_id="tenant-a", analysis_id=aid, recording_id=rid, person_id="p-asha",
+                         dimension="concept_clarity", name="Concept clarity", weight=0.6, score=4, verified=True)),
+        ("scores", Score(tenant_id="tenant-a", analysis_id=aid, recording_id=rid, person_id="p-asha",
+                         dimension="recap_and_closure", name="Recap and closure", weight=0.4, score=3, verified=True)),
+    ):  # fmt: skip
+        api.db[collection].insert_one(doc.model_dump(by_alias=True))
+    return aid
+
+
+DISPUTE = {"dimension_key": "concept_clarity", "proposed_score": 5, "comment": "The definitions were checked twice."}
+
+
+def raise_dispute(api: Api, caller: str) -> httpx.Response:
+    path = f"/v1/analyses/{fresh_analysis(api)}/disputes"
+    return api.client.post(path, json=DISPUTE, headers=api.headers(caller, create=True))
+
+
+def resolve_dispute(api: Api, caller: str) -> httpx.Response:
+    """Accepts a fresh dispute that Asha (staff_uploader) raised about her own score."""
+    raised = raise_dispute(api, "staff_uploader")
+    assert raised.status_code == 201, raised.text
+    body = {"decision": "accepted", "final_score": 5, "note": "The quotes show both terms defined."}
+    return api.client.post(f"/v1/disputes/{raised.json()['id']}/resolve", json=body, headers=api.headers(caller))
+
+
 CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /health": lambda a, who: a.client.get("/health", headers=a.headers(who)),
     "GET /ready": lambda a, who: a.client.get("/ready", headers=a.headers(who)),
@@ -297,6 +334,9 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
         "/v1/overview?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z", headers=a.headers(who)
     ),
     "GET /v1/people/{person_id}/trend": lambda a, who: a.client.get("/v1/people/p-asha/trend", headers=a.headers(who)),
+    "POST /v1/analyses/{analysis_id}/disputes": raise_dispute,
+    "GET /v1/disputes": lambda a, who: a.client.get("/v1/disputes", headers=a.headers(who)),
+    "POST /v1/disputes/{dispute_id}/resolve": resolve_dispute,
 }
 
 

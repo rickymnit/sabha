@@ -298,7 +298,8 @@ class Analysis(TenantDoc):
     rubric_hash: str = Field(min_length=1)
     report_key: str = Field(min_length=1)
     status: Literal["COMPLETED", "NEEDS_REVIEW"]
-    overall_score: float | None = None
+    overall_score: float | None = None  # with any reviewer's scores from accepted disputes (P6.7)
+    ai_overall_score: float | None = None  # the AI's own overall score, kept once a dispute changes overall_score
     verified_share: float = Field(ge=0, le=1)
     review_reasons: list[str] = Field(default_factory=list)
     model_ids: list[str] = Field(default_factory=list)
@@ -325,6 +326,43 @@ class Score(TenantDoc):
     verified: bool
     not_applicable: bool = False
     evidence: list[dict[str, Any]] = Field(default_factory=list)
+    # A reviewer's score from an accepted dispute (P6.7); it replaces `score` in reports and trends, and `score`
+    # stays as the AI's, for history.
+    human_score: int | None = Field(default=None, ge=1, le=5)
+    dispute_id: str | None = None
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+    @property
+    def shown_score(self) -> int | None:
+        return self.human_score if self.human_score is not None else self.score
+
+
+class Dispute(TenantDoc):
+    """A request to look again at one score of one analysis (P6.7, owner's decisions 2026-10-26).
+
+    Raised by the person analysed, their unit's managers, owners or admins; decided by a reviewer, manager, owner or
+    admin who did not raise it. At most one open dispute per (analysis, dimension). `calibration` is filled when it
+    is decided: a person's score next to the AI's, for the calibration loop (P5.9).
+    """
+
+    analysis_id: str = Field(min_length=1)
+    recording_id: str = Field(min_length=1)
+    person_id: str | None = None
+    unit_id: str | None = None
+    dimension: str = Field(min_length=1)
+    dimension_name: str = Field(min_length=1)
+    ai_score: int = Field(ge=1, le=5)
+    current_score: int = Field(ge=1, le=5)  # the score shown when it was raised (a reviewer's, after an earlier one)
+    proposed_score: int = Field(ge=1, le=5)
+    comment: str = Field(min_length=1)
+    raised_by: str = Field(min_length=1)
+    status: Literal["open", "accepted", "rejected"] = "open"
+    final_score: int | None = Field(default=None, ge=1, le=5)
+    resolution_note: str | None = None
+    resolved_by: str | None = None
+    resolved_by_role: Role | None = None
+    resolved_at: UtcDatetime | None = None
+    calibration: dict[str, Any] | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

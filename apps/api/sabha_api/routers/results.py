@@ -14,9 +14,9 @@ from sabha_api.auth import Principal, current_principal
 from sabha_api.auth.directory import Directory, directory
 from sabha_api.deps import tenant_repo
 from sabha_api.errors import NotReadyError
+from sabha_api.services import disputes, voices
 from sabha_api.services import results as service
-from sabha_api.services import voices
-from sabha_core.models import Analysis, AuditEntry, Person, Recording, Score, Transcript, Unit
+from sabha_core.models import Analysis, AuditEntry, Dispute, Person, Recording, Score, Transcript, Unit
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
 
@@ -32,6 +32,7 @@ Transcripts = Annotated[TenantRepo[Transcript], Depends(tenant_repo("transcripts
 Entries = Annotated[TenantRepo[AuditEntry], Depends(tenant_repo("audit_log", AuditEntry))]
 Units = Annotated[TenantRepo[Unit], Depends(tenant_repo("units", Unit))]
 Found = Annotated[Directory, Depends(directory)]
+Disputes = Annotated[TenantRepo[Dispute], Depends(tenant_repo("disputes", Dispute))]
 Limit = Annotated[int, Query(ge=1, le=service.MAX_LIMIT)]
 
 
@@ -95,7 +96,7 @@ async def get_transcript(
 @recordings_router.get("/{recording_id}/analysis", response_model=dict[str, Any])
 async def get_analysis(
     recording_id: str, request: Request, principal: Caller, found: Found, recordings: Recordings, people: People,
-    analyses: Analyses, reader: Reader, entries: Entries,
+    analyses: Analyses, scores: Scores, dispute_repo: Disputes, reader: Reader, entries: Entries,
 ) -> dict[str, Any]:  # fmt: skip
     """Everything the report page shows, in one payload for the recording's state: processing (with the stage),
     failed or needs_review (with plain-language reasons), or completed/partial (verified dimensions with their
@@ -105,6 +106,8 @@ async def get_analysis(
     tenant = await found.tenant(principal.tenant_id)
     person_label = tenant.labels.person if tenant is not None else "Staff"
     payload, analysis = await service.analysis_payload(recording, analyses, reader, person_label=person_label)
+    payload = await disputes.annotate_report(payload, principal, recording, analysis, scores=scores,
+                                             disputes=dispute_repo)  # fmt: skip
     if analysis is not None and payload["status"] in ("completed", "partial"):
         await audit(entries, principal, request, action="analysis.view", target_type="recording",
                     target_id=recording.id, meta={"analysis_id": analysis.id})  # fmt: skip
