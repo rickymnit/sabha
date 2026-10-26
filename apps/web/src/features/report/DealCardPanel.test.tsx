@@ -9,6 +9,7 @@ const labels: Labels = { person: "Sales rep", person_plural: "Team", recording: 
                          recording_plural: "Conversations", unit: "Team", manager: "Sales head" }; // prettier-ignore
 const ev = (start_ms: number, quote: string) => ({ quote, utterance_id: "u0001", start_ms, end_ms: start_ms + 4_000 });
 const CARD: DealCard = {
+  current_setup: [{ fact: "Uses another ERP at Rs 12 per student a month.", evidence: ev(60_000, "abhi toh 10 12 rupaye") }],
   customer_needs: [{ need: "Cut the two days spent on reconciliation.", evidence: ev(27_000, "do din lag jaate hain") }],
   objections: [
     { objection: "Price is above this quarter's budget.", response: "Quarterly billing from April.", settled: "yes",
@@ -31,6 +32,7 @@ describe("DealCardPanel", () => {
     expect(within(card).getByText("Send the quotation and hold a call.")).toBeInTheDocument();
     expect(within(card).getByText("Both sides, Thursday 4 pm")).toBeInTheDocument();
     expect(within(card).getByText("Cut the two days spent on reconciliation.")).toBeInTheDocument();
+    expect(within(card).getByText("Uses another ERP at Rs 12 per student a month.")).toBeInTheDocument();
     expect(within(card).getByText("Settled")).toBeInTheDocument();
     expect(within(card).getByText("Unclear")).toBeInTheDocument();
     expect(within(card).getByText(/1 item was left out because its words could not be found/)).toBeInTheDocument();
@@ -41,7 +43,7 @@ describe("DealCardPanel", () => {
   it("says plainly when nothing was agreed and no objection was raised", () => {
     render(
       <DealCardPanel
-        card={{ ...CARD, next_step: null, objections: [], left_out: 0 }}
+        card={{ ...CARD, next_step: null, objections: [], current_setup: [], left_out: 0 }}
         labels={labels}
         onSeek={vi.fn()}
       />,
@@ -49,5 +51,6 @@ describe("DealCardPanel", () => {
     expect(screen.getByText("No next step was agreed in this meeting.")).toBeInTheDocument();
     expect(screen.getByText("The customer raised no objections.")).toBeInTheDocument();
     expect(screen.queryByText(/left out/)).toBeNull();
+    expect(screen.queryByText("What they use today")).toBeNull(); // nothing said about it: no empty section
   });
 });

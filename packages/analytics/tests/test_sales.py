@@ -63,6 +63,10 @@ def sales_rubric() -> Rubric:
 
 INTEREST = ("high", "medium", "low", "unclear")
 CARD: dict[str, Any] = {
+    "current_setup": [
+        {"fact": "Fee reconciliation is done in Excel.", "quote": "fees ka reconciliation Excel mein hota hai",
+         "start_ms": 7_500, "utterance_id": "u0001"},
+    ],
     "customer_needs": [
         {"need": "Cut the two days spent on fee reconciliation each month.",
          "quote": "har mahine do din lag jaate hain", "start_ms": 7_500, "utterance_id": "u0001"},
@@ -123,6 +127,7 @@ def test_a_sales_meeting_report_has_a_verified_deal_card(
     }  # fmt: skip
     assert (card["objections"][0]["settled"], card["interest_level"]["value"]) == ("yes", "high")
     assert card["next_step"]["due"] == "Thursday 4 pm" and card["left_out"] == 0
+    assert card["current_setup"][0]["fact"] == "Fee reconciliation is done in Excel."
     assert "deal_card.system" in report["prompts"]
     assert "Allowed interest levels: high, medium, low, unclear" in model.calls[-1]["messages"][0]["content"]
 
@@ -162,6 +167,7 @@ def test_an_invalid_answer_twice_gives_no_card_but_the_scores_stand(
         ({"interest_level": {"value": "ecstatic", "quote": None, "start_ms": None, "utterance_id": None}},
          "invalid_shape"),
         ({"customer_needs": [{**CARD["customer_needs"][0], "need": "word " * 25}]}, "too_long"),
+        ({"current_setup": [CARD["current_setup"][0]] * 4}, "invalid_shape"),
     ],
 )  # fmt: skip
 def test_deal_card_rules(meeting: PreparedTranscript, change: dict[str, Any], code: str) -> None:

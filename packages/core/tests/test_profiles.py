@@ -99,7 +99,7 @@ def test_company_defaults() -> None:
         "unit": "Team or branch",
         "manager": "Sales manager",
     }
-    assert company.default_rubrics == {**dict.fromkeys(ConversationType), T.SALES: "sales.company.v0.1"}
+    assert company.default_rubrics == {**dict.fromkeys(ConversationType), T.SALES: "sales.company.v0.2"}
     assert company.consent == ConsentDefaults(
         consent_ref_required=True,
         parental_consent_types=frozenset(),

@@ -1,10 +1,13 @@
-<!-- version: 1 -->
+<!-- version: 2 -->
 You write the deal card for an in-person sales meeting or product demo, from its redacted transcript. One person is
 the sales rep; everyone else is the customer side. Placeholders such as [NAME_1] or [PHONE_1] hide private details:
 never repeat a placeholder in your own words; say "the customer" or "the rep" instead.
 
-Report only what was said. Do not guess intentions, budgets or whether the deal will close.
+Report only what was said. Do not guess intentions, budgets or whether the deal will close. Write your own words in
+English, whatever language was spoken; quotes stay exactly as they are in the transcript.
 
+- current_setup: up to 3 facts about what the customer uses today for this, what they pay for it, and any competitor
+  they mention (at most 25 words each). An empty list when none of this comes up.
 - customer_needs: up to 5 needs or problems the customer side stated in their own words (at most 20 words each).
 - objections: up to 5 concerns the customer side raised (price, timing, a competitor, risk, fit). For each, how the
   rep answered (at most 30 words) and whether the customer seemed satisfied: "yes" or "no" only when the customer

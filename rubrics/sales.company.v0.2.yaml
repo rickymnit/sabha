@@ -1,0 +1,148 @@
+# Sales rubric v0.2: DRAFT for the product owner's and the client's sales manager's review (2026-10-26).
+# In-person sales meetings and product demos: a sales rep with one or more people from the customer's side.
+#
+# Changes from v0.1 (sales.company.v0.1.yaml stays as the record of the first draft): rebuilt around the client
+# sales manager's own method, as demonstrated in a training pitch (owner's decision, 2026-10-26): open with a clear
+# positioning, turn the customer's everyday problems into value with concrete examples and comparisons, show how
+# the product differs from what they use, and answer price with what it saves them. Two things good selling needs
+# that the demonstration lacked stay in: asking about the customer's own situation, and booking a specific next
+# step. The training recording itself is not kept in the product or the repository.
+#
+# Rules (as for every rubric):
+# - Anchors describe only what the sales rep says or does that a rater can point to in the transcript or audio.
+#   No guesses about intentions, feelings or whether the deal will close.
+# - Customers are never scored. What they say appears only as evidence of what the rep did, and in the deal card.
+# - Example utterances are illustrative Hinglish. All names, amounts, companies and products in them are fictional.
+#   "[company]" stands in for the rep's company and "[product]" for what they sell.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: sales.company.v0.2
+segment: company
+version: "0.2"
+roles: [sales_rep, customer]  # sales_rep is the person analysed; customer (one or more people) is context only
+
+dimensions:
+  - key: opening_and_positioning
+    name: Opening and positioning
+    weight: 0.10
+    definition: "The rep introduces themselves and [company], says in one or two sentences what [product] is and how it differs, and connects it to what the customer uses today."
+    min_quotes: 1
+    anchors:
+      1: "The rep starts listing features without introducing themselves, [company] or what [product] is."
+      2: "The rep introduces themselves and [company] but does not say what [product] is or why it matters to this customer."
+      3: "The rep introduces themselves and [company] and says what [product] is, but in general terms with no link to the customer's current way of working."
+      4: "The rep introduces themselves and [company], positions [product] in one or two clear sentences, and links it to what the customer uses today."
+      5: "The rep introduces themselves and [company], positions [product] clearly, links it to what the customer uses today, and says what the meeting will cover or checks the customer's time."
+    examples:
+      1: "Sir isme attendance hai, fees hai, transport hai, library hai, sab kuch hai..."
+      5: "Good afternoon sir, main Karan, [company] se. [product] ek AI wala school software hai jo sirf data store nahi karta, khud batata hai kya dhyan dena hai. Aap abhi koi ERP use kar rahe hain na? Main 15 minute mein dikhata hoon kaise yeh alag hai, theek hai?"
+
+  - key: discovery
+    name: Discovering the customer's situation
+    weight: 0.20
+    definition: "The rep asks the customer about their own situation (current tools, problems, size, who decides) and uses the answers, instead of only assuming their problems."
+    min_quotes: 1
+    anchors:
+      1: "The rep asks the customer nothing about their situation; every problem mentioned is the rep's assumption."
+      2: "The rep asks only a yes/no question about the current setup ('ERP toh hoga na?') and does not follow up."
+      3: "The rep asks at least one open question about the customer's situation or problems but does not use the answer later."
+      4: "The rep asks open questions about the customer's situation and problems and refers back to an answer when presenting."
+      5: "The rep asks open questions about the current setup, the main problems and who decides, refers back to the answers when presenting, and checks they understood ('toh aapki sabse badi problem yeh hai, sahi?')."
+    examples:
+      1: "Aapke yahan bhi reports banane mein time lagta hoga, sab schools mein lagta hai."
+      5: "Abhi monthly fee report kaun banata hai aur usmein kitna time lagta hai? ... Toh do din accounts wale lagate hain aur phir aapko samjhana padta hai. Final decision aap lenge ya trustees bhi?"
+
+  - key: pains_to_value
+    name: Turning problems into value
+    weight: 0.25
+    definition: "For each problem raised, the rep shows how [product] solves it with something concrete: a specific feature, an everyday example or comparison, or a number in the customer's terms."
+    min_quotes: 2
+    anchors:
+      1: "The rep lists features with no link to any problem the customer has."
+      2: "The rep names problems in general ('time waste hota hai') and features in general, without connecting them concretely."
+      3: "The rep links at least one problem to a feature with a concrete example, but most of the pitch stays generic."
+      4: "The rep links most features to a named problem, with concrete examples, comparisons or numbers the customer can picture."
+      5: "The rep links each feature to a named problem with a concrete example or comparison, puts at least one benefit in the customer's own numbers (time, staff, money), and checks whether it fits ('aapke yahan aisa hota hai?')."
+    examples:
+      1: "Isme AI hai, automation hai, dashboards hai, bahut features hain."
+      5: "Abhi discount ka pata saal ke end mein chalta hai. Isme usi din alert aayega ki kisi ko normal se zyada discount diya gaya. Aapke 1,200 bachchon mein ek bhi galat discount pakda toh woh yahin bach gaya. Aapke yahan aisa kabhi hua hai?"
+
+  - key: differentiation
+    name: Showing the difference
+    weight: 0.10
+    definition: "The rep explains specifically how [product] differs from what the customer uses now or from competitors, with an example rather than only a claim."
+    min_quotes: 1
+    not_applicable_when: "Neither the customer's current solution nor any competitor comes up in the meeting, so there is nothing to compare with."
+    anchors:
+      1: "The rep runs down the current solution or a competitor without saying anything specific."
+      2: "The rep only claims to be better or first ('sabse best hai', 'pehli company hai') with no specifics."
+      3: "The rep names one specific difference but gives no example of what it means for the customer."
+      4: "The rep names specific differences and gives an example of what each means in the customer's daily work."
+      5: "The rep names specific differences with examples, stays factual and respectful about competitors, and ties the difference to a problem the customer said they have."
+    examples:
+      1: "Baaki sab companies bekaar hain sir, unka software chalta hi nahi."
+      5: "Abhi ke ERP mein report ka naya column chahiye toh ticket banta hai aur hafte lagte hain. Isme aap bolke maang lijiye, 'is report mein pending fees bhi daal do', aur turant ban jayegi. Aapne bataya tha ki yahi wait aapko pareshan karta hai."
+
+  - key: price_and_objections
+    name: Price and objections
+    weight: 0.20
+    definition: "The rep states the price clearly, answers concerns (price, switching, risk) specifically, ideally comparing with what the customer spends now and what [product] saves them, and checks the concern is settled."
+    min_quotes: 1
+    not_applicable_when: "Price is not discussed and the customer raises no concern, doubt or objection, so there is nothing to answer."
+    anchors:
+      1: "The rep avoids giving a price when asked, or dismisses or argues with a concern."
+      2: "The rep gives a vague price ('affordable hai sir') or answers a concern with a general reassurance and moves on."
+      3: "The rep gives a clear price or a specific answer to a concern, but does not relate it to what the customer spends or saves, or check it settled."
+      4: "The rep gives a clear price and answers concerns specifically, comparing with the customer's current spend or what [product] saves them."
+      5: "The rep gives a clear price, compares it with the customer's current spend, shows the saving in the customer's own numbers, answers other concerns specifically, and asks whether that settles them."
+    examples:
+      1: "Price ki tension mat lijiye sir, woh baad mein dekh lenge."
+      5: "Rs 30 per student per month hai. Abhi aap Rs 12 dete hain, toh 1,000 bachchon pe saal ke lagbhag Rs 2 lakh zyada. Agar do staff ka typing aur reports ka kaam hat gaya, toh woh unki salary se pehle hi nikal jaata hai. Kya is hisaab se price ki chinta door hoti hai?"
+
+  - key: next_step_commitment
+    name: Booked next step
+    weight: 0.15
+    definition: "The meeting ends with a specific next step, such as a demo or a trial, with a date or time that the customer agrees to."
+    min_quotes: 1
+    anchors:
+      1: "The meeting ends with no next step mentioned."
+      2: "The rep only asks 'koi sawaal?' or says 'demo dikha dunga' with no date or time."
+      3: "The rep proposes a specific next step but no date, or the customer does not respond to it."
+      4: "The rep proposes a specific next step with a date or time and the customer agrees."
+      5: "The rep proposes a specific next step with a date or time and who will attend, the customer agrees, and the rep repeats it back."
+    examples:
+      1: "Toh sir yeh tha, aapke koi sawaal ho toh bataiye."
+      5: "Toh Thursday 11 baje main aapke office aakar live demo deta hoon, aap aur accounts head dono rahenge. Main aaj shaam calendar invite bhej deta hoon. Theek hai sir?"
+
+# Numbers computed in code from the transcript and audio (CLAUDE.md golden rule 5), shown next to the scores and
+# never produced by the LLM. No targets or thresholds are set.
+computed_metrics:
+  - duration_s               # length of the meeting, in seconds
+  - sales_rep_talk_share     # share of speech time spoken by the rep
+  - customer_talk_share      # share of speech time spoken by the customer side
+  - sales_rep_question_count # number of questions the rep asks
+  - open_question_ratio      # share of the rep's questions classed as open (what, how, why, tell me)
+  - longest_monologue_s      # longest uninterrupted stretch of the rep talking, in seconds
+
+output:
+  - summary         # what the meeting was about and where the deal stands
+  - strengths
+  - gaps
+  - suggestions
+  - current_setup   # deal card: what the customer uses today, what they pay, competitors mentioned, each with a quote
+  - customer_needs  # deal card: the needs the customer stated, each with a quote
+  - objections      # deal card: concerns the customer raised, how the rep answered, and whether it seemed settled
+  - interest_level  # deal card: one value from output_values.interest_level, with the quote it rests on
+  - next_step       # deal card: the agreed action, who does it and the date said, or null when none was agreed
+
+# Allowed values. Interest is judged only from what the customer says, and "unclear" is always allowed.
+output_values:
+  interest_level:
+    - high       # the customer asks about price, timelines or next steps, or names people to involve
+    - medium     # the customer engages with questions but commits to nothing
+    - low        # the customer says it is not a priority or not a fit
+    - unclear    # too little from the customer to tell
+
+# Scores from this rubric stay hidden from users until agreement between the model and human raters, measured by
+# eval/kappa.py on real annotated recordings, reaches this value. No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}

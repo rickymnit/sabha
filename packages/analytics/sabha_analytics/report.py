@@ -240,6 +240,7 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
                 problems.append(f"phase {phase['phase']} points at unknown utterance {uid!r}")
     card = report.get("deal_card") or {}
     evidence = [
+        *(item["evidence"] for item in card.get("current_setup", [])),
         *(item["evidence"] for item in card.get("customer_needs", [])),
         *(item["evidence"] for item in card.get("objections", [])),
         *([card["next_step"]["evidence"]] if card.get("next_step") else []),

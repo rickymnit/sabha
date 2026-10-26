@@ -70,8 +70,10 @@
       "description": "Sales meetings only: the deal card, verified items only (sabha_analytics.sales).",
       "oneOf": [{"type": "null"}, {
         "type": "object", "additionalProperties": false,
-        "required": ["customer_needs", "objections", "interest_level", "next_step", "left_out"],
+        "required": ["current_setup", "customer_needs", "objections", "interest_level", "next_step", "left_out"],
         "properties": {
+          "current_setup": {"type": "array", "maxItems": 3, "items": {"type": "object", "additionalProperties": false,
+            "required": ["fact", "evidence"], "properties": {"fact": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
           "customer_needs": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,
             "required": ["need", "evidence"], "properties": {"need": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
           "objections": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,

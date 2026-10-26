@@ -1,4 +1,4 @@
-// Deal card for a sales meeting: what the customer needs, the objections and how they were answered, how interested
+// Deal card for a sales meeting: what the customer uses today, what they need, the objections and how they were answered, how interested
 // the customer seemed and the agreed next step. Every item is backed by a quote that was found in the transcript
 // (sabha_analytics.sales); its time button plays that moment.
 
@@ -106,20 +106,34 @@ export function DealCardPanel({ card, labels, onSeek }: DealCardPanelProps) {
           )}
         </Section>
 
-        <Section title="What the customer needs">
-          {card.customer_needs.length === 0 ? (
-            <p className="m-0 text-muted">The customer did not state a need in their own words.</p>
-          ) : (
-            <ul className="m-0 flex list-none flex-col gap-3 p-0">
-              {card.customer_needs.map((item) => (
-                <li key={item.evidence.utterance_id + item.need} className="flex flex-col gap-1">
-                  <span className="text-ink">{item.need}</span>
-                  <Quote evidence={item.evidence} onSeek={onSeek} />
-                </li>
-              ))}
-            </ul>
+        <div className="flex min-w-0 flex-col gap-6">
+          {card.current_setup.length > 0 && (
+            <Section title="What they use today">
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {card.current_setup.map((item) => (
+                  <li key={item.evidence.utterance_id + item.fact} className="flex flex-col gap-1">
+                    <span className="text-ink">{item.fact}</span>
+                    <Quote evidence={item.evidence} onSeek={onSeek} />
+                  </li>
+                ))}
+              </ul>
+            </Section>
           )}
-        </Section>
+          <Section title="What the customer needs">
+            {card.customer_needs.length === 0 ? (
+              <p className="m-0 text-muted">The customer did not state a need in their own words.</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {card.customer_needs.map((item) => (
+                  <li key={item.evidence.utterance_id + item.need} className="flex flex-col gap-1">
+                    <span className="text-ink">{item.need}</span>
+                    <Quote evidence={item.evidence} onSeek={onSeek} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </div>
       </div>
 
       <Section title="Objections">

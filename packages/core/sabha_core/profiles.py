@@ -184,7 +184,8 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
         ),
         default_rubrics={
             **dict.fromkeys(ConversationType),
-            _T.SALES: "sales.company.v0.1",  # draft for the owner's review (2026-10-26): in-person sales meetings
+            # Draft built on the client's sales training (2026-10-26), for review: in-person sales meetings.
+            _T.SALES: "sales.company.v0.2",
         },
         consent=ConsentDefaults(
             parental_consent_types=frozenset(),

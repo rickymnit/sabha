@@ -2,6 +2,8 @@
 
 From the redacted transcript the model writes, every item with a quote it rests on:
 
+- current_setup: up to 3 facts about what the customer uses today, what they pay for it and competitors they
+  mention (owner's decision, 2026-10-26), each at most 25 words;
 - customer_needs: up to 5 needs the customer side stated, each at most 20 words;
 - objections: up to 5 concerns the customer raised, how the rep answered (at most 30 words) and whether the
   customer seemed satisfied ("yes", "no" or "unclear", judged only from what was said);
@@ -45,6 +47,8 @@ UNCLEAR = "unclear"
 SETTLED_VALUES = ("yes", "no", UNCLEAR)
 OWNERS = ("sales_rep", "customer", "both")
 MAX_ITEMS = 5
+MAX_SETUP_ITEMS = 3
+MAX_SETUP_WORDS = 25
 MAX_NEED_WORDS = 20
 MAX_OBJECTION_WORDS = 20
 MAX_RESPONSE_WORDS = 30
@@ -68,6 +72,12 @@ class Evidence:
     utterance_id: str
     start_ms: int
     end_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class SetupFact:
+    fact: str
+    evidence: Evidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +110,7 @@ class NextStep:
 
 @dataclass(frozen=True, slots=True)
 class DealCard:
+    current_setup: tuple[SetupFact, ...]
     customer_needs: tuple[Need, ...]
     objections: tuple[Objection, ...]
     interest: Interest | None  # None when its quote could not be verified
@@ -113,6 +124,7 @@ class DealCard:
             return {"quote": e.quote, "utterance_id": e.utterance_id, "start_ms": e.start_ms, "end_ms": e.end_ms}
 
         return {
+            "current_setup": [{"fact": f.fact, "evidence": ev(f.evidence)} for f in self.current_setup],
             "customer_needs": [{"need": n.need, "evidence": ev(n.evidence)} for n in self.customer_needs],
             "objections": [
                 {"objection": o.objection, "response": o.response, "settled": o.settled, "evidence": ev(o.evidence)}
@@ -164,8 +176,9 @@ def deal_card_schema(interest: Sequence[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["customer_needs", "objections", "interest_level", "next_step"],
+        "required": ["current_setup", "customer_needs", "objections", "interest_level", "next_step"],
         "properties": {
+            "current_setup": {"type": "array", "maxItems": MAX_SETUP_ITEMS, "items": _item({"fact": text})},
             "customer_needs": {"type": "array", "maxItems": MAX_ITEMS, "items": _item({"need": text})},
             "objections": {
                 "type": "array",
@@ -238,13 +251,22 @@ def validate_deal_card(
 ) -> tuple[DealCard | None, list[Problem]]:
     """The card (verified items only) and every problem found. The card is None when the answer's shape or texts
     are invalid; quote problems alone still give a card, without those items."""
-    keys = {"customer_needs", "objections", "interest_level", "next_step"}
+    keys = {"current_setup", "customer_needs", "objections", "interest_level", "next_step"}
     if not isinstance(data, dict) or set(data) != keys:
         return None, [Problem("invalid_output", f"Answer with exactly {', '.join(sorted(keys))}.")]
     check = _Check(transcript, interest)
-    needs, objections = data["customer_needs"], data["objections"]
+    setup, needs, objections = data["current_setup"], data["customer_needs"], data["objections"]
     if not isinstance(needs, list) or not isinstance(objections, list) or max(len(needs), len(objections)) > MAX_ITEMS:
         return None, [Problem("invalid_shape", f"customer_needs and objections are lists of at most {MAX_ITEMS}.")]
+    if not isinstance(setup, list) or len(setup) > MAX_SETUP_ITEMS:
+        return None, [Problem("invalid_shape", f"current_setup is a list of at most {MAX_SETUP_ITEMS}.")]
+
+    kept_setup = []
+    for i, item in enumerate(setup, 1):
+        fact = check.text(f"current_setup {i}", item.get("fact") if isinstance(item, dict) else None, MAX_SETUP_WORDS)
+        ev = check.evidence(f"current_setup {i}", item) if isinstance(item, dict) else None
+        if fact is not None and ev is not None:
+            kept_setup.append(SetupFact(fact, ev))
 
     kept_needs = []
     for i, item in enumerate(needs, 1):
@@ -291,7 +313,8 @@ def validate_deal_card(
     blocking = [p for p in check.problems if p.code != "quote_not_found"]
     if blocking:
         return None, check.problems
-    card = DealCard(tuple(kept_needs), tuple(kept_objections), level, next_step, left_out=check.unverified)
+    card = DealCard(tuple(kept_setup), tuple(kept_needs), tuple(kept_objections), level, next_step,
+                    left_out=check.unverified)  # fmt: skip
     return card, check.problems
 
 
