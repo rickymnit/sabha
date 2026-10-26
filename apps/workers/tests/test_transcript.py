@@ -67,6 +67,7 @@ class Setup:
     kind: ConversationType = ConversationType.TEACHING
     tie_breaker: Any = None
     confirmed_roles: dict[str, str] | None = None  # a reviewer's answer (ADR 0007)
+    tenant: Tenant = field(default_factory=lambda: TENANT)
     saved: list[Transcript] = field(default_factory=list)
     store: Memory = field(default_factory=Memory)
 
@@ -74,7 +75,7 @@ class Setup:
         diarization = {"compact": [{"speaker_label": s, "start_ms": a, "end_ms": b} for s, a, b in self.turns]}
         self.store.put("t1/r1/diarize@v1/diarization@v1.json", json.dumps(diarization).encode())
         deps = TranscriptDeps(
-            diarize_version="v1", tenant=lambda _: TENANT, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
+            diarize_version="v1", tenant=lambda _: self.tenant, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
             tie_breaker=lambda *_: self.tie_breaker, save=lambda _, doc: self.saved.append(doc),
         )  # fmt: skip
         recording = Recording(id="r1", tenant_id="t1", type=self.kind, confirmed_roles=self.confirmed_roles)
@@ -155,6 +156,19 @@ def test_confirmed_roles_that_do_not_fit_send_it_back_for_review(confirmed: dict
     with pytest.raises(NeedsReviewError) as caught:
         setup.run(LECTURE)
     assert caught.value.code == "unclear_roles"
+
+
+def test_in_a_meeting_every_voice_is_a_participant_and_nothing_goes_to_review() -> None:
+    company = Tenant.from_profile("company", name="Brightpath Software", plan=Plan.PILOT, id="t1")
+    setup = even_split()  # two voices taking equal turns: in a lesson this would need review
+    setup.kind, setup.tenant = ConversationType.MEETING, company
+    setup.tie_breaker = lambda _: pytest.fail("a meeting has no one to find")
+    meta = setup.run(LECTURE)
+    (doc,) = setup.saved
+    assert doc.roles == {"S0": "participant", "S1": "participant"} and doc.roles_need_review is False
+    assert (doc.roles_method, doc.rubric_id, meta["rubric"]) == ("all_participants", "meeting.company.v0.1",
+                                                                 "meeting.company.v0.1")  # fmt: skip
+    assert {u["role"] for u in setup.transcript()["utterances"]} == {"participant"}
 
 
 def test_a_confident_tie_break_settles_unclear_roles() -> None:

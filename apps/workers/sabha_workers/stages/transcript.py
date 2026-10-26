@@ -11,6 +11,7 @@
    Writes `roles@v1.json`.
 4. Assembles `transcript@v1.json` with sabha_asr.assembly: utterances with role, speaker label, text and times on
    the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it.
+   Meetings have no one to find: every voice is a "participant" (method "all_participants"), never reviewed.
 5. Roles still unclear: the transcript is kept (with the best guess, for the reviewer) and NeedsReviewError
    `unclear_roles` stops the pipeline. A guess is never analysed (golden rule 5).
 
@@ -36,6 +37,8 @@ from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
 from sabha_workers.rubrics import NoRubric
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext
+
+ALL_PARTICIPANTS = "all_participants"  # roles method for meetings: every voice is a participant
 
 
 @dataclass(frozen=True)
@@ -94,10 +97,14 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
         rubric, _ = deps.rubric(tenant, recording.type)
     except NoRubric as exc:
         raise PermanentError("no_rubric", str(exc)) from exc
-    if len(rubric.roles) < 2:
-        raise PermanentError("no_rubric", f"rubric {rubric.id} names fewer than two roles")
+    meeting = recording.type is ConversationType.MEETING
+    if len(rubric.roles) < (1 if meeting else 2):
+        raise PermanentError("no_rubric", f"rubric {rubric.id} names too few roles")
 
-    if recording.confirmed_roles is not None:
+    if meeting:  # everyone is a participant and the meeting is analysed: nobody to find, nothing to review
+        labels = sorted({turn.speaker_label for turn in turns})
+        assignment = RoleAssignment({label: SpeakerRole(rubric.roles[0], 1.0, ALL_PARTICIPANTS) for label in labels})
+    elif recording.confirmed_roles is not None:
         assignment = confirmed_assignment(recording.confirmed_roles, turns, (rubric.roles[0], rubric.roles[1]))
     else:
         names = [tenant.name, *tenant.name_variants]

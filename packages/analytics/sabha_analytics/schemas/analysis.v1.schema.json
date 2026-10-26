@@ -90,6 +90,24 @@
         }
       }]
     },
+    "meeting_notes": {
+      "description": "Meetings only: decisions, action items and open questions, verified items only (sabha_analytics.meetings).",
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false, "required": ["decisions", "action_items", "open_questions", "left_out"],
+        "properties": {
+          "decisions": {"type": "array", "maxItems": 8, "items": {"type": "object", "additionalProperties": false,
+            "required": ["decision", "evidence"], "properties": {"decision": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "action_items": {"type": "array", "maxItems": 10, "items": {"type": "object", "additionalProperties": false,
+            "required": ["action", "owner", "owner_voice", "due", "evidence"],
+            "properties": {"action": {"type": "string", "minLength": 1}, "owner": {"type": ["string", "null"]},
+                           "owner_voice": {"type": ["string", "null"]}, "due": {"type": ["string", "null"]},
+                           "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "open_questions": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,
+            "required": ["question", "evidence"], "properties": {"question": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "left_out": {"type": "integer", "minimum": 0, "description": "Items left out because their quote was not found in the transcript."}
+        }
+      }]
+    },
     "model_ids": {"type": "array", "items": {"type": "string"}},
     "prompts": {
       "type": "object",

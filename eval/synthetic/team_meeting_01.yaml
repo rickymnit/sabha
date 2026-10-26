@@ -1,0 +1,28 @@
+# A fictional founder's weekly team meeting, voiced with Sarvam text-to-speech (scripts/dev/synthetic_audio.py) to
+# test the meeting pipeline without real recordings. Every person, company, figure and date here is made up. Not for
+# any quality figure (golden rule 6): it tests the pipeline, not the scoring's accuracy.
+#
+# Brightpath Software's founder runs the meeting. It has a clear agenda and a budget decision, two actions with
+# owners (one without a date), a quiet colleague who is invited in once, a side topic that is parked, and a hiring
+# question left open, so the notes and the meeting score have something to say.
+title: "Weekly team meeting, 26 Oct (sample)"
+language_code: hi-IN
+speakers:
+  kabir: {voice: kabir, role: participant}   # founder, runs the meeting
+  riya: {voice: ishita, role: participant}   # marketing
+  aman: {voice: aditya, role: participant}   # sales
+  sana: {voice: neha, role: participant}     # support, speaks little
+lines:
+  - [kabir, "चलो शुरू करते हैं। आज तीन points हैं: Diwali campaign का budget, नया sales hire, और Green Valley school वाला escalation। Meeting के end तक budget final करना है।"]
+  - [riya, "Campaign के लिए मेरा suggestion है दो लाख, सिर्फ Instagram और WhatsApp पर। Last year newspaper ads से almost कोई lead नहीं आई थी।"]
+  - [aman, "Agree, लेकिन WhatsApp पर schools के principals का database हमारे पास पुराना है। उसको update करना पड़ेगा।"]
+  - [kabir, "ठीक है। तो decide हुआ: Diwali campaign का budget दो लाख, सिर्फ Instagram और WhatsApp। Riya, campaign plan Friday तक share कर दोगी?"]
+  - [riya, "हाँ, Friday शाम तक plan भेज दूंगी।"]
+  - [aman, "और database update मैं करवा दूंगा।"]
+  - [kabir, "अच्छा, अब escalation। Sana, Green Valley वाला issue तुम देख रही थी, क्या status है?"]
+  - [sana, "उनकी fees की report में total गलत आ रहा था। Fix हो गया है, कल उनको confirm कर दिया।"]
+  - [kabir, "Good। अब hiring। Aman, नया sales person कब तक चाहिए?"]
+  - [aman, "देखो, North में दो बड़े schools pipeline में हैं, लेकिन budget approval अभी clear नहीं है।"]
+  - [riya, "Waise कल वाला cricket match देखा किसी ने? क्या finish था!"]
+  - [kabir, "हाहा, वो बाद में। Hiring का decision अभी नहीं हो सकता, next week numbers देखकर तय करेंगे।"]
+  - [kabir, "तो recap: budget दो लाख final। Riya, campaign plan Friday तक। Aman, principals का database update करोगे। Hiring next week। Thanks सबको।"]

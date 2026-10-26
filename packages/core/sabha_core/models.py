@@ -250,6 +250,8 @@ class Recording(TenantDoc):
     # Review (ADR 0007): speaker label -> role, as a reviewer confirmed them for an "unclear_roles" recording. The
     # transcript stage uses them instead of guessing.
     confirmed_roles: dict[str, str] | None = None
+    # Meetings: names people gave the anonymous voices ("S1" -> "Riya"), display only; never sent to a model.
+    voice_names: dict[str, str] = Field(default_factory=dict)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

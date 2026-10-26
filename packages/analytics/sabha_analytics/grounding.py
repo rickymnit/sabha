@@ -186,6 +186,8 @@ class PreparedUtterance:
     norm_text: str = field(repr=False, compare=False)
     norm_offsets: tuple[tuple[int, int], ...] = field(repr=False, compare=False)
     """[start, end) of each token in `norm_text`."""
+    speaker: str = ""
+    """The diarizer's anonymous speaker label ("S1"); shown to the model only when the transcript says so."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +200,8 @@ class PreparedTranscript:
     sha256: str
     """SHA-256 of the canonical JSON of the source transcript; utterance ids refer to that exact transcript."""
     asr_model: str
+    show_speakers: bool = False
+    """Meetings: every line is a "participant", so prompts also show the speaker label (owners of action items)."""
     _by_id: dict[str, PreparedUtterance] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -212,7 +216,8 @@ class PreparedTranscript:
         `[u0042 start_ms=310300 end_ms=314000 teacher] text`. Times stay as words apart ("start_ms=") so that no two
         numbers touch, which would look like a phone or Aadhaar number to the PII guard."""
         return "\n".join(
-            f"[{u.id} start_ms={u.start_ms} end_ms={u.end_ms} {u.role}] {' '.join(u.text.split())}"
+            f"[{u.id} start_ms={u.start_ms} end_ms={u.end_ms} {u.role}"
+            f"{' ' + u.speaker if self.show_speakers and u.speaker else ''}] {' '.join(u.text.split())}"
             for u in self.utterances
         )
 
@@ -227,6 +232,7 @@ def prepare_transcript(
     *,
     names: Iterable[KnownName] = (),
     masked_roles: Iterable[str] = DEFAULT_MASKED_ROLES,
+    show_speakers: bool = False,
 ) -> PreparedTranscript:
     """Validate a transcript@v1 document, give each utterance its id and redact its text.
 
@@ -260,6 +266,7 @@ def prepare_transcript(
                 tokens=tokens,
                 norm_text=" ".join(token.norm for token in tokens),
                 norm_offsets=tuple(offsets),
+                speaker=str(utterance.get("speaker_label") or ""),
             )
         )
     return PreparedTranscript(
@@ -267,6 +274,7 @@ def prepare_transcript(
         mapping=mapping if mapping is not None else RedactionMapping(),
         sha256=_canonical_sha256(document),
         asr_model=document["asr_model"],
+        show_speakers=show_speakers,
     )
 
 

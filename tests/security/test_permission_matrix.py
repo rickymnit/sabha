@@ -248,6 +248,22 @@ def review(api: Api, caller: str) -> httpx.Response:
     return api.client.post(f"/v1/recordings/{rid}/review", json=body, headers=api.headers(caller))
 
 
+def name_voices(api: Api, caller: str) -> httpx.Response:
+    """Names a voice in a fresh meeting of Asha's."""
+    rid = f"rec-meeting-{uuid.uuid4().hex[:8]}"
+    for collection, doc in (
+        ("recordings", Recording(id=rid, tenant_id="tenant-a", type=ConversationType.MEETING, consent_ref="c",
+                                 status=RecordingStatus.COMPLETED, person_id="p-asha", unit_id="unit-1",
+                                 created_by="u-staff_uploader")),
+        ("transcripts", Transcript(tenant_id="tenant-a", recording_id=rid, version="transcript@v1",
+                                   storage_key=TRANSCRIPT_KEY, asr_model="fake", word_timing="approximate",
+                                   word_count=0, utterance_count=0, roles={"S0": "participant"},
+                                   rubric_id="meeting.company.v0.1")),
+    ):  # fmt: skip
+        api.db[collection].insert_one(doc.model_dump(by_alias=True))
+    return api.client.put(f"/v1/recordings/{rid}/voices", json={"names": {"S0": "Riya"}}, headers=api.headers(caller))
+
+
 CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /health": lambda a, who: a.client.get("/health", headers=a.headers(who)),
     "GET /ready": lambda a, who: a.client.get("/ready", headers=a.headers(who)),
@@ -276,6 +292,7 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
         f"/v1/recordings/{DONE}/speakers", headers=a.headers(who)
     ),
     "POST /v1/recordings/{recording_id}/review": review,
+    "PUT /v1/recordings/{recording_id}/voices": name_voices,
     "GET /v1/overview": lambda a, who: a.client.get(
         "/v1/overview?from=2026-01-01T00:00:00Z&to=2026-12-31T00:00:00Z", headers=a.headers(who)
     ),

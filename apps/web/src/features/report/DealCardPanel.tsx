@@ -33,7 +33,7 @@ function Chip({ text, tone }: { text: string; tone: string }) {
   );
 }
 
-function Quote({ evidence, onSeek }: { evidence: CardEvidence; onSeek: (ms: number) => void }) {
+export function Quote({ evidence, onSeek }: { evidence: CardEvidence; onSeek: (ms: number) => void }) {
   return (
     <span className="flex items-start gap-2 text-small text-muted">
       <button

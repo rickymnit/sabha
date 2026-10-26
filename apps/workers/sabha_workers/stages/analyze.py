@@ -99,8 +99,9 @@ def make_work(deps: AnalyzeDeps) -> Work:
 
         person = deps.person(ctx.tenant_id, recording.person_id) if recording.person_id else None
         names = [KnownName(person.name, STAFF)] if person is not None else []
-        transcript = prepare_transcript(document, names=names)
-        metrics = compute_metrics(document, primary_role=rubric.primary_role, segment_map=segment_map,
+        meeting = recording.type is ConversationType.MEETING
+        transcript = prepare_transcript(document, names=names, show_speakers=meeting)
+        metrics = compute_metrics(document, primary_role=rubric.primary_role, segment_map=segment_map, voices=meeting,
                                   segment_stats=stats(segment_map, recording.duration_ms),
                                   roles=list(rubric.roles))  # fmt: skip
         selected = select_metrics(metrics, rubric.computed_metrics)
@@ -111,6 +112,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 phase_names=DEFAULT_PHASES.get(recording.type.value),
                 reception=recording.type is ConversationType.RECEPTION,
                 sales=recording.type is ConversationType.SALES,
+                meeting=meeting,
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:
             retryable = isinstance(exc, BudgetUnavailableError) or exc.retryable
@@ -124,7 +126,9 @@ def make_work(deps: AnalyzeDeps) -> Work:
         ctx.artefacts.put(key, json.dumps(report, ensure_ascii=False).encode(), "application/json")
         usage = report["usage"]["total"]
         analysis = Analysis(
-            recording_id=recording.id, version=deps.analysis_version, person_id=recording.person_id,
+            # A meeting is scored as a whole: its analysis and scores belong to no one (owner's decision, 2026-10-24).
+            recording_id=recording.id, version=deps.analysis_version,
+            person_id=None if meeting else recording.person_id,
             unit_id=recording.unit_id, conversation_type=recording.type, rubric_id=rubric.id,
             rubric_version=rubric.version, rubric_hash=rubric_hash, report_key=key, status=report["next_status"],
             overall_score=report["overall"]["score"], verified_share=report["overall"]["verified_share"],

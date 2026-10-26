@@ -173,6 +173,22 @@ export interface DealCard {
   left_out: number;
 }
 
+/** Meetings: decisions, action items and open questions, each on a verified quote. */
+export interface MeetingNotes {
+  decisions: { decision: string; evidence: CardEvidence }[];
+  action_items: {
+    action: string;
+    /** As named in the meeting; null when nobody was named. */
+    owner: string | null;
+    /** The anonymous voice that took the work, when clear ("S2"); shown by the name people gave it. */
+    owner_voice: string | null;
+    due: string | null;
+    evidence: CardEvidence;
+  }[];
+  open_questions: { question: string; evidence: CardEvidence }[];
+  left_out: number;
+}
+
 export interface AnalysisReport {
   status: "completed" | "partial";
   /** Empty when completed; for partial, why some dimensions are missing. */
@@ -200,6 +216,8 @@ export interface AnalysisReport {
   phases?: Phase[] | null;
   /** Sales meetings only. */
   deal_card?: DealCard | null;
+  /** Meetings only. */
+  meeting_notes?: MeetingNotes | null;
 }
 
 export interface AnalysisProcessing {

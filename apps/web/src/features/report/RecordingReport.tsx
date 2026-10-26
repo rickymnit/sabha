@@ -18,10 +18,12 @@ import {
 } from "../transcript";
 import { checkedText, formatScore, joinList } from "./format";
 import { DealCardPanel } from "./DealCardPanel";
+import { MeetingNotesPanel } from "./MeetingNotesPanel";
 import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
 import { ReportTimeline } from "./ReportTimeline";
+import { VoicesPanel } from "./VoicesPanel";
 import { DimensionDetail, RubricScoreList } from "./RubricPanels";
 import { evidenceLines } from "./timeline";
 import { notApplicableDimensions, visibleDimensions } from "./visibility";
@@ -60,6 +62,13 @@ export interface RecordingReportProps {
   canDispute?: boolean;
   /** Sends a dispute; required for the dispute button to open the dialog. */
   onSubmitDispute?: (draft: DisputeDraft) => Promise<void>;
+  /** Meetings: the voices in order of first speech, their names, and saving new names. */
+  meeting?: {
+    voices: string[];
+    names: Record<string, string>;
+    voiceName: (voice: string) => string;
+    onSaveNames: (names: Record<string, string>) => Promise<void>;
+  };
 }
 
 export function RecordingReport({
@@ -73,6 +82,7 @@ export function RecordingReport({
   rubricHref,
   canDispute = false,
   onSubmitDispute,
+  meeting,
 }: RecordingReportProps) {
   const isReport = analysis.status === "completed" || analysis.status === "partial";
   return (
@@ -96,6 +106,7 @@ export function RecordingReport({
           viewerRole={viewerRole}
           getPlaybackUrl={getPlaybackUrl}
           onSubmitDispute={canDispute ? onSubmitDispute : undefined}
+          meeting={meeting}
         />
       )}
     </div>
@@ -115,6 +126,7 @@ function ReportBody({
   viewerRole,
   getPlaybackUrl,
   onSubmitDispute,
+  meeting,
 }: ReportBodyProps) {
   const [disputeOpen, setDisputeOpen] = useState(false);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
@@ -156,6 +168,20 @@ function ReportBody({
       <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
 
       {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
+
+      {analysis.meeting_notes && meeting && (
+        <MeetingNotesPanel notes={analysis.meeting_notes} voiceName={meeting.voiceName} onSeek={seek} />
+      )}
+
+      {meeting && transcript && (
+        <VoicesPanel
+          key={JSON.stringify(meeting.names)}
+          transcript={transcript}
+          voices={meeting.voices}
+          names={meeting.names}
+          onSave={meeting.onSaveNames}
+        />
+      )}
 
       <section
         aria-labelledby={timelineHeadingId}

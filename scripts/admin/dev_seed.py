@@ -51,7 +51,7 @@ COMPANY_USERS = [  # (subject suffix, name, job title, role, units, person id)
     ("rohit", "Rohit Sharma", "Sales rep, North", Role.STAFF, ["team-north"], "p-rohit"),
     ("neha", "Neha Gupta", "Sales rep, South", Role.STAFF, ["team-south"], "p-neha"),
 ]
-COMPANY_TYPES = [ConversationType.SALES]  # add reception and meetings as their analysis is built
+COMPANY_TYPES = [ConversationType.SALES, ConversationType.MEETING]  # reception follows when its analysis is built
 # How the speech recogniser writes the name when it is said inside Hindi speech.
 COMPANY_NAME_VARIANTS = ["Brightpath", "ब्राइट पाथ सॉफ्टवेयर", "ब्राइट पाथ", "ब्राइटपाथ"]
 # How the speech recogniser writes the name when it is said inside Hindi speech.
@@ -100,9 +100,14 @@ def _seed_tenant(
         tenants.insert_one(Tenant.from_profile(profile, name=tenant_name, plan=Plan.PILOT, id=tenant_id,
                                                name_variants=name_variants or [], **types))  # fmt: skip
         written += 1
-    elif name_variants and tenants.find_one({"_id": tenant_id, "name_variants": name_variants}) is None:
-        tenants.update_one({"_id": tenant_id}, {"$set": {"name_variants": name_variants}})
-        written += 1
+    else:  # an earlier seed: bring the variants and conversation types up to date
+        wanted = {
+            **({"name_variants": name_variants} if name_variants else {}),
+            **({"enabled_types": [t.value for t in enabled_types]} if enabled_types else {}),
+        }
+        if wanted and tenants.find_one({"_id": tenant_id, **wanted}) is None:
+            tenants.update_one({"_id": tenant_id}, {"$set": wanted})
+            written += 1
     units = SyncTenantRepo(db, "units", tenant_id, Unit)
     people = SyncTenantRepo(db, "people", tenant_id, Person)
     users = SyncTenantRepo(db, "users", tenant_id, User)

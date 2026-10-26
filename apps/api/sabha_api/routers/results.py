@@ -15,6 +15,7 @@ from sabha_api.auth.directory import Directory, directory
 from sabha_api.deps import tenant_repo
 from sabha_api.errors import NotReadyError
 from sabha_api.services import results as service
+from sabha_api.services import voices
 from sabha_core.models import Analysis, AuditEntry, Person, Recording, Score, Transcript, Unit
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
@@ -53,6 +54,17 @@ async def list_recordings(
     `type` narrow the list; they never show more than you may see."""
     return await service.list_recordings(principal, cursor=cursor, limit=limit, recordings=recordings, people=people,
                                          analyses=analyses, person_id=person_id, type=type)  # fmt: skip
+
+
+@recordings_router.put("/{recording_id}/voices", response_model=voices.VoicesOut)
+async def name_voices(
+    recording_id: str, body: voices.VoicesIn, request: Request, principal: Caller, recordings: Recordings,
+    people: People, transcripts: Transcripts, entries: Entries,
+) -> voices.VoicesOut:  # fmt: skip
+    """Meetings: names for the anonymous voices ("S1" -> "Riya"), for display only. Replaces all names; an empty
+    name removes one. Audited."""
+    return await voices.name_voices(principal, recording_id, body, request, recordings=recordings, people=people,
+                                    transcripts=transcripts, entries=entries)  # fmt: skip
 
 
 @recordings_router.get("/{recording_id}", response_model=service.RecordingDetail)

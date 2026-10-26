@@ -41,6 +41,7 @@ DEFAULT_PHASES: dict[str, tuple[str, ...]] = {
     "teaching": ("introduction", "explanation", "guided_practice", "closing"),
     "reception": ("greeting", "need", "information", "resolution", "close"),
     "sales": ("opening", "discovery", "presentation", "objections", "close"),
+    "meeting": ("opening", "discussion", "decisions", "close"),
 }
 
 

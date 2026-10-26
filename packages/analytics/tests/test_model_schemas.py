@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from sabha_analytics.classify import classification_schema
+from sabha_analytics.meetings import meeting_notes_schema
 from sabha_analytics.phases import DEFAULT_PHASES, phases_schema
 from sabha_analytics.reception import TicketValues, ticket_schema
 from sabha_analytics.rubric import Rubric
@@ -40,10 +41,11 @@ def schemas(rubric: Rubric) -> dict[str, dict[str, Any]]:
         "phases": phases_schema(DEFAULT_PHASES["sales"]),
         "ticket": ticket_schema(TicketValues(("fee_query", "other"), ("resolved", "follow_up_needed"))),
         "deal card": deal_card_schema(("high", "medium", "low", "unclear")),
+        "meeting notes": meeting_notes_schema(["S0", "S1", "S2"]),
     }
 
 
-@pytest.mark.parametrize("name", ["scoring", "synthesis", "classify", "phases", "ticket", "deal card"])
+@pytest.mark.parametrize("name", ["scoring", "synthesis", "classify", "phases", "ticket", "deal card", "meeting notes"])
 def test_answer_formats_are_accepted_by_strict_structured_outputs(rubric: Rubric, name: str) -> None:
     problems = []
     for path, node in nodes(schemas(rubric)[name]):
@@ -55,3 +57,14 @@ def test_answer_formats_are_accepted_by_strict_structured_outputs(rubric: Rubric
             if set(node.get("required", [])) != set(node["properties"]):
                 problems.append(f"{path}: every property must be required")
     assert problems == []
+
+
+def test_prompts_protect_whoever_is_not_analysed() -> None:
+    from sabha_analytics.scoring import prompt_roles
+
+    lesson = prompt_roles("teaching.school.v0.1", ["teacher", "students"])
+    assert lesson["conversation"] == "school lesson" and lesson["staff_role"] == "teacher"
+    assert "Everyone else (students) is context only" in lesson["people_rule"]  # golden rule 10
+    meeting = prompt_roles("meeting.company.v0.1", ["participant"])
+    assert meeting["conversation"] == "team meeting" and meeting["staff_role"] == "participants"
+    assert "Never score, rank, praise or criticise an individual participant" in meeting["people_rule"]

@@ -364,6 +364,39 @@ def test_who_may_resolve(api: Api) -> None:
     assert api.post("asha", "/v1/recordings/r-asha/review", body).status_code == 403  # her own: never
 
 
+# --- Meetings: naming the voices ---
+
+
+def meeting(api: Api, rid: str) -> None:
+    recording(api, rid, "p-asha", "unit-1", 5)
+    api.db.recordings.update_one({"_id": rid}, {"$set": {"type": "meeting"}})
+    insert(api.db, "transcripts", Transcript(
+        tenant_id=T, recording_id=rid, version="transcript@v1", storage_key=f"{T}/{rid}/t.json", asr_model="m",
+        word_timing="approximate", word_count=10, utterance_count=3, roles={"S0": "participant", "S1": "participant"},
+        role_choices=["participant"], rubric_id="meeting.company.v0.1",
+    ))  # fmt: skip
+
+
+def test_voices_in_a_meeting_can_be_named_and_the_names_come_back_with_the_recording(api: Api) -> None:
+    meeting(api, "r-meet")
+    response = api.client.put("/v1/recordings/r-meet/voices", json={"names": {"S0": " Riya ", "S1": ""}},
+                              headers={"Authorization": f"Bearer {api.idp.token('manager')}"})  # fmt: skip
+    assert response.json() == {"recording_id": "r-meet", "voice_names": {"S0": "Riya"}}  # empty removes; trimmed
+    assert api.get("owner", "/v1/recordings/r-meet").json()["voice_names"] == {"S0": "Riya"}
+    (entry,) = api.db.audit_log.find({"action": "recording.voices"})
+    assert entry["meta"] == {"voices": ["S0"]}
+
+
+def test_only_meeting_voices_that_spoke_can_be_named(api: Api) -> None:
+    meeting(api, "r-meet")
+    headers = {"Authorization": f"Bearer {api.idp.token('owner')}"}
+    ghost = api.client.put("/v1/recordings/r-meet/voices", json={"names": {"S7": "Nobody"}}, headers=headers)
+    assert (ghost.status_code, ghost.json()["code"]) == (400, "unknown_voice")
+    recording(api, "r-lesson", "p-asha", "unit-1", 5)
+    lesson = api.client.put("/v1/recordings/r-lesson/voices", json={"names": {"S0": "Asha"}}, headers=headers)
+    assert (lesson.status_code, lesson.json()["code"]) == (409, "not_a_meeting")  # students are never named
+
+
 # --- Transcript and analysis ---
 
 

@@ -501,3 +501,18 @@ def test_hold_gaps_count_only_gaps_longer_than_ten_seconds() -> None:
     result = {m.key: m.value for m in metrics}
     assert result["hold_gap_count"] == 1
     assert result["long_silence_count"] == 3  # all three gaps are over 5 s
+
+
+def test_voice_metrics_are_for_meetings_only_and_count_aggregates() -> None:
+    fixture = load("lesson_overlap")
+    assert not {m.key for m in run(fixture)} & {"voice_count", "top_voice_share", "quiet_voice_count"}  # lessons: never
+    transcript = fixture["transcript"]
+    segment_map = SegmentMap.from_records(fixture["segments"])
+    with_voices = compute_metrics(transcript, primary_role=fixture["primary_role"], segment_map=segment_map,
+                                  segment_stats=stats(segment_map, fixture["total_ms"]), voices=True)  # fmt: skip
+    by_key = {m.key: m for m in with_voices}
+    labels = {u["speaker_label"] for u in transcript["utterances"]}
+    assert by_key["voice_count"].value == len(labels)
+    share = by_key["top_voice_share"].value
+    assert share is not None and 0 < share <= 1
+    assert all("SPEAKER" not in m.key.upper() for m in with_voices)  # aggregates; no metric names a voice

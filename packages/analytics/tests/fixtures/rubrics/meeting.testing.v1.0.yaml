@@ -1,0 +1,28 @@
+# Test fixture only: a small, valid meeting rubric for the meeting notes tests. Not a real rubric; the wording is fictional.
+id: meeting.testing.v1.0
+segment: testing
+version: "1.0"
+roles: [participant]
+
+dimensions:
+  - key: decisions_made
+    name: Decisions made
+    weight: 0.5
+    definition: "Decisions are said out loud."
+    min_quotes: 1
+    anchors: {1: "None.", 2: "Implied.", 3: "One said.", 4: "Most said.", 5: "Said and summed up."}
+    examples: {1: "Baad mein dekhte hain.", 5: "Toh decide hua: budget 2 lakh."}
+
+  - key: actions_assigned
+    name: Actions with owners and dates
+    weight: 0.5
+    definition: "Work goes to a named person with a date."
+    min_quotes: 1
+    anchors: {1: "None.", 2: "No date.", 3: "Some dates.", 4: "Most with dates.", 5: "All, read back."}
+    examples: {1: "Yeh karna padega.", 5: "Riya kal 12 baje tak."}
+
+computed_metrics: [duration_s, voice_count, top_voice_share, quiet_voice_count]
+
+output: [summary, strengths, gaps, suggestions, decisions, action_items, open_questions]
+
+visibility_gate: {metric: cohens_kappa, min: 0.60}

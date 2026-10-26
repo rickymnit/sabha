@@ -402,6 +402,9 @@ METRIC_NAMES = {
     "open_question_ratio": "Open questions",
     "words_per_minute": "Speaking pace",
     "longest_monologue_s": "Longest uninterrupted talk",
+    "voice_count": "Voices",
+    "top_voice_share": "Largest share of talk",
+    "quiet_voice_count": "Voices hardly heard",
 }
 ROLE_METRIC_NAMES = {"talk_share": "{role} talk time", "turn_count": "Turns by {role_lower}",
                      "question_count": "Questions asked by {role_lower}"}  # fmt: skip
@@ -507,6 +510,7 @@ def report_payload(
         ]
         or None,
         "deal_card": report.get("deal_card"),  # sales meetings: verified items only (sabha_analytics.sales)
+        "meeting_notes": report.get("meeting_notes"),  # meetings: verified items only (sabha_analytics.meetings)
     }
 
 
@@ -538,6 +542,7 @@ class RecordingDetail(RecordingOut):
     speech_ms: int | None  # after silence removal; None until preprocessing has run
     languages: list[str]  # language names, from the transcript
     removed_silence: list[Range]  # on the original timeline (golden rule 4)
+    voice_names: dict[str, str]  # meetings: names given to the anonymous voices ("S1" -> "Riya")
 
 
 def silence_gaps(segment_map: SegmentMap, duration_ms: int | None) -> list[Range]:
@@ -565,6 +570,7 @@ async def recording_detail(
     return RecordingDetail(
         **base.model_dump(), type_label=recording.type.value.capitalize(),
         unit_name=unit.name if unit else None, recorded_at=recording.recorded_at or recording.created_at,
+        voice_names=recording.voice_names,
         speech_ms=None if segment_map is None else segment_map.compact_length_ms, languages=languages,
         removed_silence=[] if segment_map is None else silence_gaps(segment_map, recording.duration_ms),
     )  # fmt: skip

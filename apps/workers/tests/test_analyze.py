@@ -33,6 +33,7 @@ S = RecordingStatus
 ANALYZE = StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED)
 ROOT = Path(__file__).resolve().parents[3]
 RUBRIC = load_rubric(ROOT / "packages/analytics/tests/fixtures/rubrics/teaching.testing.v1.0.yaml")
+MEETING_RUBRIC = load_rubric(ROOT / "packages/analytics/tests/fixtures/rubrics/meeting.testing.v1.0.yaml")
 TENANT = Tenant.from_profile("school", name="Sunrise Public School", plan=Plan.PILOT, id="t1")
 ROWS = (  # the analytics package's test lesson; u0002 is a student line with a phone number
     ("teacher", 0, 8_000, "Aaj hum photosynthesis ke baare mein padhenge, dhyan se suno."),
@@ -131,16 +132,18 @@ class Stage:
                                   jitter=lambda: 0.0)  # fmt: skip
         SyncTenantRepo(db, "people", "t1", Person).insert_one(Person(id="p-asha", name="Asha", unit_id="unit-1"))
 
-    def recording(self, *, with_inputs: bool = True) -> str:
-        rec = Recording(type=ConversationType.TEACHING, status=S.ANALYZING, consent_ref="c", person_id="p-asha",
+    def recording(self, *, with_inputs: bool = True, kind: ConversationType = ConversationType.TEACHING,
+                  document: dict[str, Any] | None = None) -> str:  # fmt: skip
+        rec = Recording(type=kind, status=S.ANALYZING, consent_ref="c", person_id="p-asha",
                         unit_id="unit-1", duration_ms=DURATION_MS)  # fmt: skip
         rid = SyncTenantRepo(self.db, "recordings", "t1", Recording).insert_one(rec).id
         if with_inputs:
-            self.artefacts.put(f"t1/{rid}/transcribe@v1/transcript@v1.json", json.dumps(transcript()).encode())
+            body = json.dumps(document or transcript()).encode()
+            self.artefacts.put(f"t1/{rid}/transcribe@v1/transcript@v1.json", body)
             self.artefacts.put(f"t1/{rid}/preprocess@v1/segments@v1.json", MAP.to_json().encode())
         return rid
 
-    def deps(self, judge: FakeJudge) -> AnalyzeDeps:
+    def deps(self, judge: FakeJudge, rubric: Any = RUBRIC) -> AnalyzeDeps:
         def save(tenant_id: str, analysis: Analysis, scores: list[Score]) -> None:
             analyses = SyncTenantRepo(self.db, "analyses", tenant_id, Analysis)
             rows = SyncTenantRepo(self.db, "scores", tenant_id, Score)
@@ -153,11 +156,11 @@ class Stage:
         return AnalyzeDeps(
             preprocess_version="v1", transcribe_version="v1", analysis_version="v1", tenant=lambda _: TENANT,
             person=lambda t, p: SyncTenantRepo(self.db, "people", t, Person).find_one({"_id": p}),
-            rubric=lambda *_: RUBRIC, judge=lambda *_: judge, save=save, llm_cost=lambda *_: None,
+            rubric=lambda *_: rubric, judge=lambda *_: judge, save=save, llm_cost=lambda *_: None,
         )  # fmt: skip
 
-    def run(self, rid: str, judge: FakeJudge) -> str:
-        return self.runner.run(ANALYZE, make_work(self.deps(judge)), "t1", rid, attempt=1).result
+    def run(self, rid: str, judge: FakeJudge, rubric: Any = RUBRIC) -> str:
+        return self.runner.run(ANALYZE, make_work(self.deps(judge, rubric)), "t1", rid, attempt=1).result
 
     def doc(self, rid: str) -> dict[str, Any]:
         found = self.db.recordings.find_one({"_id": rid})
@@ -244,3 +247,50 @@ def test_missing_transcript_fails_for_a_replay(stage: Stage) -> None:
     rid = stage.recording(with_inputs=False)
     assert stage.run(rid, good_judge()) == "failed"
     assert stage.doc(rid)["status_reason"] == "missing_input"
+
+
+def meeting_transcript() -> dict[str, Any]:
+    rows = (("S0", 0, 8_000, "Aaj ka agenda budget aur vendor issue hai, dono pe decision chahiye."),
+            ("S1", 9_000, 20_000, "Toh decide karte hain budget do lakh rahega, sirf Instagram pe."),
+            ("S2", 21_000, 30_000, "Vendor ko main kal baarah baje tak call kar dungi, pakka."))  # fmt: skip
+    return {"version": "transcript@v1", "timeline": "original", "asr_model": "sarvam/saaras:v4",
+            "word_timing": "approximate", "word_count": sum(len(r[3].split()) for r in rows),
+            "utterances": [{"role": "participant", "speaker_label": v, "start_ms": a, "end_ms": b, "text": t,
+                            "avg_confidence": None, "low_confidence_spans": []} for v, a, b, t in rows]}  # fmt: skip
+
+
+def test_a_meeting_is_scored_as_a_whole_and_its_scores_belong_to_no_one(stage: Stage) -> None:
+    rid = stage.recording(kind=ConversationType.MEETING, document=meeting_transcript())
+    scores = {"dimensions": [
+        {"key": "decisions_made", "score": 4, "rationale": "The budget decision is said out loud.",
+         "evidence": [{"quote": "budget do lakh rahega", "utterance_id": "u0001", "start_ms": 9_000}]},
+        {"key": "actions_assigned", "score": 4, "rationale": "The vendor call has an owner and a time.",
+         "evidence": [{"quote": "kal baarah baje tak call kar dungi", "utterance_id": "u0002", "start_ms": 21_000}]},
+    ]}  # fmt: skip
+    synthesis = {
+        "summary": "A short meeting that settled the budget and gave out the vendor call.",
+        "strengths": ["The budget decision is said clearly.", "The vendor call has a time."],
+        "gaps": ["Decisions were not read back.", "No next check-in was set."],
+        "suggestions": [{"text": "Read the decision back.", "utterance_id": "u0001"},
+                        {"text": "Confirm who owns each action.", "utterance_id": "u0002"},
+                        {"text": "Close with the list of actions.", "utterance_id": "u0002"}],
+    }  # fmt: skip
+    phases = {
+        "phases": [
+            {"phase": "opening", "start_utterance_id": "u0000", "end_utterance_id": "u0000"},
+            {"phase": "decisions", "start_utterance_id": "u0001", "end_utterance_id": "u0002"},
+        ]
+    }
+    notes = {"decisions": [{"decision": "The budget is Rs 2 lakh, on Instagram only.", "quote": "budget do lakh rahega",
+                            "start_ms": 9_000, "utterance_id": "u0001"}],
+             "action_items": [{"action": "Call the vendor.", "owner": None, "owner_voice": "S2", "due": "tomorrow 12",
+                               "quote": "kal baarah baje tak call kar dungi", "start_ms": 21_000,
+                               "utterance_id": "u0002"}],
+             "open_questions": []}  # fmt: skip
+    assert stage.run(rid, FakeJudge([scores, synthesis, phases, notes]), MEETING_RUBRIC) == "done"
+    (analysis,) = stage.db.analyses.find({"recording_id": rid})
+    assert analysis["person_id"] is None  # nobody is scored, so nobody's trend shows it
+    assert all(s["person_id"] is None for s in stage.db.scores.find({"analysis_id": analysis["_id"]}))
+    report = json.loads(stage.artefacts.get(f"t1/{rid}/analyze@v1/analysis@v1.json"))
+    assert report["meeting_notes"]["action_items"][0]["owner_voice"] == "S2"
+    assert {m["key"]: m["value"] for m in report["metrics"]}["voice_count"] == 3

@@ -1,0 +1,115 @@
+# Meeting rubric v0.1: DRAFT for the product owner's review (2026-10-26). Team meetings such as a founder's weekly
+# meeting with the team, recorded on a phone or a laptop.
+#
+# The MEETING is scored, never a person (owner's decision, 2026-10-24): every speaker is a "participant", and no
+# score, rank or criticism is ever given to an individual. Meeting notes (decisions, action items, open questions)
+# come with the report, each backed by a quote.
+#
+# Rules (as for every rubric):
+# - Anchors describe only what is said in the meeting that a rater can point to in the transcript or audio.
+#   No guesses about intentions, feelings or whether the meeting was "productive" in general.
+# - Example utterances are illustrative Hinglish. All names, projects and dates in them are fictional.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: meeting.company.v0.1
+segment: company
+version: "0.1"
+roles: [participant]  # everyone who speaks; the meeting as a whole is analysed
+
+dimensions:
+  - key: clear_purpose
+    name: Clear purpose
+    weight: 0.15
+    definition: "Early in the meeting someone says what the meeting is for or what will be covered."
+    min_quotes: 1
+    anchors:
+      1: "Nobody says what the meeting is for; the discussion starts on whatever comes up."
+      2: "A topic is mentioned in passing, but no purpose or list of points is stated."
+      3: "Someone states the purpose or the main topic, but not what the meeting should decide or produce."
+      4: "Someone states the purpose and the points to cover, or what the meeting should decide."
+      5: "Someone states the purpose, the points to cover and what the meeting should decide, and checks whether anyone has something to add."
+    examples:
+      1: "Haan toh... kya chal raha hai sabka?"
+      5: "Aaj teen cheezein: Diwali campaign ka budget, naya hire, aur client escalation. End tak budget final karna hai. Kisi ko kuch aur add karna hai?"
+
+  - key: decisions_made
+    name: Decisions made
+    weight: 0.25
+    definition: "Discussion leads to decisions that are said out loud clearly, so everyone knows what was decided."
+    min_quotes: 1
+    anchors:
+      1: "Topics are discussed but nothing is decided; each ends with 'dekhte hain' or moves on."
+      2: "A decision seems to be reached but is never said clearly; it is left to be inferred."
+      3: "At least one decision is said clearly, but other topics end without one."
+      4: "Most topics that needed a decision end with the decision said clearly."
+      5: "Most topics end with a decision said clearly, and the decisions are summed up before the meeting ends."
+    examples:
+      1: "Budget pe baad mein baat karte hain, chalo next."
+      5: "Toh decide hua: Diwali campaign ka budget 2 lakh, sirf Instagram aur WhatsApp. Theek hai sab?"
+
+  - key: actions_assigned
+    name: Actions with owners and dates
+    weight: 0.25
+    definition: "Work that comes out of the meeting is given to a named person with a date or time, and they accept it."
+    min_quotes: 1
+    not_applicable_when: "The meeting produces no work for anyone to do, so there is nothing to assign."
+    anchors:
+      1: "Work is mentioned but nobody is asked to do it ('yeh karna padega')."
+      2: "Work is given to a person but with no date or time, and they do not respond."
+      3: "Work is given to named people, but with no date or time for most of it."
+      4: "Most work is given to a named person with a date or time, and they accept it."
+      5: "Each piece of work is given to a named person with a date or time, they accept it, and the list is read back before the meeting ends."
+    examples:
+      1: "Haan woh vendor wala issue bhi dekhna padega kabhi."
+      5: "Riya, vendor ko kal 12 baje tak call karogi? ... Haan, kar dungi. ... Toh final list: Riya vendor kal 12 tak, Aman deck Friday tak."
+
+  - key: everyone_heard
+    name: Everyone heard
+    weight: 0.15
+    definition: "People other than the main speaker are invited in and their points are taken up, rather than the meeting being one long monologue."
+    min_quotes: 1
+    anchors:
+      1: "One person talks almost throughout; others are not asked anything and their few remarks are ignored."
+      2: "Others speak only when they interrupt; nobody is invited to give a view."
+      3: "At least one person is asked for their view, but most of the meeting is one person talking."
+      4: "Several people are asked for their views by name, and what they say is taken up in the discussion."
+      5: "Several people are asked by name, quieter people are invited in, and their points change or shape a decision."
+    examples:
+      1: "Main bata deta hoon kya karna hai, sab dhyan se suno..."
+      5: "Aman, tum client se roz baat karte ho, tumhara kya kehna hai? ... Accha point hai, toh launch ek hafta aage karte hain."
+
+  - key: focus_and_close
+    name: Focus and close
+    weight: 0.20
+    definition: "The meeting stays on its points, parks side topics, and ends with a recap of what was decided and what happens next."
+    min_quotes: 1
+    anchors:
+      1: "The discussion drifts between unrelated topics and the meeting ends abruptly."
+      2: "The meeting drifts often, and side topics are not brought back to the points."
+      3: "The meeting mostly stays on its points but ends without any recap."
+      4: "Side topics are parked or brought back to the points, and the meeting ends with a short recap."
+      5: "Side topics are parked explicitly, the meeting ends with a recap of decisions and actions, and the next meeting or check-in is set."
+    examples:
+      1: "Arre wo cricket match dekha kal? ... Chalo bye, baad mein baat karte hain."
+      5: "Yeh hiring wala topic alag meeting mein lete hain. Toh recap: budget final, Riya aur Aman ke actions upar, next check-in Monday 10 baje."
+
+# Numbers computed in code from the transcript and audio (CLAUDE.md golden rule 5), shown next to the scores and
+# never produced by the LLM. Voices are counted as aggregates only; no metric names a person. No targets are set.
+computed_metrics:
+  - duration_s          # length of the meeting, in seconds
+  - voice_count         # how many different voices spoke
+  - top_voice_share     # share of all speaking time taken by the voice that spoke most
+  - quiet_voice_count   # voices with less than 5% of all speaking time
+
+output:
+  - summary         # what the meeting was about and what came out of it
+  - strengths
+  - gaps
+  - suggestions
+  - decisions       # meeting notes: each decision said in the meeting, with a quote
+  - action_items    # meeting notes: what, who (as named in the meeting) and by when, with a quote
+  - open_questions  # meeting notes: questions raised and left open, with a quote
+
+# Scores from this rubric stay hidden from users until agreement between the model and human raters, measured by
+# eval/kappa.py on real annotated recordings, reaches this value. No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}

@@ -66,6 +66,8 @@ export interface RecordingDetail extends RecordingItem {
   speech_ms: number | null;
   languages: string[];
   removed_silence: TimeRange[];
+  /** Meetings: names people gave the anonymous voices ("S1" -> "Riya"). */
+  voice_names: Record<string, string>;
 }
 
 export interface TranscriptResponse {

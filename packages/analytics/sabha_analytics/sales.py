@@ -161,7 +161,7 @@ _QUOTE = {
 }
 
 
-def _item(fields: Mapping[str, Any]) -> dict[str, Any]:
+def quoted_item(fields: Mapping[str, Any]) -> dict[str, Any]:
     properties = {**fields, **_QUOTE}
     return {"type": "object", "additionalProperties": False, "required": list(properties), "properties": properties}
 
@@ -178,12 +178,12 @@ def deal_card_schema(interest: Sequence[str]) -> dict[str, Any]:
         "additionalProperties": False,
         "required": ["current_setup", "customer_needs", "objections", "interest_level", "next_step"],
         "properties": {
-            "current_setup": {"type": "array", "maxItems": MAX_SETUP_ITEMS, "items": _item({"fact": text})},
-            "customer_needs": {"type": "array", "maxItems": MAX_ITEMS, "items": _item({"need": text})},
+            "current_setup": {"type": "array", "maxItems": MAX_SETUP_ITEMS, "items": quoted_item({"fact": text})},
+            "customer_needs": {"type": "array", "maxItems": MAX_ITEMS, "items": quoted_item({"need": text})},
             "objections": {
                 "type": "array",
                 "maxItems": MAX_ITEMS,
-                "items": _item({"objection": text, "response": text, "settled": {"enum": list(SETTLED_VALUES)}}),
+                "items": quoted_item({"objection": text, "response": text, "settled": {"enum": list(SETTLED_VALUES)}}),
             },
             "interest_level": {
                 "type": "object",
@@ -194,7 +194,7 @@ def deal_card_schema(interest: Sequence[str]) -> dict[str, Any]:
             "next_step": {
                 "anyOf": [  # strict structured outputs allow anyOf, not oneOf
                     {"type": "null"},
-                    _item({"action": text, "owner": {"enum": list(OWNERS)}, "due": {"type": ["string", "null"]}}),
+                    quoted_item({"action": text, "owner": {"enum": list(OWNERS)}, "due": {"type": ["string", "null"]}}),
                 ]
             },
         },
@@ -202,11 +202,12 @@ def deal_card_schema(interest: Sequence[str]) -> dict[str, Any]:
 
 
 @dataclass
-class _Check:
-    """Validates one answer: shape problems block it; quote problems are fed back and the items are left out."""
+class QuoteCheck:
+    """Validates one answer: shape problems block it; quote problems are fed back and the items are left out. Shared
+    by the deal card and the meeting notes."""
 
     transcript: PreparedTranscript
-    interest: Sequence[str]
+    interest: Sequence[str] = ()
     problems: list[Problem] = field(default_factory=list)
     unverified: int = 0
 
@@ -222,7 +223,7 @@ class _Check:
             )
         if PLACEHOLDER.search(value):
             self.problems.append(
-                Problem("placeholder_in_text", f"{where} contains a placeholder; say 'the customer' instead.")
+                Problem("placeholder_in_text", f"{where} contains a placeholder; describe the person in words instead.")
             )
         return value
 
@@ -254,7 +255,7 @@ def validate_deal_card(
     keys = {"current_setup", "customer_needs", "objections", "interest_level", "next_step"}
     if not isinstance(data, dict) or set(data) != keys:
         return None, [Problem("invalid_output", f"Answer with exactly {', '.join(sorted(keys))}.")]
-    check = _Check(transcript, interest)
+    check = QuoteCheck(transcript, interest)
     setup, needs, objections = data["current_setup"], data["customer_needs"], data["objections"]
     if not isinstance(needs, list) or not isinstance(objections, list) or max(len(needs), len(objections)) > MAX_ITEMS:
         return None, [Problem("invalid_shape", f"customer_needs and objections are lists of at most {MAX_ITEMS}.")]

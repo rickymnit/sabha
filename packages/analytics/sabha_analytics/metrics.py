@@ -91,7 +91,13 @@ RUBRIC_KEY_ALIASES: Mapping[str, str] = MappingProxyType(
 ROLE_METRIC_SUFFIXES = ("talk_share", "turn_count", "question_count")
 """Per-role keys are f"{role}_{suffix}"."""
 
+QUIET_VOICE_SHARE = 0.05
+"""Meetings: a voice with less than this share of all speaking time counts as hardly heard."""
+
 RECORDING_METRIC_KEYS = ("duration_s", "silence_share", "longest_silence_s", "long_silence_count", "hold_gap_count")
+VOICE_METRIC_KEYS = ("voice_count", "top_voice_share", "quiet_voice_count")
+"""Meetings only (compute_metrics(voices=True)): how the talk was shared among the voices, as aggregates. Never for
+lessons or calls, where counting voices would drift towards analysing students or callers (golden rule 10)."""
 PRIMARY_METRIC_KEYS = (
     "open_question_count",
     "open_question_ratio",
@@ -296,7 +302,9 @@ def _ratio(numerator: float, denominator: float, places: int = 4) -> float | Non
 def available_metric_keys(roles: Iterable[str]) -> frozenset[str]:
     """Every key compute_metrics produces for these roles, plus the rubric aliases."""
     role_keys = {f"{role}_{suffix}" for role in roles for suffix in ROLE_METRIC_SUFFIXES}
-    return frozenset({*RECORDING_METRIC_KEYS, *PRIMARY_METRIC_KEYS, *role_keys, *RUBRIC_KEY_ALIASES})
+    return frozenset(
+        {*RECORDING_METRIC_KEYS, *PRIMARY_METRIC_KEYS, *VOICE_METRIC_KEYS, *role_keys, *RUBRIC_KEY_ALIASES}
+    )
 
 
 def select_metrics(metrics: Iterable[Metric], keys: Iterable[str]) -> tuple[Metric, ...]:
@@ -339,12 +347,14 @@ def compute_metrics(
     segment_map: SegmentMap,
     segment_stats: SegmentStats,
     roles: Sequence[str] | None = None,
+    voices: bool = False,
 ) -> tuple[Metric, ...]:
     """All metrics for one recording, in a stable order. Raises ValueError on inconsistent input.
 
     `roles` are the rubric roles (primary first); per-role metrics are produced for each, even a role that never
     speaks. Without `roles`, the primary role and the roles in the transcript (in order of first appearance) are
-    used. `segment_stats` must be `timemap.stats(segment_map, total_ms)` for the same recording.
+    used. `segment_stats` must be `timemap.stats(segment_map, total_ms)` for the same recording. `voices=True` adds
+    VOICE_METRIC_KEYS (meetings only).
     """
     validate_transcript(transcript)
     utterances: list[Mapping[str, Any]] = list(transcript["utterances"])
@@ -399,6 +409,28 @@ def compute_metrics(
             f"Number of holds: gaps with no speech longer than {HOLD_GAP_MS // 1000} s between stretches of speech.",
         ),
     ]
+    if voices:
+        # Per voice (the diarizer's anonymous labels), as aggregates only: how the talk was shared, never who did well.
+        voice_ms = {
+            label: _union_ms((u["start_ms"], u["end_ms"]) for u in utterances if u["speaker_label"] == label)
+            for label in dict.fromkeys(u["speaker_label"] for u in utterances)
+        }
+        all_voice_ms = sum(voice_ms.values())
+        metrics += [
+            Metric("voice_count", len(voice_ms), "count", "Number of different voices that spoke."),
+            Metric(
+                "top_voice_share",
+                _ratio(max(voice_ms.values(), default=0), all_voice_ms),
+                "ratio",
+                "Share of all speaking time taken by the voice that spoke most.",
+            ),
+            Metric(
+                "quiet_voice_count",
+                sum(1 for ms in voice_ms.values() if all_voice_ms and ms / all_voice_ms < QUIET_VOICE_SHARE),
+                "count",
+                f"Voices with less than {QUIET_VOICE_SHARE:.0%} of all speaking time.",
+            ),
+        ]
     for role in resolved:
         who = role.replace("_", " ")  # "sales_rep" reads "sales rep" in the definitions
         metrics += [

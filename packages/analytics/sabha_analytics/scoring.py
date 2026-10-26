@@ -130,15 +130,22 @@ CONVERSATION_KINDS = {
 
 
 def prompt_roles(rubric_id: str, roles: Sequence[str]) -> dict[str, str]:
-    """$conversation, $staff_role and $others for the system prompts, from the rubric."""
+    """$conversation, $staff_role and $people_rule for the system prompts, from the rubric."""
     kind = rubric_id.split(".", 1)[0]
-    staff = roles[0] if roles else "staff member"
-    others = roles[1] if len(roles) > 1 else "others"
-    return {
-        "conversation": CONVERSATION_KINDS.get(kind, "conversation"),
-        "staff_role": staff.replace("_", " "),
-        "others": others.replace("_", " "),
-    }
+    staff = (roles[0] if roles else "staff member").replace("_", " ")
+    if len(roles) > 1:
+        others = roles[1].replace("_", " ")
+        rule = (
+            f"The person analysed is the {staff}. Everyone else ({others}) is context only: never score, judge or "
+            "describe any of them individually, and refer to them only by their role."
+        )
+    else:  # a meeting: one role for everyone, and the meeting as a whole is analysed (owner's decision, 2026-10-24)
+        staff = f"{staff}s" if not staff.endswith("s") else staff
+        rule = (
+            "The meeting is judged as a whole. Never score, rank, praise or criticise an individual participant; "
+            "speak of the meeting or the team."
+        )
+    return {"conversation": CONVERSATION_KINDS.get(kind, "conversation"), "staff_role": staff, "people_rule": rule}
 
 
 @dataclass(frozen=True, slots=True)

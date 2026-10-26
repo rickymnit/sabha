@@ -5,20 +5,23 @@
 import { useCallback } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
+import { apiFetch } from "../api/client";
 import { useAnalysis, useApi, useRecording, useTranscript } from "../api/hooks";
+import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
 import { Button, EmptyState, Skeleton, SkeletonGroup } from "../design";
 import { RecordingReport } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
 import { viewerRole } from "../app/format";
 import { RESOLVERS } from "../app/nav";
-import { reportRecording, roleLabels } from "./recordingView";
+import { meetingView, reportRecording, roleLabels, voiceLabel } from "./recordingView";
 
 export function RecordingPage() {
   const me = useOutletContext<Me>();
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const api = useApi();
+  const { token } = useSession();
   const recording = useRecording(id);
   const analysis = useAnalysis(id);
   const hasTranscript = analysis.data !== undefined && analysis.data.status !== "processing";
@@ -50,6 +53,21 @@ export function RecordingPage() {
     );
   }
   const data = transcript.data ?? null;
+  const isMeeting = recording.data.type === "meeting";
+  const view = isMeeting && data ? meetingView(data.transcript, recording.data.voice_names) : null;
+  const meeting = view
+    ? {
+        voices: view.voices,
+        names: recording.data.voice_names,
+        voiceName: (voice: string) => voiceLabel(voice, view.voices, recording.data.voice_names),
+        onSaveNames: async (names: Record<string, string>) => {
+          await apiFetch(`/v1/recordings/${encodeURIComponent(id)}/voices`, { method: "PUT", token, body: { names } });
+          await recording.refetch();
+        },
+      }
+    : undefined;
+  // A meeting has an organiser, not a person analysed (ADR 0008).
+  const labels = isMeeting ? { ...me.tenant.labels, person: "Organiser" } : me.tenant.labels;
   const canReview = recording.data.status === "NEEDS_REVIEW" && RESOLVERS.includes(me.user.role);
   return (
     <div className="flex flex-col gap-4">
@@ -64,11 +82,12 @@ export function RecordingPage() {
       <RecordingReport
         recording={reportRecording(recording.data)}
         analysis={analysis.data}
-        transcript={data?.transcript ?? null}
-        labels={me.tenant.labels}
-        roles={roleLabels(data?.roles ?? {}, me.tenant.labels.person)}
+        transcript={view?.transcript ?? data?.transcript ?? null}
+        labels={labels}
+        roles={view?.roles ?? roleLabels(data?.roles ?? {}, me.tenant.labels.person)}
         viewerRole={viewerRole(me.user.role)}
         getPlaybackUrl={getPlaybackUrl}
+        meeting={meeting}
       />
     </div>
   );

@@ -173,6 +173,18 @@ routes:
     anonymous: 401
     others: 200
 
+  PUT /v1/recordings/{recording_id}/voices:
+    # Meetings: naming the anonymous voices, display only; a fresh meeting of Asha's per call. Audited.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # not their unit
+    reviewer_unit: 200
+    staff_uploader: 200  # their own recording
+    staff_colleague: 404
+    other_tenant: 404
+
   GET /v1/reviews:
     # Recordings waiting for a person's decision (ADR 0007); filtered like the recordings list.
     anonymous: 401
