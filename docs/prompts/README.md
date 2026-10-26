@@ -31,7 +31,6 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 
 | Task | File | What remains |
 | --- | --- | --- |
-| Company reception | none yet | Rubric `reception.company`, company profile defaults, report and ticket for business front desks |
 | P6.7 disputes (partly built) | `week-5.md` | The dispute endpoints and `disputes` collection, score overrides with history, the resolution notification; the dialog is on mock data |
 | P2.8 re-analysis | `week-5.md` | Not started |
 | P6.9 consent (partly built) | `week-6.md` | Consent records (scope, validity), releasing recordings awaiting consent, the admin UI and the upload selector |
@@ -90,6 +89,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | P5.6 scoring and grounding, P5.7 synthesis and storage, P5.7b analysis API, P5.8 reception | A real lesson and 10 real calls end to end on staging |
 | P6.3 upload screen, P6.4a/P6.4b overview, P7.4 permission tests | Add every new route to `tests/security/permissions.yaml` (the test enforces it) |
 | Sales meetings (rubric `sales.company.v0.2`, deal card), meetings (`meeting.company.v0.1`, ADR 0008) | Added 2026-10-24 to 2026-10-26; no prompt file |
+| Company reception: walk-in visitors (`reception.company.v0.1`), the ticket on the report with verified quotes | Draft rubric for the owner's review; a full run on audio once Sarvam has credit |
 
 ## Coverage check
 
