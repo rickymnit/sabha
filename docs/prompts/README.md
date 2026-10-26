@@ -31,7 +31,6 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 
 | Task | File | What remains |
 | --- | --- | --- |
-| P2.8 re-analysis | `week-5.md` | Not started |
 | P6.9 consent (partly built) | `week-6.md` | Consent records (scope, validity), releasing recordings awaiting consent, the admin UI and the upload selector |
 | P2.6 live status | `week-2.md` | Not started (server-sent events for the recordings list and overview) |
 | P6.8 role views | `week-6.md` | Not started; includes the workspace setup, rubric editor and plans pages in `docs/design/` |
@@ -90,6 +89,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | Sales meetings (rubric `sales.company.v0.2`, deal card), meetings (`meeting.company.v0.1`, ADR 0008) | Added 2026-10-24 to 2026-10-26; no prompt file |
 | Company reception: walk-in visitors (`reception.company.v0.1`), the ticket on the report with verified quotes | Draft rubric for the owner's review; a full run on audio once Sarvam has credit |
 | P6.7 disputes: raise, the Disputes tab in Reviews, decide, email; the reviewer's score counts in the overall and trends | Calibration records are stored on each dispute; reading them into the calibration loop is P5.9 |
+| P2.8 re-analysis: one recording or many (count first, 100 per request), every version kept, numbers from the latest only | Re-analysis with a chosen rubric version is in the API only (the app always uses the current rubric) |
 
 ## Coverage check
 
