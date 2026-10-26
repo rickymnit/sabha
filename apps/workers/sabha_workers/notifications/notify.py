@@ -25,6 +25,7 @@ from sabha_core.models import Delivery, Dispute, OutboxEvent, Person, Recording,
 from sabha_core.repo import SyncTenantRepo, own_tenant
 from sabha_workers.notifications.delivery_log import MongoDeliveryLog
 from sabha_workers.notifications.emails import (
+    Decision,
     PlannedEmail,
     Recipient,
     plan_dispute_emails,
@@ -99,14 +100,15 @@ def notify(
         log.warning("nothing to notify about", extra={"event_id": event_id, "recording_id": recording_id})
         return NotifyResult()
     status, reason = event.payload.get("to_status"), event.payload.get("reason")
-    decision = None
+    decision: Decision | None = None
     planned: list[PlannedEmail]
     if event.type == DISPUTE_RESOLVED:
-        dispute = SyncTenantRepo(db, "disputes", tenant_id, Dispute).find_one({"_id": event.payload["dispute_id"]})
-        if dispute is None or dispute.status == "open":
+        disputes = SyncTenantRepo(db, "disputes", tenant_id, Dispute)
+        dispute = disputes.find_one({"_id": event.payload["dispute_id"]})
+        if dispute is None or dispute.status not in ("accepted", "rejected"):  # open, or closed by a re-analysis
             log.warning("no decided dispute to notify about", extra={"event_id": event_id})
             return NotifyResult()
-        decision = dispute.status
+        decision = "accepted" if dispute.status == "accepted" else "rejected"
         planned = plan_dispute_emails(event_id, dispute.raised_by, recipients(db, tenant_id, recording,
                                                                               also=dispute.raised_by))  # fmt: skip
     else:
