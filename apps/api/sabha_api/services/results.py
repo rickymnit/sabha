@@ -509,9 +509,18 @@ def report_payload(
             {"name": p["phase"], "start_ms": p["start_ms"], "end_ms": p["end_ms"]} for p in report.get("phases") or []
         ]
         or None,
+        "ticket": shown_ticket(report.get("ticket")),
         "deal_card": report.get("deal_card"),  # sales meetings: verified items only (sabha_analytics.sales)
         "meeting_notes": report.get("meeting_notes"),  # meetings: verified items only (sabha_analytics.meetings)
     }
+
+
+def shown_ticket(ticket: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Reception: the ticket with its verified quotes. Tickets stored before quotes were asked for (2026-10-26) have
+    none, so they are not shown (golden rule 5)."""
+    if not ticket or not ticket.get("evidence"):
+        return None
+    return ticket
 
 
 async def analysis_payload(

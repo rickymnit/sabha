@@ -173,6 +173,19 @@ export interface DealCard {
   left_out: number;
 }
 
+/** Reception calls and walk-in visits: category, outcome and follow-up, on two verified quotes. */
+export interface Ticket {
+  /** One of the rubric's categories, for example "appointment_or_meeting". */
+  category: string;
+  /** One of the rubric's statuses: "resolved", "follow_up_needed" or "escalated". */
+  status: string;
+  follow_up: { text: string; owner_role: string } | null;
+  /** At most 60 words. */
+  summary: string;
+  /** Where the caller or visitor says what they need, and where the conversation reaches its outcome. */
+  evidence: { need: CardEvidence; outcome: CardEvidence };
+}
+
 /** Meetings: decisions, action items and open questions, each on a verified quote. */
 export interface MeetingNotes {
   decisions: { decision: string; evidence: CardEvidence }[];
@@ -214,6 +227,8 @@ export interface AnalysisReport {
   /** Exactly three. */
   suggestions: Suggestion[];
   phases?: Phase[] | null;
+  /** Reception only. */
+  ticket?: Ticket | null;
   /** Sales meetings only. */
   deal_card?: DealCard | null;
   /** Meetings only. */

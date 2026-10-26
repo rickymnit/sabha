@@ -18,7 +18,7 @@ from pymongo import MongoClient
 from pymongo.database import Database
 
 from sabha_api.resources import open_resources
-from sabha_api.services.results import metric_name, recording_title, without_ids
+from sabha_api.services.results import metric_name, recording_title, shown_ticket, without_ids
 from sabha_core.indexes import ensure_indexes
 from sabha_core.models import (
     Analysis,
@@ -557,6 +557,8 @@ def test_the_title_is_the_file_name_without_its_extension(file_name: str | None,
         ("teacher_question_count", "Teacher", "Questions asked by teacher"),
         ("receptionist_talk_share", "Receptionist", "Receptionist talk time"),
         ("caller_talk_share", "Receptionist", "Caller talk time"),
+        ("visitor_talk_share", "Sales rep", "Visitor talk time"),
+        ("receptionist_talk_share", "Sales rep", "Sales rep talk time"),  # the tenant's word for its staff
         ("longest_silence_s", "Teacher", "Longest silence"),
         ("longest_monologue_s", "Teacher", "Longest uninterrupted talk"),
         ("words_per_minute", "Teacher", "Speaking pace"),
@@ -577,3 +579,14 @@ def test_metric_names_are_plain_words(key: str, person: str, name: str) -> None:
 )
 def test_old_reports_lose_utterance_ids(text: str, clean: str) -> None:
     assert without_ids(text) == clean
+
+
+def test_a_ticket_is_shown_only_with_its_verified_quotes() -> None:
+    quote = {"quote": "mujhe Mr. Mehta se milna hai", "utterance_id": "u0000", "start_ms": 0, "end_ms": 3_000}
+    ticket = {"category": "appointment_or_meeting", "status": "resolved", "follow_up": None,
+              "summary": "A visitor came for a meeting and was handed over.",
+              "evidence": {"need": quote, "outcome": quote}}  # fmt: skip
+    assert shown_ticket(ticket) == ticket
+    old = {k: v for k, v in ticket.items() if k != "evidence"}  # stored before quotes were asked for
+    assert shown_ticket(old) is None
+    assert shown_ticket(None) is None

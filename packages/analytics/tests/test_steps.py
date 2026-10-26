@@ -73,6 +73,8 @@ TICKET = {
     "status": "follow_up_needed",
     "follow_up": {"text": "Call the caller back with the Grade 3 fees.", "owner_role": "accounts office"},
     "summary": "Caller asked about Grade 3 admission and fees; the accounts office will call back with the fees.",
+    "need_quote": {"quote": "mujhe Grade 3 admission ke baare mein", "utterance_id": "u0001", "start_ms": 6_500},
+    "outcome_quote": {"quote": "accounts office kal shaam tak call karke", "utterance_id": "u0004", "start_ms": 24_500},
 }
 
 
@@ -222,11 +224,30 @@ def test_bad_boundaries_are_reasked_then_dropped(
         ({"status": "pending"}, "invalid_status"),  # the draft's word, not in the approved list
         ({"summary": "Caller [NAME_1] asked about fees."}, "placeholder_in_text"),
         ({"summary": "word " * 61}, "too_long"),
+        (
+            {"need_quote": {"quote": "main fees online bhar dunga", "utterance_id": "u0001", "start_ms": 6_500}},
+            "quote_not_found",
+        ),  # golden rule 5: a quote that is not in the transcript means no ticket
+        ({"outcome_quote": None}, "invalid_shape"),
     ],
 )
-def test_ticket_rules(reception_rubric: Rubric, change: dict[str, object], code: str) -> None:
-    ticket, problems = validate_ticket({**TICKET, **change}, ticket_values(reception_rubric.output_values))
+def test_ticket_rules(reception_rubric: Rubric, call: PreparedTranscript, change: dict[str, object],
+                      code: str) -> None:  # fmt: skip
+    values = ticket_values(reception_rubric.output_values)
+    ticket, problems = validate_ticket({**TICKET, **change}, values, transcript=call)
     assert ticket is None and code in {p.code for p in problems}
+
+
+def test_a_ticket_keeps_its_quotes_in_the_transcripts_own_words(reception_rubric: Rubric,
+                                                                call: PreparedTranscript) -> None:  # fmt: skip
+    loose = {**TICKET, "need_quote": {"quote": "Mujhe grade 3 admission ke baare me", "utterance_id": "u0001",
+                                      "start_ms": 6_500}}  # fmt: skip
+    ticket, problems = validate_ticket(loose, ticket_values(reception_rubric.output_values), transcript=call)
+    assert problems == [] and ticket is not None
+    record = ticket.to_record()["evidence"]
+    assert record["need"] == {"quote": "mujhe Grade 3 admission ke baare mein", "utterance_id": "u0001",
+                              "start_ms": 6_500, "end_ms": 12_000}  # fmt: skip
+    assert record["outcome"]["utterance_id"] == "u0004" and record["outcome"]["end_ms"] == 34_000
 
 
 def test_a_reception_call_yields_a_valid_ticket_style_report(
@@ -250,6 +271,7 @@ def test_a_reception_call_yields_a_valid_ticket_style_report(
         "text": "Call the caller back with the Grade 3 fees.",
         "owner_role": "accounts office",
     }
+    assert report["ticket"]["evidence"]["outcome"]["quote"] == "accounts office kal shaam tak call karke"
     assert [p["phase"] for p in report["phases"]] == ["greeting", "need", "information", "close"]
     assert {"segment.system", "reception.system"} <= set(report["prompts"])
 

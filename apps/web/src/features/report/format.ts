@@ -89,3 +89,9 @@ export function checkedText(dimensions: readonly { verified: boolean }[]): strin
   }
   return `${checked} of ${dimensions.length} scores are backed by quotes found in the transcript.`;
 }
+
+/** A rubric value in plain words: "appointment_or_meeting" -> "Appointment or meeting". */
+export function words(value: string): string {
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

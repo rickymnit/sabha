@@ -23,6 +23,7 @@ import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
 import { ReportTimeline } from "./ReportTimeline";
+import { TicketPanel } from "./TicketPanel";
 import { VoicesPanel } from "./VoicesPanel";
 import { DimensionDetail, RubricScoreList } from "./RubricPanels";
 import { evidenceLines } from "./timeline";
@@ -166,6 +167,8 @@ function ReportBody({
   return (
     <>
       <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+
+      {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={seek} />}
 
       {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
 

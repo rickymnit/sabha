@@ -192,16 +192,8 @@ def build_report(
             }
             for ph in phases.phases
         ],
-        "ticket": None
-        if ticket is None or ticket.ticket is None
-        else {
-            "category": ticket.ticket.category,
-            "status": ticket.ticket.status,
-            "follow_up": None
-            if ticket.ticket.follow_up is None
-            else {"text": ticket.ticket.follow_up.text, "owner_role": ticket.ticket.follow_up.owner_role},
-            "summary": ticket.ticket.summary,
-        },
+        # Reception: shown only with both quotes verified (sabha_analytics.reception).
+        "ticket": None if ticket is None or ticket.ticket is None else ticket.ticket.to_record(),
         # Sales: verified items only (sabha_analytics.sales). No card is not a reason for review.
         "deal_card": None if deal_card is None or deal_card.card is None else deal_card.card.to_record(),
         # Meetings: verified items only (sabha_analytics.meetings). No notes is not a reason for review.
@@ -252,6 +244,8 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
         *([card["next_step"]["evidence"]] if card.get("next_step") else []),
         *([card["interest_level"]["evidence"]] if (card.get("interest_level") or {}).get("evidence") else []),
     ]
+    ticket = report.get("ticket") or {}
+    evidence += list((ticket.get("evidence") or {}).values())
     notes = report.get("meeting_notes") or {}
     evidence += [
         item["evidence"] for key in ("decisions", "action_items", "open_questions") for item in notes.get(key, [])
@@ -259,9 +253,9 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
     for item in evidence:
         utterance = transcript.get(item["utterance_id"])
         if utterance is None or item["quote"] not in utterance.text:
-            problems.append(f"deal card or notes quote is not the transcript's own wording: {item['quote']!r}")
+            problems.append(f"ticket, deal card or notes quote is not the transcript's own wording: {item['quote']!r}")
         elif (item["start_ms"], item["end_ms"]) != (utterance.start_ms, utterance.end_ms):
-            problems.append("deal card or notes evidence times differ from the transcript")
+            problems.append("ticket, deal card or notes evidence times differ from the transcript")
     if report["overall"]["score"] is None and report["next_status"] != RecordingStatus.NEEDS_REVIEW.value:
         problems.append("no overall score, but the report does not ask for review")
     if problems:

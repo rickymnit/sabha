@@ -55,14 +55,19 @@
       }}]
     },
     "ticket": {
+      "description": "Reception only: the ticket, shown only with both quotes verified (sabha_analytics.reception).",
       "oneOf": [{"type": "null"}, {
-        "type": "object", "additionalProperties": false, "required": ["category", "status", "follow_up", "summary"],
+        "type": "object", "additionalProperties": false,
+        "required": ["category", "status", "follow_up", "summary", "evidence"],
         "properties": {
           "category": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", "description": "One of the rubric's output_values.category."},
           "status": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", "description": "One of the rubric's output_values.status."},
           "follow_up": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false,
             "required": ["text", "owner_role"], "properties": {"text": {"type": "string"}, "owner_role": {"type": "string"}}}]},
-          "summary": {"type": "string", "minLength": 1}
+          "summary": {"type": "string", "minLength": 1},
+          "evidence": {"type": "object", "additionalProperties": false, "required": ["need", "outcome"],
+            "description": "Where the caller or visitor says what they need, and where the conversation reaches its outcome.",
+            "properties": {"need": {"$ref": "#/$defs/card_evidence"}, "outcome": {"$ref": "#/$defs/card_evidence"}}}
         }
       }]
     },

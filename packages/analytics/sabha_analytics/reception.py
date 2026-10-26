@@ -1,7 +1,13 @@
 """The ticket for a front-desk conversation: a school's phone call or a business's walk-in visitor (plan task P5.8).
 
 From the redacted transcript the model writes: category, resolution status, follow-up (what still has to happen and
-the role of the person who should do it, or null when nothing is left) and a ticket summary of at most 60 words.
+the role of the person who should do it, or null when nothing is left), a ticket summary of at most 60 words, and two
+quotes: `need_quote`, where the caller or visitor says what they need (the category and summary rest on it), and
+`outcome_quote`, where the conversation reaches its outcome (the status and follow-up rest on it).
+
+- Golden rule 5: both quotes must be found in the transcript (grounding.verify_quote, the same check as rubric
+  evidence) and are stored in the transcript's own wording with that utterance's times. A ticket is shown only with
+  both; a quote that is not found counts as a failing answer.
 
 - Category and status must be from the rubric's approved lists (`output_values.category` and `.status`, read by
   `ticket_values`), so a tenant's rubric, not code, decides them. The status list must include "resolved".
@@ -20,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from sabha_analytics.grounding import PreparedTranscript
+from sabha_analytics.sales import Evidence, QuoteCheck, quoted_item
 from sabha_analytics.scoring import (
     PLACEHOLDER,
     PROMPTS_DIR,
@@ -40,6 +47,7 @@ MAX_SUMMARY_WORDS = 60
 MAX_FOLLOW_UP_WORDS = 40
 MAX_OWNER_ROLE_CHARS = 40
 TICKET_FAILED = "ticket_failed"
+TICKET_KEYS = ("category", "status", "follow_up", "summary", "need_quote", "outcome_quote")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +81,22 @@ class Ticket:
     status: str
     follow_up: FollowUp | None
     summary: str
+    need_evidence: Evidence
+    outcome_evidence: Evidence
+
+    def to_record(self) -> dict[str, Any]:
+        def ev(e: Evidence) -> dict[str, Any]:
+            return {"quote": e.quote, "utterance_id": e.utterance_id, "start_ms": e.start_ms, "end_ms": e.end_ms}
+
+        return {
+            "category": self.category,
+            "status": self.status,
+            "follow_up": None
+            if self.follow_up is None
+            else {"text": self.follow_up.text, "owner_role": self.follow_up.owner_role},
+            "summary": self.summary,
+            "evidence": {"need": ev(self.need_evidence), "outcome": ev(self.outcome_evidence)},
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,15 +115,18 @@ def ticket_schema(values: TicketValues) -> dict[str, Any]:
         "required": ["text", "owner_role"],
         "properties": {"text": {"type": "string", "minLength": 1}, "owner_role": {"type": "string", "minLength": 1}},
     }
+    quote = quoted_item({})
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["category", "status", "follow_up", "summary"],
+        "required": [*TICKET_KEYS],
         "properties": {
             "category": {"enum": list(values.categories)},
             "status": {"enum": list(values.statuses)},
             "follow_up": {"anyOf": [{"type": "null"}, follow_up]},  # strict structured outputs allow anyOf, not oneOf
             "summary": {"type": "string", "minLength": 1},
+            "need_quote": quote,
+            "outcome_quote": quote,
         },
     }
 
@@ -115,11 +142,22 @@ def _text(where: str, value: object, max_words: int) -> list[Problem]:
     return problems
 
 
-def validate_ticket(data: object, values: TicketValues) -> tuple[Ticket | None, list[Problem]]:
-    keys = {"category", "status", "follow_up", "summary"}
-    if not isinstance(data, dict) or set(data) != keys:
-        return None, [Problem("invalid_output", "Answer with exactly category, status, follow_up and summary.")]
+def validate_ticket(
+    data: object, values: TicketValues, *, transcript: PreparedTranscript
+) -> tuple[Ticket | None, list[Problem]]:
+    if not isinstance(data, dict) or set(data) != set(TICKET_KEYS):
+        return None, [Problem("invalid_output", f"Answer with exactly {', '.join(TICKET_KEYS)}.")]
     problems: list[Problem] = []
+    quotes = QuoteCheck(transcript)
+    found: dict[str, Evidence | None] = {}
+    for key in ("need_quote", "outcome_quote"):
+        if isinstance(data[key], dict):
+            found[key] = quotes.evidence(key, data[key])
+        else:
+            found[key] = None
+            problems.append(Problem("invalid_shape", f"{key} must be {{quote, start_ms, utterance_id}}."))
+    need, outcome = found["need_quote"], found["outcome_quote"]
+    problems += quotes.problems
     if data["category"] not in values.categories:
         problems.append(Problem("invalid_category", f"category must be one of {', '.join(values.categories)}."))
     if data["status"] not in values.statuses:
@@ -148,9 +186,9 @@ def validate_ticket(data: object, values: TicketValues) -> tuple[Ticket | None, 
             )
         else:
             parsed = FollowUp(follow_up["text"], role)
-    if problems:
+    if problems or need is None or outcome is None:
         return None, problems
-    return Ticket(data["category"], data["status"], parsed, data["summary"]), []
+    return Ticket(data["category"], data["status"], parsed, data["summary"], need, outcome), []
 
 
 def write_ticket(
@@ -185,7 +223,7 @@ def write_ticket(
             keys=(),
             calls=calls,
         )
-        ticket, problems = validate_ticket(data, values)
+        ticket, problems = validate_ticket(data, values, transcript=transcript)
         if ticket is not None:
             return TicketOutcome(ticket, attempt, (), tuple(calls), (system_p, request_p))
     return TicketOutcome(None, 2, tuple(dict.fromkeys(p.code for p in problems)), tuple(calls), (system_p, request_p))
