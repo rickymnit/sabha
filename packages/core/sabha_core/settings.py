@@ -138,6 +138,11 @@ class Settings(BaseSettings):
     # repo root in development); the worker images set /app/rubrics.
     rubrics_dir: str = "rubrics"
 
+    # Live status (P2.6, GET /v1/events): a heartbeat comment while nothing happens, and how long one connection
+    # lasts before the server ends it (the web app reconnects with Last-Event-ID, so nothing is missed).
+    events_heartbeat_s: float = Field(default=15.0, gt=0)
+    events_max_connection_s: float = Field(default=300.0, gt=0)
+
     # Speaker diarization (P3.4). "fake" (a scripted diarizer) is only allowed when APP_ENV=test.
     diarizer: Literal["pyannote", "fake"] = "pyannote"
     diarization_device: str = Field(default="cpu", pattern=r"^(cpu|cuda(:[0-9]+)?)$")

@@ -280,3 +280,10 @@ routes:
     admin: 200
     other_tenant: 200
     others: 403
+
+  GET /v1/events:
+    # Live status (P2.6): every signed-in caller may listen; each receives only events about recordings they may
+    # see (tested in apps/api/tests/test_events.py). The matrix runs without Redis, so the route answers 503 and
+    # the web app keeps polling.
+    anonymous: 401
+    others: [200, 503]

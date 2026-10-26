@@ -83,7 +83,8 @@ def test_every_caller_has_an_expected_status(entry: str) -> None:
     assert named <= callers, f"{entry}: unknown callers {sorted(named - callers)}"
     assert "others" in rules or named == callers, f"{entry}: no status for {sorted(callers - named)}"
     for status in rules.values():
-        assert status in STATUSES, f"{entry}: unexpected status {status}"
+        for one in status if isinstance(status, list) else [status]:
+            assert one in STATUSES, f"{entry}: unexpected status {one}"
 
 
 # --- Every route, called as every caller (integration) ---
@@ -349,6 +350,7 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /v1/disputes": lambda a, who: a.client.get("/v1/disputes", headers=a.headers(who)),
     "POST /v1/disputes/{dispute_id}/resolve": resolve_dispute,
     "POST /v1/recordings/{recording_id}/reanalyze": reanalyze,
+    "GET /v1/events": lambda a, who: a.client.get("/v1/events", headers=a.headers(who)),
     "POST /v1/reanalysis": lambda a, who: a.client.post(
         "/v1/reanalysis",
         json={"type": "teaching", "reason": "Rubric updated.", "dry_run": True},
