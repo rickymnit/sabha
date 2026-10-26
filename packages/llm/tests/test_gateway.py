@@ -203,6 +203,15 @@ def test_cost_comes_from_the_published_prices() -> None:
     assert cost_usd(ModelSpec("x", "y"), 10, 0, 10) is None
 
 
+def test_cache_writes_cost_their_own_published_price() -> None:
+    luna = CATALOG["openai:gpt-6-luna"]
+    # 1 000 000 input tokens: 200 000 read from the cache, 300 000 written to it, 500 000 plain; 100 000 output.
+    # $0.10 plain, $0.01 cached, $0.125 cache write, $0.50 output per million (model page, 2026-10-24).
+    assert cost_usd(luna, 1_000_000, 200_000, 100_000, 300_000) == pytest.approx(0.05 + 0.002 + 0.0375 + 0.05)
+    # Without a separate write price, written tokens cost as input.
+    assert cost_usd(CATALOG["openai:o3-mini"], 1_000_000, 0, 0, 300_000) == pytest.approx(1.10)
+
+
 def test_the_prompt_hash_is_stable_and_depends_on_the_schema() -> None:
     setup = Setup(["ok", "ok", '{"score": 1}'])
     first, second, with_schema = setup.complete(), setup.complete(), setup.complete(json_schema=SCHEMA)

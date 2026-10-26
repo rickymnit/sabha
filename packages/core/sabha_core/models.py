@@ -377,6 +377,7 @@ class LlmCall(TenantDoc):
     tokens_in: int = Field(default=0, ge=0)
     tokens_out: int = Field(default=0, ge=0)
     cached_tokens: int = Field(default=0, ge=0)
+    cache_write_tokens: int = Field(default=0, ge=0)
     cost_usd: float | None = None
     latency_ms: int = Field(ge=0)
     attempt: int = Field(ge=1)

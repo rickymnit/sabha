@@ -20,6 +20,8 @@ class ModelSpec:
     usd_per_m_input: float | None = None
     usd_per_m_cached_input: float | None = None
     usd_per_m_output: float | None = None
+    # Writing input to the prompt cache, where the provider prices it separately; otherwise it costs as input.
+    usd_per_m_cache_write: float | None = None
     price_source: str | None = None
     accepts_temperature: bool = False
     accepts_reasoning_effort: bool = False
@@ -32,6 +34,17 @@ class ModelSpec:
 CATALOG: dict[str, ModelSpec] = {
     spec.key: spec
     for spec in (
+        ModelSpec(
+            provider="openai",
+            name="gpt-6-luna",
+            usd_per_m_input=0.10,
+            usd_per_m_cached_input=0.01,
+            usd_per_m_output=0.50,
+            usd_per_m_cache_write=0.125,
+            price_source="https://developers.openai.com/api/docs/models/gpt-6-luna (checked 2026-10-24)",
+            accepts_reasoning_effort=True,  # none, low, medium (default), high, xhigh, max (same page)
+        ),
+        # Shut down by OpenAI on 2026-10-23 (it now answers 404); kept so earlier calls' costs stay explained.
         ModelSpec(
             provider="openai",
             name="o3-mini",
@@ -53,11 +66,16 @@ def spec_for(key: str) -> ModelSpec:
         raise LlmConfigError(f"unknown model {key!r}; known: {', '.join(sorted(CATALOG))}") from None
 
 
-def cost_usd(spec: ModelSpec, tokens_in: int, cached_tokens: int, tokens_out: int) -> float | None:
-    """Cost from the published prices, or None if any needed price is missing."""
+def cost_usd(
+    spec: ModelSpec, tokens_in: int, cached_tokens: int, tokens_out: int, cache_write_tokens: int = 0
+) -> float | None:
+    """Cost from the published prices, or None if any needed price is missing. Cached and cache-write tokens are
+    parts of `tokens_in`; cache writes cost as input unless the provider prices them separately."""
     cached_price = spec.usd_per_m_cached_input if cached_tokens else 0.0
     if spec.usd_per_m_input is None or spec.usd_per_m_output is None or cached_price is None:
         return None
-    uncached = max(0, tokens_in - cached_tokens)
-    total = uncached * spec.usd_per_m_input + cached_tokens * cached_price + tokens_out * spec.usd_per_m_output
+    write_price = spec.usd_per_m_cache_write if spec.usd_per_m_cache_write is not None else spec.usd_per_m_input
+    plain = max(0, tokens_in - cached_tokens - cache_write_tokens)
+    total = (plain * spec.usd_per_m_input + cached_tokens * cached_price + cache_write_tokens * write_price
+             + tokens_out * spec.usd_per_m_output)  # fmt: skip
     return round(total / 1_000_000, 8)

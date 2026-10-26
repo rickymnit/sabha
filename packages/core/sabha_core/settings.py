@@ -100,11 +100,12 @@ class Settings(BaseSettings):
     sarvam_api_key: SecretStr | None = None
     sarvam_base_url: str = "https://api.sarvam.ai"
 
-    # LLM gateway (packages/llm, plan task P5.1). Models are "<provider>:<model>", e.g. "openai:o3-mini". Fallbacks
+    # LLM gateway (packages/llm, plan task P5.1). Models are "<provider>:<model>", e.g. "openai:gpt-6-luna". Fallbacks
     # are per task and only used when listed: {"score_dimension": ["openai:o4-mini"]} (golden rule 7). Token
     # budgets are per UTC day; unset means no limit (the owner sets the numbers; none are assumed here).
-    llm_model_small: str = "openai:o3-mini"
-    llm_model_mid: str = "openai:o3-mini"
+    # gpt-6-luna for both since 2026-10-24 (owner's choice): o3-mini was shut down on 2026-10-23.
+    llm_model_small: str = "openai:gpt-6-luna"
+    llm_model_mid: str = "openai:gpt-6-luna"
     llm_fallbacks: dict[str, list[str]] = Field(default_factory=dict)
     llm_timeout_s: float = Field(default=120.0, gt=0)
     llm_max_retries: int = Field(default=3, ge=0, le=10)

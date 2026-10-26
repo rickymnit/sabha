@@ -172,6 +172,7 @@ class Gateway:
                                 usage.tokens_in + extra.tokens_in,
                                 usage.tokens_out + extra.tokens_out,
                                 usage.cached_tokens + extra.cached_tokens,
+                                usage.cache_write_tokens + extra.cache_write_tokens,
                             ),
                         )
                         parsed, problem = _parse(response.text, json_schema)
@@ -179,13 +180,14 @@ class Gateway:
                             raise InvalidJsonError(f"{key} answered {task} with invalid JSON twice: {problem}")
                     elif problem is not None:
                         parsed = None
-                cost = cost_usd(spec, usage.tokens_in, usage.cached_tokens, usage.tokens_out)
+                cost = cost_usd(spec, usage.tokens_in, usage.cached_tokens, usage.tokens_out, usage.cache_write_tokens)
                 span.set_attributes(
                     {
                         "llm.model": key,
                         "llm.tokens_in": usage.tokens_in,
                         "llm.tokens_out": usage.tokens_out,
                         "llm.cached_tokens": usage.cached_tokens,
+                        "llm.cache_write_tokens": usage.cache_write_tokens,
                         "llm.failed_attempts": len(failures),
                     }
                 )
@@ -251,7 +253,10 @@ class Gateway:
                 tokens_in=usage.tokens_in,
                 tokens_out=usage.tokens_out,
                 cached_tokens=usage.cached_tokens,
-                cost_usd=cost_usd(spec, usage.tokens_in, usage.cached_tokens, usage.tokens_out),
+                cache_write_tokens=usage.cache_write_tokens,
+                cost_usd=cost_usd(
+                    spec, usage.tokens_in, usage.cached_tokens, usage.tokens_out, usage.cache_write_tokens
+                ),
                 latency_ms=latency_ms,
                 attempt=attempt,
                 fallback_reason=fallback_reason,

@@ -28,7 +28,11 @@ def answer(text: str = '{"score": 4}', **extra: Any) -> dict[str, Any]:
             {"type": "reasoning", "summary": []},
             {"type": "message", "content": [{"type": "output_text", "text": text}]},
         ],
-        "usage": {"input_tokens": 1200, "input_tokens_details": {"cached_tokens": 1024}, "output_tokens": 300},
+        "usage": {
+            "input_tokens": 1200,
+            "input_tokens_details": {"cached_tokens": 1024, "cache_write_tokens": 100},
+            "output_tokens": 300,
+        },
         **extra,
     }
 
@@ -73,6 +77,7 @@ def test_text_and_usage_are_read_from_the_response() -> None:
     result = provider(lambda r: httpx.Response(200, json=answer())).complete(REQUEST)
     assert result.text == '{"score": 4}'
     assert (result.usage.tokens_in, result.usage.cached_tokens, result.usage.tokens_out) == (1200, 1024, 300)
+    assert result.usage.cache_write_tokens == 100
     assert result.model_id == "o3-mini-2025-01-31"
 
 

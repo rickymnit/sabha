@@ -22,6 +22,7 @@ class Usage:
     tokens_in: int = 0
     tokens_out: int = 0
     cached_tokens: int = 0  # part of tokens_in served from the provider's prompt cache
+    cache_write_tokens: int = 0  # part of tokens_in written to the prompt cache (billed at its own price)
 
     @property
     def total(self) -> int:

@@ -1,4 +1,4 @@
-"""OpenAI through the Responses API, which OpenAI recommends for reasoning models such as o3-mini.
+"""OpenAI through the Responses API, which OpenAI recommends for its reasoning models (gpt-6-luna; formerly o3-mini).
 
 Request: POST {base_url}/responses with `model`, `input` (messages, system role included), `max_output_tokens`, and
 for JSON answers `text.format = {type: "json_schema", name, schema, strict: true}` (structured outputs). Optional
@@ -7,7 +7,8 @@ catalog marks as accepting them.
 
 Response: the text of every `output_text` part of the `message` items. A refusal, or `status: "incomplete"`
 (for example cut off at max_output_tokens), is a non-retryable ProviderError. Usage: `input_tokens`,
-`input_tokens_details.cached_tokens`, `output_tokens` (reasoning tokens are part of output tokens).
+`input_tokens_details.cached_tokens` and `.cache_write_tokens` (both parts of `input_tokens`; checked 2026-10-26),
+`output_tokens` (reasoning tokens are part of output tokens).
 
 Errors: 429, 5xx and timeouts are retryable; other statuses are not. Reasons carry the status and OpenAI's error
 code only, never prompt or answer text.
@@ -103,9 +104,12 @@ def _parse(data: Any) -> ProviderResponse:
     if not texts:
         raise ProviderError(NAME, "response has no output text", retryable=False)
     usage = data.get("usage") or {}
-    cached = (usage.get("input_tokens_details") or {}).get("cached_tokens") or 0
+    details = usage.get("input_tokens_details") or {}
+    cached, written = details.get("cached_tokens") or 0, details.get("cache_write_tokens") or 0
     return ProviderResponse(
         text="".join(texts),
-        usage=Usage(int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0), int(cached)),
+        usage=Usage(
+            int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0), int(cached), int(written)
+        ),
         model_id=str(data.get("model") or "unknown"),
     )

@@ -6,6 +6,12 @@ link and the date checked. Nothing here comes from memory (golden rules 6 and 12
 
 ## Decision so far
 
+- **2026-10-24:** OpenAI **shut down `o3-mini` on 2026-10-23** (deprecations page, checked 2026-10-24: replacement
+  suggested `gpt-5.6-sol`); our calls failed with HTTP 404 "model has been deprecated". The product owner chose
+  **`gpt-6-luna`** for both tiers (scoring and synthesis, and the role tie-breaker), the lowest-priced current model.
+  Rejected as stop-gaps: `gpt-5` and `gpt-5-mini`, which OpenAI shuts down on 2026-12-11, inside the pilot.
+  Whether luna judges as well as a larger model is not yet measured: the bake-off (P5.3) compares models on
+  human-rated recordings, and no quality figure is claimed until then (golden rule 6).
 - **2026-10-16:** the product owner chose **OpenAI** with the model **`o3-mini`** for scoring and synthesis.
   To confirm from OpenAI's documentation and our API dashboard, not from memory:
   - that `o3-mini` is available to our API project and not scheduled for retirement;
@@ -30,21 +36,21 @@ only candidate.
 
 | Field | OpenAI | Candidate 2 | Candidate 3 |
 | --- | --- | --- | --- |
-| Models we would use: mid tier (scoring, synthesis) | `o3-mini` (chosen 2026-10-16). Model page, 2026-10-19: not deprecated, no shutdown date, Chat Completions and Responses endpoints, 200 000-token context, 100 000-token output. A third-party article claims a 2026-10-01 retirement; OpenAI's page does not: confirm in our dashboard | TBD | TBD |
-| Models we would use: small tier (role tie-breaker) | TBD (`o3-mini` too, or a smaller model) | TBD | TBD |
-| Reasoning effort / temperature support | Not stated on the model page (2026-10-19): the gateway sends neither until confirmed | TBD | TBD |
+| Models we would use: mid tier (scoring, synthesis) | `gpt-6-luna` (chosen 2026-10-24). Model page, 2026-10-24: no deprecation or shutdown date listed; Responses API; structured outputs supported. Was `o3-mini` (chosen 2026-10-16, shut down 2026-10-23) | TBD | TBD |
+| Models we would use: small tier (role tie-breaker) | `gpt-6-luna` (chosen 2026-10-24) | TBD | TBD |
+| Reasoning effort / temperature support | `gpt-6-luna`: reasoning effort none, low, medium (default), high, xhigh, max (model page, 2026-10-24); temperature not stated, so not sent | TBD | TBD |
 | India region available (yes / no / how) | TBD | TBD | TBD |
 | Data retention policy (API inputs and outputs) | TBD | TBD | TBD |
 | Training on our data (default, and how to opt out) | TBD | TBD | TBD |
 | DPA available (and covers DPDP Act, 2023?) | TBD | TBD | TBD |
 | Structured output / JSON schema support | Supported (model page, 2026-10-19) | TBD | TBD |
-| Prompt caching (how, minimum prefix, price) | Cached input priced at $0.55 per million tokens (model page, 2026-10-19); how and minimum prefix TBD | TBD | TBD |
+| Prompt caching (how, minimum prefix, price) | `gpt-6-luna`: cached input $0.01, cache writes $0.125 per million tokens (model page, 2026-10-24). Automatic; usage reports `cached_tokens` and `cache_write_tokens`, both part of `input_tokens` (seen in our own calls, 2026-10-26) | TBD | TBD |
 | Batch API and discount | TBD | TBD | TBD |
 | Rate limits for our tier | TBD | TBD | TBD |
-| Price per million input tokens | $1.10 (`o3-mini`, model page, 2026-10-19) | TBD | TBD |
-| Price per million output tokens | $4.40 (`o3-mini`, model page, 2026-10-19) | TBD | TBD |
-| Source link(s) | https://developers.openai.com/api/docs/models/o3-mini | TBD | TBD |
-| Date checked | 2026-10-19 | TBD | TBD |
+| Price per million input tokens | $0.10 (`gpt-6-luna`, model page, 2026-10-24); was $1.10 (`o3-mini`, 2026-10-19) | TBD | TBD |
+| Price per million output tokens | $0.50 (`gpt-6-luna`, model page, 2026-10-24); was $4.40 (`o3-mini`, 2026-10-19) | TBD | TBD |
+| Source link(s) | https://developers.openai.com/api/docs/models/gpt-6-luna, https://developers.openai.com/api/docs/deprecations (o3-mini: https://developers.openai.com/api/docs/models/o3-mini) | TBD | TBD |
+| Date checked | 2026-10-24 (o3-mini: 2026-10-19) | TBD | TBD |
 
 Prices go into the gateway's price table (plan task 5.1) only from this sheet, with the date; cost figures are
 never estimated.
