@@ -92,6 +92,8 @@ def wait_for(condition: Callable[[], bool], timeout_s: float = 20.0) -> None:
         ("recording.transcribing", {}, ("transcribe",)),
         ("recording.analyzing", {}, ("analyze",)),
         ("recording.completed", {}, ("notify", "meter")),
+        ("recording.completed", {"reanalysis": True}, ()),  # quiet, and no audio metered twice (2026-10-26)
+        ("recording.analyzing", {"reanalysis": True}, ("analyze",)),
         ("recording.failed", {}, ("notify",)),
         ("recording.needs_review", {}, ("notify",)),
     ],

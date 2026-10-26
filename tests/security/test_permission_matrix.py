@@ -301,6 +301,17 @@ def resolve_dispute(api: Api, caller: str) -> httpx.Response:
     return api.client.post(f"/v1/disputes/{raised.json()['id']}/resolve", json=body, headers=api.headers(caller))
 
 
+def reanalyze(api: Api, caller: str) -> httpx.Response:
+    """Re-analyses a fresh finished recording of Asha's."""
+    rid = api.db.analyses.find_one({"_id": fresh_analysis(api)})["recording_id"]
+    transcript = Transcript(tenant_id="tenant-a", recording_id=rid, version="transcript@v1", storage_key=TRANSCRIPT_KEY,
+                            asr_model="fake", word_timing="approximate", word_count=0, utterance_count=0,
+                            roles={"S0": "teacher"}, rubric_id="teaching.school.v0.1")  # fmt: skip
+    api.db.transcripts.insert_one(transcript.model_dump(by_alias=True))
+    body = {"reason": "The rubric was updated."}
+    return api.client.post(f"/v1/recordings/{rid}/reanalyze", json=body, headers=api.headers(caller, create=True))
+
+
 CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /health": lambda a, who: a.client.get("/health", headers=a.headers(who)),
     "GET /ready": lambda a, who: a.client.get("/ready", headers=a.headers(who)),
@@ -337,6 +348,12 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "POST /v1/analyses/{analysis_id}/disputes": raise_dispute,
     "GET /v1/disputes": lambda a, who: a.client.get("/v1/disputes", headers=a.headers(who)),
     "POST /v1/disputes/{dispute_id}/resolve": resolve_dispute,
+    "POST /v1/recordings/{recording_id}/reanalyze": reanalyze,
+    "POST /v1/reanalysis": lambda a, who: a.client.post(
+        "/v1/reanalysis",
+        json={"type": "teaching", "reason": "Rubric updated.", "dry_run": True},
+        headers=a.headers(who, create=True),
+    ),
 }
 
 

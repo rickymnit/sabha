@@ -25,12 +25,12 @@ from sabha_core.repo import SyncTenantRepo
 from sabha_core.state import RecordingStatus
 from sabha_core.timemap import Segment, SegmentMap
 from sabha_llm.errors import LlmConfigError, ProviderError
-from sabha_workers.stages.analyze import AnalyzeDeps, make_work
+from sabha_workers.stages.analyze import AnalyzeDeps, make_work, store_analysis
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
 
 pytestmark = pytest.mark.integration
 S = RecordingStatus
-ANALYZE = StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED)
+ANALYZE = StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED, per_run=True)
 ROOT = Path(__file__).resolve().parents[3]
 RUBRIC = load_rubric(ROOT / "packages/analytics/tests/fixtures/rubrics/teaching.testing.v1.0.yaml")
 MEETING_RUBRIC = load_rubric(ROOT / "packages/analytics/tests/fixtures/rubrics/meeting.testing.v1.0.yaml")
@@ -131,6 +131,7 @@ class Stage:
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"analyze": "v1"}, worker="test",
                                   jitter=lambda: 0.0)  # fmt: skip
         SyncTenantRepo(db, "people", "t1", Person).insert_one(Person(id="p-asha", name="Asha", unit_id="unit-1"))
+        self.rubric_asked: list[str | None] = []
 
     def recording(self, *, with_inputs: bool = True, kind: ConversationType = ConversationType.TEACHING,
                   document: dict[str, Any] | None = None) -> str:  # fmt: skip
@@ -144,19 +145,15 @@ class Stage:
         return rid
 
     def deps(self, judge: FakeJudge, rubric: Any = RUBRIC) -> AnalyzeDeps:
-        def save(tenant_id: str, analysis: Analysis, scores: list[Score]) -> None:
-            analyses = SyncTenantRepo(self.db, "analyses", tenant_id, Analysis)
-            rows = SyncTenantRepo(self.db, "scores", tenant_id, Score)
-            for old in analyses.find({"recording_id": analysis.recording_id, "version": analysis.version}):
-                rows.delete_many({"analysis_id": old.id})
-            analyses.delete_many({"recording_id": analysis.recording_id, "version": analysis.version})
-            analyses.insert_one(analysis)
-            rows.insert_many(scores)
+        def pick(tenant: Tenant, kind: ConversationType, rubric_id: str | None) -> Any:
+            self.rubric_asked.append(rubric_id)
+            return rubric
 
         return AnalyzeDeps(
             preprocess_version="v1", transcribe_version="v1", analysis_version="v1", tenant=lambda _: TENANT,
             person=lambda t, p: SyncTenantRepo(self.db, "people", t, Person).find_one({"_id": p}),
-            rubric=lambda *_: rubric, judge=lambda *_: judge, save=save, llm_cost=lambda *_: None,
+            rubric=pick, judge=lambda *_: judge, save=lambda t, a, s: store_analysis(self.db, t, a, s),
+            llm_cost=lambda *_: None,
         )  # fmt: skip
 
     def run(self, rid: str, judge: FakeJudge, rubric: Any = RUBRIC) -> str:
@@ -294,3 +291,52 @@ def test_a_meeting_is_scored_as_a_whole_and_its_scores_belong_to_no_one(stage: S
     report = json.loads(stage.artefacts.get(f"t1/{rid}/analyze@v1/analysis@v1.json"))
     assert report["meeting_notes"]["action_items"][0]["owner_voice"] == "S2"
     assert {m["key"]: m["value"] for m in report["metrics"]}["voice_count"] == 3
+
+
+# --- Re-analysis (P2.8) ---
+
+
+def reanalyse(stage: Stage, rid: str, run: int, rubric_id: str | None = None) -> None:
+    """What POST /v1/recordings/{id}/reanalyze does to the recording: back to ANALYZING with the next run."""
+    stage.db.recordings.update_one({"_id": rid}, {"$set": {"status": "ANALYZING", "analysis_run": run,
+                                                           "rubric_id": rubric_id}})  # fmt: skip
+
+
+def test_a_reanalysis_stores_a_new_version_and_keeps_the_old(stage: Stage) -> None:
+    rid = stage.recording()
+    assert stage.run(rid, good_judge()) == "done"
+    reanalyse(stage, rid, 2)
+    assert stage.run(rid, good_judge()) == "done"  # not skipped: run 2 has its own artefact folder
+
+    assert stage.doc(rid)["status"] == "COMPLETED"
+    assert stage.artefacts.exists(f"t1/{rid}/analyze@v1-run2/analysis@v1.json")
+    by_version = {a["version"]: a for a in stage.db.analyses.find({"recording_id": rid})}
+    assert set(by_version) == {"v1", "v1-run2"}
+    assert (by_version["v1"]["superseded"], by_version["v1-run2"]["superseded"]) == (True, False)
+    old_scores = list(stage.db.scores.find({"analysis_id": by_version["v1"]["_id"]}))
+    new_scores = list(stage.db.scores.find({"analysis_id": by_version["v1-run2"]["_id"]}))
+    assert len(old_scores) == len(new_scores) == 2
+    assert all(s["superseded"] for s in old_scores) and not any(s["superseded"] for s in new_scores)
+    # Finishing a re-analysis is quiet: the event says so, and the relay starts neither notify nor meter.
+    done = stage.db.outbox.find_one({"type": "recording.completed", "payload.meta.reanalysis": True})
+    assert done is not None and done["payload"]["meta"]["analysis_run"] == 2
+
+
+def test_a_retried_reanalysis_replaces_only_its_own_version(stage: Stage) -> None:
+    rid = stage.recording()
+    stage.run(rid, good_judge())
+    reanalyse(stage, rid, 2)
+    stage.run(rid, good_judge())
+    latest = Analysis.model_validate(stage.db.analyses.find_one({"version": "v1-run2"}))
+    rows = [Score.model_validate(s) for s in stage.db.scores.find({"recording_id": rid, "superseded": False})]
+    store_analysis(stage.db, "t1", latest, rows)  # the same version again, as a retried stage would
+    assert stage.db.analyses.count_documents({"recording_id": rid}) == 2
+    assert stage.db.analyses.count_documents({"recording_id": rid, "superseded": False}) == 1
+
+
+def test_a_reanalysis_uses_the_rubric_chosen_for_it(stage: Stage) -> None:
+    rid = stage.recording()
+    stage.run(rid, good_judge())
+    reanalyse(stage, rid, 2, rubric_id="teaching.testing.v1.0")
+    stage.run(rid, good_judge())
+    assert stage.rubric_asked == [None, "teaching.testing.v1.0"]

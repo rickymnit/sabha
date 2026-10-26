@@ -55,9 +55,11 @@ ROUTES: dict[str, tuple[str, ...]] = {
 
 def routes(event: OutboxEvent) -> tuple[str, ...]:
     """The pipeline tasks an event starts. An upload starts preprocessing only if it is ready (not held)."""
+    meta = event.payload.get("meta") or {}
     if event.type == "recording.uploaded":
-        meta = event.payload.get("meta") or {}
         return ("preprocess",) if meta.get("ready") else ()
+    if event.type == "recording.completed" and meta.get("reanalysis"):
+        return ()  # quiet (owner's decision, 2026-10-26), and no audio is metered twice
     return ROUTES.get(event.type, ())
 
 

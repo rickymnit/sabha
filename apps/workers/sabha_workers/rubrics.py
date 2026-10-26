@@ -35,9 +35,14 @@ def rubric_id_for(tenant: Tenant, conversation_type: ConversationType) -> str:
     return rubric_id
 
 
-def rubric_for(tenant: Tenant, conversation_type: ConversationType, rubrics_dir: Path) -> tuple[Rubric, str]:
-    """(rubric, content hash) for this tenant's recordings of this type (module docstring)."""
-    path = rubrics_dir / f"{rubric_id_for(tenant, conversation_type)}.yaml"
+def rubric_for(
+    tenant: Tenant, conversation_type: ConversationType, rubrics_dir: Path, *, rubric_id: str | None = None
+) -> tuple[Rubric, str]:
+    """(rubric, content hash) for this tenant's recordings of this type (module docstring), or the rubric chosen for
+    a re-analysis (`rubric_id`, P2.8), which must be of the same type."""
+    if rubric_id is not None and rubric_id.split(".", 1)[0] != conversation_type.value:
+        raise NoRubric(f"rubric {rubric_id} is not for {conversation_type} recordings")
+    path = rubrics_dir / f"{rubric_id or rubric_id_for(tenant, conversation_type)}.yaml"
     if not path.exists():
         raise NoRubric(f"rubric file {path} is missing")
     return _load(path, path.stat().st_mtime_ns)

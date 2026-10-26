@@ -60,6 +60,11 @@ def artefact_prefix(tenant_id: str, recording_id: str, stage: str, version: str)
     return f"{tenant_prefix(tenant_id)}{recording}/{stage}@{version}/"
 
 
+def run_version(version: str, run: int) -> str:
+    """The artefact version of a stage's n-th run: "v1" for the first, "v1-run2" for a re-analysis (P2.8)."""
+    return version if run <= 1 else f"{version}-run{run}"
+
+
 def belongs_to(tenant_id: str, key: str) -> bool:
     """True if `key` is under the tenant's prefix (and does not climb out of it)."""
     return key.startswith(tenant_prefix(tenant_id)) and ".." not in key.split("/")

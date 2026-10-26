@@ -252,6 +252,10 @@ class Recording(TenantDoc):
     confirmed_roles: dict[str, str] | None = None
     # Meetings: names people gave the anonymous voices ("S1" -> "Riya"), display only; never sent to a model.
     voice_names: dict[str, str] = Field(default_factory=dict)
+    # Re-analysis (P2.8): which analysis run this is (1 = the first) and, when one was chosen, the rubric to use
+    # instead of the tenant's default. The analyze stage writes run n to analyze@<version>-run<n>/.
+    analysis_run: int = Field(default=1, ge=1)
+    rubric_id: str | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
@@ -300,6 +304,7 @@ class Analysis(TenantDoc):
     status: Literal["COMPLETED", "NEEDS_REVIEW"]
     overall_score: float | None = None  # with any reviewer's scores from accepted disputes (P6.7)
     ai_overall_score: float | None = None  # the AI's own overall score, kept once a dispute changes overall_score
+    superseded: bool = False  # a newer analysis of the recording exists (re-analysis, P2.8): history only
     verified_share: float = Field(ge=0, le=1)
     review_reasons: list[str] = Field(default_factory=list)
     model_ids: list[str] = Field(default_factory=list)
@@ -330,6 +335,7 @@ class Score(TenantDoc):
     # stays as the AI's, for history.
     human_score: int | None = Field(default=None, ge=1, le=5)
     dispute_id: str | None = None
+    superseded: bool = False  # its analysis was superseded by a re-analysis: left out of trends
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
     @property
@@ -356,7 +362,7 @@ class Dispute(TenantDoc):
     proposed_score: int = Field(ge=1, le=5)
     comment: str = Field(min_length=1)
     raised_by: str = Field(min_length=1)
-    status: Literal["open", "accepted", "rejected"] = "open"
+    status: Literal["open", "accepted", "rejected", "closed"] = "open"  # closed: re-analysed before a decision
     final_score: int | None = Field(default=None, ge=1, le=5)
     resolution_note: str | None = None
     resolved_by: str | None = None

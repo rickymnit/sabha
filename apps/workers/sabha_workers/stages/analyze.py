@@ -11,8 +11,13 @@
    grounding verifier must find in the transcript, the overall score from verified dimensions only, synthesis,
    the timeline phases, and for reception the call's ticket. The report is checked against analysis@v1.
 5. Stores the report as `analysis@v1.json`, an `analyses` document and one `scores` document per dimension, in one
-   transaction. The analysis is keyed by (recording, stage version), so a retried stage replaces its own result
-   instead of adding a second one.
+   transaction (`store_analysis`). The analysis is keyed by (recording, version), so a retried stage replaces its
+   own result instead of adding a second one.
+
+Re-analysis (P2.8): run n > 1 of a recording (`Recording.analysis_run`) uses version "<version>-run<n>", so its
+artefacts and analysis are new and the earlier ones stay as history, marked `superseded` with their scores. It
+uses the rubric chosen for it (`Recording.rubric_id`), if any, instead of the tenant's default, and its cost is
+that of the LLM calls made since it started. The transcript is reused: nothing before this stage runs again.
 6. The report's status decides the end: COMPLETED (the runner moves on and the outbox event starts notify and
    meter), or NEEDS_REVIEW with the report's first review reason (low_verification, synthesis_failed, ...).
 
@@ -26,7 +31,10 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+
+from pymongo.database import Database
 
 from sabha_analytics.grounding import prepare_transcript
 from sabha_analytics.metrics import compute_metrics, select_metrics
@@ -34,10 +42,11 @@ from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse
 from sabha_analytics.rubric import Rubric
 from sabha_analytics.scoring import JudgeModel
-from sabha_core.models import Analysis, Person, Score, Tenant
+from sabha_core.models import Analysis, Person, Score, Tenant, utc_now
 from sabha_core.profiles import ConversationType
+from sabha_core.repo import SyncTenantRepo
 from sabha_core.state import RecordingStatus
-from sabha_core.storage import artefact_prefix
+from sabha_core.storage import artefact_prefix, run_version
 from sabha_core.timemap import SegmentMap, stats
 from sabha_llm.errors import BudgetUnavailableError, LlmError, ProviderError
 from sabha_llm.redact import STAFF, KnownName
@@ -54,10 +63,11 @@ class AnalyzeDeps:
     analysis_version: str  # the analyze stage's artefact version: one analysis per (recording, version)
     tenant: Callable[[str], Tenant | None]
     person: Callable[[str, str], Person | None]  # (tenant_id, person_id)
-    rubric: Callable[[Tenant, ConversationType], tuple[Rubric, str]]
+    rubric: Callable[[Tenant, ConversationType, str | None], tuple[Rubric, str]]  # (.., the rubric chosen, if any)
     judge: Callable[[str, str], JudgeModel]  # (tenant_id, recording_id) -> the LLM, through the gateway
     save: Callable[[str, Analysis, list[Score]], None]  # (tenant_id, analysis, scores), atomically
-    llm_cost: Callable[[str, str], float | None]  # (tenant_id, recording_id): cost of this recording's LLM calls
+    # (tenant_id, recording_id, since): cost of the recording's LLM calls, since a time for a re-analysis
+    llm_cost: Callable[[str, str, datetime | None], float | None]
 
 
 def _get_json(ctx: StageContext, key: str) -> Any:
@@ -83,6 +93,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
 
     def work(ctx: StageContext) -> dict[str, Any]:
         recording = ctx.recording
+        started = utc_now()
+        rerun = recording.analysis_run > 1
         pre = artefact_prefix(ctx.tenant_id, recording.id, "preprocess", deps.preprocess_version)
         asr = artefact_prefix(ctx.tenant_id, recording.id, "transcribe", deps.transcribe_version)
         document = _get_json(ctx, asr + "transcript@v1.json")
@@ -93,7 +105,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
         if tenant is None:
             raise PermanentError("missing_input", "the recording's tenant was not found")
         try:
-            rubric, rubric_hash = deps.rubric(tenant, recording.type)
+            rubric, rubric_hash = deps.rubric(tenant, recording.type, recording.rubric_id)
         except NoRubric as exc:
             raise PermanentError("no_rubric", str(exc)) from exc
 
@@ -127,18 +139,19 @@ def make_work(deps: AnalyzeDeps) -> Work:
         usage = report["usage"]["total"]
         analysis = Analysis(
             # A meeting is scored as a whole: its analysis and scores belong to no one (owner's decision, 2026-10-24).
-            recording_id=recording.id, version=deps.analysis_version,
+            recording_id=recording.id, version=run_version(deps.analysis_version, recording.analysis_run),
             person_id=None if meeting else recording.person_id,
             unit_id=recording.unit_id, conversation_type=recording.type, rubric_id=rubric.id,
             rubric_version=rubric.version, rubric_hash=rubric_hash, report_key=key, status=report["next_status"],
             overall_score=report["overall"]["score"], verified_share=report["overall"]["verified_share"],
             review_reasons=report["review_reasons"], model_ids=report["model_ids"],
             prompt_hashes={name: p["sha256"] for name, p in report["prompts"].items()},
-            usage=usage, cost_usd=deps.llm_cost(ctx.tenant_id, recording.id),
+            usage=usage, cost_usd=deps.llm_cost(ctx.tenant_id, recording.id, started if rerun else None),
         )  # fmt: skip
         deps.save(ctx.tenant_id, analysis, scores_from(report, analysis))
         meta = {
             "rubric": rubric.id,
+            "analysis_run": recording.analysis_run,
             "overall_score": analysis.overall_score,
             "verified_share": analysis.verified_share,
             "dimensions_verified": sum(1 for d in report["dimensions"] if d["verified"]),
@@ -155,3 +168,23 @@ def make_work(deps: AnalyzeDeps) -> Work:
         return meta
 
     return work
+
+
+def store_analysis(db: Database[dict[str, Any]], tenant_id: str, analysis: Analysis, scores: list[Score]) -> None:
+    """Save an analysis and its scores in one transaction: replace the same version's (a retried stage) and mark
+    every other version of the recording, with its scores, as superseded (a re-analysis keeps them as history)."""
+    analyses = SyncTenantRepo(db, "analyses", tenant_id, Analysis)
+    rows = SyncTenantRepo(db, "scores", tenant_id, Score)
+    same = {"recording_id": analysis.recording_id, "version": analysis.version}
+    with db.client.start_session() as session, session.start_transaction():
+        for old in analyses.find(same, session=session):
+            rows.delete_many({"analysis_id": old.id}, session=session)
+        analyses.delete_many(same, session=session)
+        older = analyses.find({"recording_id": analysis.recording_id}, session=session)
+        if older:
+            ids = [a.id for a in older]
+            analyses.update_many({"_id": {"$in": ids}}, {"$set": {"superseded": True}}, session=session)
+            rows.update_many({"analysis_id": {"$in": ids}}, {"$set": {"superseded": True}}, session=session)
+        analyses.insert_one(analysis, session=session)
+        if scores:
+            rows.insert_many(scores, session=session)

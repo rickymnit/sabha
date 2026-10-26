@@ -106,7 +106,7 @@ class DisputeOut(BaseModel):
     current_score: int  # the score shown when the dispute was raised
     proposed_score: int
     comment: str
-    status: Literal["open", "accepted", "rejected"]
+    status: Literal["open", "accepted", "rejected", "closed"]
     final_score: int | None
     resolution_note: str | None
     created_at: datetime
@@ -134,7 +134,7 @@ class DisputeItem(BaseModel):
     proposed_score: int
     comment: str
     evidence: list[Quote]
-    status: Literal["open", "accepted", "rejected"]
+    status: Literal["open", "accepted", "rejected", "closed"]
     raised_by_me: bool  # then someone else decides it
     created_at: datetime
 
@@ -192,7 +192,7 @@ async def raise_dispute(
             raise ForbiddenError("Reviewers decide disputes; the person analysed or their manager raises them.")
         raise ForbiddenError("Nobody is analysed in a meeting, so its scores are disputed by managers.")
     score = await scores.find_one({"analysis_id": analysis.id, "dimension": body.dimension_key})
-    if score is None or not score.verified or score.not_applicable or score.score is None:
+    if analysis.superseded or score is None or not score.verified or score.not_applicable or score.score is None:
         raise NotDisputableError("Only a score shown in the report can be disputed.")
     current = score.shown_score or score.score
     if body.proposed_score == current:
@@ -335,5 +335,6 @@ async def annotate_report(
                 }
             out["dispute_open"] = out["key"] in open_keys
         dimensions.append(out)
+    latest = payload.get("is_latest", True) and not analysis.superseded  # earlier versions are history only
     return {**payload, "dimensions": dimensions, "overall": analysis.overall_score,
-            "can_dispute": may_raise(principal, recording, analysis)}  # fmt: skip
+            "can_dispute": latest and may_raise(principal, recording, analysis)}  # fmt: skip

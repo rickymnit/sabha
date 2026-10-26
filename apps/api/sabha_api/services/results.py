@@ -40,6 +40,7 @@ from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
 
 VIEW_ALL = frozenset({Role.OWNER, Role.ADMIN})
+LATEST: dict[str, Any] = {"superseded": {"$ne": True}}  # an analysis or score not replaced by a re-analysis
 UNIT_SCOPED = frozenset({Role.MANAGER, Role.REVIEWER})
 MAX_LIMIT = 100
 NOTHING: dict[str, Any] = {"_id": {"$in": []}}
@@ -246,6 +247,7 @@ class AnalysisSummary(BaseModel):
     rubric_id: str
     rubric_version: str
     model_ids: list[str]
+    superseded: bool  # a newer analysis of the recording exists (re-analysis)
     created_at: datetime
 
 
@@ -267,7 +269,8 @@ def summary(analysis: Analysis) -> AnalysisSummary:
     return AnalysisSummary(
         id=analysis.id, version=analysis.version, status=analysis.status, overall_score=analysis.overall_score,
         verified_share=analysis.verified_share, review_reasons=analysis.review_reasons, rubric_id=analysis.rubric_id,
-        rubric_version=analysis.rubric_version, model_ids=analysis.model_ids, created_at=analysis.created_at,
+        rubric_version=analysis.rubric_version, model_ids=analysis.model_ids, superseded=analysis.superseded,
+        created_at=analysis.created_at,
     )  # fmt: skip
 
 
@@ -362,13 +365,13 @@ async def trend(
     scores: TenantRepo[Score],
 ) -> TrendOut:
     if dimension is None:
-        rows = await analyses.find({"person_id": person.id, "status": "COMPLETED"}, sort=[("created_at", -1)],
+        rows = await analyses.find({"person_id": person.id, "status": "COMPLETED", **LATEST}, sort=[("created_at", -1)],
                                    limit=limit)  # fmt: skip
         points = [TrendPoint(recording_id=a.recording_id, analysis_id=a.id, created_at=a.created_at,
                              score=a.overall_score, verified=a.overall_score is not None) for a in rows]  # fmt: skip
     else:
-        found = await scores.find({"person_id": person.id, "dimension": dimension}, sort=[("created_at", -1)],
-                                  limit=limit)  # fmt: skip
+        found = await scores.find({"person_id": person.id, "dimension": dimension, **LATEST},
+                                  sort=[("created_at", -1)], limit=limit)  # fmt: skip
         points = [TrendPoint(recording_id=s.recording_id, analysis_id=s.analysis_id, created_at=s.created_at,
                              score=s.shown_score, verified=s.verified) for s in found]  # fmt: skip
     return TrendOut(person_id=person.id, dimension=dimension, points=list(reversed(points)))  # oldest first
@@ -524,17 +527,32 @@ def shown_ticket(ticket: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 async def analysis_payload(
-    recording: Recording, analyses: TenantRepo[Analysis], reader: ArtefactReader, *, person_label: str
+    recording: Recording,
+    analyses: TenantRepo[Analysis],
+    reader: ArtefactReader,
+    *,
+    person_label: str,
+    analysis_id: str | None = None,
 ) -> tuple[dict[str, Any], Analysis | None]:
+    """The report payload of the recording's latest analysis, or of an earlier version (`analysis_id`, which must
+    be one of this recording's; 404 otherwise). `is_latest` says which it is."""
     found = await analyses.find({"recording_id": recording.id}, sort=[("created_at", -1)], limit=1)
-    analysis = found[0] if found else None
+    newest = found[0] if found else None
+    analysis = newest
+    if analysis_id is not None:
+        analysis = await analyses.find_one({"_id": analysis_id, "recording_id": recording.id})
+        if analysis is None:
+            raise NotFoundError("This recording has no such analysis.")
     report = None if analysis is None else await reader.json(analysis.report_key)
     history: list[float] = []
     if analysis is not None and recording.person_id:
         others = {"person_id": recording.person_id, "status": "COMPLETED", "recording_id": {"$ne": recording.id}}
         earlier = await analyses.find(others, sort=[("created_at", -1)], limit=20)
         history = [a.overall_score for a in earlier if a.overall_score is not None]
-    return report_payload(recording, analysis, report, person_label=person_label, history=history), analysis
+    payload = report_payload(recording, analysis, report, person_label=person_label, history=history)
+    if analysis is not None and "analysis_id" in payload:
+        payload["is_latest"] = newest is not None and analysis.id == newest.id
+    return payload, analysis
 
 
 class Range(BaseModel):

@@ -258,3 +258,25 @@ routes:
     staff_uploader: 403  # she raised it, and staff never resolve
     staff_colleague: 403
     other_tenant: 404
+
+  POST /v1/recordings/{recording_id}/reanalyze:
+    # Score a finished recording again from its transcript (P2.8, owner's decision 2026-10-26: owners and admins;
+    # each run costs an LLM scoring). A fresh finished recording of Asha's per call. Audited.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 403  # sees it, but re-analysis is for owners and admins
+    manager_other_unit: 404
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 404
+    other_tenant: 404
+
+  POST /v1/reanalysis:
+    # Re-analyse every finished recording of a type scored with an older rubric (count first, at most 100 per
+    # request). Called with dry_run, so it only counts; other_tenant counts its own tenant's (none).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403

@@ -97,6 +97,7 @@ async def get_transcript(
 async def get_analysis(
     recording_id: str, request: Request, principal: Caller, found: Found, recordings: Recordings, people: People,
     analyses: Analyses, scores: Scores, dispute_repo: Disputes, reader: Reader, entries: Entries,
+    analysis_id: str | None = None,
 ) -> dict[str, Any]:  # fmt: skip
     """Everything the report page shows, in one payload for the recording's state: processing (with the stage),
     failed or needs_review (with plain-language reasons), or completed/partial (verified dimensions with their
@@ -105,7 +106,8 @@ async def get_analysis(
     recording = await service.visible_recording(principal, recording_id, recordings, people)
     tenant = await found.tenant(principal.tenant_id)
     person_label = tenant.labels.person if tenant is not None else "Staff"
-    payload, analysis = await service.analysis_payload(recording, analyses, reader, person_label=person_label)
+    payload, analysis = await service.analysis_payload(recording, analyses, reader, person_label=person_label,
+                                                       analysis_id=analysis_id)  # fmt: skip
     payload = await disputes.annotate_report(payload, principal, recording, analysis, scores=scores,
                                              disputes=dispute_repo)  # fmt: skip
     if analysis is not None and payload["status"] in ("completed", "partial"):

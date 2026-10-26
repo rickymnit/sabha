@@ -41,7 +41,7 @@ from sabha_core.outbox import record_transition
 from sabha_core.repo import SyncTenantRepo
 from sabha_core.stage_runs import finish_stage_run, start_stage_run
 from sabha_core.state import ConcurrentTransition, ConsentRequired, RecordingStatus
-from sabha_core.storage import artefact_prefix
+from sabha_core.storage import artefact_prefix, run_version
 
 log = logging.getLogger("sabha.workers.stage")
 tracer = trace.get_tracer("sabha.workers")
@@ -76,6 +76,7 @@ class StageSpec:
     working: RecordingStatus  # the status while this stage runs
     done_to: RecordingStatus  # the status once it has finished
     entry_from: RecordingStatus | None = None  # moved from here into `working` when the stage starts
+    per_run: bool = False  # re-run by re-analysis (P2.8): run n > 1 writes to <version>-run<n>
 
 
 class ArtefactStore(Protocol):
@@ -208,6 +209,9 @@ class StageRunner:
 
         runs = self._repo("stage_runs", tenant_id, StageRun)
         version = self._versions[spec.name]
+        rerun = spec.per_run and recording.analysis_run > 1
+        if rerun:
+            version = run_version(version, recording.analysis_run)
         run = start_stage_run(runs, recording_id, spec.name, version, worker=self._worker, now=self._now())
         prefix = artefact_prefix(tenant_id, recording_id, spec.name, version)
         try:
@@ -217,8 +221,10 @@ class StageRunner:
                 else:
                     meta = work(StageContext(tenant_id, recording, prefix, self._artefacts, attempt)) or {}
                     self._artefacts.put(prefix + DONE_MARKER, b"", "text/plain")
+            # A re-analysis ends quietly: the event says so, and the relay sends neither emails nor metering.
+            done_meta = {"reanalysis": True, "analysis_run": recording.analysis_run} if rerun else None
             try:
-                self._move(tenant_id, recording_id, spec.working, spec.done_to, f"{spec.name}_done")
+                self._move(tenant_id, recording_id, spec.working, spec.done_to, f"{spec.name}_done", meta=done_meta)
             except ConcurrentTransition:
                 log.info("another worker finished this stage", extra={"recording_id": recording_id})
             finish_stage_run(runs, run, succeeded=True, meta=meta, now=self._now())
@@ -241,11 +247,14 @@ class StageRunner:
             self._stop(tenant_id, recording_id, spec, RecordingStatus.FAILED, code, (detail, attempt))
             return Outcome("failed")
 
-    def _move(self, tenant_id: str, recording_id: str, src: RecordingStatus, dst: RecordingStatus, reason: str) -> None:
+    def _move(
+        self, tenant_id: str, recording_id: str, src: RecordingStatus, dst: RecordingStatus, reason: str,
+        meta: dict[str, Any] | None = None,
+    ) -> None:  # fmt: skip
         recordings = self._repo("recordings", tenant_id, Recording)
         outbox = self._repo("outbox", tenant_id, OutboxEvent)
         with self._client.start_session() as session, session.start_transaction():
-            record_transition(recordings, outbox, recording_id, src, dst, session=session, reason=reason)
+            record_transition(recordings, outbox, recording_id, src, dst, session=session, reason=reason, meta=meta)
 
     def _stop(
         self,

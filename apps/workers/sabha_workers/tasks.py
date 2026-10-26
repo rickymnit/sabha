@@ -13,7 +13,7 @@ import logging
 import os
 import socket
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -30,7 +30,7 @@ from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_asr.registry import build_transcriber
 from sabha_asr.roles import RoleTieBreaker
 from sabha_asr.transcriber import Transcriber
-from sabha_core.models import Analysis, AudioInfo, LlmCall, Person, Recording, Score, Transcript, utc_now
+from sabha_core.models import AudioInfo, LlmCall, Person, Recording, Transcript, utc_now
 from sabha_core.mongo import open_sync
 from sabha_core.repo import SyncTenantRepo, own_tenant
 from sabha_core.settings import Settings, get_settings
@@ -57,7 +57,7 @@ SPECS: dict[str, StageSpec] = {
     "preprocess": StageSpec("preprocess", working=S.PREPROCESSING, done_to=S.DIARIZING, entry_from=S.UPLOADED),
     "diarize": StageSpec("diarize", working=S.DIARIZING, done_to=S.TRANSCRIBING),
     "transcribe": StageSpec("transcribe", working=S.TRANSCRIBING, done_to=S.ANALYZING),
-    "analyze": StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED),
+    "analyze": StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED, per_run=True),
 }
 
 
@@ -182,22 +182,11 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
             raise LlmConfigError("no LLM provider is configured (set OPENAI_API_KEY)")
         return GatewayJudge(llm, tenant_id=tenant_id, recording_id=recording_id)
 
-    def save_analysis(tenant_id: str, analysis: Analysis, scores: list[Score]) -> None:
-        analyses = SyncTenantRepo(db, "analyses", tenant_id, Analysis)
-        score_rows = SyncTenantRepo(db, "scores", tenant_id, Score)
-        with db.client.start_session() as session, session.start_transaction():
-            previous = analyses.find({"recording_id": analysis.recording_id, "version": analysis.version},
-                                     session=session)  # fmt: skip
-            for old in previous:
-                score_rows.delete_many({"analysis_id": old.id}, session=session)
-            analyses.delete_many({"recording_id": analysis.recording_id, "version": analysis.version},
-                                 session=session)  # fmt: skip
-            analyses.insert_one(analysis, session=session)
-            if scores:
-                score_rows.insert_many(scores, session=session)
-
-    def llm_cost(tenant_id: str, recording_id: str) -> float | None:
-        calls = SyncTenantRepo(db, "llm_calls", tenant_id, LlmCall).find({"recording_id": recording_id})
+    def llm_cost(tenant_id: str, recording_id: str, since: datetime | None) -> float | None:
+        query: dict[str, Any] = {"recording_id": recording_id}
+        if since is not None:  # a re-analysis: only its own calls
+            query["created_at"] = {"$gte": since}
+        calls = SyncTenantRepo(db, "llm_calls", tenant_id, LlmCall).find(query)
         costs = [call.cost_usd for call in calls]
         return None if any(cost is None for cost in costs) else round(sum(c for c in costs if c is not None), 6)
 
@@ -209,9 +198,9 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         person=lambda tenant_id, person_id: SyncTenantRepo(db, "people", tenant_id, Person).find_one(
             {"_id": person_id}
         ),
-        rubric=lambda tenant, kind: rubric_for(tenant, kind, rubrics_dir),
+        rubric=lambda tenant, kind, rubric_id: rubric_for(tenant, kind, rubrics_dir, rubric_id=rubric_id),
         judge=judge,
-        save=save_analysis,
+        save=lambda tenant_id, analysis, scores: analyze.store_analysis(db, tenant_id, analysis, scores),
         llm_cost=llm_cost,
     )
 

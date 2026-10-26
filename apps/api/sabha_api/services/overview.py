@@ -118,11 +118,12 @@ async def overview(
     dimension_scores = await scores.find({"analysis_id": {"$in": list(by_id)}, "verified": True}) if by_id else []
     groups: dict[tuple[str, str], tuple[str, str, list[int]]] = {}
     for score in dimension_scores:
-        if score.score is None:  # not applicable to this recording: no score to count
+        shown = score.shown_score  # a reviewer's score from an accepted dispute counts (P6.7)
+        if shown is None:  # not applicable to this recording: no score to count
             continue
         analysis = by_id[score.analysis_id]
         key = (analysis.rubric_id, score.dimension)
-        groups.setdefault(key, (score.name, analysis.conversation_type.value, []))[2].append(score.score)
+        groups.setdefault(key, (score.name, analysis.conversation_type.value, []))[2].append(shown)
     coaching = sorted(
         (CoachingItem(rubric_id=rubric_id, dimension_key=dimension, dimension_name=name, type=kind,
                       median=round(median(values), 2), n=len(values))
