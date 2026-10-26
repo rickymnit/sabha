@@ -1,13 +1,16 @@
-// TanStack Query hooks for the API (P6.2). Every request carries the session's token; recordings still moving
-// through the pipeline are refetched every REFRESH_MS so statuses update without a reload (SSE comes with P2.6).
+// TanStack Query hooks for the API (P6.2). Every request carries the session's token. Recordings still moving
+// through the pipeline update through the live stream (api/live.ts, P2.6); while there is none, they are refetched
+// every REFRESH_MS instead.
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import type { DisputeDraft, DisputePage, Resolution } from "../features/disputes/types";
 import type { OverviewStats } from "../features/overview/types";
 import type { AnalysisPayload } from "../features/report/types";
 import { useSession } from "../session/session";
 import { ApiError, apiFetch } from "./client";
+import { connectLive, isLive } from "./live";
 import {
   IN_PROGRESS,
   type AnalysisVersion,
@@ -25,7 +28,22 @@ import {
   type TranscriptResponse,
 } from "./types";
 
-export const REFRESH_MS = 10_000;
+export const REFRESH_MS = 5_000;
+
+/** Polling only while the live stream is down (P2.6). */
+function poll(): number | false {
+  return isLive() ? false : REFRESH_MS;
+}
+
+/** Opens the live status stream for the signed-in session (P2.6); one per tab, from the app shell. */
+export function useLiveEvents(enabled: boolean): void {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!enabled || !token) return undefined;
+    return connectLive({ token, queryClient });
+  }, [enabled, token, queryClient]);
+}
 
 /** A fetcher bound to the current session's token. */
 export function useApi(): <T>(path: string) => Promise<T> {
@@ -65,9 +83,7 @@ export function useRecordings(filters: RecordingFilters = {}, pageSize = 20) {
     getNextPageParam: (last) => last.next_cursor,
     enabled: Boolean(token),
     refetchInterval: (query) =>
-      query.state.data?.pages.some((page) => page.items.some((item) => IN_PROGRESS.has(item.status)))
-        ? REFRESH_MS
-        : false,
+      query.state.data?.pages.some((page) => page.items.some((item) => IN_PROGRESS.has(item.status))) ? poll() : false,
   });
 }
 
@@ -77,7 +93,7 @@ export function useRecording(id: string): UseQueryResult<RecordingDetail, ApiErr
     queryKey: ["recording", id, token],
     queryFn: () => apiFetch<RecordingDetail>(`/v1/recordings/${encodeURIComponent(id)}`, { token }),
     enabled: Boolean(token),
-    refetchInterval: (query) => (query.state.data && IN_PROGRESS.has(query.state.data.status) ? REFRESH_MS : false),
+    refetchInterval: (query) => (query.state.data && IN_PROGRESS.has(query.state.data.status) ? poll() : false),
   });
 }
 
@@ -89,7 +105,7 @@ export function useAnalysis(id: string, analysisId?: string): UseQueryResult<Ana
     queryKey: ["analysis", id, analysisId ?? "latest", token],
     queryFn: () => apiFetch<AnalysisPayload>(`/v1/recordings/${encodeURIComponent(id)}/analysis${version}`, { token }),
     enabled: Boolean(token),
-    refetchInterval: (query) => (query.state.data?.status === "processing" ? REFRESH_MS : false),
+    refetchInterval: (query) => (query.state.data?.status === "processing" ? poll() : false),
   });
 }
 
@@ -138,7 +154,7 @@ export function useOverview(period: { from: string; to: string }): UseQueryResul
     queryFn: () => apiFetch<OverviewStats>(`/v1/overview?${new URLSearchParams(period)}`, { token }),
     enabled: Boolean(token),
     refetchInterval: (query) =>
-      query.state.data?.in_progress?.some((s) => s.stage !== "needs_review") ? REFRESH_MS : false,
+      query.state.data?.in_progress?.some((s) => s.stage !== "needs_review") ? poll() : false,
   });
 }
 

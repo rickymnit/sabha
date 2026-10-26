@@ -6,7 +6,7 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useDisputes, useMe, useReviews } from "../api/hooks";
+import { useDisputes, useLiveEvents, useMe, useReviews } from "../api/hooks";
 import type { Me } from "../api/types";
 import { Avatar, Button, EmptyState, Icon, Logo, NavItem, Skeleton, SkeletonGroup } from "../design";
 import { useSession } from "../session/session";
@@ -96,6 +96,7 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
 /** Signed-in pages: loads /v1/me once, then the sidebar and the page. */
 export function Layout() {
   const me = useMe();
+  useLiveEvents(me.isSuccess); // lists, reports and queues update as recordings move (P2.6)
   const { signOut } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   // On phones the menu closes once a page is chosen.
