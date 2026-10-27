@@ -73,6 +73,8 @@ export function affectedQueries(event: LiveEvent): QueryKey[] {
   }
   if (event.status === "NEEDS_REVIEW" || event.type === "recording.transcribing") keys.push(["reviews"]);
   if (event.status === "COMPLETED") keys.push(["people-summary"], ["people"]);
+  // A recording's length is measured by preprocessing, so this month's hours change when diarization starts.
+  if (event.status === "DIARIZING") keys.push(["usage"]);
   if (event.type === "dispute.resolved") keys.push(["disputes"]);
   return keys;
 }

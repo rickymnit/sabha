@@ -14,6 +14,8 @@ export interface NavEntry {
 }
 
 const EVERYONE: Role[] = ["owner", "admin", "manager", "reviewer", "staff"];
+/** Who manages the organisation: settings and the plan's usage. */
+export const ADMINS: Role[] = ["owner", "admin"];
 /** Who resolves reviews (ADR 0007): never staff, not even for their own recordings. */
 export const RESOLVERS: Role[] = ["owner", "admin", "manager", "reviewer"];
 
@@ -59,7 +61,7 @@ export function navItems(me: Me): NavEntry[] {
       to: "/settings",
       label: "Settings",
       icon: "settings",
-      roles: ["owner", "admin"],
+      roles: ADMINS,
       match: (path) => path === "/settings",
     },
   ];

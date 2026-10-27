@@ -6,12 +6,13 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useDisputes, useLiveEvents, useMe, useReviews } from "../api/hooks";
+import { useDisputes, useLiveEvents, useMe, useRecordingCounts, useReviews, useUsage } from "../api/hooks";
 import type { Me } from "../api/types";
 import { Avatar, Button, EmptyState, Icon, Logo, NavItem, Skeleton, SkeletonGroup } from "../design";
 import { useSession } from "../session/session";
 import { capitalise, roleTitle, unitNames } from "./format";
-import { RESOLVERS, navItems } from "./nav";
+import { ADMINS, RESOLVERS, navItems } from "./nav";
+import { PlanUsage } from "./PlanUsage";
 
 /** A sidebar link that changes page without reloading (keeps cmd/ctrl-click for a new tab). */
 function Link({
@@ -46,6 +47,11 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   const resolver = RESOLVERS.includes(me.user.role);
   const reviews = useReviews(resolver);
   const disputes = useDisputes(resolver);
+  const counts = useRecordingCounts();
+  const usage = useUsage(ADMINS.includes(me.user.role));
+  // The menu's extras never break a page: an answer of an unexpected shape just leaves them out.
+  const typeCounts = typeof counts.data?.by_type === "object" ? counts.data.by_type : undefined;
+  const planUsage = typeof usage.data?.used_hours === "number" ? usage.data : undefined;
   const waiting = (reviews.data?.items.length ?? 0) + (disputes.data?.items.filter((d) => !d.raised_by_me).length ?? 0);
   return (
     <nav id={id} aria-label="Main" className="flex h-full flex-col gap-6 px-3.5 py-5">
@@ -73,21 +79,30 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
         <div className="flex flex-col gap-0.5">
           <p className="m-0 px-2.5 pb-1.5 text-caption font-semibold text-muted-2">Conversation types</p>
           {me.tenant.enabled_types.map((t) => (
-            <Link key={t} to={`/recordings?type=${t}`} type={t} current={pathname === "/recordings" && type === t}>
+            <Link
+              key={t}
+              to={`/recordings?type=${t}`}
+              type={t}
+              current={pathname === "/recordings" && type === t}
+              {...(typeCounts ? { count: typeCounts[t] ?? 0 } : {})}
+            >
               {capitalise(t)}
             </Link>
           ))}
         </div>
       )}
-      <div className="mt-auto flex items-center gap-2.5 border-t border-line-subtle px-1 pt-3">
-        <Avatar name={me.user.name} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-semibold text-ink">{me.user.name}</span>
-          <span className="text-caption leading-snug text-muted-2">{roleTitle(me.user, labels)}</span>
+      <div className="mt-auto flex flex-col gap-3">
+        {planUsage && <PlanUsage usage={planUsage} />}
+        <div className="flex items-center gap-2.5 border-t border-line-subtle px-1 pt-3">
+          <Avatar name={me.user.name} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm font-semibold text-ink">{me.user.name}</span>
+            <span className="text-caption leading-snug text-muted-2">{roleTitle(me.user, labels)}</span>
+          </div>
+          <Button variant="ghost" aria-label="Sign out" title="Sign out" onClick={signOut} className="text-muted-2">
+            <Icon name="signOut" />
+          </Button>
         </div>
-        <Button variant="ghost" aria-label="Sign out" title="Sign out" onClick={signOut} className="text-muted-2">
-          <Icon name="signOut" />
-        </Button>
       </div>
     </nav>
   );

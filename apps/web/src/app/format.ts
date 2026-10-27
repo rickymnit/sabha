@@ -108,3 +108,8 @@ export function unitNames(me: Me, max = 2): string {
   if (names.length <= max) return names.join(", ");
   return `${names.slice(0, max).join(", ")} and ${names.length - max} more`;
 }
+
+/** Audio hours: "38.4", "2", "0.3"; one decimal, none when whole. */
+export function formatHours(hours: number): string {
+  return hours.toFixed(1).replace(/\.0$/, "");
+}

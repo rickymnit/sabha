@@ -207,3 +207,19 @@ export interface SettingsChange {
   labels?: Partial<Labels>;
   enabled_types?: ConversationType[];
 }
+
+/** GET /v1/usage (services/usage.py): this month's audio hours (owners and admins). */
+export interface UsageSummary {
+  plan: string;
+  used_hours: number;
+  /** Set by Sabha for the tenant; null until agreed, and then there is no state or message either. */
+  allowance_hours: number | null;
+  state: "ok" | "warning" | "blocked" | "overage" | null;
+  message: string | null;
+  resets_at: string;
+}
+
+/** GET /v1/recordings/counts: the recordings of each type the signed-in person may see. */
+export interface RecordingCounts {
+  by_type: Partial<Record<ConversationType, number>>;
+}

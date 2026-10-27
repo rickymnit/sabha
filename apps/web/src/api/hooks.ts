@@ -22,12 +22,14 @@ import {
   type PersonItem,
   type PersonSummary,
   type RecordingDetail,
+  type RecordingCounts,
   type RecordingPage,
   type ReviewDecision,
   type SettingsChange,
   type SpeakersResponse,
   type TenantSettings,
   type TranscriptResponse,
+  type UsageSummary,
 } from "./types";
 
 export const REFRESH_MS = 5_000;
@@ -295,6 +297,26 @@ export function useBulkReanalyse() {
       if (request.dry_run) return;
       await Promise.all(["recordings", "overview"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
     },
+  });
+}
+
+/** GET /v1/recordings/counts, for the menu. Under ["recordings"], so live status refreshes it with the lists. */
+export function useRecordingCounts(): UseQueryResult<RecordingCounts, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["recordings", "counts", token],
+    queryFn: () => apiFetch<RecordingCounts>("/v1/recordings/counts", { token }),
+    enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/usage: this month's audio hours, for the plan block (owners and admins). */
+export function useUsage(enabled: boolean): UseQueryResult<UsageSummary, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["usage", token],
+    queryFn: () => apiFetch<UsageSummary>("/v1/usage", { token }),
+    enabled: enabled && Boolean(token),
   });
 }
 
