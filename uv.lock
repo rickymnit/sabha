@@ -2283,6 +2283,7 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "pymongo" },
     { name = "redis" },
+    { name = "sabha-analytics" },
     { name = "sabha-core" },
     { name = "uvicorn" },
 ]
@@ -2296,6 +2297,7 @@ requires-dist = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
     { name = "pymongo", specifier = ">=4.9" },
     { name = "redis", specifier = ">=5.0" },
+    { name = "sabha-analytics", editable = "packages/analytics" },
     { name = "sabha-core", editable = "packages/core" },
     { name = "uvicorn", specifier = ">=0.54" },
 ]

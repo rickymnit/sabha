@@ -320,3 +320,15 @@ routes:
     # (apps/api/tests/test_usage.py).
     anonymous: 401
     others: 200
+
+  GET /v1/rubrics:
+    # The rubrics of the tenant's conversation types, read-only: everyone signed in, staff included, so they can see
+    # how they are scored (owner's decision, 2026-10-27).
+    anonymous: 401
+    others: 200
+
+  GET /v1/rubrics/{rubric_id}:
+    # The school's teaching rubric. other_tenant is a school too, so reads the same file (rubrics are product
+    # content, not tenant data); a profile without it gets 404 (apps/api/tests/test_rubrics.py).
+    anonymous: 401
+    others: 200

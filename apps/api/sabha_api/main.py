@@ -34,6 +34,7 @@ from sabha_api.routers import (
     recordings,
     results,
     reviews,
+    rubrics,
     usage,
     users,
 )
@@ -109,6 +110,7 @@ def create_app(
     app.include_router(events.router)
     app.include_router(workspace_settings.router)
     app.include_router(usage.router)
+    app.include_router(rubrics.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

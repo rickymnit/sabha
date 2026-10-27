@@ -11,6 +11,7 @@ dependencies = [
   "pyjwt[crypto]>=2.10",
   "pymongo>=4.9",
   "redis>=5.0",
+  "sabha-analytics",  # the rubric loader, so the API reads rubric files exactly as scoring does (P6.8)
   "sabha-core",
   "uvicorn>=0.54",
 ]
