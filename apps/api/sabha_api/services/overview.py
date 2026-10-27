@@ -136,6 +136,21 @@ def check_period(start: datetime, end: datetime) -> tuple[datetime, datetime]:
     return start, end
 
 
+def subtree(units: Iterable[Unit], unit_id: str) -> set[str]:
+    """The unit and every unit under it, at any depth (a circular parent chain is walked once)."""
+    children: dict[str, list[str]] = {}
+    for u in units:
+        if u.parent_id:
+            children.setdefault(u.parent_id, []).append(u.id)
+    found, todo = {unit_id}, [unit_id]
+    while todo:
+        for child in children.get(todo.pop(), []):
+            if child not in found:
+                found.add(child)
+                todo.append(child)
+    return found
+
+
 def roots_of(units: Iterable[Unit]) -> dict[str, str]:
     """Each unit's top-level unit (itself when it has no parent). A broken chain (a missing or circular parent)
     stops at the last unit found."""
@@ -187,12 +202,8 @@ async def overview(
     visible = await visible_filter(principal, people)
     conditions = [visible] if visible else []
     if unit_id is not None:
-        conditions.append({"unit_id": {"$in": [u for u, root in roots.items() if root == unit_id or u == unit_id]}})
+        conditions.append({"unit_id": {"$in": sorted(subtree(all_units, unit_id))}})
     scope: dict[str, object] = {"$and": conditions} if conditions else {}
-    # Analyses are matched through the recordings the caller may see, exactly as the recordings list does (not
-    # through the unit copied onto each analysis, which could disagree if a recording moved).
-    seen = await recordings.find(scope)
-    by_id = {r.id: r for r in seen}
     # The switcher: every top-level unit for those who see everything, the top of their own units for managers and
     # reviewers, none for staff (who see only their own recordings).
     mine = roots.values() if not visible else (roots.get(u, u) for u in principal.unit_ids)
@@ -200,12 +211,19 @@ async def overview(
 
     # One read covers every bucket: from the oldest series period or trend week, with no upper bound, so a result
     # made after `to` moves its recording out of every earlier period.
+    # Analyses are matched through the recordings the caller may see, exactly as the recordings list does (not
+    # through the unit copied onto each analysis, which could disagree if a recording moved). Someone who sees
+    # everything, with no unit chosen, needs no list: only the recordings the analyses point at are read.
     window = min(end - length * SERIES_PERIODS, end - WEEK * TREND_WEEKS)
-    query = {"recording_id": {"$in": list(by_id)}, "status": "COMPLETED", "created_at": {"$gte": window}}
-    found = await analyses.find(query, sort=[("created_at", 1)]) if by_id else []
+    query: dict[str, object] = {"status": "COMPLETED", "created_at": {"$gte": window}}
+    if conditions:
+        query["recording_id"] = {"$in": [r.id for r in await recordings.find(scope)]}
+    found = await analyses.find(query, sort=[("created_at", 1)])
     latest: dict[str, Analysis] = {}
     for analysis in found:
         latest[analysis.recording_id] = analysis  # ascending, so the newest wins
+    by_id = {r.id: r for r in await recordings.find({"_id": {"$in": list(latest)}})} if latest else {}
+    latest = {rid: a for rid, a in latest.items() if rid in by_id}
     newest = [a for a in latest.values() if a.created_at < end]
 
     series = [
@@ -267,8 +285,13 @@ async def overview(
                   for r in busy]  # fmt: skip
 
     since = utc_now() - timedelta(days=TURNAROUND_DAYS)
-    done = await recordings.find({"$and": [*conditions, {"status": RecordingStatus.COMPLETED.value,
-                                                         "status_changed_at": {"$gte": since}}]})  # fmt: skip
+    # First runs only: a re-analysis moves status_changed_at days later and would inflate the time.
+    first_runs = {
+        "status": RecordingStatus.COMPLETED.value,
+        "status_changed_at": {"$gte": since},
+        "analysis_run": {"$in": [1, None]},
+    }  # recordings from before re-analysis have no analysis_run
+    done = await recordings.find({"$and": [*conditions, first_runs]})
     minutes: dict[str, list[float]] = {}
     for r in done:
         if r.completed_at and r.status_changed_at and r.status_changed_at >= r.completed_at:

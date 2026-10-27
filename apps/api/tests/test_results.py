@@ -271,6 +271,26 @@ def test_the_inbox_lists_only_what_each_caller_may_act_on(api: Api) -> None:
     assert kinds("asha") == []  # staff decide nothing here, and Ravi's call is not theirs
 
 
+def test_inbox_follow_ups_are_verified_and_never_crowded_out_by_other_units(api: Api) -> None:
+    def call(rid: str, person: str, unit: str, minutes_ago: int,
+             status: Literal["COMPLETED", "NEEDS_REVIEW"] = "COMPLETED") -> None:  # fmt: skip
+        recording(api, rid, person, unit, minutes_ago + 5)
+        api.db.recordings.update_one({"_id": rid}, {"$set": {"type": "reception"}})
+        insert(api.db, "analyses", Analysis(
+            tenant_id=T, recording_id=rid, version="v1", person_id=person, unit_id=unit,
+            conversation_type=ConversationType.RECEPTION, rubric_id="reception.school.v0.2", rubric_version="0.2",
+            rubric_hash="h", report_key=f"{T}/{rid}/a.json", status=status, verified_share=1.0,
+            ticket_status="follow_up_needed", created_at=utc_now() - timedelta(minutes=minutes_ago),
+        ))  # fmt: skip
+
+    call("r-mine", "p-asha", "unit-1", 120)
+    call("r-unchecked", "p-asha", "unit-1", 60, status="NEEDS_REVIEW")  # golden rule 5: never shown
+    for i in range(60):  # newer calls of another unit, more than one page of the inbox
+        call(f"r-other-{i}", "p-ravi", "unit-2", i)
+    ids = [item["id"] for item in api.get("manager", "/v1/inbox").json()["items"]]
+    assert ids == ["follow_up:r-mine"]
+
+
 def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:
     recording(api, "r-1", "p-asha", "unit-1", 30, RecordingStatus.FAILED)
     api.db.recordings.update_one({"_id": "r-1"}, {"$set": {"status_reason": "no_speech"}})
@@ -370,6 +390,14 @@ def test_the_overview_compares_periods_and_units_and_never_widens(api: Api) -> N
     assert api.get("owner", f"/v1/overview?{urlencode(params)}").json()["recordings_analysed"] == 1
     manager = api.get("manager", f"/v1/overview?{urlencode(params)}").json()  # unit-2 is not theirs
     assert (manager["recordings_analysed"], [u["id"] for u in manager["units"]]) == (0, ["unit-1"])
+
+    # a unit nested under unit-2 counts for unit-2; a re-analysed recording is left out of the turnaround
+    insert(api.db, "units", Unit(id="unit-2b", tenant_id=T, name="unit-2b", parent_id="unit-2"))
+    recording(api, "r-nested", "p-ravi", "unit-2b", day)
+    analysis(api, "r-nested", "v1", 4.0, day // 2, person="p-ravi")
+    assert api.get("owner", f"/v1/overview?{urlencode(params)}").json()["recordings_analysed"] == 2
+    api.db.recordings.update_one({"_id": "r-now"}, {"$set": {"analysis_run": 2}})
+    assert overview(api, "owner")["turnaround"] == []
 
 
 def test_the_overview_period_is_checked(api: Api) -> None:

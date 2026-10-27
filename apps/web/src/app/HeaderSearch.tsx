@@ -18,7 +18,13 @@ interface Option {
   detail: string;
 }
 
-const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+// navigator.platform is deprecated: prefer User-Agent Client Hints (Chromium), fall back to the user-agent string.
+const platform =
+  typeof navigator === "undefined"
+    ? ""
+    : ((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+      navigator.userAgent);
+const isMac = /Mac|iPhone|iPad/i.test(platform);
 
 export function HeaderSearch({ me }: { me: Me }) {
   const labels = me.tenant.labels;

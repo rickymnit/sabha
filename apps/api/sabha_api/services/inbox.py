@@ -104,12 +104,19 @@ async def inbox(
             waiting.append(("failed", r, r.status_changed_at or r.created_at,
                             {"reason": r.status_reason, "note": status_note(r)}))  # fmt: skip
 
+    # Only a COMPLETED analysis counts: one still waiting for review is not shown (golden rule 5). The caller's
+    # visibility is part of the query, before the limit, so other units' calls cannot crowd theirs out.
     since = utc_now() - timedelta(days=FOLLOW_UP_DAYS)
-    calls = await analyses.find({"conversation_type": ConversationType.RECEPTION.value, "superseded": False,
-                                 "ticket_status": "follow_up_needed", "created_at": {"$gte": since}},
-                                sort=[("created_at", -1)], limit=PER_KIND * 2)  # fmt: skip
+    calls_query: dict[str, object] = {
+        "conversation_type": ConversationType.RECEPTION.value, "status": "COMPLETED", "superseded": False,
+        "ticket_status": "follow_up_needed", "created_at": {"$gte": since},
+    }  # fmt: skip
+    if visible:
+        mine = await recordings.find({"$and": [visible, {"type": ConversationType.RECEPTION.value}]})
+        calls_query["recording_id"] = {"$in": [r.id for r in mine]}
+    calls = await analyses.find(calls_query, sort=[("created_at", -1)], limit=PER_KIND)
     await load([a.recording_id for a in calls])
-    for a in [a for a in calls if a.recording_id in by_id][:PER_KIND]:
+    for a in [a for a in calls if a.recording_id in by_id]:
         waiting.append(("follow_up", by_id[a.recording_id], a.created_at,
                         {"follow_up": a.ticket_follow_up, "ticket_category": a.ticket_category}))  # fmt: skip
 
