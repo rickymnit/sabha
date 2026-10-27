@@ -228,8 +228,8 @@ class S3Originals:
             raise
 
 
-RecordAudio = Callable[[str, str, int, AudioInfo], None]
-"""(tenant_id, recording_id, duration_ms, audio): store them on the recording."""
+RecordAudio = Callable[[str, str, int, int, AudioInfo], None]
+"""(tenant_id, recording_id, duration_ms, speech_ms, audio): store them on the recording."""
 
 
 NO_SPEECH = "no_speech"
@@ -289,7 +289,7 @@ def make_work(
                            "vad": {"model": f"silero_vad@{MODEL_VERSION}", **asdict(params)}},
             }  # fmt: skip
             ctx.artefacts.put(ctx.prefix + "audio.json", json.dumps(summary, indent=2).encode(), "application/json")
-            record_audio(ctx.tenant_id, recording.id, duration_ms, probed.audio_info())
+            record_audio(ctx.tenant_id, recording.id, duration_ms, speech["speech_ms"], probed.audio_info())
             if not segment_map.segments:
                 raise NeedsReviewError(NO_SPEECH, "voice activity detection found no speech in the recording")
             compact = folder / "compact.wav"

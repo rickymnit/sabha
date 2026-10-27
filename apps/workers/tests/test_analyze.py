@@ -25,7 +25,7 @@ from sabha_core.repo import SyncTenantRepo
 from sabha_core.state import RecordingStatus
 from sabha_core.timemap import Segment, SegmentMap
 from sabha_llm.errors import LlmConfigError, ProviderError
-from sabha_workers.stages.analyze import AnalyzeDeps, make_work, store_analysis
+from sabha_workers.stages.analyze import AnalyzeDeps, make_work, store_analysis, ticket_fields
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
 
 pytestmark = pytest.mark.integration
@@ -340,3 +340,15 @@ def test_a_reanalysis_uses_the_rubric_chosen_for_it(stage: Stage) -> None:
     reanalyse(stage, rid, 2, rubric_id="teaching.testing.v1.0")
     stage.run(rid, good_judge())
     assert stage.rubric_asked == [None, "teaching.testing.v1.0"]
+
+
+def test_only_a_ticket_with_verified_quotes_is_copied_for_counting() -> None:
+    ticket = {"category": "fee_query", "status": "follow_up_needed", "summary": "Second instalment",
+              "follow_up": {"text": "Accounts call back by 5 pm", "owner_role": "accounts"},
+              "evidence": {"need": {"quote": "..."}, "outcome": {"quote": "..."}}}  # fmt: skip
+    assert ticket_fields({"ticket": ticket}) == {
+        "ticket_status": "follow_up_needed", "ticket_category": "fee_query",
+        "ticket_follow_up": "Accounts call back by 5 pm",
+    }  # fmt: skip
+    assert ticket_fields({"ticket": {**ticket, "evidence": None}}) == {}  # golden rule 5
+    assert ticket_fields({"ticket": None}) == {}

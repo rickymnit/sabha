@@ -227,10 +227,10 @@ class Stage:
         self.s3 = s3_storage.client()
         self.artefacts = S3Artefacts(self.s3, "sabha-artefacts")
 
-        def record_audio(tenant_id: str, recording_id: str, duration_ms: int, audio: AudioInfo) -> None:
+        def record_audio(tenant_id: str, recording_id: str, duration_ms: int, speech_ms: int, audio: AudioInfo) -> None:
             recordings = SyncTenantRepo(db, "recordings", tenant_id, Recording)
-            recordings.update_one({"_id": recording_id},
-                                  {"$set": {"duration_ms": duration_ms, "audio": audio.model_dump()}})  # fmt: skip
+            recordings.update_one({"_id": recording_id}, {"$set": {"duration_ms": duration_ms, "speech_ms": speech_ms,
+                                                                   "audio": audio.model_dump()}})  # fmt: skip
 
         self.work = make_work(S3Originals(self.s3, "sabha-audio"), record_audio, lambda: vad)
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"preprocess": "v1"}, worker="test")
@@ -272,6 +272,7 @@ def test_the_stage_writes_its_files_maps_the_speech_and_moves_on(stage: Stage, s
     recording = stage.recording(rid)
     assert recording["status"] == "DIARIZING"
     assert abs(recording["duration_ms"] - spoken_lesson.total_ms) < 100
+    assert 0 < recording["speech_ms"] < recording["duration_ms"]  # the silence skipped is the difference
     assert recording["audio"] == {"codec": "mp3", "sample_rate": 16_000, "channels": 1}
     prefix = f"t1/{rid}/preprocess@v1/"
     names = ("normalised.wav", "playback.opus", "audio.json", "compact.wav", "segments@v1.json", DONE_MARKER)

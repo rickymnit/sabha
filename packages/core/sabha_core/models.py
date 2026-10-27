@@ -249,6 +249,8 @@ class Recording(TenantDoc):
     # Preprocess (P3.2): the length of the recording (the original timeline) and its audio stream. The priority
     # lanes (P7.2) and billing (P8.6) read duration_ms.
     duration_ms: int | None = Field(default=None, ge=0)
+    # Speech the VAD kept (the compact length); duration_ms minus this is the silence skipped (Overview, UI v2).
+    speech_ms: int | None = Field(default=None, ge=0)
     audio: AudioInfo | None = None
     # Retention (P7.3): when the nightly job deleted the audio (original and working copies) after the tenant's
     # retention_days. Transcripts and scores stay.
@@ -325,6 +327,12 @@ class Analysis(TenantDoc):
     superseded: bool = False  # a newer analysis of the recording exists (re-analysis, P2.8): history only
     verified_share: float = Field(ge=0, le=1)
     review_reasons: list[str] = Field(default_factory=list)
+    # Reception: the call's ticket, copied from the report so it can be counted (UI v2 Overview): its status from the
+    # rubric's output_values ("resolved", "follow_up_needed", "escalated") and what must happen next. None when the
+    # report has no ticket with verified quotes (results.shown_ticket, golden rule 5).
+    ticket_status: str | None = None
+    ticket_category: str | None = None
+    ticket_follow_up: str | None = None
     model_ids: list[str] = Field(default_factory=list)
     prompt_hashes: dict[str, str] = Field(default_factory=dict)
     usage: dict[str, int] = Field(default_factory=dict)

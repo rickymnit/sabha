@@ -120,10 +120,11 @@ def runtime() -> Runtime:
 
 
 def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str, Work]:
-    def record_audio(tenant_id: str, recording_id: str, duration_ms: int, audio: AudioInfo) -> None:
+    def record_audio(tenant_id: str, recording_id: str, duration_ms: int, speech_ms: int, audio: AudioInfo) -> None:
         recordings = SyncTenantRepo(db, "recordings", tenant_id, Recording)
         recordings.update_one(
-            {"_id": recording_id}, {"$set": {"duration_ms": duration_ms, "audio": audio.model_dump()}}
+            {"_id": recording_id},
+            {"$set": {"duration_ms": duration_ms, "speech_ms": speech_ms, "audio": audio.model_dump()}},
         )
 
     @cache

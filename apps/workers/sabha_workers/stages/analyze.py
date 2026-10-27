@@ -88,6 +88,17 @@ def scores_from(report: dict[str, Any], analysis: Analysis) -> list[Score]:
     ]  # fmt: skip
 
 
+def ticket_fields(report: dict[str, Any]) -> dict[str, str | None]:
+    """The reception ticket's status, category and follow-up for the Analysis document, so they can be counted.
+    Only a ticket with its verified quotes counts (as results.shown_ticket shows it, golden rule 5)."""
+    ticket = report.get("ticket")
+    if not ticket or not ticket.get("evidence"):
+        return {}
+    follow_up = ticket.get("follow_up") or {}
+    return {"ticket_status": ticket.get("status"), "ticket_category": ticket.get("category"),
+            "ticket_follow_up": follow_up.get("text")}  # fmt: skip
+
+
 def make_work(deps: AnalyzeDeps) -> Work:
     """The analyze `work` function for StageRunner (module docstring)."""
 
@@ -137,6 +148,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
         key = ctx.prefix + "analysis@v1.json"
         ctx.artefacts.put(key, json.dumps(report, ensure_ascii=False).encode(), "application/json")
         usage = report["usage"]["total"]
+        ticket = ticket_fields(report)
         analysis = Analysis(
             # A meeting is scored as a whole: its analysis and scores belong to no one (owner's decision, 2026-10-24).
             recording_id=recording.id, version=run_version(deps.analysis_version, recording.analysis_run),
@@ -147,6 +159,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
             review_reasons=report["review_reasons"], model_ids=report["model_ids"],
             prompt_hashes={name: p["sha256"] for name, p in report["prompts"].items()},
             usage=usage, cost_usd=deps.llm_cost(ctx.tenant_id, recording.id, started if rerun else None),
+            ticket_status=ticket.get("ticket_status"), ticket_category=ticket.get("ticket_category"),
+            ticket_follow_up=ticket.get("ticket_follow_up"),
         )  # fmt: skip
         deps.save(ctx.tenant_id, analysis, scores_from(report, analysis))
         meta = {
