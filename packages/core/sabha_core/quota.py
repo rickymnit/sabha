@@ -1,7 +1,10 @@
 """Monthly audio-hour quotas (plan task P7.2).
 
-Each tenant has a monthly allowance of audio hours, set by a Sabha admin with its plan (P7.x admin pages); nothing
-here invents a number. Usage is the audio duration of the tenant's recordings that started processing this month.
+Each tenant has a monthly allowance of audio hours: the one Sabha set for it (Tenant.audio_hours_allowance, via
+scripts/admin), else its plan's (DEFAULT_ALLOWANCE_HOURS, from the plans design). The pilot has none. Usage is the
+original length of the tenant's recordings uploaded this month whose transcription succeeded ("Audio hours are
+counted on the original recording length once transcription succeeds; failed uploads are never charged",
+docs/design/source/Plans.dc.html).
 
 - At WARN_SHARE (80 %) of the allowance the tenant is warned (an event and a banner), once per month.
 - At 100 % the plan decides: pilot and starter block new uploads with a clear message; growth allows them and
@@ -40,6 +43,20 @@ MAX_TYPES: dict[Plan, int] = {
     Plan.STARTER: 2,
     Plan.GROWTH: len(ConversationType),
 }
+
+# Plans.dc.html: "On Starter, new uploads pause at 100 hours until next month. ... move to Growth for 500 hours and
+# automatic extra hours." The free pilot has no allowance (owner's decision, 2026-10-27).
+DEFAULT_ALLOWANCE_HOURS: dict[Plan, float | None] = {
+    Plan.PILOT: None,
+    Plan.STARTER: 100,
+    Plan.GROWTH: 500,
+}
+
+
+def allowance_for(plan: Plan, override: float | None) -> float | None:
+    """The tenant's monthly audio hours: the one Sabha set for it, else its plan's; None means no limit."""
+    return override if override is not None else DEFAULT_ALLOWANCE_HOURS[plan]
+
 
 OVER_LIMIT: dict[Plan, OverLimit] = {
     Plan.PILOT: OverLimit.BLOCK,

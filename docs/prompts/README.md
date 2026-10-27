@@ -35,7 +35,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | P6.2 app shell (partly built) | `week-1.md` | Tenant switcher (when a person belongs to several organisations), Playwright smoke test |
 | P1.8 audit log (partly built) | `week-2.md` | `GET /v1/audit` and the immutability tests |
 | P2.7 notifications (partly built) | `week-5.md` | Webhook settings and the delivery task (signing is built); emails are done |
-| P7.2 limits and quotas (partly built) | `week-5.md` | Limiter in the auth dependency, quota checks on upload, lane by duration, admission ETA |
+| P7.2 limits and quotas (partly built) | `week-5.md` | Limiter in the auth dependency, lane by duration, admission ETA, the 80 % warning email (quota checks on upload are done) |
 | P7.3 backups, retention, erasure | `week-6.md` | Not started |
 | P7.8 admin ops (partly built), P8.6 usage export | `week-7.md` | Admin endpoints and UI, replay and abandon, usage export for invoicing |
 
@@ -89,7 +89,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | P2.8 re-analysis: one recording or many (count first, 100 per request), every version kept, numbers from the latest only | Re-analysis with a chosen rubric version is in the API only (the app always uses the current rubric) |
 | P2.6 live status: GET /v1/events and pages that update themselves, polling only as a fallback | Remaining from the prompt: none |
 | P1.7 settings: `GET`/`PATCH /v1/settings` and the Settings page (words, types within the plan, audited); new workspaces by `scripts/admin/create_tenant.py` (owner's choice, 2026-10-27, no self-sign-up) | None |
-| P6.2 menu numbers: recordings per type (`GET /v1/recordings/counts`), the plan block (`GET /v1/usage`), the test against hard-coded nouns | Monthly audio-hour allowances per customer are set with `scripts/admin/set_plan.py`; none is set until agreed |
+| P6.2 menu numbers: recordings per type (`GET /v1/recordings/counts`), the plan block (`GET /v1/usage`), the test against hard-coded nouns | Allowances: Starter 100 h (uploads pause), Growth 500 h (extra billed), pilot none (owner, 2026-10-27, from the plans design); `scripts/admin/set_plan.py` overrides one customer's. Hours count once transcription succeeds |
 | P6.9 consent (partly built) | Parked for the owner's law team (2026-10-26); golden rule 9 stays enforced at upload |
 
 ## Coverage check

@@ -16,7 +16,8 @@ from sabha_api.deps import Transactions, tenant_repo, transactions
 from sabha_api.errors import NotFoundError, NotReadyError
 from sabha_api.idempotency import HEADER, idempotent
 from sabha_api.services import recordings as service
-from sabha_core.models import AuditEntry, IdempotencyRecord, OutboxEvent, Person, Recording, Unit
+from sabha_api.services import usage
+from sabha_core.models import AuditEntry, IdempotencyRecord, OutboxEvent, Person, Recording, Transcript, Unit
 from sabha_core.repo import TenantRepo
 
 router = APIRouter(prefix="/v1/recordings", tags=["recordings"])
@@ -46,15 +47,18 @@ async def create_recording(
     people: Annotated[TenantRepo[Person], Depends(tenant_repo("people", Person))],
     units: Annotated[TenantRepo[Unit], Depends(tenant_repo("units", Unit))],
     entries: Annotated[TenantRepo[AuditEntry], Depends(tenant_repo("audit_log", AuditEntry))],
+    transcripts: Annotated[TenantRepo[Transcript], Depends(tenant_repo("transcripts", Transcript))],
     txn: Annotated[Transactions, Depends(transactions)],
     idempotency_key: Annotated[str | None, Header(alias=HEADER)] = None,
 ) -> JSONResponse:
-    """Create a recording and start its upload: PUT each part to its URL, then call complete."""
+    """Create a recording and start its upload: PUT each part to its URL, then call complete. Refused (422
+    quota_exhausted) once a Starter plan's audio hours for the month are used up."""
 
     async def handler() -> tuple[int, dict[str, object]]:
         tenant = await found.tenant(principal.tenant_id)
         if tenant is None:
             raise NotFoundError("Your organisation could not be found.")
+        await usage.check_uploads(tenant, recordings, transcripts)
         out = await service.create(
             principal,
             body,

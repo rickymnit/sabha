@@ -1,8 +1,11 @@
 """The sidebar's numbers (P6.2, P7.2): this month's audio hours and the recordings per conversation type.
 
 - GET /v1/usage (owners and admins): the plan, the audio hours of recordings uploaded this calendar month in India
-  time (their measured duration; not yet measured counts nothing), the allowance Sabha set for the tenant or null
-  when none is set (never an invented number, golden rule 6), the quota state and the reset time.
+  time, counted on the original length once transcription succeeded (failed uploads are never charged), the
+  allowance (the one Sabha set for the tenant, else the plan's: Starter 100, Growth 500, pilot none;
+  docs/design/source/Plans.dc.html), the quota state and the reset time.
+- Uploads (POST /v1/recordings) pause when a blocking plan (Starter) has used its allowance; Growth goes on and the
+  extra hours are billed; the pilot has no limit.
 - GET /v1/recordings/counts (everyone signed in): how many recordings of each type the caller may see, the same
   recordings the list shows, so a count and the list it opens always agree.
 
@@ -25,7 +28,7 @@ from pymongo.database import Database
 
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import IdentityLink, Person, Recording, Role, Tenant, Unit, User, utc_now
+from sabha_core.models import IdentityLink, Person, Recording, Role, Tenant, Transcript, Unit, User, utc_now
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import IST, Plan, month_bounds
 from sabha_core.repo import COLLECTIONS
@@ -41,6 +44,7 @@ USERS = {  # subject -> (tenant, user id, role, units)
     "owner-b": (B, "u-owner-b", Role.OWNER, []),
 }
 HOUR_MS = 3_600_000
+RUBRIC = "teaching.school.v0.1"
 
 
 @dataclass
@@ -93,41 +97,101 @@ def api(make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[st
 
 def recording(api: Api, *, tenant: str = T, type: str = "teaching", person: str = "p-asha", unit: str = "unit-1",
               duration_ms: int | None = HOUR_MS, created_at: datetime | None = None,
-              status: RecordingStatus = RecordingStatus.COMPLETED) -> None:  # fmt: skip
-    insert(api.db, "recordings", Recording(tenant_id=tenant, type=ConversationType(type), status=status,
+              status: RecordingStatus = RecordingStatus.COMPLETED, transcribed: bool = True) -> None:  # fmt: skip
+    rid = f"r-{uuid.uuid4().hex[:8]}"
+    insert(api.db, "recordings", Recording(id=rid, tenant_id=tenant, type=ConversationType(type), status=status,
                                            consent_ref="c", person_id=person, unit_id=unit, file_name="x.mp3",
                                            duration_ms=duration_ms, created_at=created_at or utc_now()))  # fmt: skip
+    if transcribed:
+        insert(api.db, "transcripts", Transcript(tenant_id=tenant, recording_id=rid, version="transcript@v1",
+                                                 storage_key=f"{tenant}/{rid}/transcribe@v1/transcript@v1.json",
+                                                 asr_model="fake", word_timing="approximate", word_count=0,
+                                                 utterance_count=0, roles={}, rubric_id=RUBRIC))  # fmt: skip
 
 
 # --- Usage ---
 
 
-def test_usage_adds_up_this_months_measured_audio(api: Api) -> None:
+def test_usage_counts_this_months_transcribed_audio(api: Api) -> None:
     start, end = month_bounds(utc_now())
     recording(api, duration_ms=2 * HOUR_MS, created_at=start)  # the first moment of the month, India time
     recording(api, duration_ms=HOUR_MS // 2, type="reception", person="p-ravi", unit="unit-2")
-    recording(api, duration_ms=None, status=RecordingStatus.PREPROCESSING)  # not measured yet
+    recording(api, duration_ms=HOUR_MS, status=RecordingStatus.FAILED)  # failed after transcription: charged
+    recording(api, duration_ms=3 * HOUR_MS, status=RecordingStatus.FAILED, transcribed=False)  # never charged
+    recording(api, duration_ms=3 * HOUR_MS, status=RecordingStatus.DIARIZING, transcribed=False)  # not yet
     recording(api, duration_ms=5 * HOUR_MS, created_at=start - timedelta(seconds=1))  # last month
     recording(api, tenant=B, type="sales", duration_ms=7 * HOUR_MS)  # another tenant
     response = api.get("owner", "/v1/usage")
     assert response.status_code == 200, response.text
     out = response.json()
     assert out["plan"] == "starter"
-    assert out["used_hours"] == pytest.approx(2.5)
-    assert out["allowance_hours"] is None  # Sabha has not set one: no invented number
-    assert out["state"] is None
+    assert out["used_hours"] == pytest.approx(3.5)
+    assert out["allowance_hours"] == 100  # Starter's (Plans.dc.html)
+    assert out["state"] == "ok"
     assert out["message"] is None
     assert datetime.fromisoformat(out["resets_at"]) == end
     assert datetime.fromisoformat(out["resets_at"]).astimezone(IST).day == 1
 
 
-def test_usage_against_the_allowance_sabha_set(api: Api) -> None:
+def test_re_analysis_does_not_count_twice(api: Api) -> None:
+    recording(api, duration_ms=HOUR_MS)
+    rid = api.db["recordings"].find_one({"tenant_id": T})["_id"]  # type: ignore[index]
+    insert(api.db, "transcripts", Transcript(tenant_id=T, recording_id=rid, version="transcript@v2",
+                                             storage_key=f"{T}/{rid}/transcribe@v2/transcript@v2.json",
+                                             asr_model="fake", word_timing="approximate", word_count=0,
+                                             utterance_count=0, roles={}, rubric_id=RUBRIC))  # fmt: skip
+    assert api.get("owner", "/v1/usage").json()["used_hours"] == pytest.approx(1)
+
+
+@pytest.mark.parametrize(("plan", "allowance"), [("starter", 100), ("growth", 500), ("pilot", None)])
+def test_each_plan_has_its_allowance(api: Api, plan: str, allowance: int | None) -> None:
+    api.db["tenants"].update_one({"_id": T}, {"$set": {"plan": plan}})
+    out = api.get("owner", "/v1/usage").json()
+    assert out["allowance_hours"] == allowance
+    assert (out["state"] is None) == (allowance is None)
+
+
+def test_an_allowance_set_for_the_tenant_wins_over_the_plans(api: Api) -> None:
     api.db["tenants"].update_one({"_id": T}, {"$set": {"audio_hours_allowance": 3}})
     recording(api, duration_ms=int(2.5 * HOUR_MS))
     out = api.get("admin", "/v1/usage").json()
     assert out["allowance_hours"] == 3
     assert out["state"] == "warning"  # past 80 %
     assert "2.5 of this month's 3 audio hours" in out["message"]
+
+
+# --- Uploads pause at the limit ---
+
+UPLOAD = {"type": "teaching", "file_name": "Fractions.mp3", "size_bytes": 1024, "content_type": "audio/mpeg",
+          "person_id": "p-asha", "consent_ref": "c"}  # fmt: skip
+
+
+def upload(api: Api, sub: str = "owner") -> httpx.Response:
+    headers = {"Authorization": f"Bearer {api.idp.token(sub)}", "Idempotency-Key": uuid.uuid4().hex}
+    return api.client.post("/v1/recordings", json=UPLOAD, headers=headers)
+
+
+def test_starter_uploads_pause_once_the_hours_are_used(api: Api) -> None:
+    recording(api, duration_ms=99 * HOUR_MS)
+    assert upload(api).status_code == 201  # 99 of 100
+    recording(api, duration_ms=HOUR_MS)
+    refused = upload(api, "asha")
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "quota_exhausted"
+    assert "paused until" in refused.json()["detail"]
+
+
+def test_growth_uploads_go_on_past_the_limit(api: Api) -> None:
+    api.db["tenants"].update_one({"_id": T}, {"$set": {"plan": "growth"}})
+    recording(api, duration_ms=501 * HOUR_MS)
+    assert upload(api).status_code == 201
+    assert api.get("owner", "/v1/usage").json()["state"] == "overage"
+
+
+def test_the_pilot_has_no_limit(api: Api) -> None:
+    api.db["tenants"].update_one({"_id": T}, {"$set": {"plan": "pilot"}})
+    recording(api, duration_ms=1000 * HOUR_MS)
+    assert upload(api).status_code == 201
 
 
 def test_the_allowance_is_never_zero_or_negative() -> None:

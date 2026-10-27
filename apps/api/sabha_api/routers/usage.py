@@ -10,7 +10,7 @@ from sabha_api.auth import Principal, require_role
 from sabha_api.deps import own_tenant_repo, tenant_repo
 from sabha_api.errors import NotFoundError
 from sabha_api.services import usage as service
-from sabha_core.models import Recording
+from sabha_core.models import Recording, Transcript
 from sabha_core.repo import OwnTenantRepo, TenantRepo
 
 router = APIRouter(tags=["usage"])
@@ -21,9 +21,10 @@ async def usage(
     principal: Annotated[Principal, Depends(require_role(*service.ALLOWED))],
     own: Annotated[OwnTenantRepo, Depends(own_tenant_repo)],
     recordings: Annotated[TenantRepo[Recording], Depends(tenant_repo("recordings", Recording))],
+    transcripts: Annotated[TenantRepo[Transcript], Depends(tenant_repo("transcripts", Transcript))],
 ) -> service.UsageOut:
     """This month's audio hours against the plan's allowance (owners and admins)."""
     tenant = await own.get()
     if tenant is None:
         raise NotFoundError("Your organisation could not be found.")
-    return await service.summary(tenant, recordings)
+    return await service.summary(tenant, recordings, transcripts)
