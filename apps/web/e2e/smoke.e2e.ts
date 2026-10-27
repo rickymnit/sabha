@@ -83,7 +83,7 @@ test("a teacher lands on their lessons and a report opens with scores and transc
 
 test("an unknown address shows a way back, not a dead end", async ({ page }) => {
   await signInAs(page, "Meena Iyer");
-  await page.goto("/rubrics");
+  await page.goto("/plans");
   await expect(page.getByRole("heading", { name: "We couldn't find that page" })).toBeVisible();
   await page.getByRole("button", { name: "Go to lessons" }).click();
   await expect(page.getByRole("heading", { name: "Lessons", level: 1 })).toBeVisible();

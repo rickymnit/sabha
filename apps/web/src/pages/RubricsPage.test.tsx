@@ -141,7 +141,7 @@ describe("the rubrics page", () => {
       within(changes)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["Greeting: weight 50% to 100%", "Greeting: level 2 description", "Hold: removed"]);
+    ).toEqual(["Greeting: weight 50% to 100%", "Greeting: level 2 description changed", "Hold: removed"]);
     const history = screen.getByRole("region", { name: "Version history" });
     expect(within(history).getByRole("link", { name: /v0\.2/ })).toHaveAttribute("aria-current", "page");
     expect(within(history).getByText("In use")).toBeInTheDocument();

@@ -31,7 +31,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 
 | Task | File | What remains |
 | --- | --- | --- |
-| P6.8 role views | `week-6.md` | Not started; includes the workspace setup, rubric editor and plans pages in `docs/design/` |
+| P6.8 role views (partly built) | `week-6.md` | Rubric editing and publishing (needs P5.9 calibration and real rater scores), the plans and billing page (needs a billing system); keyboard focus order is checked only by axe so far |
 | P6.2 app shell (partly built) | `week-1.md` | Tenant switcher (when a person belongs to several organisations), Playwright smoke test |
 | P1.8 audit log (partly built) | `week-2.md` | `GET /v1/audit` and the immutability tests |
 | P2.7 notifications (partly built) | `week-5.md` | Webhook settings and the delivery task (signing is built); emails are done |
@@ -89,6 +89,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | P2.8 re-analysis: one recording or many (count first, 100 per request), every version kept, numbers from the latest only | Re-analysis with a chosen rubric version is in the API only (the app always uses the current rubric) |
 | P2.6 live status: GET /v1/events and pages that update themselves, polling only as a fallback | Remaining from the prompt: none |
 | P1.7 settings: `GET`/`PATCH /v1/settings` and the Settings page (words, types within the plan, audited); new workspaces by `scripts/admin/create_tenant.py` (owner's choice, 2026-10-27, no self-sign-up) | None |
+| P6.8 role views: read-only rubric pages for everyone, role-only pages guarded, not-found and session-ended states, pages loaded on first open (main bundle 548 to 396 kB), axe and contrast checks, browser tests per role (`e2e/roles.e2e.ts`) | "Internal" admin-only scores are left out: golden rule 5 (owner, 2026-10-27) |
 | P6.2 menu numbers: recordings per type (`GET /v1/recordings/counts`), the plan block (`GET /v1/usage`), the test against hard-coded nouns | Allowances: Starter 100 h (uploads pause), Growth 500 h (extra billed), pilot none (owner, 2026-10-27, from the plans design); `scripts/admin/set_plan.py` overrides one customer's. Hours count once transcription succeeds |
 | P6.9 consent (partly built) | Parked for the owner's law team (2026-10-26); golden rule 9 stays enforced at upload |
 

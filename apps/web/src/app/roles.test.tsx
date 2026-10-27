@@ -138,3 +138,23 @@ describe("a session that ends on its own", () => {
     expect(screen.queryByText(/Your session ended/)).not.toBeInTheDocument();
   });
 });
+
+describe("pages for some roles only", () => {
+  it.each(["/overview", "/people", "/reviews", "/reviews/r9"])(
+    "send a teacher who types %s to their lessons",
+    async (path) => {
+      stubApi({ "/v1/me": me("staff"), "/v1/recordings": EMPTY });
+      const router = renderAt(path);
+      expect(await screen.findByRole("heading", { level: 1, name: "Lessons" })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/recordings");
+    },
+  );
+
+  it("still open for a coordinator", async () => {
+    stubApi({ "/v1/me": me("manager"), "/v1/recordings": EMPTY, "/v1/reviews": EMPTY, "/v1/disputes": EMPTY,
+              "/v1/people/summary": [] }); // prettier-ignore
+    const router = renderAt("/people");
+    expect(await screen.findByRole("heading", { level: 1, name: "Teachers" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/people");
+  });
+});

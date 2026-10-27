@@ -8,7 +8,9 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppLoading } from "./AppLoading";
 import { Home } from "./Home";
 import { Layout } from "./Layout";
+import { RESOLVERS } from "./nav";
 import { RequireSession } from "./RequireSession";
+import { RoleGate } from "./RoleGate";
 
 // Pages load when first opened (P6.8), so the first screen needs only the shell. While a page loads, the one before
 // stays on screen; on the very first load, AppLoading shows.
@@ -27,8 +29,26 @@ export const routes: RouteObject[] = [
         children: [
           { path: "/", element: <Home /> },
           {
-            path: "/overview",
-            ...page(() => import("../pages/OverviewRoute").then((m) => ({ Component: m.OverviewRoute }))),
+            // Owners, admins, managers and reviewers: staff have no overview, people list or review queue.
+            element: <RoleGate roles={RESOLVERS} />,
+            children: [
+              {
+                path: "/overview",
+                ...page(() => import("../pages/OverviewRoute").then((m) => ({ Component: m.OverviewRoute }))),
+              },
+              {
+                path: "/people",
+                ...page(() => import("../pages/PeoplePage").then((m) => ({ Component: m.PeoplePage }))),
+              },
+              {
+                path: "/reviews",
+                ...page(() => import("../pages/ReviewQueuePage").then((m) => ({ Component: m.ReviewQueuePage }))),
+              },
+              {
+                path: "/reviews/:id",
+                ...page(() => import("../pages/ReviewPage").then((m) => ({ Component: m.ReviewPage }))),
+              },
+            ],
           },
           {
             path: "/recordings",
@@ -39,15 +59,6 @@ export const routes: RouteObject[] = [
             ...page(() => import("../pages/RecordingPage").then((m) => ({ Component: m.RecordingPage }))),
           },
           { path: "/upload", ...page(() => import("../pages/UploadPage").then((m) => ({ Component: m.UploadPage }))) },
-          { path: "/people", ...page(() => import("../pages/PeoplePage").then((m) => ({ Component: m.PeoplePage }))) },
-          {
-            path: "/reviews",
-            ...page(() => import("../pages/ReviewQueuePage").then((m) => ({ Component: m.ReviewQueuePage }))),
-          },
-          {
-            path: "/reviews/:id",
-            ...page(() => import("../pages/ReviewPage").then((m) => ({ Component: m.ReviewPage }))),
-          },
           {
             path: "/rubrics",
             ...page(() => import("../pages/RubricsPage").then((m) => ({ Component: m.RubricsPage }))),

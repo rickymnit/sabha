@@ -275,24 +275,27 @@ const ITEM_NAMES: Record<string, string> = {
   weight: "Weight",
   definition: "What it measures",
   min_quotes: "Quotes required",
-  not_applicable_when: "When it is not scored",
-  "dimension added": "Added",
-  "dimension removed": "Removed",
+  not_applicable_when: "Rule for when it is not scored",
   "dimension order": "Order of dimensions",
 };
 
 /** "Checks for understanding: level 2 description", in plain words. */
 function describe(change: Change, names: Map<string, string>): string {
   const where = change.dimension ? (names.get(change.dimension) ?? change.dimension.replaceAll("_", " ")) : "Rubric";
-  const level = /^(anchors|examples)\[(\d)\]$/.exec(change.item);
-  let what = ITEM_NAMES[change.item] ?? change.item.replaceAll("_", " ");
-  if (level) what = `level ${level[2]} ${level[1] === "anchors" ? "description" : "example"}`;
+  const say = (text: string) => `${capitalise(where)}: ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+  if (change.item === "dimension added") return say("added");
+  if (change.item === "dimension removed") return say("removed");
   if (change.item === "weight" && change.old && change.new) {
-    what = `weight ${percent(Number(change.old))} to ${percent(Number(change.new))}`;
-  } else if (change.item === "min_quotes" && change.old && change.new) {
-    what = `quotes required ${change.old} to ${change.new}`;
+    return say(`weight ${percent(Number(change.old))} to ${percent(Number(change.new))}`);
   }
-  return `${capitalise(where)}: ${what.charAt(0).toLowerCase()}${what.slice(1)}`;
+  if (change.item === "min_quotes" && change.old && change.new) {
+    return say(`quotes required ${change.old} to ${change.new}`);
+  }
+  const level = /^(anchors|examples)\[(\d)\]$/.exec(change.item);
+  const what = level
+    ? `level ${level[2]} ${level[1] === "anchors" ? "description" : "example"}`
+    : (ITEM_NAMES[change.item] ?? change.item.replaceAll("_", " "));
+  return say(`${what} changed`); // a wording change: the old and new text are in the rubric files
 }
 
 const SHOWN_CHANGES = 8;

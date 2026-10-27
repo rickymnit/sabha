@@ -61,6 +61,8 @@ E2E_UNITS = {"unit-e2e": "Test class"}
 E2E_USERS = [
     ("e2e-owner", "Test Principal", "Principal", Role.OWNER, [], None),
     ("e2e-teacher", "Test Teacher", "Teacher, Test class", Role.STAFF, ["unit-e2e"], "p-e2e"),
+    # A second teacher, so the browser tests can check one teacher cannot open the other's report (P6.8).
+    ("e2e-colleague", "Test Colleague", "Teacher, Test class", Role.STAFF, ["unit-e2e"], "p-e2e-colleague"),
 ]
 
 
