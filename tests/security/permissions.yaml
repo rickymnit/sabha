@@ -287,3 +287,21 @@ routes:
     # the web app keeps polling.
     anonymous: 401
     others: [200, 503]
+
+  GET /v1/settings:
+    # Workspace settings (P1.7): owners and admins ("Admins can rename any of these in Settings", the setup design).
+    # Everyone else reads the labels from /v1/me. other_tenant reads its own tenant's.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403
+
+  PATCH /v1/settings:
+    # Body: rename the person label. other_tenant renames its own tenant's (apps/api/tests/test_settings.py checks
+    # tenant A is untouched).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403

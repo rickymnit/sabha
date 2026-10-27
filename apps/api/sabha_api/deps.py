@@ -20,7 +20,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from sabha_api.auth import Principal, current_principal
 from sabha_api.errors import NotReadyError
 from sabha_core.models import TenantDoc
-from sabha_core.repo import TenantRepo, check_tenant_collection
+from sabha_core.repo import OwnTenantRepo, TenantRepo, check_tenant_collection
 
 
 def _database(request: Request) -> AsyncDatabase[dict[str, Any]]:
@@ -41,6 +41,14 @@ def tenant_repo[T: TenantDoc](collection: str, model: type[T]) -> Callable[..., 
         return TenantRepo(db, collection, principal.tenant_id, model)
 
     return dependency
+
+
+async def own_tenant_repo(
+    principal: Annotated[Principal, Depends(current_principal)],
+    db: Annotated[AsyncDatabase[dict[str, Any]], Depends(_database)],
+) -> OwnTenantRepo:
+    """The caller's own tenant record, for the settings routes (P1.7)."""
+    return OwnTenantRepo(db, principal.tenant_id)
 
 
 class Transactions:

@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from enum import StrEnum
 
+from sabha_core.profiles import ConversationType
+
 IST = timezone(timedelta(hours=5, minutes=30), "IST")
 WARN_SHARE = 0.8
 
@@ -30,6 +32,14 @@ class OverLimit(StrEnum):
     BLOCK = "block"
     METER = "meter"
 
+
+# How many conversation types a tenant may have switched on at once: "Starter covers any two; Growth covers all five",
+# and the free pilot covers all five (docs/design/source/Setup.dc.html, Plans.dc.html).
+MAX_TYPES: dict[Plan, int] = {
+    Plan.PILOT: len(ConversationType),
+    Plan.STARTER: 2,
+    Plan.GROWTH: len(ConversationType),
+}
 
 OVER_LIMIT: dict[Plan, OverLimit] = {
     Plan.PILOT: OverLimit.BLOCK,

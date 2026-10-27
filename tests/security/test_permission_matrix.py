@@ -351,6 +351,10 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "POST /v1/disputes/{dispute_id}/resolve": resolve_dispute,
     "POST /v1/recordings/{recording_id}/reanalyze": reanalyze,
     "GET /v1/events": lambda a, who: a.client.get("/v1/events", headers=a.headers(who)),
+    "GET /v1/settings": lambda a, who: a.client.get("/v1/settings", headers=a.headers(who)),
+    "PATCH /v1/settings": lambda a, who: a.client.patch(
+        "/v1/settings", json={"labels": {"person": "Educator"}}, headers=a.headers(who)
+    ),
     "POST /v1/reanalysis": lambda a, who: a.client.post(
         "/v1/reanalysis",
         json={"type": "teaching", "reason": "Rubric updated.", "dry_run": True},

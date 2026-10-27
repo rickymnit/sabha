@@ -23,10 +23,13 @@ from sabha_core.repo import (
     COLLECTIONS,
     SYSTEM_COLLECTIONS,
     CollectionNotAllowedError,
+    MissingTenantError,
+    OwnTenantRepo,
     SyncSystemRepo,
     SyncTenantRepo,
     SystemRepo,
     TenantRepo,
+    TenantViolationError,
 )
 
 pytestmark = pytest.mark.integration
@@ -166,3 +169,77 @@ def test_async_system_repo_exists_for_login(mongo_uri: str, db: Database[dict[st
             await client.close()
 
     assert asyncio.run(scenario()) == 0
+
+
+# --- OwnTenantRepo: a tenant's own settings, through its own id only (P1.7) ---
+
+
+def _own(mongo_uri: str, db: Database[dict[str, Any]], tenant_id: str, scenario: Any) -> Any:
+    async def run() -> Any:
+        client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(mongo_uri)
+        try:
+            return await scenario(OwnTenantRepo(client[db.name], tenant_id))
+        finally:
+            await client.close()
+
+    return asyncio.run(run())
+
+
+def _two_tenants(db: Database[dict[str, Any]]) -> None:
+    tenants = SyncSystemRepo(db, "tenants", Tenant)
+    tenants.insert_one(Tenant.from_profile("school", name="Sunrise", plan=Plan.PILOT, id="t1"))
+    tenants.insert_one(Tenant.from_profile("company", name="Brightpath", plan=Plan.PILOT, id="t2"))
+
+
+def test_own_tenant_repo_reads_only_its_own_tenant(mongo_uri: str, db: Database[dict[str, Any]]) -> None:
+    _two_tenants(db)
+
+    async def scenario(repo: OwnTenantRepo) -> Tenant | None:
+        return await repo.get()
+
+    found = _own(mongo_uri, db, "t1", scenario)
+    assert found is not None and found.name == "Sunrise"
+
+
+def test_own_tenant_repo_changes_only_its_own_tenant(mongo_uri: str, db: Database[dict[str, Any]]) -> None:
+    _two_tenants(db)
+
+    async def scenario(repo: OwnTenantRepo) -> int:
+        return await repo.update_settings({"name": "Sunrise Public School", "enabled_types": ["teaching"]})
+
+    assert _own(mongo_uri, db, "t1", scenario) == 1
+    tenants = SyncSystemRepo(db, "tenants", Tenant)
+    mine, other = tenants.find_one({"_id": "t1"}), tenants.find_one({"_id": "t2"})
+    assert mine is not None and mine.name == "Sunrise Public School" and mine.enabled_types == ["teaching"]
+    assert other is not None and other.name == "Brightpath" and other.enabled_types == ["reception", "meeting", "sales"]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"plan": "growth"},  # plans change through Sabha, never from the tenant's own settings
+        {"profile": "company"},
+        {"region": "us-east-1"},
+        {"_id": "t2"},
+        {"tenant_id": "t2"},
+        {"retention_days": 1},
+        {"name": "ok", "plan": "growth"},  # one bad field refuses the whole update
+        {},
+    ],
+)
+def test_own_tenant_repo_refuses_other_fields(mongo_uri: str, db: Database[dict[str, Any]], fields: Any) -> None:
+    _two_tenants(db)
+
+    async def scenario(repo: OwnTenantRepo) -> int:
+        return await repo.update_settings(fields)
+
+    with pytest.raises(TenantViolationError):
+        _own(mongo_uri, db, "t1", scenario)
+    unchanged = SyncSystemRepo(db, "tenants", Tenant).find_one({"_id": "t1"})
+    assert unchanged is not None and unchanged.name == "Sunrise" and unchanged.plan == Plan.PILOT
+
+
+@pytest.mark.parametrize("tenant_id", ["", "   ", None])
+def test_own_tenant_repo_needs_a_tenant_id(mongo_uri: str, db: Database[dict[str, Any]], tenant_id: Any) -> None:
+    with pytest.raises(MissingTenantError):
+        OwnTenantRepo(db, tenant_id)  # type: ignore[arg-type]  # a sync handle is enough: it fails before any use

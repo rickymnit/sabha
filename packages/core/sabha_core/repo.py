@@ -13,7 +13,8 @@ collection, tenant and model. Every operation is scoped to that tenant:
   ($lookup, $unionWith, $graphLookup, $out, $merge, $documents, $collStats, $currentOp, ...) raise
   UnsafePipelineError, also inside $facet; stages that set or rewrite tenant_id raise TenantViolationError. A job
   that needs a join or a $merge gets its own vetted method here.
-- Only collections in COLLECTIONS can be used, and `tenants` only through the SystemRepo.
+- Only collections in COLLECTIONS can be used, and `tenants` only through the SystemRepo or, for a tenant's own
+  settings, the OwnTenantRepo (its own record and its settings fields only).
 
 `SystemRepo` / `SyncSystemRepo` are unscoped and serve SYSTEM_COLLECTIONS only: tenants, the relay's own state, the
 outbox (the relay reads
@@ -414,3 +415,29 @@ def own_tenant(db: Database[dict[str, Any]], tenant_id: str) -> Tenant | None:
     Unlike SystemRepo this reads one tenant, by the caller's own tenant id only.
     """
     return SyncSystemRepo(db, "tenants", Tenant).find_one({"_id": _check_tenant_id(tenant_id)})
+
+
+class OwnTenantRepo:
+    """Async access to one tenant's own record, for its settings page (P1.7): reads and updates `{_id: tenant_id}`
+    only, and changes only SETTINGS_FIELDS. Plan, profile, region and retention change through Sabha's admin
+    scripts, never from the tenant's own settings."""
+
+    SETTINGS_FIELDS = frozenset({"name", "labels", "enabled_types"})
+
+    def __init__(self, db: AsyncDatabase[dict[str, Any]], tenant_id: str) -> None:
+        self._tenant_id = _check_tenant_id(tenant_id)
+        self._collection = db["tenants"]
+
+    async def get(self, *, session: AsyncClientSession | None = None) -> Tenant | None:
+        doc = await self._collection.find_one({"_id": self._tenant_id}, session=session)
+        return None if doc is None else Tenant.model_validate(doc)
+
+    async def update_settings(self, fields: Mapping[str, Any], *, session: AsyncClientSession | None = None) -> int:
+        """`$set` the given settings fields; matched count. Any other field (or none) raises TenantViolationError."""
+        other = set(fields) - self.SETTINGS_FIELDS
+        if not fields or other:
+            raise TenantViolationError(f"only {', '.join(sorted(self.SETTINGS_FIELDS))} are tenant settings")
+        update = {"$set": dict(fields)}
+        check_update(update)
+        result = await self._collection.update_one({"_id": self._tenant_id}, update, session=session)
+        return result.matched_count
