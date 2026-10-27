@@ -11,13 +11,13 @@ describe("ScoreBar", () => {
     expect(segments).toHaveLength(5);
     expect(container.querySelectorAll("[data-filled=true]")).toHaveLength(2);
     expect(segments[0]).toHaveClass("bg-danger-bar");
-    expect(segments[4]).toHaveClass("bg-line-subtle");
+    expect(segments[4]).toHaveClass("bg-line");
     expect(screen.getByText("2 of 5")).toBeInTheDocument();
   });
 
   it("uses the mid and good bar colours", () => {
     const { container, rerender } = render(<ScoreBar score={3} />);
-    expect(container.querySelector("[data-filled=true]")).toHaveClass("bg-type-reception");
+    expect(container.querySelector("[data-filled=true]")).toHaveClass("bg-warning-bar");
 
     rerender(<ScoreBar score={4} />);
     expect(container.querySelector("[data-filled=true]")).toHaveClass("bg-success-bar");

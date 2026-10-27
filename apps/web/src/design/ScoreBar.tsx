@@ -1,10 +1,10 @@
 import { cx } from "./cx";
 import { scoreBand, type ScoreBand } from "./score";
 
-// Analysis.dc.html:274-278 (bar colours) and :207 (26 x 8px segments, 3px radius, 3px gap).
+// UI v2 rubric rows (docs/design/v2/03-lesson-report.png, 04-sales-report.png): five short rounded dashes, 16 x 5px, 4px apart.
 const fills: Record<ScoreBand, string> = {
   low: "bg-danger-bar",
-  mid: "bg-type-reception", // #D9831F, the design's mid-band bar colour (tokens.md, type-reception).
+  mid: "bg-warning-bar",
   good: "bg-success-bar",
 };
 
@@ -24,12 +24,12 @@ export function ScoreBar({ score, max = 5, valueText, hideValue = false, classNa
   const text = valueText ?? `${score} of ${max}`;
   const fill = fills[scoreBand(score)];
   const segments = (
-    <span className="flex gap-[3px]">
+    <span className="flex gap-1">
       {Array.from({ length: max }, (_, i) => (
         <span
           key={i}
           data-filled={i < filled}
-          className={cx("h-2 w-[26px] rounded-sm", i < filled ? fill : "bg-line-subtle")}
+          className={cx("h-[5px] w-4 rounded-full", i < filled ? fill : "bg-line")}
         />
       ))}
     </span>

@@ -1,8 +1,8 @@
 import { cx } from "./cx";
 import { scoreBand } from "./score";
 
-const strokes = { low: "stroke-danger-bar", mid: "stroke-type-reception", good: "stroke-success-bar" } as const;
-const dots = { low: "fill-danger-bar", mid: "fill-type-reception", good: "fill-success-bar" } as const;
+const strokes = { low: "stroke-danger-bar", mid: "stroke-warning-bar", good: "stroke-success-bar" } as const;
+const dots = { low: "fill-danger-bar", mid: "fill-warning-bar", good: "fill-success-bar" } as const;
 
 export interface SparklineProps {
   /** Scores from 1 to 5, oldest first. */

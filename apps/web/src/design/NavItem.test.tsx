@@ -14,7 +14,7 @@ describe("NavItem", () => {
     const link = screen.getByRole("link", { name: "Recordings" });
     expect(link).toHaveAttribute("aria-current", "page");
     expect(link).toHaveAttribute("href", "/recordings");
-    expect(link).toHaveClass("min-h-touch", "bg-primary-tint", "text-primary-hover");
+    expect(link).toHaveClass("min-h-touch", "bg-primary-tint", "text-primary");
   });
 
   it("reads the badge with its label, and shows type counts", () => {

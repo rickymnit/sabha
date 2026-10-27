@@ -72,7 +72,7 @@ describe("the menu's numbers", () => {
     expect(within(menu).getByRole("link", { name: "Reception, 46" })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: "Sales, 0" })).toBeInTheDocument();
     const plan = await within(menu).findByRole("region", { name: "Plan usage" });
-    expect(within(plan).getByText("Starter plan")).toBeInTheDocument();
+    expect(within(plan).getByText("Audio this month")).toBeInTheDocument();
     expect(within(plan).getByText("38.4 of 100 audio hours used")).toBeInTheDocument();
     expect(within(plan).getByRole("progressbar")).toHaveAttribute("aria-valuetext", "38.4 of 100 audio hours used");
   });
@@ -112,7 +112,7 @@ describe("the plan block", () => {
 
   it("shows hours used without a limit until Sabha sets an allowance", () => {
     renderBlock({ plan: "pilot", used_hours: 3.2, allowance_hours: null, state: null });
-    expect(screen.getByText("Pilot plan")).toBeInTheDocument();
+    expect(screen.getByText("3.2 h")).toBeInTheDocument();
     expect(screen.getByText("3.2 audio hours this month")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });

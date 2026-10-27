@@ -513,8 +513,8 @@ export default function ComponentsDemo() {
             </p>
             <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2">
               <li>
-                Score colour bands use the report rule: below 3 danger, 3 to 3.99 warning, 4 and above success (the
-                overview design used 3.5 as the top cut-off, so 3.9 now shows as warning).
+                Score colour bands use the UI v2 rule: below 3.0 danger, 3.0 to 3.7 warning, 3.8 and above success, on
+                the one-decimal value shown (so 3.75 is success).
               </li>
               <li>
                 Every control is at least 44px tall, including sidebar rows and segmented buttons (the design used
@@ -565,10 +565,13 @@ export default function ComponentsDemo() {
             </Row>
           </Section>
 
-          <Section title="ScoreChip and ScoreBar" note="Bands: below 3 danger, 3 to 3.99 warning, 4 and above success.">
+          <Section
+            title="ScoreChip and ScoreBar"
+            note="Bands: below 3.0 danger, 3.0 to 3.7 warning, 3.8 and above success."
+          >
             <div className="flex flex-col gap-4">
               <Row>
-                {[1, 2, 2.9, 3, 3.5, 3.99, 4, 5].map((s) => (
+                {[1, 2, 2.9, 3, 3.7, 3.75, 3.8, 5].map((s) => (
                   <ScoreChip key={s} score={s} decimals={Number.isInteger(s) ? 0 : 2} />
                 ))}
                 <ScoreChip score={null} />

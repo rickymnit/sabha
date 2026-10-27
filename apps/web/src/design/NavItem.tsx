@@ -44,7 +44,7 @@ export function NavItem({
       aria-current={current ? "page" : undefined}
       className={cx(
         "flex min-h-touch items-center justify-between gap-2.5 rounded px-2.5 no-underline",
-        current ? "bg-primary-tint font-semibold text-primary-hover" : "text-ink-2 hover:bg-surface-subtle",
+        current ? "bg-primary-tint font-semibold text-primary" : "text-ink-2 hover:bg-surface-subtle",
         className,
       )}
       {...rest}
@@ -59,8 +59,8 @@ export function NavItem({
         {children}
       </span>
       {badge !== undefined && (
-        // 36px = the design's min-width 22px + 7px padding each side, which it renders content-box (tokens.md).
-        <span className="min-w-[36px] rounded-full bg-warning-tint px-[7px] py-px text-center text-caption font-semibold tabular-nums text-warning-ink">
+        // UI v2: a solid primary pill (docs/design/v2/*.png, the Reviews count).
+        <span className="min-w-[36px] rounded-full bg-primary px-[7px] py-px text-center text-caption font-semibold tabular-nums text-surface">
           <span aria-hidden="true">{badge}</span>
           <span className="sr-only">, {badgeLabel ?? badge}</span>
         </span>

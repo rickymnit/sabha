@@ -32,3 +32,11 @@ export { initials } from "./initials";
 export { Avatar, Logo, type AvatarProps, type LogoProps } from "./Logo";
 export { ChoiceCards, type ChoiceCardOption, type ChoiceCardsProps } from "./ChoiceCards";
 export { Sparkline, type SparklineProps } from "./Sparkline";
+export {
+  SpeakerStrip,
+  type SpeakerStripCardProps,
+  type SpeakerStripLanesProps,
+  type SpeakerStripProps,
+  type SpeakerStripRowProps,
+} from "./SpeakerStrip";
+export { speakerSpans, staffShare, type SpeakerKind, type SpeakerSegment, type SpeakerSpan } from "./speakerSpans";

@@ -8,7 +8,7 @@ importers:
 
   .:
     dependencies:
-      '@fontsource/instrument-sans':
+      '@fontsource/geist':
         specifier: 5.3.0
         version: 5.3.0
       '@tanstack/react-query':
@@ -285,8 +285,8 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@fontsource/instrument-sans@5.3.0':
-    resolution: {integrity: sha512-QwXc4hb/px3XvSPS2CPAOgey8nyrQFxgxrmXQQ+pN+P51hKdAcchxpg8rSbjANFfPu6VKXhDqkVDucXMZ9CM5g==}
+  '@fontsource/geist@5.3.0':
+    resolution: {integrity: sha512-u03ftlfVwb05uijq2jGDJ03/HKGqMKaNFk7KOhkpBUex8+BhrAOfMs/XciJ2UUNUX9fEsZbZQld/RWMA2oFU7g==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1872,7 +1872,7 @@ snapshots:
 
   '@exodus/bytes@1.16.0': {}
 
-  '@fontsource/instrument-sans@5.3.0': {}
+  '@fontsource/geist@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

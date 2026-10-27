@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
-// Every value here comes from docs/design/tokens.md. Colours, font sizes and radii replace Tailwind's
-// defaults (not extend them) so only design tokens are available.
+// Every value here comes from docs/design/tokens.md (UI v2 since 2026-10-27). Colours, font sizes and radii replace
+// Tailwind's defaults (not extend them) so only design tokens are available.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -9,52 +9,53 @@ export default {
       transparent: "transparent",
       current: "currentColor",
       inherit: "inherit",
-      ink: { DEFAULT: "#17211D", 2: "#33403B" },
-      muted: { DEFAULT: "#4A5752", 2: "#5C6863" },
-      subtle: "#6B7772",
+      ink: { DEFAULT: "#121521", 2: "#3D414C", raised: "#262B3E" },
+      muted: { DEFAULT: "#5F6677", 2: "#686F7F" },
+      subtle: "#686F7F",
       line: {
-        DEFAULT: "#DDE2E0",
-        strong: "#A9B4AF",
-        input: "#CFD6D3",
-        subtle: "#E6EAE8",
+        DEFAULT: "#E4E7EC",
+        strong: "#B8BDC7",
+        input: "#D7D8DC",
+        subtle: "#ECEEF2",
       },
-      track: "#EEF1F0",
-      fill: { DEFAULT: "#F1F3F2", 2: "#E9ECEB" },
-      surface: { DEFAULT: "#FFFFFF", subtle: "#F8F9F8", faint: "#FAFBFA" },
-      page: "#F3F5F4",
+      track: "#EEF0F3",
+      fill: { DEFAULT: "#F1F2F5", 2: "#E9EBEF" },
+      surface: { DEFAULT: "#FFFFFF", subtle: "#F6F7F9", faint: "#FAFBFC" },
+      page: "#F6F7F9",
       primary: {
-        DEFAULT: "#2546B8",
-        hover: "#1A3490",
-        tint: "#E8EDFB",
-        "tint-subtle": "#F3F6FD",
-        "tint-strong": "#DCE3F7",
-        border: "#B9C6EE",
-        disabled: "#C9D2EE",
-        "disabled-ink": "#33407A",
-        chart: "#3A57C4",
+        DEFAULT: "#3346D3",
+        hover: "#2536B0",
+        tint: "#EEF0FC",
+        "tint-subtle": "#F5F5FD",
+        "tint-strong": "#DDE2F8",
+        border: "#B9C1F0",
+        disabled: "#C9CEF2",
+        "disabled-ink": "#2F3A86",
       },
-      "brand-accent": "#F2B35B",
-      success: { DEFAULT: "#1E6B4B", bar: "#2E8B62", tint: "#E3F2EA" },
+      "brand-accent": "#F2A33A",
+      success: { DEFAULT: "#0B6343", bar: "#1F9A6B", tint: "#DDF1E6" },
       warning: {
-        DEFAULT: "#8A5200",
-        ink: "#7A4300",
-        tint: "#FDEBD3",
-        "tint-subtle": "#FDF1DE",
-        surface: "#FEF6EC",
-        border: "#F7DDB8",
+        DEFAULT: "#7A4A00",
+        ink: "#7A4A00",
+        bar: "#E8A23F",
+        tint: "#FCEBCF",
+        "tint-subtle": "#FEF6E9",
+        surface: "#FEFAF1",
+        border: "#ECD9B8",
       },
-      danger: { DEFAULT: "#B42318", bar: "#C8372B", tint: "#FBE9E7" },
+      danger: { DEFAULT: "#A12B12", bar: "#DB532E", tint: "#FBE2DB" },
       type: {
-        teaching: "#2546B8",
-        reception: "#D9831F",
+        teaching: "#3346D3",
+        reception: "#F2A33A",
         counselling: "#1E7A55",
         meeting: "#7A4DB8",
         sales: "#0F7C8C",
       },
-      speaker: { students: "#E39A3B" },
+      // Who spoke when: the analysed staff member and everyone else (SpeakerStrip, report timeline).
+      speaker: { staff: "#3346D3", other: "#F2A33A" },
     },
     fontFamily: {
-      sans: ["'Instrument Sans'", "'Segoe UI'", "system-ui", "sans-serif"],
+      sans: ["Geist", "'Segoe UI'", "system-ui", "sans-serif"],
     },
     fontSize: {
       "2xs": "11px",
@@ -98,7 +99,7 @@ export default {
         touch: "44px",
       },
       boxShadow: {
-        seg: "0 0 0 1px #DDE2E0",
+        seg: "0 0 0 1px #E4E7EC",
       },
       // Motion is not in the designs; these are ours. Components apply them only under `motion-safe:`, so
       // people who ask for reduced motion get none.

@@ -1,14 +1,14 @@
 import { cx } from "./cx";
 import { scoreBand, type ScoreBand } from "./score";
 
-// Report score chips, Analysis.dc.html:196 and :274-278.
+// Score chips, UI v2 (docs/design/v2/01- to 04-*.png): tinted box, number in the band's tone.
 const chipTones: Record<ScoreBand, string> = {
   low: "bg-danger-tint text-danger",
-  mid: "bg-warning-tint-subtle text-warning",
+  mid: "bg-warning-tint text-warning",
   good: "bg-success-tint text-success",
 };
 
-// Coloured number without a background, as in the overview table (Main.dc.html:233-239).
+// Coloured number without a background, for dense tables.
 const textTones: Record<ScoreBand, string> = {
   low: "text-danger",
   mid: "text-warning",
@@ -30,7 +30,7 @@ export interface ScoreChipProps {
   className?: string;
 }
 
-/** A 1–5 score coloured by band: below 3 danger, 3 to 3.99 warning, 4 and above success. */
+/** A 1–5 score coloured by band (scoreBand): below 3.0 danger, 3.0 to 3.7 warning, 3.8 and above success. */
 export function ScoreChip({
   score,
   max = 5,
@@ -56,7 +56,7 @@ export function ScoreChip({
       className={cx(
         "tabular-nums",
         variant === "chip"
-          ? cx("inline-block min-w-[34px] rounded-seg py-[3px] text-center font-bold", chipTones[band])
+          ? cx("inline-block min-w-[34px] rounded-md px-1.5 py-[3px] text-center font-semibold", chipTones[band])
           : cx("font-semibold", textTones[band]),
         className,
       )}

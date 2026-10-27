@@ -31,7 +31,7 @@ export interface ReportTimelineProps {
 }
 
 const roleColour = (roles: RoleLabels, role: string | undefined) =>
-  role && roles[role]?.analysed ? "bg-primary-chart" : "bg-speaker-students";
+  role && roles[role]?.analysed ? "bg-speaker-staff" : "bg-speaker-other";
 
 export function ReportTimeline({
   heading,

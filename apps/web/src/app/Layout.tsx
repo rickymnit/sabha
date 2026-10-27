@@ -1,6 +1,6 @@
-// The app shell (docs/design/01-overview.png sidebar): logo, the school, navigation in the tenant's own words, the
-// conversation types it has switched on, and the signed-in person. On phones the sidebar becomes a top bar with a
-// menu button. Every noun comes from GET /v1/me labels (CLAUDE.md: never hard-code "Teacher" or "Lesson").
+// The app shell (UI v2 sidebar, docs/design/v2/*.png): logo, the school, navigation in the tenant's own
+// words, the conversation types it has switched on, and the signed-in person. On phones the sidebar becomes a top bar
+// with a menu button. Every noun comes from GET /v1/me labels (CLAUDE.md: never hard-code "Teacher" or "Lesson").
 // Only finished pages are in the menu (app/nav.ts).
 
 import { useState, type MouseEvent, type ReactNode } from "react";
@@ -8,7 +8,7 @@ import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-
 
 import { useDisputes, useLiveEvents, useMe, useRecordingCounts, useReviews, useUsage } from "../api/hooks";
 import type { Me } from "../api/types";
-import { Avatar, Button, EmptyState, Icon, Logo, NavItem } from "../design";
+import { Avatar, Button, EmptyState, Icon, Logo, NavItem, initials } from "../design";
 import { useSession } from "../session/session";
 import { capitalise, roleTitle, unitNames } from "./format";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
@@ -44,7 +44,7 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   const { signOut } = useSession();
   const labels = me.tenant.labels;
   const type = params.get("type");
-  const units = unitNames(me);
+  const units = unitNames(me, 1);
   const resolver = RESOLVERS.includes(me.user.role);
   const reviews = useReviews(resolver);
   const disputes = useDisputes(resolver);
@@ -59,9 +59,19 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
       <div className="hidden px-2 md:block">
         <Logo />
       </div>
-      <div className="rounded border border-line bg-surface-subtle px-2.5 py-2">
-        <p className="m-0 text-sm font-semibold text-ink">{me.tenant.name}</p>
-        {units && <p className="m-0 text-caption text-muted-2">{units}</p>}
+      <div className="flex items-center gap-2.5 rounded-card border border-line bg-surface px-2.5 py-2">
+        <span
+          aria-hidden="true"
+          className="flex size-9 shrink-0 items-center justify-center rounded bg-primary-tint text-caption font-bold text-primary"
+        >
+          {initials(me.tenant.name)}
+        </span>
+        <div className="min-w-0">
+          <p className="m-0 truncate text-sm font-semibold text-ink">{me.tenant.name}</p>
+          <p className="m-0 truncate text-caption text-muted">
+            {[capitalise(me.tenant.profile), units].filter(Boolean).join(", ")}
+          </p>
+        </div>
       </div>
       <div className="flex flex-col gap-0.5">
         {navItems(me).map((item) => (
@@ -94,8 +104,8 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
       )}
       <div className="mt-auto flex flex-col gap-3">
         {planUsage && <PlanUsage usage={planUsage} />}
-        <div className="flex items-center gap-2.5 border-t border-line-subtle px-1 pt-3">
-          <Avatar name={me.user.name} />
+        <div className="flex items-center gap-2.5 px-1">
+          <Avatar name={me.user.name} tone="ink" />
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-sm font-semibold text-ink">{me.user.name}</span>
             <span className="text-caption leading-snug text-muted-2">{roleTitle(me.user, labels)}</span>

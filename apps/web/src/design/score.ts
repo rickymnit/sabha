@@ -1,12 +1,13 @@
 export type ScoreBand = "low" | "mid" | "good";
 
 /**
- * Score colour band, using the report-screen rule (Analysis.dc.html:274-278), chosen over the overview's
- * 3.5 cut-off (Main.dc.html:233-239): below 3 is low, 3 to 3.99 is mid, 4 and above is good.
- * See docs/design/tokens.md "Score colour bands".
+ * Score colour band, UI v2 rule (docs/design/v2/01-overview.png, the coaching legend): below 3.0 is low,
+ * 3.0 to 3.7 is mid, 3.8 and above is good. The cut is on the one-decimal value people see, so 3.75 (shown as 3.8)
+ * is good. See docs/design/tokens.md "Score colour bands".
  */
 export function scoreBand(score: number): ScoreBand {
-  if (score < 3) return "low";
-  if (score < 4) return "mid";
+  const shown = Math.round(score * 10) / 10;
+  if (shown < 3) return "low";
+  if (shown < 3.8) return "mid";
   return "good";
 }

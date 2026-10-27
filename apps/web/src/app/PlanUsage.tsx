@@ -1,11 +1,11 @@
-// The plan block at the foot of the menu (docs/design/01-overview.png): the plan and this month's audio hours, for
+// The plan block at the foot of the menu (UI v2, docs/design/v2/*.png): this month's audio hours, for
 // owners and admins. Hours are measured audio (GET /v1/usage). With no allowance agreed yet, it shows the hours used
 // without a limit rather than an invented one (golden rule 6). Hidden while loading or on error: it is not worth an
 // error message of its own.
 
 import type { UsageSummary } from "../api/types";
 import { ProgressBar, cx, type ProgressTone } from "../design";
-import { capitalise, formatHours } from "./format";
+import { formatHours } from "./format";
 
 const TONES: Record<NonNullable<UsageSummary["state"]>, ProgressTone> = {
   ok: "primary",
@@ -17,14 +17,21 @@ const TONES: Record<NonNullable<UsageSummary["state"]>, ProgressTone> = {
 export function PlanUsage({ usage }: { usage: UsageSummary }) {
   const used = formatHours(usage.used_hours);
   const allowance = usage.allowance_hours;
+  const amount = allowance === null ? `${used} h` : `${used} / ${formatHours(allowance)} h`;
   const summary =
     allowance === null
       ? `${used} audio ${used === "1" ? "hour" : "hours"} this month`
       : `${used} of ${formatHours(allowance)} audio hours used`;
   const alert = usage.state === "warning" || usage.state === "blocked" || usage.state === "overage";
   return (
-    <section aria-label="Plan usage" className="flex flex-col gap-2 rounded border border-line bg-surface px-3 py-2.5">
-      <p className="m-0 text-sm font-semibold text-ink">{capitalise(usage.plan)} plan</p>
+    <section aria-label="Plan usage" className="flex flex-col gap-2 rounded-card bg-surface-subtle px-3 py-3">
+      <p className="m-0 flex justify-between gap-2 text-sm">
+        <span className="font-semibold text-ink">Audio this month</span>
+        <span className="tabular-nums text-ink-2">
+          <span aria-hidden="true">{amount}</span>
+          <span className="sr-only">{summary}</span>
+        </span>
+      </p>
       {allowance !== null && (
         <ProgressBar
           value={Math.min(usage.used_hours, allowance)}
@@ -34,7 +41,7 @@ export function PlanUsage({ usage }: { usage: UsageSummary }) {
           tone={usage.state ? TONES[usage.state] : "primary"}
         />
       )}
-      <p className="m-0 text-caption text-muted-2">{summary}</p>
+      <p className="m-0 text-caption text-muted">Resets on {formatResetDay(usage.resets_at)}</p>
       {alert && usage.message && (
         <p
           className={cx(
@@ -46,5 +53,12 @@ export function PlanUsage({ usage }: { usage: UsageSummary }) {
         </p>
       )}
     </section>
+  );
+}
+
+/** "1 November", in India time (the app shows Asia/Kolkata). */
+function formatResetDay(iso: string): string {
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "long", timeZone: "Asia/Kolkata" }).format(
+    new Date(iso),
   );
 }

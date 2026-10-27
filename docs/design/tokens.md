@@ -1,83 +1,83 @@
 # Design tokens
 
-Extracted from the design source files in `docs/design/source/*.dc.html` and checked against the screenshots
-in `docs/design/*.png`. Every value cites where it came from (`File:line`, first or most representative
-occurrence). The designs use inline styles, so these names are ours; the values are the designers'.
+**UI v2 (since 2026-10-27).** Colours and the font come from the v2 screens in `docs/design/v2/` (`01-overview.png`,
+`02-recordings.png`, `03-lesson-report.png`, `04-sales-report.png`, `05-reviews.png`, rendered from the designer's
+PDF, which is too large for the repository). The owner gave the main values; tints and bar colours were sampled from
+the PDF's pixels. Sizes, radii, spacing and the focus ring below are still the v1
+values from `docs/design/source/*.dc.html` (`File:line`) until a page's v2 restyle changes them.
 
 `apps/web/tailwind.config.ts` maps these tokens one to one. Change a value here first, then in the config.
 
 ## Colour
 
+Text on every background below meets WCAG AA (4.5:1) for normal text.
+
 ### Text and neutrals
 
-| Token | Hex | Used for | Source |
-| --- | --- | --- | --- |
-| `ink` | `#17211D` | Primary text, headings, numbers | `Main.dc.html:18` (root `color`) |
-| `ink-2` | `#33403B` | Nav items, table cells, secondary text on white | `Main.dc.html:42` |
-| `muted` | `#4A5752` | Labels, subtitles, table headers, captions | `Main.dc.html:73`, `:89`, `:166` |
-| `muted-2` | `#5C6863` | Quieter meta text, icons, counts, "/ 5" suffix, empty score "—" | `Main.dc.html:33`, `:121`, `:235` |
-| `subtle` | `#6B7772` | "Not included" in plan tables | `Plans.dc.html:164` |
-| `line-strong` | `#A9B4AF` | Dashed drop-zone and "add" borders | `Upload.dc.html:302`, `Rubrics.dc.html:194` |
-| `line-input` | `#CFD6D3` | Input and secondary-button borders | `Main.dc.html:92`, `:97` |
-| `line` | `#DDE2E0` | Panel borders, sidebar border, pressed segmented button ring | `Main.dc.html:20`, `:108`, `:155` |
-| `line-subtle` | `#E6EAE8` | Dividers inside panels, plan card border, stage card border | `Main.dc.html:70`, `:109`, `:152` |
-| `track` | `#EEF1F0` | Table row dividers, progress-bar tracks | `Main.dc.html:72`, `:178`, `:213` |
-| `fill` | `#F1F3F2` | Segmented control background | `Main.dc.html:154` |
-| `fill-2` | `#E9ECEB` | Timeline section labels on the report page | `Analysis.dc.html:142` |
-| `surface` | `#FFFFFF` | Panels, sidebar, inputs | `Main.dc.html:20`, `:108` |
-| `surface-subtle` | `#F8F9F8` | Campus switcher, neutral stage cards | `Main.dc.html:30`, `:254` |
-| `surface-faint` | `#FAFBFA` | Waveform background, unselected option cards | `Analysis.dc.html:154`, `Setup.dc.html:191` |
-| `page` | `#F3F5F4` | Page background behind panels | `Main.dc.html:13`, `:18` |
+| Token | Hex | Used for |
+| --- | --- | --- |
+| `ink` | `#121521` | Primary text, headings, numbers; the signed-in person's avatar |
+| `ink-2` | `#3D414C` | Nav items, table cells, secondary text on white |
+| `ink-raised` | `#262B3E` | Chips on an ink surface (the sales report's "Next step agreed" card) |
+| `muted` | `#5F6677` | Labels, subtitles, table headers, captions |
+| `muted-2`, `subtle` | `#686F7F` | Quieter meta text, icons, counts |
+| `line` | `#E4E7EC` | Panel borders, sidebar border, empty score-dash segments |
+| `line-input` | `#D7D8DC` | Input and secondary-button borders |
+| `line-strong` | `#B8BDC7` | Dashed drop-zone borders |
+| `line-subtle` | `#ECEEF2` | Dividers inside panels |
+| `track` | `#EEF0F3` | Bar tracks; the speaker strip where nobody speaks |
+| `fill`, `fill-2` | `#F1F2F5`, `#E9EBEF` | Segmented-control background, timeline section labels |
+| `surface` | `#FFFFFF` | Panels, sidebar, inputs |
+| `surface-subtle` | `#F6F7F9` | Plan block, metric cards inside panels, timeline lanes |
+| `surface-faint` | `#FAFBFC` | Unselected option cards |
+| `page` | `#F6F7F9` | Page ground behind panels |
 
-### Primary (brand blue)
+### Primary and speakers
 
-| Token | Hex | Used for | Source |
-| --- | --- | --- | --- |
-| `primary` | `#2546B8` | Primary button, links, focus ring, active marks | `Main.dc.html:14`, `:101` |
-| `primary-hover` | `#1A3490` | Link hover; also text on primary tints (active nav, "Transcribing" chip) | `Main.dc.html:14`, `:38`, `:228` |
-| `primary-tint` | `#E8EDFB` | Active nav background, in-progress chip background | `Main.dc.html:38`, `:228` |
-| `primary-tint-subtle` | `#F3F6FD` | In-progress stage cards | `Main.dc.html:256` |
-| `primary-tint-strong` | `#DCE3F7` | Avatar background, in-progress stage card border | `Main.dc.html:76`, `:256` |
-| `primary-border` | `#B9C6EE` | Selected option-card border | `Setup.dc.html:191` |
-| `primary-disabled` | `#C9D2EE` | Disabled primary button background | `Rubrics.dc.html:98` |
-| `primary-disabled-ink` | `#33407A` | Disabled primary button text | `Rubrics.dc.html:98` |
-| `primary-chart` | `#3A57C4` | Teacher bars in the talk-time chart | `Analysis.dc.html:352` |
-| `brand-accent` | `#F2B35B` | Amber bar in the logo mark only | `Main.dc.html:25` |
+One blue (owner, 2026-10-27): the primary colour is also the staff speaker's colour.
 
-### Status
+| Token | Hex | Used for |
+| --- | --- | --- |
+| `primary` | `#3346D3` | Primary button, links, focus ring, active nav text, Reviews badge |
+| `primary-hover` | `#2536B0` | Hover; text on primary tints |
+| `primary-tint` | `#EEF0FC` | Active nav background, org mark, "Try next time" box |
+| `primary-tint-subtle` | `#F5F5FD` | Selected list item |
+| `primary-tint-strong` | `#DDE2F8` | Stronger tint |
+| `primary-border` | `#B9C1F0` | Selected option-card border |
+| `primary-disabled`, `primary-disabled-ink` | `#C9CEF2`, `#2F3A86` | Disabled primary button |
+| `speaker-staff` | `#3346D3` | The analysed staff member in SpeakerStrip and the logo |
+| `speaker-other` | `#F2A33A` | Everyone else (students, client, visitor); also `brand-accent` in the logo |
 
-| Token | Hex | Used for | Source |
-| --- | --- | --- | --- |
-| `success` | `#1E6B4B` | Positive deltas, "Analysed" chip text, scores ≥ 3.5 (overview) | `Main.dc.html:112`, `:227`, `:238` |
-| `success-bar` | `#2E8B62` | Progress and score bars in the good band | `Analysis.dc.html:275` |
-| `success-tint` | `#E3F2EA` | "Analysed" / "Live" / "Ready" chip background | `Main.dc.html:227`, `Rubrics.dc.html:233` |
-| `warning` | `#8A5200` | Mid-band score text (3.0–3.49 on overview), "Changed in draft" | `Main.dc.html:237`, `Rubrics.dc.html:157` |
-| `warning-ink` | `#7A4300` | Text on warning tints ("Needs review" chip, Reviews badge) | `Main.dc.html:51`, `:230`, `:258` |
-| `warning-tint` | `#FDEBD3` | "Needs review" / "Calibrating" chip, Reviews badge | `Main.dc.html:51`, `:230` |
-| `warning-tint-subtle` | `#FDF1DE` | Mid-band score chip background | `Analysis.dc.html:276` |
-| `warning-surface` | `#FEF6EC` | "Needs review" stage card background | `Main.dc.html:258` |
-| `warning-border` | `#F7DDB8` | "Needs review" stage card border | `Main.dc.html:258` |
-| `danger` | `#B42318` | Low scores (< 3), error text | `Main.dc.html:236`, `Upload.dc.html:264` |
-| `danger-bar` | `#C8372B` | Progress and score bars in the low band | `Analysis.dc.html:277` |
-| `danger-tint` | `#FBE9E7` | Low-score chip and error icon background | `Analysis.dc.html:277`, `Upload.dc.html:264` |
+### Score tones and status
+
+| Token | Hex | Used for |
+| --- | --- | --- |
+| `success` | `#0B6343` | Good-band score text, positive deltas, "Ready" |
+| `success-bar` | `#1F9A6B` | Score dashes and bars in the good band |
+| `success-tint` | `#DDF1E6` | Good-band chips and heatmap cells, "Handled" |
+| `warning`, `warning-ink` | `#7A4A00` | Mid-band score text, "Disputed", "Needs review", other-speaker labels |
+| `warning-bar` | `#E8A23F` | Score dashes in the mid band |
+| `warning-tint` | `#FCEBCF` | Mid-band chips and heatmap cells |
+| `warning-tint-subtle` | `#FEF6E9` | Softer amber fill |
+| `warning-surface` | `#FEFAF1` | Quote boxes on the deal card, highlighted transcript lines, the proposer's card |
+| `warning-border` | `#ECD9B8` | Border of those boxes |
+| `danger` | `#A12B12` | Low-band score text, errors, "Failed", "Open" |
+| `danger-bar` | `#DB532E` | Score dashes in the low band |
+| `danger-tint` | `#FBE2DB` | Low-band chips and heatmap cells |
 
 ### Conversation types
 
-| Token | Hex | Type | Source |
-| --- | --- | --- | --- |
-| `type-teaching` | `#2546B8` | Teaching (same value as `primary`) | `Main.dc.html:64`, `:232` |
-| `type-reception` | `#D9831F` | Reception (also the mid-band score bar) | `Main.dc.html:65`, `:232`; `Analysis.dc.html:276` |
-| `type-counselling` | `#1E7A55` | Counselling (close to, but not the same as, `success`) | `Main.dc.html:66`, `:232`; `Setup.dc.html:173` |
-| `type-meeting` | `#7A4DB8` | Meetings | `Main.dc.html:67`, `:232`; `Setup.dc.html:175` |
-| `type-sales` | `#0F7C8C` | Sales | `Main.dc.html:68`, `:232`; `Setup.dc.html:176` |
-
-Speaker colours on the report page: teacher `#3A57C4` (`primary-chart`), students `#E39A3B`
-(`Analysis.dc.html:133`, `:352`), token `speaker-students`.
+| Token | Hex | Type |
+| --- | --- | --- |
+| `type-teaching` | `#3346D3` | Teaching (same as `primary`) |
+| `type-reception` | `#F2A33A` | Reception |
+| `type-counselling` | `#1E7A55` | Counselling |
+| `type-meeting` | `#7A4DB8` | Meetings |
+| `type-sales` | `#0F7C8C` | Sales |
 
 ## Typography
 
-**Family:** `'Instrument Sans', 'Segoe UI', system-ui, sans-serif` (`Main.dc.html:18`). The designs load it
-from Google Fonts (`Main.dc.html:10`); the app self-hosts it with `@fontsource/instrument-sans` instead, so
+**Family:** `Geist, 'Segoe UI', system-ui, sans-serif` (UI v2). The app self-hosts it with `@fontsource/geist`, so
 pages make no requests to an outside font service.
 
 **Weights:** 400, 500, 600, 700 (`Main.dc.html:10`). 600 is the workhorse for emphasis (143 uses across the
@@ -137,8 +137,8 @@ need no arbitrary values.
 
 ## Focus ring
 
-`outline: 2px solid #2546B8; outline-offset: 2px` on `:focus-visible` for buttons, links, inputs, selects and
-textareas, plus `label:focus-within` for the upload zone and `label:has(input[type=radio]:focus-visible)` for
+`outline: 2px solid #3346D3; outline-offset: 2px` (`primary`) on `:focus-visible` for buttons, links, inputs,
+selects and textareas, plus `label:focus-within` for the upload zone and `label:has(input[type=radio]:focus-visible)` for
 option cards. Source: line 15 of every design file (`Main.dc.html:15`, `Upload.dc.html:15`,
 `Setup.dc.html:15-16`).
 
@@ -153,24 +153,21 @@ decision (raise them to 44px, or accept them as desktop-only).
 
 ## Status chips
 
-Pill: `padding 3px 9px`, radius `full`, 12.5px / 600, with a 6px dot in the text colour
+Still the v1 pill until the Recordings restyle (v2 shows a dot and coloured text with no background,
+`02-recordings.png`): `padding 3px 9px`, radius `full`, 12.5px / 600, with a 6px dot in the text colour
 (`Main.dc.html:187`).
+The token names are unchanged, so the hex values below are the v2 ones.
 
-| Status | Text | Background | Source |
-| --- | --- | --- | --- |
-| Analysed | `success` `#1E6B4B` | `success-tint` `#E3F2EA` | `Main.dc.html:227` |
-| Transcribing | `primary-hover` `#1A3490` | `primary-tint` `#E8EDFB` | `Main.dc.html:228` |
-| Analysing | `primary-hover` `#1A3490` | `primary-tint` `#E8EDFB` | `Main.dc.html:229` |
-| Needs review | `warning-ink` `#7A4300` | `warning-tint` `#FDEBD3` | `Main.dc.html:230` |
-| Live (rubric) | `success` | `success-tint` | `Rubrics.dc.html:233` |
-| Calibrating (rubric) | `warning-ink` | `warning-tint` | `Rubrics.dc.html:234` |
+| Status | Text | Background |
+| --- | --- | --- |
+| Analysed | `success` `#0B6343` | `success-tint` `#DDF1E6` |
+| Transcribing, Analysing, Uploading | `primary-hover` `#2536B0` | `primary-tint` `#EEF0FC` |
+| Needs review | `warning-ink` `#7A4A00` | `warning-tint` `#FCEBCF` |
+| Failed | `danger` `#A12B12` | `danger-tint` `#FBE2DB` |
+| Live (rubric) | `success` | `success-tint` |
+| Calibrating (rubric) | `warning-ink` | `warning-tint` |
 
-**Not in the designs:** "Failed" and "Uploading" chips (P6.1 lists both). The nearest source styles are the
-upload rows: error = `danger` on `danger-tint`, uploading = `primary-hover` on `primary-tint`
-(`Upload.dc.html:261`, `:264`). Use those unless the designer says otherwise.
-
-Badge (nav count): `min-width 22px`, `padding 1px 7px`, radius `full`, 12px / 600, `warning-ink` on
-`warning-tint` (`Main.dc.html:51`).
+Badge (nav count, UI v2): `min-width 22px`, `padding 1px 7px`, radius `full`, 12px / 600, white on `primary`.
 
 **Box sizing:** the design files leave most elements at the browser default (`content-box`); only the sidebar,
 main area and a few wrappers set `border-box`. Tailwind uses `border-box` everywhere, so a padded element with a
@@ -180,13 +177,13 @@ it at the 44px token.
 
 Type marker: 8×8px square, radius `xs`, in the type colour (`Main.dc.html:64`, `:183`).
 
-## Score colour bands — open question
+## Score colour bands
 
-The two screens disagree:
+UI v2 rule (owner, 2026-10-27; the coaching legend in `v2/01-overview.png`), in `apps/web/src/design/score.ts`:
 
-| Screen | Low (`danger`) | Mid (`warning`) | Good (`success`) | Source |
-| --- | --- | --- | --- | --- |
-| Overview table | < 3.0 | 3.0 – 3.49 | ≥ 3.5 | `Main.dc.html:233-239` |
-| Report score chips | < 3.0 | 3.0 – 3.99 | ≥ 4.0 | `Analysis.dc.html:274-278` |
+| Low (`danger`) | Mid (`warning`) | Good (`success`) |
+| --- | --- | --- |
+| below 3.0 | 3.0 to 3.7 | 3.8 and above |
 
-The spike follows the overview. Pick one rule before P6.1 builds `ScoreChip`.
+The cut is on the one-decimal value people see, so 3.75 (shown as 3.8) is good. It replaces the v1 rule (good
+from 4.0).

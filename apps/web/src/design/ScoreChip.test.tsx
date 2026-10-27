@@ -6,9 +6,9 @@ import { ScoreChip } from "./ScoreChip";
 describe("ScoreChip", () => {
   it.each([
     [2.9, "low", ["bg-danger-tint", "text-danger"]],
-    [3, "mid", ["bg-warning-tint-subtle", "text-warning"]],
-    [3.99, "mid", ["bg-warning-tint-subtle", "text-warning"]],
-    [4, "good", ["bg-success-tint", "text-success"]],
+    [3, "mid", ["bg-warning-tint", "text-warning"]],
+    [3.7, "mid", ["bg-warning-tint", "text-warning"]],
+    [3.8, "good", ["bg-success-tint", "text-success"]],
   ] as const)("colours %s as %s", (score, band, classes) => {
     const { container } = render(<ScoreChip score={score} decimals={2} />);
 
@@ -23,7 +23,7 @@ describe("ScoreChip", () => {
 
     rerender(<ScoreChip score={3} variant="text" decimals={1} />);
     expect(screen.getByText("3.0", { exact: false })).toHaveClass("text-warning");
-    expect(screen.getByText("3.0", { exact: false })).not.toHaveClass("bg-warning-tint-subtle");
+    expect(screen.getByText("3.0", { exact: false })).not.toHaveClass("bg-warning-tint");
   });
 
   it("shows a dash with screen-reader text when there is no score", () => {
