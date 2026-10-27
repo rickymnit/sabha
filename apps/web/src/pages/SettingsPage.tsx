@@ -78,6 +78,7 @@ export function SettingsPage() {
       <Panel>
         <EmptyState
           className="py-14"
+          headingAs="h1"
           icon={<Icon name="settings" size={26} />}
           title="Only owners and administrators can change settings"
           description="Ask your administrator if something here needs changing."
@@ -251,7 +252,7 @@ function SettingsForm({ settings }: { settings: TenantSettings }) {
         </Panel>
       </div>
 
-      <aside className="flex flex-col gap-6">
+      <aside aria-label="Preview" className="flex flex-col gap-6">
         <Preview draft={draft} />
       </aside>
 

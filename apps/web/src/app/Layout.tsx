@@ -163,6 +163,7 @@ export function Layout() {
         </Button>
       </header>
       <aside
+        aria-label="Menu"
         onClick={closeOnLink}
         className={`${menuOpen ? "block" : "hidden"} border-b border-line bg-surface md:sticky md:top-0 md:block md:h-screen md:w-sidebar md:shrink-0 md:border-b-0 md:border-r`}
       >

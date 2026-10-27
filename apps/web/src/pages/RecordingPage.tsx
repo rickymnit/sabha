@@ -74,6 +74,7 @@ export function RecordingPage() {
       <div className="rounded-panel border border-line bg-surface">
         <EmptyState
           className="py-16"
+          headingAs="h1"
           icon={<Icon name={missing ? "search" : "alert"} size={26} />}
           title={missing ? `We couldn't find this ${thing}` : `We couldn't load this ${thing}`}
           description={

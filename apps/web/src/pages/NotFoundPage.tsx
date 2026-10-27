@@ -12,6 +12,7 @@ export function NotFoundPage() {
     <div className="rounded-panel border border-line bg-surface">
       <EmptyState
         className="py-16"
+        headingAs="h1"
         icon={<Icon name="search" size={26} />}
         title="We couldn't find that page"
         description="The link may be old, or the page may have moved."

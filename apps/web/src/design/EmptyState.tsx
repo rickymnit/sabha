@@ -9,7 +9,7 @@ export interface EmptyStateProps {
   icon?: ReactNode;
   /** A button or link that gets the person started. */
   action?: ReactNode;
-  headingAs?: "h2" | "h3";
+  headingAs?: "h1" | "h2" | "h3";
   className?: string;
 }
 

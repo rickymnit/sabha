@@ -57,7 +57,9 @@ export function Table<Row>({
       role="region"
       tabIndex={0}
       aria-labelledby={caption ? captionId : undefined}
-      aria-label={caption ? undefined : ariaLabel}
+      // The scroller is its own region (so keyboards can scroll it); "Lessons table" keeps it apart from the panel
+      // around it, which usually carries the table's name too (axe landmark-unique).
+      aria-label={caption ? undefined : ariaLabel && `${ariaLabel} table`}
       className={cx("relative overflow-x-auto", className)}
     >
       <table className="w-full border-collapse text-table" style={{ minWidth }} aria-label={ariaLabel}>

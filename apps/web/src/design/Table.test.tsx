@@ -35,7 +35,8 @@ describe("Table", () => {
   it("sits in a focusable, named region that scrolls sideways", () => {
     render(<Table aria-label="Invoices" minWidth={520} columns={columns} rows={rows} rowKey={(r) => r.id} />);
 
-    const region = screen.getByRole("region", { name: "Invoices" });
+    // Named apart from the table (and the panel around it), so landmarks stay unique (axe landmark-unique).
+    const region = screen.getByRole("region", { name: "Invoices table" });
     expect(region).toHaveAttribute("tabindex", "0");
     expect(region).toHaveClass("overflow-x-auto", "relative");
     expect(screen.getByRole("table", { name: "Invoices" })).toHaveStyle({ minWidth: "520px" });
