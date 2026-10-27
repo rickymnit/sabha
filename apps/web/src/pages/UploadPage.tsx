@@ -307,7 +307,12 @@ export function UploadPage() {
           )}
         </div>
 
-        <Panel as="aside" title="Settings" description="Applied to every file you upload now." className="gap-5">
+        <Panel
+          as="aside"
+          title="Analysis settings"
+          description="Applied to every file you upload now."
+          className="gap-5"
+        >
           {me.tenant.enabled_types.length > 1 && (
             <ChoiceCards
               legend="Conversation type"

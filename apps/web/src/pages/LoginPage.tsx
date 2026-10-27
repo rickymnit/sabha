@@ -9,6 +9,7 @@ import { useDevUsers } from "../api/hooks";
 import { ApiError } from "../api/client";
 import type { DevUser } from "../api/types";
 import { Avatar, Button, Icon, Logo, Skeleton, SkeletonGroup } from "../design";
+import { takeSessionEnded } from "../session/ended";
 import { useSession } from "../session/session";
 
 // Demo accounts in the order someone showing Sabha would pick them: the head of the school first.
@@ -125,6 +126,15 @@ export function LoginPage() {
   const people = useDevUsers(dev && !session.token);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [ended] = useState(takeSessionEnded);
+  const endedNote = ended && (
+    <p
+      role="status"
+      className="m-0 rounded border border-warning-border bg-warning-surface px-3 py-2 text-sm text-warning-ink"
+    >
+      Your session ended. Please sign in again to carry on where you were.
+    </p>
+  );
 
   if (session.token) return <Navigate to={from} replace />;
 
@@ -135,6 +145,7 @@ export function LoginPage() {
           <h1 className="m-0 text-title font-bold">Sign in to Sabha</h1>
           <p className="m-0 text-muted">Use your work account.</p>
         </div>
+        {endedNote}
         <Button fullWidth onClick={() => void session.signInRedirect?.()}>
           Continue
         </Button>
@@ -168,6 +179,7 @@ export function LoginPage() {
         <h1 className="m-0 text-title font-bold">Welcome</h1>
         <p className="m-0 text-muted">Choose an account to explore Sabha.</p>
       </div>
+      {endedNote}
       {error && (
         <p role="alert" className="m-0 rounded border border-danger-tint bg-danger-tint px-3 py-2 text-sm text-danger">
           {error}

@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { ApiError } from "../api/client";
+import { markSessionEnded } from "../session/ended";
 import { AuthProvider, readAuthConfig } from "../auth";
 import { ToastProvider, useToast } from "../design";
 import { DevSessionProvider, OidcSessionProvider } from "../session/providers";
@@ -19,7 +20,10 @@ export function ApiErrors() {
   useEffect(() => {
     const onError = (event: Event) => {
       const error = (event as CustomEvent<unknown>).detail;
-      if (error instanceof ApiError && error.status === 401) return signOut();
+      if (error instanceof ApiError && error.status === 401) {
+        markSessionEnded();
+        return signOut();
+      }
       if (error instanceof ApiError && error.status === 404) return; // pages show their own "not found"
       toast.show({
         tone: "error",

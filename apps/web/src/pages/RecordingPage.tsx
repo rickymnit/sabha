@@ -17,7 +17,7 @@ import {
 } from "../api/hooks";
 import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
-import { Button, EmptyState, Skeleton, SkeletonGroup, useToast } from "../design";
+import { Button, EmptyState, Icon, Skeleton, SkeletonGroup, useToast } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
 import { RecordingReport } from "../features/report";
@@ -66,11 +66,40 @@ export function RecordingPage() {
 
   if (recording.isError || analysis.isError) {
     const error = recording.error ?? analysis.error;
+    const thing = me.tenant.labels.recording.toLowerCase();
+    const things = me.tenant.labels.recording_plural.toLowerCase();
+    // 404 also when the recording is someone else's the viewer may not see: the page never says which.
+    const missing = error?.status === 404;
     return (
-      <EmptyState
-        title={error?.status === 404 ? "Not found" : "Could not load this page"}
-        description={error?.message}
-      />
+      <div className="rounded-panel border border-line bg-surface">
+        <EmptyState
+          className="py-16"
+          icon={<Icon name={missing ? "search" : "alert"} size={26} />}
+          title={missing ? `We couldn't find this ${thing}` : `We couldn't load this ${thing}`}
+          description={
+            missing
+              ? "The link may be old, or it may be for someone else's work that you do not have access to."
+              : `Please try again in a moment.${error?.requestId ? ` If it keeps happening, quote reference ${error.requestId}.` : ""}`
+          }
+          action={
+            <>
+              {!missing && (
+                <Button
+                  onClick={() => {
+                    void recording.refetch();
+                    void analysis.refetch();
+                  }}
+                >
+                  Try again
+                </Button>
+              )}
+              <Button variant={missing ? "primary" : "secondary"} onClick={() => navigate("/recordings")}>
+                Go to {things}
+              </Button>
+            </>
+          }
+        />
+      </div>
     );
   }
   if (!recording.data || !analysis.data) {
