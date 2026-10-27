@@ -117,16 +117,19 @@ class PersonOut(BaseModel):
     unit_id: str | None
 
 
-async def visible_people(principal: Principal, people: TenantRepo[Person]) -> list[PersonOut]:
-    """The people this caller may see and upload for: all (owners, admins), their units (managers, reviewers) or
-    only themselves (staff), by name."""
+def people_filter(principal: Principal) -> dict[str, Any]:
+    """The people this caller may see, as a MongoDB filter: all (owners, admins), their units (managers, reviewers)
+    or only themselves (staff)."""
     if principal.role in VIEW_ALL:
-        query: dict[str, Any] = {}
-    elif principal.role in UNIT_SCOPED:
-        query = {"unit_id": {"$in": list(principal.unit_ids)}}
-    else:
-        query = {"user_id": principal.user_id}
-    found = await people.find(query, sort=[("name", 1)])
+        return {}
+    if principal.role in UNIT_SCOPED:
+        return {"unit_id": {"$in": list(principal.unit_ids)}}
+    return {"user_id": principal.user_id}
+
+
+async def visible_people(principal: Principal, people: TenantRepo[Person]) -> list[PersonOut]:
+    """The people this caller may see and upload for (people_filter), by name."""
+    found = await people.find(people_filter(principal), sort=[("name", 1)])
     return [PersonOut(id=p.id, name=p.name, unit_id=p.unit_id) for p in found]
 
 

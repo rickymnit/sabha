@@ -101,7 +101,6 @@ export function RecordingsPage() {
           Re-analyse…
         </Button>
       )}
-      {upload}
     </span>
   );
   const bulkDialog = bulkOpen && (

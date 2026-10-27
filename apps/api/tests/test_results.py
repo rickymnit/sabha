@@ -216,6 +216,24 @@ def test_the_list_shows_who_spoke_when_but_never_a_guess_awaiting_review(api: Ap
     assert strips["r-guess"] is None
 
 
+def test_search_finds_names_only_among_what_the_caller_may_see(api: Api) -> None:
+    recording(api, "asha-fractions", "p-asha", "unit-1", 30)
+    recording(api, "ravi-fractions", "p-ravi", "unit-2", 20)
+    insert(api.db, "people", Person(id="p-asha-b", tenant_id="tenant-b", name="Asha B", unit_id="unit-1"))
+
+    def found(sub: str, q: str) -> tuple[list[str], list[str]]:
+        body = api.get(sub, f"/v1/search?q={q}").json()
+        return [p["id"] for p in body["people"]], [r["id"] for r in body["recordings"]]
+
+    assert found("owner", "FRACTIONS") == ([], ["ravi-fractions", "asha-fractions"])  # any case, newest first
+    assert found("owner", "ash") == (["p-asha"], ["asha-fractions"])  # never tenant-b's Asha
+    assert found("manager", "fractions") == ([], ["asha-fractions"])  # unit-1 only
+    assert found("asha", "as") == (["p-asha"], ["asha-fractions"])
+    assert found("asha", "ravi") == ([], [])  # staff see only their own
+    assert found("owner", ".*") == ([], [])  # the text is escaped, never read as a pattern
+    assert api.get("owner", "/v1/search?q=a").status_code == 422  # at least two characters
+
+
 def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:
     recording(api, "r-1", "p-asha", "unit-1", 30, RecordingStatus.FAILED)
     api.db.recordings.update_one({"_id": "r-1"}, {"$set": {"status_reason": "no_speech"}})

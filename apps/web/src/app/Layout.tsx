@@ -13,6 +13,7 @@ import { useSession } from "../session/session";
 import { capitalise, roleTitle, unitNames } from "./format";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
 import { AppLoading } from "./AppLoading";
+import { HeaderSearch } from "./HeaderSearch";
 import { PlanUsage } from "./PlanUsage";
 
 /** A sidebar link that changes page without reloading (keeps cmd/ctrl-click for a new tab). */
@@ -119,6 +120,23 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   );
 }
 
+/** The bar above every page (UI v2): search, and Upload for everyone (staff upload for themselves). */
+function Header({ me }: { me: Me }) {
+  const navigate = useNavigate();
+  return (
+    <div className="border-b border-line bg-surface px-4 py-2.5 md:sticky md:top-0 md:z-10 md:px-[clamp(16px,3vw,40px)]">
+      <div className="mx-auto flex max-w-[1360px] items-center gap-2.5">
+        <HeaderSearch me={me} />
+        <div className="ml-auto flex items-center gap-2.5">
+          <Button icon={<Icon name="upload" size={16} />} onClick={() => navigate("/upload")}>
+            Upload
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Signed-in pages: loads /v1/me once, then the sidebar and the page. */
 export function Layout() {
   const me = useMe();
@@ -179,11 +197,14 @@ export function Layout() {
       >
         <Sidebar me={me.data} id="main-menu" />
       </aside>
-      <main className="min-w-0 flex-1 px-4 pb-12 pt-6 md:px-[clamp(16px,3vw,40px)] md:pt-7">
-        <div className="mx-auto max-w-[1360px]">
-          <Outlet context={me.data} />
-        </div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Header me={me.data} />
+        <main className="min-w-0 flex-1 px-4 pb-12 pt-6 md:px-[clamp(16px,3vw,40px)] md:pt-7">
+          <div className="mx-auto max-w-[1360px]">
+            <Outlet context={me.data} />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

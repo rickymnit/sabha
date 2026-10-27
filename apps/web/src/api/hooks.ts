@@ -28,6 +28,7 @@ import {
   type RecordingPage,
   type RubricDetail,
   type RubricListItem,
+  type SearchResults,
   type ReviewDecision,
   type SettingsChange,
   type SpeakersResponse,
@@ -364,6 +365,19 @@ export function useRecordingCounts(): UseQueryResult<RecordingCounts, ApiError> 
     queryKey: ["recordings", "counts", token],
     queryFn: () => apiFetch<RecordingCounts>("/v1/recordings/counts", { token }),
     enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/search: people and recordings by name (two characters or more), keeping the last answer while typing. */
+export function useSearch(q: string): UseQueryResult<SearchResults, ApiError> {
+  const { token } = useSession();
+  const text = q.trim();
+  return useQuery({
+    queryKey: ["search", text, token],
+    queryFn: () => apiFetch<SearchResults>(`/v1/search?q=${encodeURIComponent(text)}`, { token }),
+    enabled: Boolean(token) && text.length >= 2,
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
   });
 }
 

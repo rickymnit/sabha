@@ -91,6 +91,13 @@ export interface PersonItem {
   unit_id: string | null;
 }
 
+/** GET /v1/search: names only, from what the caller may see. */
+export interface SearchResults {
+  people: PersonItem[];
+  /** Newest first. */
+  recordings: RecordingItem[];
+}
+
 /** A row of the People page (GET /v1/people/summary): real counts and scores only. */
 export interface PersonSummary extends PersonItem {
   /** Recordings with a completed analysis. */
