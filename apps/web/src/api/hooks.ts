@@ -157,11 +157,16 @@ export function usePeopleSummary(enabled = true): UseQueryResult<PersonSummary[]
 }
 
 /** The Overview numbers for a period; refreshed while something is being processed, so "Processing now" moves. */
-export function useOverview(period: { from: string; to: string }): UseQueryResult<OverviewStats, ApiError> {
+export function useOverview(
+  period: { from: string; to: string },
+  unitId: string | null = null,
+): UseQueryResult<OverviewStats, ApiError> {
   const { token } = useSession();
+  const params = unitId ? { ...period, unit_id: unitId } : period;
   return useQuery({
-    queryKey: ["overview", period.from, period.to, token],
-    queryFn: () => apiFetch<OverviewStats>(`/v1/overview?${new URLSearchParams(period)}`, { token }),
+    queryKey: ["overview", period.from, period.to, unitId, token],
+    queryFn: () => apiFetch<OverviewStats>(`/v1/overview?${new URLSearchParams(params)}`, { token }),
+    placeholderData: (previous) => previous,
     enabled: Boolean(token),
     refetchInterval: (query) =>
       query.state.data?.in_progress?.some((s) => s.stage !== "needs_review") ? poll() : false,

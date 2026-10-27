@@ -197,11 +197,10 @@ describe("the overview", () => {
   it("is where a principal lands, with the period's numbers, what is processing and recent lessons", async () => {
     stubApi({ "/v1/me": OWNER, "/v1/overview": STATS, "/v1/recordings": PAGE });
     renderAt("/", signedIn);
-    expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /, Priya$/ })).toBeInTheDocument();
     expect(await screen.findByText("From 3 lessons")).toBeInTheDocument();
     const processing = screen.getByRole("region", { name: "Processing now" });
-    expect(within(processing).getByText("Transcribing").parentElement).toHaveTextContent("2");
-    expect(within(processing).getByRole("button", { name: /Needs review/ })).toBeInTheDocument();
+    expect(within(processing).getByText(/2 more in progress/)).toBeInTheDocument();
     expect(screen.getByText("Recap and closure")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Fractions" })).toBeInTheDocument();
   });

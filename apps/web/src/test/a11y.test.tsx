@@ -98,11 +98,11 @@ async function violations(container: Element): Promise<string[]> {
 
 afterEach(() => vi.unstubAllGlobals());
 
-const PAGES: [string, string, string][] = [
+const PAGES: [string, string, string | RegExp][] = [
   // [address, role, the heading that says the page is ready]
   ["/login", "staff", "Welcome"],
   ["/recordings", "staff", "Lessons"],
-  ["/overview", "owner", "Overview"],
+  ["/overview", "owner", /^Good (morning|afternoon|evening), /],
   ["/people", "manager", "Teachers"],
   ["/reviews", "reviewer", "Reviews"],
   ["/rubrics/teaching.school.v0.1", "staff", "Teaching rubric"],

@@ -1,26 +1,31 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { coachingItems, overviewMetrics } from "./metrics";
+import { ALL_UNITS, coachingRows, overviewTiles } from "./metrics";
 import { emptyOverview, mockLabels, mockOverview, mockTypeNames } from "./mock";
 import { OverviewPage, type OverviewPageProps } from "./OverviewPage";
 import type { OverviewStats } from "./types";
 
 const NOW = () => new Date("2026-10-16T05:00:00Z");
+const tiles = (stats: OverviewStats, types: OverviewPageProps["enabledTypes"] = ["teaching", "reception"]) =>
+  Object.fromEntries(overviewTiles(stats, mockTypeNames, mockLabels, "last week", types).map((t) => [t.id, t]));
 
 function renderPage(stats: OverviewStats | undefined, overrides: Partial<OverviewPageProps> = {}) {
   const onRangeChange = vi.fn();
   render(
     <OverviewPage
       stats={stats}
-      scopeLabel="All campuses"
+      name="Priya"
       preset="7d"
       range={{ start: "2026-10-06", end: "2026-10-12" }}
       onRangeChange={onRangeChange}
+      compare="last week"
+      unit={ALL_UNITS}
+      onUnitChange={vi.fn()}
       typeNames={mockTypeNames}
       labels={mockLabels}
-      rubricHref={(id) => `/rubrics/${id}`}
+      enabledTypes={["teaching", "reception"]}
       now={NOW}
       {...overrides}
     />,
@@ -28,70 +33,27 @@ function renderPage(stats: OverviewStats | undefined, overrides: Partial<Overvie
   return { onRangeChange, user: userEvent.setup() };
 }
 
-const strip = () => screen.getByRole("region", { name: "In this period" });
-
-describe("overview metrics", () => {
-  it("shows the headline numbers with their labels from the tenant", () => {
-    renderPage(mockOverview());
-    expect(screen.getByText("All campuses, 6 to 12 October 2026")).toBeInTheDocument();
-    const cells = within(strip());
-    expect(cells.getByText("Lessons analysed").nextSibling).toHaveTextContent("214");
-    expect(cells.getByText("Audio processed").nextSibling).toHaveTextContent("162 h");
-    expect(cells.getByText("41.2 h of silence skipped")).toBeInTheDocument();
-    expect(cells.getByText("Median teaching score").nextSibling).toHaveTextContent("3.5 / 5");
-    expect(cells.getByText("From 128 lessons")).toBeInTheDocument();
+describe("overview tiles", () => {
+  it("compares with the previous period and draws one bar per period", () => {
+    const t = tiles(mockOverview());
+    expect(t.analysed).toMatchObject({ value: "214", foot: "Up 32 on last week", footTone: "good" });
+    expect(t.analysed?.bars).toHaveLength(8);
+    expect(t.analysed?.bars.at(-1)).toBe(1); // the busiest period is the full height
+    expect(t.audio?.foot).toBe("41.2 h of silence skipped");
+    expect(t["median-teaching"]).toMatchObject({ value: "3.5", foot: "Up 0.2 on last week" });
+    expect(t.resolved).toMatchObject({ value: "81", foot: "Down 3 points on last week", footTone: "bad" });
   });
 
-  it("hides a median whose n is 0 instead of showing 0", () => {
-    renderPage(mockOverview());
-    expect(within(strip()).queryByText("Median sales score")).toBeNull();
+  it("leaves out what has no data instead of showing 0", () => {
+    expect(tiles(emptyOverview())).toEqual({});
+    const t = tiles({ ...mockOverview(), silence_n: 0, tickets: 0 });
+    expect(t.audio?.foot).toBeUndefined();
+    expect(t.resolved).toBeUndefined();
+    expect(tiles(mockOverview(), ["teaching"]).resolved).toBeUndefined(); // reception not switched on
   });
 
-  it("shows an empty state, not zeros, when nothing was analysed", () => {
-    renderPage(emptyOverview());
-    expect(screen.queryByText("Audio processed")).toBeNull();
-    expect(screen.getByText("No lessons analysed in this period")).toBeInTheDocument();
-    expect(screen.queryByText("0")).toBeNull();
-    expect(overviewMetrics(emptyOverview(), mockTypeNames, mockLabels)).toEqual([]);
-  });
-
-  it("shows a placeholder while loading", () => {
-    renderPage(undefined);
-    expect(screen.queryByRole("region", { name: "In this period" })).toBeNull();
-    expect(screen.queryByText("Where coaching helps most")).toBeNull();
-  });
-});
-
-describe("where coaching helps most", () => {
-  it("lists dimensions with data, lowest first, with n and a link to the rubric", () => {
-    renderPage(mockOverview());
-    const panel = screen.getByRole("region", { name: "Where coaching helps most" });
-    const items = within(panel).getAllByRole("listitem");
-    expect(items.map((li) => within(li).getByRole("link").textContent)).toEqual([
-      "Checks for understanding",
-      "Recap and closure",
-      "Resolution confirmed",
-    ]);
-    expect(within(items[0]!).getByText("Teaching, 128 lessons")).toBeInTheDocument();
-    expect(within(items[0]!).getByRole("link")).toHaveAttribute("href", "/rubrics/teaching.school.v1.0");
-    expect(within(panel).queryByText("Objection handling")).toBeNull(); // n = 0
-  });
-
-  it("keeps at most four items", () => {
-    const many = Array.from({ length: 6 }, (_, i) => ({
-      rubric_id: "r",
-      dimension_key: `d${i}`,
-      dimension_name: `D${i}`,
-      type: "teaching" as const,
-      median: 3 - i / 10,
-      n: 10,
-    }));
-    expect(coachingItems(many).map((i) => i.dimension_key)).toEqual(["d5", "d4", "d3", "d2"]);
-  });
-
-  it("says so when there is not enough data", () => {
-    renderPage(emptyOverview());
-    expect(screen.getByText("Not enough verified scores in this period yet.")).toBeInTheDocument();
+  it("puts the main type's weakest rubric points first in the coaching table", () => {
+    expect(coachingRows(mockOverview()).map((r) => r.dimension_key)).toEqual(["cfu", "recap"]);
   });
 });
 
@@ -112,17 +74,5 @@ describe("period picker", () => {
     await user.clear(from);
     await user.type(from, "2026-10-01");
     expect(onRangeChange).toHaveBeenLastCalledWith("custom", { start: "2026-10-01", end: "2026-10-12" });
-  });
-});
-
-describe("overview with what the API serves today", () => {
-  it("leaves out numbers the API does not send, and writes the tenant's capitalised words in lower case", () => {
-    const stats = { ...mockOverview(), silence_n: 0 };
-    const labels = { ...mockLabels, recording: "Lesson", recording_plural: "Lessons" };
-    renderPage(stats, { labels, rubricHref: undefined });
-    expect(screen.queryByText(/silence skipped/)).toBeNull();
-    expect(screen.queryByText("Open disputes")).toBeNull();
-    expect(within(strip()).getByText("From 128 lessons")).toBeInTheDocument();
-    expect(screen.queryAllByRole("link")).toHaveLength(0); // no rubric page yet: dimension names are plain text
   });
 });

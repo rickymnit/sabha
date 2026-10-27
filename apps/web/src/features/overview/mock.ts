@@ -22,7 +22,7 @@ export const mockLabels: Labels = {
 };
 
 export function mockOverview(): OverviewStats {
-  return {
+  const stats: OverviewStats = {
     from: "2026-10-05T18:30:00.000Z",
     to: "2026-10-12T18:30:00.000Z",
     recordings_analysed: 214,
@@ -34,6 +34,21 @@ export function mockOverview(): OverviewStats {
       { type: "reception", median: 3.9, n: 46 },
       { type: "sales", median: 3.1, n: 0 },
     ],
+    tickets: 100,
+    tickets_resolved: 81,
+    units: [
+      { id: "u-main", name: "Main" },
+      { id: "u-vn", name: "Vaishali Nagar" },
+    ],
+    series: [150, 160, 158, 170, 175, 180, 182].map((n, i) => ({
+      from: `2026-08-${String(17 + i).padStart(2, "0")}T18:30:00.000Z`,
+      to: `2026-08-${String(18 + i).padStart(2, "0")}T18:30:00.000Z`,
+      recordings_analysed: n,
+      audio_hours: n * 0.75,
+      median_overall_by_type: [{ type: "teaching" as const, median: 3.3, n: 100 }],
+      tickets: 100,
+      tickets_resolved: 84,
+    })),
     coaching: [
       {
         rubric_id: "teaching.school.v1.0",
@@ -69,6 +84,8 @@ export function mockOverview(): OverviewStats {
       },
     ],
   };
+  stats.series = [...(stats.series ?? []), { ...stats }];
+  return stats;
 }
 
 export function emptyOverview(): OverviewStats {

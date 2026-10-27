@@ -1,99 +1,179 @@
-// /overview (docs/design/01-overview.png) for owners, admins, managers and reviewers: the period's numbers and
-// "Where coaching helps most" (features/overview), what is being processed right now, and the newest recordings.
-// Everything comes from the API for the recordings the signed-in person may see.
+// /overview (UI v2, docs/design/v2/01-overview.png) for owners, admins, managers and reviewers: the period's numbers
+// and coaching table (features/overview), what needs a decision (GET /v1/inbox), what is being processed right now
+// and the newest recordings with who spoke when. Everything comes from the API, for what the signed-in person may
+// see.
 
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
-import { useOverview, useRecordings } from "../api/hooks";
+import { useInbox, useOverview, useRecordings } from "../api/hooks";
 import type { Me, RecordingItem } from "../api/types";
-import { capitalise, formatWhen, statusChip } from "../app/format";
+import { capitalise, formatWhen } from "../app/format";
+import { RESOLVERS } from "../app/nav";
 import {
+  Avatar,
   Button,
-  Card,
   EmptyState,
   Icon,
   Panel,
   ScoreChip,
-  StatusChip,
+  SpeakerStrip,
   Table,
   cx,
-  type CardTone,
+  staffShare,
   type ConversationType,
 } from "../design";
+import { InboxList } from "../features/inbox/InboxList";
+import { ALL_UNITS } from "../features/overview/metrics";
 import { OverviewPage } from "../features/overview/OverviewPage";
 import { presetRange, toQuery, type DayRange, type RangePreset } from "../features/overview/range";
-import type { StageCount } from "../features/overview/types";
+import type { OverviewStats, ProcessingItem } from "../features/overview/types";
 
-const STAGE_CARDS: { title: string; note: string; stages: StageCount["stage"][]; warn?: boolean }[] = [
-  { title: "Uploading", note: "Going straight to storage", stages: ["uploading", "queued"] },
-  { title: "Preparing audio", note: "Removing silence, finding speakers", stages: ["preparing", "finding_speakers"] },
-  { title: "Transcribing", note: "Speech to text", stages: ["transcribing"] },
-  { title: "Scoring", note: "Rubric scores with quotes", stages: ["analysing"] },
-  { title: "Needs review", note: "Unclear audio or speakers", stages: ["needs_review"], warn: true },
-];
+const DECISIONS_SHOWN = 4;
 
-function Processing({ counts, onReview }: { counts: StageCount[]; onReview: () => void }) {
-  const total = (stages: StageCount["stage"][]) =>
-    counts.filter((c) => stages.includes(c.stage)).reduce((sum, c) => sum + c.n, 0);
+/** The five steps a recording goes through, as the processing bars draw them. */
+const STEPS = ["Upload", "Clean", "Speakers", "Transcript", "Scoring"] as const;
+const STEP_OF: Record<ProcessingItem["stage"], number> = {
+  uploading: 0,
+  queued: 1,
+  preparing: 1,
+  finding_speakers: 2,
+  transcribing: 3,
+  analysing: 4,
+  needs_review: 4,
+};
+
+const COMPARE: Record<RangePreset, string> = {
+  "7d": "last week",
+  "30d": "the 30 days before",
+  month: "last month",
+  custom: "the period before",
+};
+
+const clock = (ms: number | null) => {
+  if (ms === null) return "";
+  const s = Math.round(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+};
+
+function useOpen() {
+  const navigate = useNavigate();
+  return (event: MouseEvent<HTMLAnchorElement>, to: string) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    navigate(to);
+  };
+}
+
+function Decisions({ me }: { me: Me }) {
+  const inbox = useInbox();
+  const open = useOpen();
+  const items = inbox.data?.items ?? [];
+  const resolver = RESOLVERS.includes(me.user.role);
   return (
-    <Panel title="Processing now">
-      <ul className="m-0 grid list-none grid-cols-2 gap-2.5 p-0 md:grid-cols-3 xl:grid-cols-5">
-        {STAGE_CARDS.map((card) => {
-          const n = total(card.stages);
-          const tone: CardTone = n === 0 ? "neutral" : card.warn ? "warning" : "active";
-          const body = (
-            <>
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="text-sm text-ink">{card.title}</span>
-                <span className={cx("text-xl font-bold", n === 0 ? "text-muted-2" : "text-ink")}>{n}</span>
-              </span>
-              <span className="text-caption text-muted">{card.note}</span>
-            </>
-          );
-          return (
-            <Card as="li" key={card.title} tone={tone} className="min-h-[76px]">
-              {card.warn && n > 0 ? (
-                <button type="button" onClick={onReview} className="flex flex-col gap-2 text-left">
-                  {body}
-                </button>
-              ) : (
-                body
-              )}
-            </Card>
-          );
-        })}
-      </ul>
+    <Panel
+      flush
+      title="Needs your decision"
+      actions={
+        resolver && (
+          <a href="/reviews" onClick={(e) => open(e, "/reviews")} className="text-sm font-semibold no-underline">
+            Open reviews
+          </a>
+        )
+      }
+    >
+      {inbox.isError ? (
+        <p className="m-0 px-5 py-4 text-sm text-muted">We couldn't load this. Please try again in a moment.</p>
+      ) : items.length === 0 ? (
+        <p className="m-0 px-5 py-4 text-sm text-muted">{inbox.isSuccess ? "Nothing is waiting for you." : " "}</p>
+      ) : (
+        <>
+          <InboxList items={items.slice(0, DECISIONS_SHOWN)} me={me} />
+          {items.length > DECISIONS_SHOWN && (
+            <p className="m-0 border-t border-line-subtle px-5 py-3 text-sm text-muted">
+              And {items.length - DECISIONS_SHOWN} more under the bell at the top.
+            </p>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function Processing({ stats, typeNames }: { stats: OverviewStats; typeNames: Record<ConversationType, string> }) {
+  const items = stats.processing ?? [];
+  const running = (stats.in_progress ?? []).filter((s) => s.stage !== "needs_review").reduce((n, s) => n + s.n, 0);
+  const typical = [...(stats.turnaround ?? [])].sort((a, b) => b.n - a.n)[0];
+  return (
+    <Panel
+      title="Processing now"
+      actions={
+        typical && (
+          <span className="text-small text-muted">
+            Typical {typeNames[typical.type].toLowerCase()}: {Math.round(typical.minutes)} min
+          </span>
+        )
+      }
+    >
+      {items.length === 0 ? (
+        <p className="m-0 text-sm text-muted">Nothing is being processed right now.</p>
+      ) : (
+        <ul className="m-0 flex list-none flex-col gap-3.5 p-0">
+          {items.map((item) => {
+            const step = STEP_OF[item.stage];
+            return (
+              <li key={item.id} className="flex flex-col gap-1.5">
+                <span className="flex justify-between gap-3 text-sm">
+                  <span className="truncate font-semibold text-ink">{item.title}</span>
+                  <span className="shrink-0 text-muted">{STEPS[step]}</span>
+                </span>
+                <span
+                  role="img"
+                  aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}
+                  className="flex gap-1"
+                >
+                  {STEPS.map((name, i) => (
+                    <span
+                      key={name}
+                      className={cx(
+                        "h-1 flex-1 rounded-full",
+                        i < step ? "bg-primary" : i === step ? "bg-primary-border" : "bg-track",
+                      )}
+                    />
+                  ))}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="m-0 text-caption text-muted">
+        {running > items.length ? `${running - items.length} more in progress. ` : ""}
+        {STEPS.join(", ")}
+      </p>
     </Panel>
   );
 }
 
 function Recent({ me }: { me: Me }) {
-  const navigate = useNavigate();
   const labels = me.tenant.labels;
+  const open = useOpen();
   const recordings = useRecordings({}, 6);
   const rows = recordings.data?.pages[0]?.items ?? [];
   const units = new Map(me.tenant.units.map((u) => [u.id, u.name]));
   const things = labels.recording_plural.toLowerCase();
-  const open = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-    event.preventDefault();
-    navigate(`/recordings/${id}`);
-  };
+  const navigate = useNavigate();
   return (
     <Panel
       flush
       title={`Recent ${things}`}
-      footer={
+      actions={
         rows.length > 0 && (
-          <a
-            href="/recordings"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate("/recordings");
-            }}
-          >
-            View all {things}
+          <a href="/recordings" onClick={(e) => open(e, "/recordings")} className="text-sm font-semibold no-underline">
+            All {things}
           </a>
         )
       }
@@ -116,37 +196,61 @@ function Recent({ me }: { me: Me }) {
               key: "title",
               header: capitalise(labels.recording),
               render: (r) => (
-                <div className="flex flex-col gap-0.5">
-                  <a
-                    href={`/recordings/${r.id}`}
-                    onClick={(e) => open(e, r.id)}
-                    className="font-semibold text-ink no-underline after:absolute after:inset-0 hover:text-primary-hover"
-                  >
-                    {r.title}
-                  </a>
-                  <span className="text-small text-muted">
-                    {[r.person?.name, r.unit_id ? units.get(r.unit_id) : undefined].filter(Boolean).join(", ")}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <Avatar name={r.person?.name ?? r.title} size={32} />
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <a
+                      href={`/recordings/${r.id}`}
+                      onClick={(e) => open(e, `/recordings/${r.id}`)}
+                      className="font-semibold text-ink no-underline after:absolute after:inset-0 hover:text-primary-hover"
+                    >
+                      {r.title}
+                    </a>
+                    <span className="text-small text-muted">
+                      {[r.person?.name, r.unit_id ? units.get(r.unit_id) : undefined].filter(Boolean).join(", ")}
+                    </span>
+                  </div>
                 </div>
               ),
             },
             {
-              key: "status",
-              header: "Status",
+              key: "speakers",
+              header: "Who spoke when",
+              hideOnPhone: true,
+              className: "w-[34%] min-w-[140px]",
               render: (r) => {
-                const { chip, text } = statusChip(r.status);
-                return <StatusChip status={chip}>{text}</StatusChip>;
+                const segments = r.speaker_strip ?? [];
+                const share = staffShare(segments);
+                return (
+                  <SpeakerStrip
+                    size="row"
+                    segments={segments}
+                    durationMs={r.duration_ms ?? 0}
+                    label={
+                      share === null
+                        ? "No speaker data yet"
+                        : `${capitalise(labels.person)} ${Math.round(share * 100)}% of speech, others ${100 - Math.round(share * 100)}%`
+                    }
+                  />
+                );
               },
+            },
+            {
+              key: "length",
+              header: "Length",
+              hideOnPhone: true,
+              className: "whitespace-nowrap tabular-nums",
+              render: (r) => clock(r.duration_ms),
             },
             {
               key: "score",
               header: "Score",
               align: "right",
-              render: (r) => <ScoreChip score={r.overall_score} variant="text" decimals={1} />,
+              render: (r) => <ScoreChip score={r.overall_score} decimals={1} />,
             },
             {
               key: "when",
-              header: "Uploaded",
+              header: "When",
               align: "right",
               hideOnPhone: true,
               className: "whitespace-nowrap",
@@ -161,13 +265,11 @@ function Recent({ me }: { me: Me }) {
 
 export function OverviewRoute() {
   const me = useOutletContext<Me>();
-  const navigate = useNavigate();
-  const [preset, setPreset] = useState<RangePreset>("30d");
-  const [range, setRange] = useState<DayRange>(() => presetRange("30d", new Date()));
-  const overview = useOverview(toQuery(range));
-  const units = new Map(me.tenant.units.map((u) => [u.id, u.name]));
-  const mine = me.user.unit_ids.map((id) => units.get(id)).filter(Boolean);
-  const scopeLabel = mine.length ? mine.join(", ") : me.tenant.name;
+  const [preset, setPreset] = useState<RangePreset>("7d");
+  const [range, setRange] = useState<DayRange>(() => presetRange("7d", new Date()));
+  const [unit, setUnit] = useState(ALL_UNITS);
+  const overview = useOverview(toQuery(range), unit === ALL_UNITS ? null : unit);
+  const inbox = useInbox();
   const typeNames = Object.fromEntries(
     (["teaching", "reception", "counselling", "meeting", "sales"] as ConversationType[]).map((t) => [t, capitalise(t)]),
   ) as Record<ConversationType, string>;
@@ -187,20 +289,22 @@ export function OverviewRoute() {
   return (
     <OverviewPage
       stats={overview.data}
-      scopeLabel={scopeLabel}
+      name={me.user.name.split(" ")[0] ?? me.user.name}
       preset={preset}
       range={range}
       onRangeChange={(p, r) => {
         setPreset(p);
         setRange(r);
       }}
+      compare={COMPARE[preset]}
+      unit={unit}
+      onUnitChange={setUnit}
       typeNames={typeNames}
       labels={me.tenant.labels}
-      processing={
-        overview.data && (
-          <Processing counts={overview.data.in_progress ?? []} onReview={() => navigate("/recordings")} />
-        )
-      }
+      enabledTypes={me.tenant.enabled_types as ConversationType[]}
+      waiting={inbox.data?.items.length}
+      decisions={<Decisions me={me} />}
+      processing={overview.data && <Processing stats={overview.data} typeNames={typeNames} />}
       recent={<Recent me={me} />}
     />
   );

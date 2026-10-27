@@ -1,6 +1,7 @@
 // Sabha design system: components built from the tokens in docs/design/tokens.md (see tailwind.config.ts).
 // Demo page: /dev/components in development.
 
+export { BarSpark, type BarSparkProps } from "./BarSpark";
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, Panel, type CardProps, type CardTone, type PanelProps } from "./Panel";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
