@@ -11,7 +11,7 @@ from sabha_api.auth import Principal, Role, require_role
 from sabha_api.deps import Transactions, tenant_repo, transactions
 from sabha_api.idempotency import HEADER, idempotent
 from sabha_api.services import invites
-from sabha_core.models import IdempotencyRecord, IdentityLink, Unit, User
+from sabha_core.models import AuditEntry, IdempotencyRecord, IdentityLink, Unit, User
 from sabha_core.repo import TenantRepo
 
 router = APIRouter(prefix="/v1/users", tags=["users"])
@@ -26,6 +26,7 @@ async def create_invite(
     users: Annotated[TenantRepo[User], Depends(tenant_repo("users", User))],
     units: Annotated[TenantRepo[Unit], Depends(tenant_repo("units", Unit))],
     identities: Annotated[TenantRepo[IdentityLink], Depends(tenant_repo("identities", IdentityLink))],
+    entries: Annotated[TenantRepo[AuditEntry], Depends(tenant_repo("audit_log", AuditEntry))],
     txn: Annotated[Transactions, Depends(transactions)],
     idempotency_key: Annotated[str | None, Header(alias=HEADER)] = None,
 ) -> JSONResponse:
@@ -39,6 +40,8 @@ async def create_invite(
             users=users,
             units=units,
             identities=identities,
+            entries=entries,
+            request=request,
             transactions=txn,
         )
         return 201, out.model_dump(mode="json")

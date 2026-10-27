@@ -17,12 +17,13 @@ from pymongo import AsyncMongoClient, MongoClient
 from pymongo.database import Database
 from pymongo.errors import DuplicateKeyError
 
-from sabha_core.models import IdentityLink, OutboxEvent, Person, Tenant
+from sabha_core.models import AuditEntry, IdentityLink, OutboxEvent, Person, Tenant
 from sabha_core.quota import Plan
 from sabha_core.repo import (
     COLLECTIONS,
     SYSTEM_COLLECTIONS,
     CollectionNotAllowedError,
+    ImmutableCollectionError,
     MissingTenantError,
     OwnTenantRepo,
     SyncSystemRepo,
@@ -243,3 +244,61 @@ def test_own_tenant_repo_refuses_other_fields(mongo_uri: str, db: Database[dict[
 def test_own_tenant_repo_needs_a_tenant_id(mongo_uri: str, db: Database[dict[str, Any]], tenant_id: Any) -> None:
     with pytest.raises(MissingTenantError):
         OwnTenantRepo(db, tenant_id)  # type: ignore[arg-type]  # a sync handle is enough: it fails before any use
+
+
+# --- The audit log is append-only (P1.8) ---
+
+
+def _entry() -> AuditEntry:
+    return AuditEntry(actor_user_id="u1", actor_role="owner", action="recording.play", target_type="recording",
+                      target_id="r1")  # fmt: skip
+
+
+SYNC_CHANGES = [
+    ("update_one", lambda r: r.update_one({}, {"$set": {"action": "x"}})),
+    ("update_one upsert", lambda r: r.update_one({"_id": "new"}, {"$set": {"action": "x"}}, upsert=True)),
+    ("update_many", lambda r: r.update_many({}, {"$set": {"action": "x"}})),
+    ("delete_one", lambda r: r.delete_one({})),
+    ("delete_many", lambda r: r.delete_many({})),
+]
+
+
+@pytest.mark.parametrize(("name", "change"), SYNC_CHANGES, ids=[n for n, _ in SYNC_CHANGES])
+def test_audit_entries_cannot_be_changed_or_deleted(db: Database[dict[str, Any]], name: str, change: Any) -> None:
+    repo = SyncTenantRepo(db, "audit_log", "t1", AuditEntry)
+    entry = repo.insert_one(_entry())
+    with pytest.raises(ImmutableCollectionError):
+        change(repo)
+    assert repo.find({}) == [entry]
+
+
+ASYNC_CHANGES = [
+    ("update_one", lambda r: r.update_one({}, {"$set": {"action": "x"}})),
+    ("update_many", lambda r: r.update_many({}, {"$set": {"action": "x"}})),
+    ("delete_one", lambda r: r.delete_one({})),
+    ("delete_many", lambda r: r.delete_many({})),
+]
+
+
+@pytest.mark.parametrize(("name", "change"), ASYNC_CHANGES, ids=[n for n, _ in ASYNC_CHANGES])
+def test_async_audit_entries_cannot_be_changed_or_deleted(
+    mongo_uri: str, db: Database[dict[str, Any]], name: str, change: Any
+) -> None:
+    async def scenario() -> list[AuditEntry]:
+        client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(mongo_uri)
+        try:
+            repo = TenantRepo(client[db.name], "audit_log", "t1", AuditEntry)
+            await repo.insert_one(_entry())
+            with pytest.raises(ImmutableCollectionError):
+                await change(repo)
+            return await repo.find({})
+        finally:
+            await client.close()
+
+    assert len(asyncio.run(scenario())) == 1
+
+
+def test_audit_entries_can_still_be_added_and_read(db: Database[dict[str, Any]]) -> None:
+    repo = SyncTenantRepo(db, "audit_log", "t1", AuditEntry)
+    repo.insert_many([_entry(), _entry()])
+    assert repo.count({"action": "recording.play"}) == 2

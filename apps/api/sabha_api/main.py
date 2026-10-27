@@ -25,6 +25,7 @@ from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
 from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
 from sabha_api.routers import (
+    audit,
     disputes,
     events,
     health,
@@ -111,6 +112,7 @@ def create_app(
     app.include_router(workspace_settings.router)
     app.include_router(usage.router)
     app.include_router(rubrics.router)
+    app.include_router(audit.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

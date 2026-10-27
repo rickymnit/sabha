@@ -332,3 +332,11 @@ routes:
     # content, not tenant data); a profile without it gets 404 (apps/api/tests/test_rubrics.py).
     anonymous: 401
     others: 200
+
+  GET /v1/audit:
+    # The audit log (P1.8): owners and admins only (owner's decision, 2026-10-27). other_tenant reads its own.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403

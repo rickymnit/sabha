@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pymongo.errors import DuplicateKeyError
 
+from sabha_api.audit import audit
 from sabha_api.auth import Principal
 from sabha_api.deps import Transactions
 from sabha_api.errors import ApiError, ConflictError, ForbiddenError
-from sabha_core.models import Email, IdentityLink, Role, Unit, User
+from sabha_core.models import AuditEntry, Email, IdentityLink, Role, Unit, User
 from sabha_core.repo import TenantRepo
 
 ROUTE = "POST /v1/users/invites"
@@ -64,6 +66,8 @@ async def invite(
     users: TenantRepo[User],
     units: TenantRepo[Unit],
     identities: TenantRepo[IdentityLink],
+    entries: TenantRepo[AuditEntry],
+    request: Request,
     transactions: Transactions,
 ) -> InviteOut:
     if body.role not in MAY_INVITE.get(principal.role, frozenset()):
@@ -78,6 +82,9 @@ async def invite(
         async with transactions.run() as session:
             user = await users.insert_one(user, session=session)
             await identities.insert_one(IdentityLink(issuer=issuer, email=body.email, user_id=user.id), session=session)
+            # The invited user as target; their role and units as details. Never the email (personal data).
+            await audit(entries, principal, request, action="user.invite", target_type="user", target_id=user.id,
+                        meta={"role": user.role, "unit_ids": unit_ids}, session=session)  # fmt: skip
     except DuplicateKeyError as exc:  # a concurrent invite for the same email won
         raise UserExistsError("A user with this email already exists in your organisation.") from exc
     return InviteOut(

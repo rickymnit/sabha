@@ -13,6 +13,7 @@ collection, tenant and model. Every operation is scoped to that tenant:
   ($lookup, $unionWith, $graphLookup, $out, $merge, $documents, $collStats, $currentOp, ...) raise
   UnsafePipelineError, also inside $facet; stages that set or rewrite tenant_id raise TenantViolationError. A job
   that needs a join or a $merge gets its own vetted method here.
+- audit_log is append-only (APPEND_ONLY): update and delete raise ImmutableCollectionError.
 - Only collections in COLLECTIONS can be used, and `tenants` only through the SystemRepo or, for a tenant's own
   settings, the OwnTenantRepo (its own record and its settings fields only).
 
@@ -95,6 +96,20 @@ class UnsafePipelineError(TenantViolationError):
 
 class CollectionNotAllowedError(ValueError):
     """This kind of repository may not use this collection."""
+
+
+class ImmutableCollectionError(ValueError):
+    """An update or delete on an append-only collection (the audit log, P1.8)."""
+
+
+# Append-only: documents are inserted and read, never updated or deleted (CLAUDE.md, every playback, export and
+# score change writes audit_log).
+APPEND_ONLY = frozenset({"audit_log"})
+
+
+def _check_mutable(collection: str) -> None:
+    if collection in APPEND_ONLY:
+        raise ImmutableCollectionError(f"{collection} is append-only: its entries are never changed or deleted")
 
 
 # --- Scoping rules (pure; shared by the async and sync repositories) ---
@@ -194,6 +209,7 @@ class TenantRepo[T: TenantDoc]:
     def __init__(self, db: AsyncDatabase[dict[str, Any]], collection: str, tenant_id: str, model: type[T]) -> None:
         self._tenant_id = _check_tenant_id(tenant_id)
         self._collection = db[check_tenant_collection(collection)]
+        self._name = collection
         self._model = model
 
     @property
@@ -233,6 +249,7 @@ class TenantRepo[T: TenantDoc]:
         session: AsyncClientSession | None = None,
     ) -> int:
         """Matched count (0 when an upsert inserted)."""
+        _check_mutable(self._name)
         check_update(update)
         result = await self._collection.update_one(
             scoped_filter(self._tenant_id, filter), update, upsert=upsert, session=session
@@ -242,15 +259,18 @@ class TenantRepo[T: TenantDoc]:
     async def update_many(
         self, filter: Filter, update: Mapping[str, Any], *, session: AsyncClientSession | None = None
     ) -> int:
+        _check_mutable(self._name)
         check_update(update)
         result = await self._collection.update_many(scoped_filter(self._tenant_id, filter), update, session=session)
         return result.matched_count
 
     async def delete_one(self, filter: Filter, *, session: AsyncClientSession | None = None) -> int:
+        _check_mutable(self._name)
         result = await self._collection.delete_one(scoped_filter(self._tenant_id, filter), session=session)
         return result.deleted_count
 
     async def delete_many(self, filter: Filter, *, session: AsyncClientSession | None = None) -> int:
+        _check_mutable(self._name)
         result = await self._collection.delete_many(scoped_filter(self._tenant_id, filter), session=session)
         return result.deleted_count
 
@@ -267,6 +287,7 @@ class SyncTenantRepo[T: TenantDoc]:
     def __init__(self, db: Database[dict[str, Any]], collection: str, tenant_id: str, model: type[T]) -> None:
         self._tenant_id = _check_tenant_id(tenant_id)
         self._collection = db[check_tenant_collection(collection)]
+        self._name = collection
         self._model = model
 
     @property
@@ -301,6 +322,7 @@ class SyncTenantRepo[T: TenantDoc]:
         self, filter: Filter, update: Mapping[str, Any], *, upsert: bool = False, session: ClientSession | None = None
     ) -> int:
         """Matched count (0 when an upsert inserted)."""
+        _check_mutable(self._name)
         check_update(update)
         result = self._collection.update_one(
             scoped_filter(self._tenant_id, filter), update, upsert=upsert, session=session
@@ -308,15 +330,18 @@ class SyncTenantRepo[T: TenantDoc]:
         return result.matched_count
 
     def update_many(self, filter: Filter, update: Mapping[str, Any], *, session: ClientSession | None = None) -> int:
+        _check_mutable(self._name)
         check_update(update)
         return self._collection.update_many(
             scoped_filter(self._tenant_id, filter), update, session=session
         ).matched_count
 
     def delete_one(self, filter: Filter, *, session: ClientSession | None = None) -> int:
+        _check_mutable(self._name)
         return self._collection.delete_one(scoped_filter(self._tenant_id, filter), session=session).deleted_count
 
     def delete_many(self, filter: Filter, *, session: ClientSession | None = None) -> int:
+        _check_mutable(self._name)
         return self._collection.delete_many(scoped_filter(self._tenant_id, filter), session=session).deleted_count
 
     def aggregate(
