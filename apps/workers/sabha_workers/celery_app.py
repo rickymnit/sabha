@@ -36,6 +36,7 @@ TASK_QUEUES: dict[str, str] = {
     "sabha.maintenance.abort_stale_uploads": IO_NOTIFY,
     "sabha.maintenance.requeue_stuck": IO_NOTIFY,
     "sabha.maintenance.expire_audio": IO_NOTIFY,  # nightly audio retention (P7.3)
+    "sabha.maintenance.backup": IO_NOTIFY,  # nightly database export (P7.3)
 }
 
 
@@ -65,6 +66,7 @@ def create_app(settings: Settings) -> Celery:
             "abort-stale-uploads": {"task": "sabha.maintenance.abort_stale_uploads", "schedule": 3600.0},
             "requeue-stuck": {"task": "sabha.maintenance.requeue_stuck", "schedule": 300.0},
             "expire-audio": {"task": "sabha.maintenance.expire_audio", "schedule": 86_400.0},  # P7.3, daily
+            "backup": {"task": "sabha.maintenance.backup", "schedule": 86_400.0},  # P7.3, daily
         },
     )
     return app

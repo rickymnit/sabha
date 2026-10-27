@@ -43,6 +43,7 @@ RAW_ACCESS_ALLOWED = {
     "apps/api/sabha_api/main.py": "hands the database handle to the user directory at start-up; reads no documents",
     "packages/core/sabha_core/mongo.py": "opens the synchronous database handle for workers and scripts",
     "apps/workers/sabha_workers/tasks.py": "the worker's set-up: hands the database handle to the runner and sweeper",
+    "packages/core/sabha_core/backup.py": "nightly backup reads all collections; the drill writes only restore_drill_*",
 }
 
 RAW_ACCESS_ALLOWED_PREFIXES = {

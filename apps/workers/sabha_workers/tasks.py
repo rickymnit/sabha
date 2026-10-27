@@ -30,6 +30,7 @@ from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_asr.registry import build_transcriber
 from sabha_asr.roles import RoleTieBreaker
 from sabha_asr.transcriber import Transcriber
+from sabha_core.backup import export_backup
 from sabha_core.models import AudioInfo, LlmCall, Person, Recording, Transcript, utc_now
 from sabha_core.mongo import open_sync
 from sabha_core.repo import SyncTenantRepo, own_tenant
@@ -262,6 +263,13 @@ def register(app: Celery) -> None:
         done = expire_audio(rt.db, rt.s3, audio_bucket=rt.settings.s3_bucket_audio,
                             artefacts_bucket=rt.settings.s3_bucket_artefacts, now=utc_now())  # fmt: skip
         return sum(d.recordings for d in done)
+
+    @app.task(name="sabha.maintenance.backup", acks_late=True)
+    def backup() -> int:
+        """Nightly database export to the backups bucket (P7.3); a rerun the same day overwrites that day's copy."""
+        rt = runtime()
+        manifest = export_backup(rt.db, rt.s3, rt.settings.s3_bucket_backups, now=utc_now())
+        return sum(c["count"] for c in manifest["collections"].values())
 
     @app.task(name="sabha.maintenance.requeue_stuck", acks_late=True)
     def requeue() -> int:
