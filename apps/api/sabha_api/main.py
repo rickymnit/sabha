@@ -34,6 +34,7 @@ from sabha_api.routers import (
     reanalysis,
     recordings,
     results,
+    retry,
     reviews,
     rubrics,
     usage,
@@ -113,6 +114,7 @@ def create_app(
     app.include_router(usage.router)
     app.include_router(rubrics.router)
     app.include_router(audit.router)
+    app.include_router(retry.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

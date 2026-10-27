@@ -142,6 +142,23 @@ def test_a_review_outcome_needs_the_flag(db: Database[dict[str, Any]]) -> None:
     assert status_of(db, closed) == "FAILED"
 
 
+def test_a_retry_needs_the_flag_and_restarts_the_stage(db: Database[dict[str, Any]]) -> None:
+    recording_id = make(db, S.FAILED)
+    with pytest.raises(InvalidTransition):
+        transition(recordings(db), recording_id, S.FAILED, S.TRANSCRIBING, reason="retry", now=NOW)
+    event = transition(recordings(db), recording_id, S.FAILED, S.TRANSCRIBING, reason="retry", retry=True,
+                       meta={"retry": True, "stage": "transcribe"}, now=NOW)  # fmt: skip
+    assert (status_of(db, recording_id), event.type) == ("TRANSCRIBING", "recording.transcribing")
+    assert event.payload["meta"] == {"retry": True, "stage": "transcribe"}
+
+
+def test_retrying_preprocessing_goes_back_to_uploaded(db: Database[dict[str, Any]]) -> None:
+    recording_id = make(db, S.FAILED)
+    event = transition(recordings(db), recording_id, S.FAILED, S.UPLOADED, reason="retry", retry=True,
+                       meta={"ready": True, "retry": True}, now=NOW)  # fmt: skip
+    assert (status_of(db, recording_id), event.type) == ("UPLOADED", "recording.uploaded")
+
+
 # --- Consent first (golden rule 9) ---
 
 

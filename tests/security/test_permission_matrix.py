@@ -22,7 +22,19 @@ from pymongo import MongoClient
 from sabha_api.main import create_app
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import Analysis, IdentityLink, Person, Recording, Role, Score, Tenant, Transcript, Unit, User
+from sabha_core.models import (
+    Analysis,
+    DeadLetter,
+    IdentityLink,
+    Person,
+    Recording,
+    Role,
+    Score,
+    Tenant,
+    Transcript,
+    Unit,
+    User,
+)
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.settings import Settings
@@ -313,6 +325,24 @@ def reanalyze(api: Api, caller: str) -> httpx.Response:
     return api.client.post(f"/v1/recordings/{rid}/reanalyze", json=body, headers=api.headers(caller, create=True))
 
 
+def failed_recording(verb: str) -> Callable[[Api, str], httpx.Response]:
+    """Retries or closes a fresh recording of Asha's that failed in transcription, with its dead letter (P7.8)."""
+
+    def call(api: Api, caller: str) -> httpx.Response:
+        rid = f"rec-failed-{uuid.uuid4().hex[:8]}"
+        recording = Recording(id=rid, tenant_id="tenant-a", type=ConversationType.TEACHING,
+                              status=RecordingStatus.FAILED, consent_ref="c", person_id="p-asha", unit_id="unit-1",
+                              created_by="u-staff_uploader")  # fmt: skip
+        letter = DeadLetter(tenant_id="tenant-a", recording_id=rid, stage="transcribe", task="sabha.transcribe",
+                            error_code="provider_auth", attempts=5, args={})  # fmt: skip
+        api.db.recordings.insert_one(recording.model_dump(by_alias=True))
+        api.db.dlq.insert_one(letter.model_dump(by_alias=True))
+        body = {"reason": "The speech-to-text key was renewed."}
+        return api.client.post(f"/v1/recordings/{rid}/{verb}", json=body, headers=api.headers(caller, create=True))
+
+    return call
+
+
 CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /health": lambda a, who: a.client.get("/health", headers=a.headers(who)),
     "GET /ready": lambda a, who: a.client.get("/ready", headers=a.headers(who)),
@@ -350,6 +380,8 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /v1/disputes": lambda a, who: a.client.get("/v1/disputes", headers=a.headers(who)),
     "POST /v1/disputes/{dispute_id}/resolve": resolve_dispute,
     "POST /v1/recordings/{recording_id}/reanalyze": reanalyze,
+    "POST /v1/recordings/{recording_id}/retry": failed_recording("retry"),
+    "POST /v1/recordings/{recording_id}/abandon": failed_recording("abandon"),
     "GET /v1/events": lambda a, who: a.client.get("/v1/events", headers=a.headers(who)),
     "GET /v1/audit": lambda a, who: a.client.get("/v1/audit", headers=a.headers(who)),
     "GET /v1/rubrics": lambda a, who: a.client.get("/v1/rubrics", headers=a.headers(who)),

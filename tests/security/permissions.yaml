@@ -340,3 +340,20 @@ routes:
     admin: 200
     other_tenant: 200
     others: 403
+
+  POST /v1/recordings/{recording_id}/retry:
+    # P7.8: owners and admins retry a failed recording (owner's decision, 2026-10-27): a fresh one of Asha's that
+    # failed in transcription, per call. other_tenant cannot see it (404).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 404
+    others: 403
+
+  POST /v1/recordings/{recording_id}/abandon:
+    # P7.8: owners and admins close a failed recording for good. Same target and outcomes as retry.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 404
+    others: 403

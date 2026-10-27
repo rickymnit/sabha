@@ -14,6 +14,7 @@ import pytest
 from sabha_core.state import (
     ALLOWED_TRANSITIONS,
     REANALYSIS_TRANSITIONS,
+    RETRY_TRANSITIONS,
     TERMINAL_STATUSES,
     WORKER_STAGES,
     ConcurrentTransition,
@@ -22,6 +23,7 @@ from sabha_core.state import (
     TransitionError,
     check_transition,
     next_statuses,
+    retry_status,
 )
 
 S = RecordingStatus
@@ -173,7 +175,8 @@ def test_refusal_message_names_the_statuses_and_the_allowed_next_ones() -> None:
 
 
 def test_refusal_from_a_final_status_says_so() -> None:
-    with pytest.raises(InvalidTransition, match=r"no transitions out of FAILED$"):
+    # PREPROCESSING is not even a retry target: preprocessing is retried through UPLOADED.
+    with pytest.raises(InvalidTransition, match=r"no transitions out of FAILED except a retry \(retry=True\)$"):
         check_transition(S.FAILED, S.PREPROCESSING)
     with pytest.raises(InvalidTransition, match="no transitions out of COMPLETED except re-analysis"):
         check_transition(S.COMPLETED, S.FAILED)
@@ -204,3 +207,52 @@ def test_table_cannot_be_changed_at_runtime() -> None:
     with pytest.raises(TypeError):
         table[S.FAILED] = frozenset({S.PREPROCESSING})
     assert isinstance(ALLOWED_TRANSITIONS[S.CREATED], frozenset)
+
+
+# --- Retrying a failed recording (P7.8, owner's decision 2026-10-27) ---
+
+# FAILED goes back to where the failed stage starts: UPLOADED for preprocessing (its start event is the upload's),
+# the stage's own status for the others. Written out by hand, like EXPECTED.
+RETRY = {(S.FAILED, S.UPLOADED), (S.FAILED, S.DIARIZING), (S.FAILED, S.TRANSCRIBING), (S.FAILED, S.ANALYZING)}
+
+
+def test_the_retry_table_is_exactly_the_expected_one() -> None:
+    assert set(RETRY_TRANSITIONS) == RETRY
+
+
+@pytest.mark.parametrize(("from_status", "to_status"), ALL_PAIRS, ids=str)
+def test_retry_unlocks_only_the_ways_back_from_failed(from_status: RecordingStatus, to_status: RecordingStatus) -> None:
+    if (from_status, to_status) in EXPECTED or (from_status, to_status) in RETRY:
+        check_transition(from_status, to_status, retry=True)  # must not raise
+    else:
+        with pytest.raises(InvalidTransition):
+            check_transition(from_status, to_status, retry=True)
+
+
+def test_leaving_failed_needs_the_retry_flag() -> None:
+    for target in (S.UPLOADED, S.DIARIZING, S.TRANSCRIBING, S.ANALYZING):
+        with pytest.raises(InvalidTransition, match="retry"):
+            check_transition(S.FAILED, target)
+        with pytest.raises(InvalidTransition):  # the other flags do not open it
+            check_transition(S.FAILED, target, reanalysis=True, review=True)
+    assert next_statuses(S.FAILED, retry=True) == frozenset({S.UPLOADED, S.DIARIZING, S.TRANSCRIBING, S.ANALYZING})
+    assert next_statuses(S.FAILED) == frozenset()
+
+
+def test_retry_never_skips_to_the_end_or_to_review() -> None:
+    for target in (S.COMPLETED, S.NEEDS_REVIEW, S.CREATED, S.PREPROCESSING):
+        with pytest.raises(InvalidTransition):
+            check_transition(S.FAILED, target, retry=True)
+
+
+@pytest.mark.parametrize(
+    ("stage", "target"),
+    [("preprocess", S.UPLOADED), ("diarize", S.DIARIZING), ("transcribe", S.TRANSCRIBING), ("analyze", S.ANALYZING)],
+)
+def test_each_stage_has_its_retry_status(stage: str, target: RecordingStatus) -> None:
+    assert retry_status(stage) is target
+
+
+def test_an_unknown_stage_has_no_retry_status() -> None:
+    with pytest.raises(ValueError, match="no stage"):
+        retry_status("cooking")

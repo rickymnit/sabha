@@ -454,7 +454,8 @@ class DeadLetter(TenantDoc):
     error_detail: str | None = Field(default=None, max_length=2000)
     attempts: int = Field(ge=1)
     args: dict[str, Any] = Field(default_factory=dict)
-    replayed_at: UtcDatetime | None = None
+    replayed_at: UtcDatetime | None = None  # an owner or admin retried it (P7.8)
+    abandoned_at: UtcDatetime | None = None  # an owner or admin closed the recording for good instead (P7.8)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
