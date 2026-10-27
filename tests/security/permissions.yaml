@@ -357,3 +357,11 @@ routes:
     admin: 200
     other_tenant: 404
     others: 403
+
+  GET /v1/recordings/{recording_id}/processing:
+    # P7.8: stage runs, the latest failure and the recorded AI cost, for owners and admins.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 404
+    others: 403

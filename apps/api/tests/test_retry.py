@@ -228,3 +228,16 @@ def test_another_tenants_recording_is_not_found(api: Api, verb: str) -> None:
     rid = failed(api, tenant=B)
     assert api.post("owner", rid, verb).status_code == 404
     assert api.recording(rid)["status"] == "FAILED"
+
+
+def test_processing_shows_the_failure_and_whether_it_can_be_retried(api: Api) -> None:
+    rid = failed(api)
+    get = lambda: api.client.get(f"/v1/recordings/{rid}/processing",  # noqa: E731
+                                 headers={"Authorization": f"Bearer {api.idp.token('admin')}"}).json()  # fmt: skip
+    before = get()
+    assert before["can_retry"] is True
+    assert before["failure"]["state"] == "open" and before["failure"]["stage"] == "transcribe"
+    assert before["ai"] == {"calls": 0, "cost_usd": None, "unpriced_calls": 0}
+    api.post("owner", rid, "retry")
+    after = get()
+    assert after["can_retry"] is False and after["failure"]["state"] == "retried"

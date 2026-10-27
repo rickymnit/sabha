@@ -274,3 +274,27 @@ export interface AuditPage {
   items: AuditEntryItem[];
   next_cursor: string | null;
 }
+
+/** GET /v1/recordings/{id}/processing (services/processing.py): owners and admins. */
+export interface ProcessingInfo {
+  stages: {
+    stage: string;
+    attempt: number;
+    status: "running" | "succeeded" | "failed";
+    started_at: string;
+    finished_at: string | null;
+    duration_ms: number | null;
+    error: string | null;
+    error_code: string | null;
+  }[];
+  failure: {
+    stage: string;
+    error: string;
+    error_code: string;
+    attempts: number;
+    at: string;
+    state: "open" | "retried" | "closed";
+  } | null;
+  can_retry: boolean;
+  ai: { calls: number; cost_usd: number | null; unpriced_calls: number };
+}

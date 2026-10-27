@@ -10,6 +10,8 @@ import {
   useAnalysis,
   useAnalysisHistory,
   useApi,
+  useFailedRecordingAction,
+  useProcessing,
   useRaiseDispute,
   useReanalyse,
   useRecording,
@@ -19,6 +21,7 @@ import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
 import { Button, EmptyState, Icon, Skeleton, SkeletonGroup, useToast } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
+import { ProcessingPanel, ReasonDialog, STAGE_NAMES } from "../features/processing";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
 import { RecordingReport } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
@@ -42,6 +45,11 @@ export function RecordingPage() {
   const transcript = useTranscript(id, hasTranscript || recording.data?.status === "ANALYZING");
   const raise = useRaiseDispute(id);
   const toast = useToast();
+  const isAdmin = me.user.role === "owner" || me.user.role === "admin";
+  const processing = useProcessing(id, isAdmin && recording.isSuccess);
+  const retry = useFailedRecordingAction(id, "retry");
+  const abandon = useFailedRecordingAction(id, "abandon");
+  const [deciding, setDeciding] = useState<"retry" | "abandon" | null>(null);
   const analysisId = analysis.data && "analysis_id" in analysis.data ? analysis.data.analysis_id : undefined;
   const submitDispute = useCallback(
     async (draft: DisputeDraft) => {
@@ -131,7 +139,8 @@ export function RecordingPage() {
   const canReview = recording.data.status === "NEEDS_REVIEW" && RESOLVERS.includes(me.user.role);
   const versions = history.data ?? [];
   const shownVersion = version ? versions.find((v) => v.id === version) : undefined;
-  const isAdmin = me.user.role === "owner" || me.user.role === "admin";
+  const failure = processing.data?.failure;
+  const stageName = failure ? (STAGE_NAMES[failure.stage] ?? failure.stage).toLowerCase() : "";
   const canReanalyse = isAdmin && recording.data.status === "COMPLETED" && !version;
   const recordingWord = me.tenant.labels.recording.toLowerCase();
   return (
@@ -143,6 +152,45 @@ export function RecordingPage() {
           </span>
           <Button onClick={() => navigate(`/reviews/${id}`)}>Review it</Button>
         </div>
+      )}
+      {processing.data?.can_retry && failure && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger-tint bg-surface px-4 py-3">
+          <span className="text-ink-2">
+            This {recordingWord} stopped while {stageName}: {failure.error}
+          </span>
+          <span className="flex gap-2">
+            <Button variant="secondary" onClick={() => setDeciding("abandon")}>
+              Close it
+            </Button>
+            <Button onClick={() => setDeciding("retry")}>Try again</Button>
+          </span>
+        </div>
+      )}
+      {isAdmin && failure?.state === "closed" && recording.data.status === "FAILED" && (
+        <p className="m-0 rounded-card border border-line-subtle bg-surface-subtle px-4 py-3 text-ink-2">
+          An administrator closed this {recordingWord}; it will not be processed again. The reason is in Activity.
+        </p>
+      )}
+      {deciding && (
+        <ReasonDialog
+          title={deciding === "retry" ? `Try this ${recordingWord} again` : `Close this ${recordingWord}`}
+          description={
+            deciding === "retry"
+              ? `Sabha runs the step that failed (${stageName}) again and carries on from there. Earlier steps are not repeated.`
+              : `It stays failed and cannot be tried again. Use this when the recording itself is unusable.`
+          }
+          submitLabel={deciding === "retry" ? "Try again" : "Close it"}
+          onSubmit={async (reason) => {
+            await (deciding === "retry" ? retry : abandon).mutateAsync(reason);
+            toast.show({
+              tone: "success",
+              title: deciding === "retry" ? "Started again" : "Closed",
+              message: deciding === "retry" ? "This page updates as it moves on." : undefined,
+              duration: 5_000,
+            });
+          }}
+          onClose={() => setDeciding(null)}
+        />
       )}
       {(versions.length > 1 || canReanalyse) && (
         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -192,6 +240,7 @@ export function RecordingPage() {
         canDispute={"can_dispute" in analysis.data && analysis.data.can_dispute === true}
         onSubmitDispute={submitDispute}
       />
+      {isAdmin && processing.data && <ProcessingPanel info={processing.data} />}
     </div>
   );
 }

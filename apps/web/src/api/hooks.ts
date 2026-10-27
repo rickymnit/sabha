@@ -21,6 +21,7 @@ import {
   type DevUser,
   type Me,
   type PersonItem,
+  type ProcessingInfo,
   type PersonSummary,
   type RecordingDetail,
   type RecordingCounts,
@@ -277,6 +278,36 @@ export function useReanalyse(recordingId: string) {
     onSuccess: async () => {
       await Promise.all(
         ["recording", "analysis", "analysis-history", "recordings", "disputes"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
+  });
+}
+
+/** GET /v1/recordings/{id}/processing: stage runs, the latest failure and AI cost (owners and admins). */
+export function useProcessing(id: string, enabled: boolean): UseQueryResult<ProcessingInfo, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["recording", id, "processing", token],
+    queryFn: () => apiFetch<ProcessingInfo>(`/v1/recordings/${encodeURIComponent(id)}/processing`, { token }),
+    enabled: enabled && Boolean(token),
+  });
+}
+
+/** POST /v1/recordings/{id}/retry or /abandon (owners and admins), with an Idempotency-Key and the reason. */
+export function useFailedRecordingAction(recordingId: string, action: "retry" | "abandon") {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      apiFetch<{ recording_id: string; status: ApiStatus; stage: string }>(
+        `/v1/recordings/${encodeURIComponent(recordingId)}/${action}`,
+        { method: "POST", token, body: { reason }, headers: { "Idempotency-Key": crypto.randomUUID() } },
+      ),
+    onSuccess: async () => {
+      await Promise.all(
+        ["recording", "analysis", "recordings", "audit"].map((key) =>
           queryClient.invalidateQueries({ queryKey: [key] }),
         ),
       );

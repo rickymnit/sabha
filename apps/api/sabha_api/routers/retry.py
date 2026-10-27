@@ -1,4 +1,4 @@
-"""Retrying or closing a failed recording (sabha_api.services.retry, plan task P7.8)."""
+"""Retrying or closing a failed recording, and how it was processed (sabha_api.services.retry and .processing, P7.8)."""
 
 from __future__ import annotations
 
@@ -10,8 +10,18 @@ from fastapi.responses import JSONResponse
 from sabha_api.auth import Principal, current_principal
 from sabha_api.deps import Transactions, tenant_repo, transactions
 from sabha_api.idempotency import HEADER, idempotent
+from sabha_api.services import processing as processing_service
 from sabha_api.services import retry as service
-from sabha_core.models import AuditEntry, DeadLetter, IdempotencyRecord, OutboxEvent, Person, Recording
+from sabha_core.models import (
+    AuditEntry,
+    DeadLetter,
+    IdempotencyRecord,
+    LlmCall,
+    OutboxEvent,
+    Person,
+    Recording,
+    StageRun,
+)
 from sabha_core.repo import TenantRepo
 
 router = APIRouter(tags=["recordings"])
@@ -58,3 +68,15 @@ async def abandon_recording(
 
     route = service.ABANDON_ROUTE.replace("{recording_id}", recording_id)
     return await idempotent(records, key=idempotency_key, route=route, body=body, handler=handler)
+
+
+@router.get("/v1/recordings/{recording_id}/processing", response_model=processing_service.ProcessingOut)
+async def recording_processing(
+    recording_id: str, principal: Caller, recordings: Recordings, people: People, dlq: Letters,
+    runs: Annotated[TenantRepo[StageRun], Depends(tenant_repo("stage_runs", StageRun))],
+    llm_calls: Annotated[TenantRepo[LlmCall], Depends(tenant_repo("llm_calls", LlmCall))],
+) -> processing_service.ProcessingOut:  # fmt: skip
+    """Each stage's runs, the latest failure and whether it can be retried, and the recorded AI cost (owners and
+    admins)."""
+    return await processing_service.processing(principal, recording_id, recordings=recordings, people=people,
+                                               runs=runs, dlq=dlq, llm_calls=llm_calls)  # fmt: skip
