@@ -9,6 +9,7 @@ import { OverviewRoute } from "../pages/OverviewRoute";
 import { PeoplePage } from "../pages/PeoplePage";
 import { ReviewPage } from "../pages/ReviewPage";
 import { ReviewQueuePage } from "../pages/ReviewQueuePage";
+import { SettingsPage } from "../pages/SettingsPage";
 import { RecordingPage } from "../pages/RecordingPage";
 import { RecordingsPage } from "../pages/RecordingsPage";
 import { UploadPage } from "../pages/UploadPage";
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
           { path: "/people", element: <PeoplePage /> },
           { path: "/reviews", element: <ReviewQueuePage /> },
           { path: "/reviews/:id", element: <ReviewPage /> },
+          { path: "/settings", element: <SettingsPage /> },
           { path: "*", element: <NotFoundPage /> },
         ],
       },

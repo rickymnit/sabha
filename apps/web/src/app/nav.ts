@@ -55,6 +55,13 @@ export function navItems(me: Me): NavEntry[] {
       roles: EVERYONE,
       match: (path) => path === "/upload",
     },
+    {
+      to: "/settings",
+      label: "Settings",
+      icon: "settings",
+      roles: ["owner", "admin"],
+      match: (path) => path === "/settings",
+    },
   ];
   return entries.filter((entry) => entry.roles.includes(me.user.role));
 }

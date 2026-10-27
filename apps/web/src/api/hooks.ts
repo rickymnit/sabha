@@ -24,7 +24,9 @@ import {
   type RecordingDetail,
   type RecordingPage,
   type ReviewDecision,
+  type SettingsChange,
   type SpeakersResponse,
+  type TenantSettings,
   type TranscriptResponse,
 } from "./types";
 
@@ -292,6 +294,30 @@ export function useBulkReanalyse() {
     onSuccess: async (_, request) => {
       if (request.dry_run) return;
       await Promise.all(["recordings", "overview"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
+    },
+  });
+}
+
+/** GET /v1/settings: the organisation's name, words and conversation types (owners and admins). */
+export function useSettings(): UseQueryResult<TenantSettings, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["settings", token],
+    queryFn: () => apiFetch<TenantSettings>("/v1/settings", { token }),
+    enabled: Boolean(token),
+  });
+}
+
+/** PATCH /v1/settings. The menu and every page read the words from /v1/me, so it is refetched at once. */
+export function useUpdateSettings() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (change: SettingsChange) =>
+      apiFetch<TenantSettings>("/v1/settings", { method: "PATCH", token, body: change }),
+    onSuccess: async (saved) => {
+      queryClient.setQueryData(["settings", token], saved);
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
     },
   });
 }

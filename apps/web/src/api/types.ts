@@ -187,3 +187,23 @@ export interface BulkReanalysisResult {
   started: number;
   remaining: number;
 }
+
+/** GET/PATCH /v1/settings (services/settings.py): owners and admins. */
+export interface TenantSettings {
+  name: string;
+  profile: string;
+  plan: string;
+  labels: Labels & Record<string, string>;
+  enabled_types: ConversationType[];
+  /** Every type in the setup screen's order; `available` when the organisation has a rubric for it. */
+  types: { type: ConversationType; enabled: boolean; available: boolean }[];
+  /** How many types the plan allows on at once. */
+  max_types: number;
+}
+
+/** PATCH /v1/settings: only what changes. */
+export interface SettingsChange {
+  name?: string;
+  labels?: Partial<Labels>;
+  enabled_types?: ConversationType[];
+}
