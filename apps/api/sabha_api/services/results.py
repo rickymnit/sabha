@@ -337,6 +337,19 @@ async def list_recordings(
     return RecordingPage(items=await recording_out(items, people, analyses), next_cursor=next_cursor)
 
 
+class RecordingCounts(BaseModel):
+    by_type: dict[str, int]  # only types with at least one recording
+
+
+async def count_recordings(
+    principal: Principal, *, recordings: TenantRepo[Recording], people: TenantRepo[Person]
+) -> RecordingCounts:
+    """Per type, the recordings `list_recordings` would show this caller (the same visibility filter)."""
+    visible = await visible_filter(principal, people)
+    rows = await recordings.aggregate([{"$match": visible}, {"$group": {"_id": "$type", "n": {"$sum": 1}}}])
+    return RecordingCounts(by_type={row["_id"]: row["n"] for row in sorted(rows, key=lambda r: str(r["_id"]))})
+
+
 async def transcript_for(
     recording: Recording, settings: Settings, transcripts: TenantRepo[Transcript], reader: ArtefactReader
 ) -> TranscriptOut:

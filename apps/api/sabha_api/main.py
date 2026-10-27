@@ -24,7 +24,19 @@ from sabha_api.auth.directory import Directory
 from sabha_api.errors import PROBLEM_RESPONSES, Problem, install_error_handlers
 from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
-from sabha_api.routers import disputes, events, health, me, overview, reanalysis, recordings, results, reviews, users
+from sabha_api.routers import (
+    disputes,
+    events,
+    health,
+    me,
+    overview,
+    reanalysis,
+    recordings,
+    results,
+    reviews,
+    usage,
+    users,
+)
 from sabha_api.routers import settings as workspace_settings
 from sabha_core.logging import configure_logging
 from sabha_core.settings import Settings, get_settings
@@ -96,6 +108,7 @@ def create_app(
     app.include_router(reanalysis.router)
     app.include_router(events.router)
     app.include_router(workspace_settings.router)
+    app.include_router(usage.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

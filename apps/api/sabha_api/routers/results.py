@@ -57,6 +57,13 @@ async def list_recordings(
                                          analyses=analyses, person_id=person_id, type=type)  # fmt: skip
 
 
+@recordings_router.get("/counts", response_model=service.RecordingCounts)
+async def count_recordings(principal: Caller, recordings: Recordings, people: People) -> service.RecordingCounts:
+    """How many recordings of each type you may see: the same recordings the list shows. Declared before
+    /{recording_id}, so "counts" is never read as an id."""
+    return await service.count_recordings(principal, recordings=recordings, people=people)
+
+
 @recordings_router.put("/{recording_id}/voices", response_model=voices.VoicesOut)
 async def name_voices(
     recording_id: str, body: voices.VoicesIn, request: Request, principal: Caller, recordings: Recordings,

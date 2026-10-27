@@ -89,6 +89,9 @@ class Tenant(Document):
     labels: Labels
     plan: Plan
     retention_days: int = Field(gt=0)
+    # Monthly audio hours in the tenant's plan (sabha_core.quota), set by Sabha (scripts/admin/create_tenant.py);
+    # None until agreed with the customer. Never a default: an invented allowance would be a fabricated number.
+    audio_hours_allowance: float | None = Field(default=None, gt=0)
     region: str = INDIA_REGION
     kms_key_id: str | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)

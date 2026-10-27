@@ -305,3 +305,18 @@ routes:
     admin: 200
     other_tenant: 200
     others: 403
+
+  GET /v1/usage:
+    # This month's audio hours against the plan (the sidebar's plan block): owners and admins. other_tenant sees its
+    # own tenant's.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403
+
+  GET /v1/recordings/counts:
+    # Recordings per conversation type for the sidebar: every signed-in caller, counting only what they may see
+    # (apps/api/tests/test_usage.py).
+    anonymous: 401
+    others: 200
