@@ -223,3 +223,37 @@ export interface UsageSummary {
 export interface RecordingCounts {
   by_type: Partial<Record<ConversationType, number>>;
 }
+
+/** GET /v1/rubrics and /v1/rubrics/{id} (services/rubrics.py): read-only, for everyone signed in. */
+export interface RubricVersion {
+  id: string;
+  version: string;
+  in_use: boolean;
+}
+
+export interface RubricListItem {
+  type: ConversationType;
+  current_id: string;
+  dimension_count: number;
+  versions: RubricVersion[];
+}
+
+export interface RubricDetail {
+  id: string;
+  type: ConversationType;
+  version: string;
+  in_use: boolean;
+  dimensions: {
+    key: string;
+    name: string;
+    weight: number;
+    definition: string;
+    min_quotes: number;
+    not_applicable_when: string | null;
+    scale: { level: number; description: string; example: string | null }[];
+  }[];
+  versions: RubricVersion[];
+  previous_id: string | null;
+  /** From the version before: `item` is "weight", "definition", "anchors[2]", "examples[1]", "dimension added", ... */
+  changes: { dimension: string | null; item: string; old: string | null; new: string | null }[];
+}

@@ -24,6 +24,8 @@ import {
   type RecordingDetail,
   type RecordingCounts,
   type RecordingPage,
+  type RubricDetail,
+  type RubricListItem,
   type ReviewDecision,
   type SettingsChange,
   type SpeakersResponse,
@@ -317,6 +319,28 @@ export function useUsage(enabled: boolean): UseQueryResult<UsageSummary, ApiErro
     queryKey: ["usage", token],
     queryFn: () => apiFetch<UsageSummary>("/v1/usage", { token }),
     enabled: enabled && Boolean(token),
+  });
+}
+
+/** GET /v1/rubrics: the rubric in use for each of the organisation's conversation types. */
+export function useRubrics(): UseQueryResult<{ items: RubricListItem[] }, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["rubrics", token],
+    queryFn: () => apiFetch<{ items: RubricListItem[] }>("/v1/rubrics", { token }),
+    enabled: Boolean(token),
+    staleTime: 10 * 60_000, // rubric files change only with a release
+  });
+}
+
+/** GET /v1/rubrics/{id}: one rubric with its scale, versions and changes. */
+export function useRubric(id: string | undefined): UseQueryResult<RubricDetail, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["rubric", id, token],
+    queryFn: () => apiFetch<RubricDetail>(`/v1/rubrics/${encodeURIComponent(id ?? "")}`, { token }),
+    enabled: Boolean(token && id),
+    staleTime: 10 * 60_000,
   });
 }
 

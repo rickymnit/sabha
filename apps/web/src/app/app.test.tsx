@@ -140,14 +140,14 @@ describe("the menu", () => {
     const links = within(menu)
       .getAllByRole("link")
       .map((a) => a.textContent);
-    expect(links).toEqual(["Lessons", "Upload", "Teaching", "Reception"]);
+    expect(links).toEqual(["Lessons", "Rubrics", "Upload", "Teaching", "Reception"]);
     expect(within(menu).getByText("Teacher, Class 6")).toBeInTheDocument();
     expect(within(menu).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
   it("answers an unknown address with a way back, not a placeholder", async () => {
     stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
-    renderAt("/rubrics", signedIn);
+    renderAt("/plans", signedIn);
     expect(await screen.findByRole("heading", { name: "We couldn't find that page" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Go to lessons" })).toBeInTheDocument();
     expect(screen.queryByText(/later step of the build/i)).toBeNull();

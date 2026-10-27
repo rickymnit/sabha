@@ -24,6 +24,7 @@ import {
   type ConversationType,
 } from "../design";
 import type { Labels } from "../features/report/types";
+import { TYPE_INFO } from "../app/conversationTypes";
 import { capitalise } from "../app/format";
 
 const EDITORS = ["owner", "admin"];
@@ -39,15 +40,6 @@ const WORDS: { key: keyof Labels; label: string; hint: string }[] = [
 ];
 const MAX_WORD = 40;
 const MAX_NAME = 120;
-
-/** The setup screen's names and descriptions for each conversation type (Setup.dc.html:171-177). */
-const TYPE_INFO: Record<ConversationType, { name: string; description: string }> = {
-  teaching: { name: "Teaching", description: "Lessons, lectures and training: clarity, questioning, pacing" },
-  counselling: { name: "Counselling", description: "One-to-one sessions: empathy, cause, agreed plan" },
-  reception: { name: "Reception", description: "Front-desk calls and visits: intent, accuracy, resolution" },
-  meeting: { name: "Meetings", description: "Internal meetings: decisions, owners, open issues" },
-  sales: { name: "Sales", description: "Sales meetings and calls: discovery, objections, next step" },
-};
 
 interface Draft {
   name: string;

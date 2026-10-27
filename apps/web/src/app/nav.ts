@@ -51,6 +51,13 @@ export function navItems(me: Me): NavEntry[] {
       match: (path) => path === "/people",
     },
     {
+      to: "/rubrics",
+      label: "Rubrics",
+      icon: "rubrics",
+      roles: EVERYONE, // staff read how they are scored (owner's decision, 2026-10-27)
+      match: (path) => path === "/rubrics" || path.startsWith("/rubrics/"),
+    },
+    {
       to: "/upload",
       label: "Upload",
       icon: "upload",
