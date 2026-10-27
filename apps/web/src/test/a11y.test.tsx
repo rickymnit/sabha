@@ -60,7 +60,7 @@ const API: Record<string, unknown> = {
   "/v1/rubrics": { items: [{ type: "teaching", current_id: "teaching.school.v0.1", dimension_count: 1,
                              versions: [{ id: "teaching.school.v0.1", version: "0.1", in_use: true }] }] }, // prettier-ignore
   "/v1/settings": { name: "Demo School", profile: "school", plan: "starter", labels: LABELS,
-                    enabled_types: ["teaching", "reception"], max_types: 2,
+                    enabled_types: ["teaching", "reception"], max_types: 2, retention_days: 90,
                     types: ["teaching", "counselling", "reception", "meeting", "sales"].map((type) => ({
                       type, enabled: type === "teaching" || type === "reception",
                       available: type === "teaching" || type === "reception" })) }, // prettier-ignore

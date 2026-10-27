@@ -315,6 +315,29 @@ export function useFailedRecordingAction(recordingId: string, action: "retry" | 
   });
 }
 
+/** POST /v1/erasure (owners): `confirm: false` only counts; `true` erases for good. */
+export function useErasure() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: { scope: "recording" | "person"; id: string; reason: string; confirm: boolean }) =>
+      apiFetch<{ erased: boolean; recordings: number; files: number }>("/v1/erasure", {
+        method: "POST",
+        token,
+        body: request,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      }),
+    onSuccess: async (result) => {
+      if (!result.erased) return;
+      await Promise.all(
+        ["recordings", "people", "people-summary", "overview", "audit"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
+  });
+}
+
 /** POST /v1/reanalysis: count (dry run) or start re-analysing a type's recordings scored with an older rubric. */
 export function useBulkReanalyse() {
   const { token } = useSession();

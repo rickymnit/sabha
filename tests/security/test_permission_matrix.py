@@ -386,6 +386,11 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "POST /v1/recordings/{recording_id}/retry": failed_recording("retry"),
     "POST /v1/recordings/{recording_id}/abandon": failed_recording("abandon"),
     "GET /v1/events": lambda a, who: a.client.get("/v1/events", headers=a.headers(who)),
+    "POST /v1/erasure": lambda a, who: a.client.post(
+        "/v1/erasure",
+        json={"scope": "recording", "id": DONE, "reason": "Asked to.", "confirm": False},
+        headers=a.headers(who, create=True),
+    ),
     "GET /v1/audit": lambda a, who: a.client.get("/v1/audit", headers=a.headers(who)),
     "GET /v1/rubrics": lambda a, who: a.client.get("/v1/rubrics", headers=a.headers(who)),
     "GET /v1/rubrics/{rubric_id}": lambda a, who: a.client.get(

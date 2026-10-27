@@ -42,6 +42,7 @@ from sabha_workers.dispatch import CeleryDispatcher
 from sabha_workers.maintenance import requeue_stuck
 from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
+from sabha_workers.retention import expire_audio
 from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages import analyze, diarize, preprocess, transcribe
 from sabha_workers.stages.roles_llm import LlmRoleTieBreaker
@@ -253,6 +254,14 @@ def register(app: Celery) -> None:
     def abort_stale() -> int:
         rt = runtime()
         return len(abort_stale_uploads(rt.s3, rt.settings.s3_bucket_audio))
+
+    @app.task(name="sabha.maintenance.expire_audio", acks_late=True)
+    def expire() -> int:
+        """Nightly audio retention (P7.3): idempotent, so a redelivered task deletes nothing twice."""
+        rt = runtime()
+        done = expire_audio(rt.db, rt.s3, audio_bucket=rt.settings.s3_bucket_audio,
+                            artefacts_bucket=rt.settings.s3_bucket_artefacts, now=utc_now())  # fmt: skip
+        return sum(d.recordings for d in done)
 
     @app.task(name="sabha.maintenance.requeue_stuck", acks_late=True)
     def requeue() -> int:

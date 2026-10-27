@@ -191,6 +191,13 @@ function SettingsForm({ settings }: { settings: TenantSettings }) {
           />
         </Panel>
 
+        <Panel title="Keeping recordings">
+          <p className="m-0 text-ink-2">
+            Audio is deleted {settings.retention_days} days after it is uploaded. Transcripts, scores and reports stay.
+            To change this, contact your Sabha representative.
+          </p>
+        </Panel>
+
         <Panel
           title="Words used across the product"
           description="Sabha uses these words in every menu, list and report, for everyone in your organisation."

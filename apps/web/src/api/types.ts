@@ -52,6 +52,8 @@ export interface RecordingItem {
   completed_at: string | null;
   /** The latest analysis's overall score, when there is one. */
   overall_score: number | null;
+  /** When retention deleted the audio (P7.3); the transcript and scores stay. */
+  audio_deleted_at: string | null;
 }
 
 export interface RecordingPage {
@@ -76,7 +78,8 @@ export interface TranscriptResponse {
   roles: Record<string, string>;
   roles_need_review: boolean;
   language_mix: Record<string, number>;
-  playback_url: string;
+  /** null once retention deleted the audio (P7.3). */
+  playback_url: string | null;
   playback_expires_in_s: number;
 }
 
@@ -199,6 +202,8 @@ export interface TenantSettings {
   types: { type: ConversationType; enabled: boolean; available: boolean }[];
   /** How many types the plan allows on at once. */
   max_types: number;
+  /** Audio is deleted after this many days (P7.3); read-only. */
+  retention_days: number;
 }
 
 /** PATCH /v1/settings: only what changes. */

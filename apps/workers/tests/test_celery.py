@@ -68,6 +68,7 @@ def test_beat_runs_the_maintenance_tasks() -> None:
     assert {entry["task"] for entry in schedule.values()} == {
         "sabha.maintenance.abort_stale_uploads",
         "sabha.maintenance.requeue_stuck",
+        "sabha.maintenance.expire_audio",
     }
 
 

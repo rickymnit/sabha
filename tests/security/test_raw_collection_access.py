@@ -57,6 +57,7 @@ SYSTEM_REPO_ALLOWED = {
     "packages/core/sabha_core/repo.py": "defines them",
     "apps/workers/sabha_workers/relay.py": "the outbox relay reads every tenant's events (P2.5)",
     "apps/workers/sabha_workers/maintenance.py": "reads the tenant list, then sweeps each tenant through TenantRepo",
+    "apps/workers/sabha_workers/retention.py": "reads the tenant list for nightly audio retention, then TenantRepo",
     "apps/api/sabha_api/auth/directory.py": "login looks up identities before the tenant is known (ADR 0002)",
     "apps/api/sabha_api/auth/dev_idp.py": "local dev sign-in (APP_ENV=local only) lists identities across tenants",
 }

@@ -365,3 +365,11 @@ routes:
     admin: 200
     other_tenant: 404
     others: 403
+
+  POST /v1/erasure:
+    # P7.3: owners only (owner's decision, 2026-10-27). Called without confirm (a count), on Asha's recording;
+    # other_tenant cannot see it (404).
+    anonymous: 401
+    owner: 200
+    other_tenant: 404
+    others: 403

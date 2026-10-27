@@ -36,6 +36,7 @@ function settings(overrides: Record<string, unknown> = {}) {
       { type: "sales", enabled: false, available: false },
     ],
     max_types: 5,
+    retention_days: 90,
     ...overrides,
   };
 }

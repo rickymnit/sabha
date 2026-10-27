@@ -250,6 +250,9 @@ class Recording(TenantDoc):
     # lanes (P7.2) and billing (P8.6) read duration_ms.
     duration_ms: int | None = Field(default=None, ge=0)
     audio: AudioInfo | None = None
+    # Retention (P7.3): when the nightly job deleted the audio (original and working copies) after the tenant's
+    # retention_days. Transcripts and scores stay.
+    audio_deleted_at: UtcDatetime | None = None
     # Review (ADR 0007): speaker label -> role, as a reviewer confirmed them for an "unclear_roles" recording. The
     # transcript stage uses them instead of guessing.
     confirmed_roles: dict[str, str] | None = None

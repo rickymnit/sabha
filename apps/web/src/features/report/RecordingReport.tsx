@@ -58,6 +58,8 @@ export interface RecordingReportProps {
   viewerRole: ViewerRole;
   /** Presigned playback URL for the audio player (P6.5). */
   getPlaybackUrl: () => Promise<PlaybackUrl>;
+  /** Shown instead of the player once retention deleted the audio (P7.3); the transcript stays. */
+  audioNote?: string;
   rubricHref?: (rubric: AnalysisReport["rubric"]) => string;
   /** True when the viewer is the person analysed or their manager (decided by the API, P6.7). */
   canDispute?: boolean;
@@ -80,6 +82,7 @@ export function RecordingReport({
   roles,
   viewerRole,
   getPlaybackUrl,
+  audioNote,
   rubricHref,
   canDispute = false,
   onSubmitDispute,
@@ -106,6 +109,7 @@ export function RecordingReport({
           roles={roles}
           viewerRole={viewerRole}
           getPlaybackUrl={getPlaybackUrl}
+          audioNote={audioNote}
           onSubmitDispute={canDispute ? onSubmitDispute : undefined}
           meeting={meeting}
         />
@@ -126,6 +130,7 @@ function ReportBody({
   roles,
   viewerRole,
   getPlaybackUrl,
+  audioNote,
   onSubmitDispute,
   meeting,
 }: ReportBodyProps) {
@@ -197,14 +202,20 @@ function ReportBody({
             </h2>
           }
           player={
-            <AudioPlayer
-              ref={playerRef}
-              label={`${labels.recording} audio`}
-              getUrl={getPlaybackUrl}
-              durationMs={recording.duration_ms}
-              onTimeUpdate={setCurrentMs}
-              showShortcutHint={false}
-            />
+            audioNote ? (
+              <p className="m-0 rounded border border-line-subtle bg-surface-subtle px-3 py-2 text-sm text-muted">
+                {audioNote}
+              </p>
+            ) : (
+              <AudioPlayer
+                ref={playerRef}
+                label={`${labels.recording} audio`}
+                getUrl={getPlaybackUrl}
+                durationMs={recording.duration_ms}
+                onTimeUpdate={setCurrentMs}
+                showShortcutHint={false}
+              />
+            )
           }
           utterances={utterances}
           roles={roles}

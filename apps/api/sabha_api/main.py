@@ -27,6 +27,7 @@ from sabha_api.resources import Resources, open_resources
 from sabha_api.routers import (
     audit,
     disputes,
+    erasure,
     events,
     health,
     me,
@@ -115,6 +116,7 @@ def create_app(
     app.include_router(rubrics.router)
     app.include_router(audit.router)
     app.include_router(retry.router)
+    app.include_router(erasure.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

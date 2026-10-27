@@ -6,7 +6,7 @@
 import { useState, type MouseEvent } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 
-import { useBulkReanalyse, useRecordings } from "../api/hooks";
+import { useBulkReanalyse, useErasure, usePeople, useRecordings } from "../api/hooks";
 import type { Me, RecordingItem } from "../api/types";
 import {
   Button,
@@ -24,6 +24,7 @@ import {
   TypeDot,
   useToast,
 } from "../design";
+import { EraseDialog } from "../features/erasure/EraseDialog";
 import { BulkReanalyseDialog } from "../features/reanalysis";
 import { capitalise, formatWhen, statusChip } from "../app/format";
 import { formatClock } from "../features/transcript/text";
@@ -83,6 +84,11 @@ export function RecordingsPage() {
   const bulk = useBulkReanalyse();
   const [bulkOpen, setBulkOpen] = useState(false);
   const isAdmin = me.user.role === "owner" || me.user.role === "admin";
+  const isOwner = me.user.role === "owner";
+  const people = usePeople();
+  const erasure = useErasure();
+  const [erasing, setErasing] = useState(false);
+  const chosenPerson = personParam ? people.data?.find((p) => p.id === personParam) : undefined;
   const upload = (
     <Button icon={<Icon name="upload" />} onClick={() => navigate("/upload")}>
       Upload
@@ -158,7 +164,27 @@ export function RecordingsPage() {
               <Icon name="close" size={14} />
             </Button>
           </span>
+          {isOwner && chosenPerson && (
+            <Button variant="ghost" className="ml-auto text-danger" onClick={() => setErasing(true)}>
+              Erase all of {chosenPerson.name}’s data
+            </Button>
+          )}
         </div>
+      )}
+      {erasing && chosenPerson && (
+        <EraseDialog
+          what={`all of ${chosenPerson.name}’s data`}
+          confirmName={chosenPerson.name}
+          recordingWord={labels.recording.toLowerCase()}
+          recordingsWord={things}
+          run={(confirm, reason) => erasure.mutateAsync({ scope: "person", id: chosenPerson.id, reason, confirm })}
+          onErased={() => {
+            setErasing(false);
+            toast.show({ tone: "success", title: `${chosenPerson.name}’s data was erased`, duration: 6_000 });
+            setFilters({ person: null });
+          }}
+          onClose={() => setErasing(false)}
+        />
       )}
       {recordings.isError ? (
         <Panel>

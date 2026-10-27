@@ -92,6 +92,7 @@ class SettingsOut(BaseModel):
     enabled_types: list[ConversationType]
     types: list[TypeOut]
     max_types: int
+    retention_days: int  # audio is deleted after this many days (P7.3); read-only, set by Sabha
 
 
 def available_types(tenant: Tenant) -> set[ConversationType]:
@@ -109,6 +110,7 @@ def settings_out(tenant: Tenant) -> SettingsOut:
         enabled_types=tenant.enabled_types,
         types=[TypeOut(type=t, enabled=t in tenant.enabled_types, available=t in available) for t in ConversationType],
         max_types=MAX_TYPES[tenant.plan],
+        retention_days=tenant.retention_days,
     )
 
 

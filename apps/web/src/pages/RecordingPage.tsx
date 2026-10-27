@@ -10,6 +10,7 @@ import {
   useAnalysis,
   useAnalysisHistory,
   useApi,
+  useErasure,
   useFailedRecordingAction,
   useProcessing,
   useRaiseDispute,
@@ -21,11 +22,12 @@ import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
 import { Button, EmptyState, Icon, Skeleton, SkeletonGroup, useToast } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
+import { EraseDialog } from "../features/erasure/EraseDialog";
 import { ProcessingPanel, ReasonDialog, STAGE_NAMES } from "../features/processing";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
 import { RecordingReport } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
-import { viewerRole } from "../app/format";
+import { formatDateTime, viewerRole } from "../app/format";
 import { RESOLVERS } from "../app/nav";
 import { meetingView, reportRecording, roleLabels, voiceLabel } from "./recordingView";
 
@@ -50,6 +52,8 @@ export function RecordingPage() {
   const retry = useFailedRecordingAction(id, "retry");
   const abandon = useFailedRecordingAction(id, "abandon");
   const [deciding, setDeciding] = useState<"retry" | "abandon" | null>(null);
+  const erasure = useErasure();
+  const [erasing, setErasing] = useState(false);
   const analysisId = analysis.data && "analysis_id" in analysis.data ? analysis.data.analysis_id : undefined;
   const submitDispute = useCallback(
     async (draft: DisputeDraft) => {
@@ -69,6 +73,7 @@ export function RecordingPage() {
     // A fresh URL each time: they expire after PLAYBACK_URL_EXPIRY_S, and issuing one is audited.
     const fresh = await api<TranscriptResponse>(`/v1/recordings/${encodeURIComponent(id)}/transcript`);
     const expires = new Date(Date.now() + fresh.playback_expires_in_s * 1000).toISOString();
+    if (!fresh.playback_url) throw new Error("The audio has been deleted.");
     return { url: fresh.playback_url, expires_at: expires };
   }, [api, id]);
 
@@ -236,11 +241,37 @@ export function RecordingPage() {
         roles={view?.roles ?? roleLabels(data?.roles ?? {}, me.tenant.labels.person)}
         viewerRole={viewerRole(me.user.role)}
         getPlaybackUrl={getPlaybackUrl}
+        audioNote={
+          recording.data.audio_deleted_at
+            ? `The audio was deleted on ${formatDateTime(recording.data.audio_deleted_at).split(",")[0]}, as your organisation keeps audio for a limited time. The transcript and scores stay.`
+            : undefined
+        }
         meeting={meeting}
         canDispute={"can_dispute" in analysis.data && analysis.data.can_dispute === true}
         onSubmitDispute={submitDispute}
       />
       {isAdmin && processing.data && <ProcessingPanel info={processing.data} />}
+      {me.user.role === "owner" && (
+        <div className="flex justify-end">
+          <Button variant="ghost" className="text-danger" onClick={() => setErasing(true)}>
+            Erase this {recordingWord}
+          </Button>
+        </div>
+      )}
+      {erasing && (
+        <EraseDialog
+          what={`this ${recordingWord}`}
+          confirmName={recording.data.title}
+          recordingWord={recordingWord}
+          recordingsWord={me.tenant.labels.recording_plural.toLowerCase()}
+          run={(confirm, reason) => erasure.mutateAsync({ scope: "recording", id, reason, confirm })}
+          onErased={() => {
+            toast.show({ tone: "success", title: `The ${recordingWord} was erased`, duration: 6_000 });
+            navigate("/recordings");
+          }}
+          onClose={() => setErasing(false)}
+        />
+      )}
     </div>
   );
 }

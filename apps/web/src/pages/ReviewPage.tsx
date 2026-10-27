@@ -142,9 +142,9 @@ export function ReviewPage() {
   const resolve = useResolveReview(id);
   const [staff, setStaff] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const player = useSamplePlayer(transcript.data?.playback_url, async () => {
+  const player = useSamplePlayer(transcript.data?.playback_url ?? undefined, async () => {
     const fresh = await transcript.refetch();
-    return fresh.data?.playback_url;
+    return fresh.data?.playback_url ?? undefined;
   });
 
   const person = labels.person.toLowerCase();

@@ -93,10 +93,13 @@ async def get_transcript(
     recording_id: str, request: Request, principal: Caller, recordings: Recordings, people: People,
     transcripts: Transcripts, reader: Reader, entries: Entries,
 ) -> service.TranscriptOut:  # fmt: skip
-    """The transcript on the original timeline and a short-lived playback URL (audited as recording.play)."""
+    """The transcript on the original timeline and a short-lived playback URL (audited as recording.play); no URL
+    once retention deleted the audio."""
     recording = await service.visible_recording(principal, recording_id, recordings, people)
     out = await service.transcript_for(recording, request.app.state.settings, transcripts, reader)
-    await audit(entries, principal, request, action="recording.play", target_type="recording", target_id=recording.id)
+    if out.playback_url is not None:
+        await audit(entries, principal, request, action="recording.play", target_type="recording",
+                    target_id=recording.id)  # fmt: skip
     return out
 
 

@@ -220,6 +220,7 @@ class RecordingOut(BaseModel):
     status_changed_at: datetime | None
     completed_at: datetime | None
     overall_score: float | None  # the latest analysis, when there is one
+    audio_deleted_at: datetime | None  # retention (P7.3) deleted the audio; transcript and scores stay
 
 
 class RecordingPage(BaseModel):
@@ -233,7 +234,7 @@ class TranscriptOut(BaseModel):
     roles: dict[str, str]
     roles_need_review: bool
     language_mix: dict[str, float]
-    playback_url: str
+    playback_url: str | None  # None once retention deleted the audio (P7.3)
     playback_expires_in_s: int
 
 
@@ -300,7 +301,7 @@ async def recording_out(
             person=PersonRef(id=r.person_id, name=names[r.person_id]) if r.person_id in names else None,
             unit_id=r.unit_id, file_name=r.file_name, duration_ms=r.duration_ms, created_at=r.created_at,
             status_changed_at=r.status_changed_at, completed_at=r.completed_at,
-            overall_score=latest[r.id].overall_score if r.id in latest else None,
+            overall_score=latest[r.id].overall_score if r.id in latest else None, audio_deleted_at=r.audio_deleted_at,
         )
         for r in recordings
     ]  # fmt: skip
@@ -360,7 +361,8 @@ async def transcript_for(
     playback = artefact_prefix(recording.tenant_id, recording.id, "preprocess", settings.artefact_version_preprocess)
     return TranscriptOut(
         recording_id=recording.id, transcript=content, roles=doc.roles, roles_need_review=doc.roles_need_review,
-        language_mix=doc.language_mix, playback_url=reader.playback_url(playback + "playback.opus"),
+        language_mix=doc.language_mix,
+        playback_url=None if recording.audio_deleted_at else reader.playback_url(playback + "playback.opus"),
         playback_expires_in_s=reader.expiry_s,
     )  # fmt: skip
 
