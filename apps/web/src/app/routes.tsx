@@ -8,7 +8,7 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppLoading } from "./AppLoading";
 import { Home } from "./Home";
 import { Layout } from "./Layout";
-import { RESOLVERS } from "./nav";
+import { ADMINS, RESOLVERS } from "./nav";
 import { RequireSession } from "./RequireSession";
 import { RoleGate } from "./RoleGate";
 
@@ -66,6 +66,16 @@ export const routes: RouteObject[] = [
           {
             path: "/rubrics/:id",
             ...page(() => import("../pages/RubricsPage").then((m) => ({ Component: m.RubricsPage }))),
+          },
+          {
+            // Owners and admins: the audit log (P1.8).
+            element: <RoleGate roles={ADMINS} />,
+            children: [
+              {
+                path: "/activity",
+                ...page(() => import("../pages/ActivityPage").then((m) => ({ Component: m.ActivityPage }))),
+              },
+            ],
           },
           {
             path: "/settings",

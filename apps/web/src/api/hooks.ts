@@ -14,6 +14,7 @@ import { connectLive, isLive } from "./live";
 import {
   IN_PROGRESS,
   type AnalysisVersion,
+  type AuditPage,
   type ApiStatus,
   type BulkReanalysisRequest,
   type BulkReanalysisResult,
@@ -319,6 +320,33 @@ export function useUsage(enabled: boolean): UseQueryResult<UsageSummary, ApiErro
     queryKey: ["usage", token],
     queryFn: () => apiFetch<UsageSummary>("/v1/usage", { token }),
     enabled: enabled && Boolean(token),
+  });
+}
+
+/** Filters for the activity log; the API applies them on top of the tenant scope. */
+export interface AuditFilters {
+  action?: string | null;
+  actorUserId?: string | null;
+  from?: string | null;
+}
+
+/** GET /v1/audit, page by page (owners and admins). */
+export function useAudit(filters: AuditFilters = {}, pageSize = 50) {
+  const { token } = useSession();
+  const { action = null, actorUserId = null, from = null } = filters;
+  return useInfiniteQuery({
+    queryKey: ["audit", pageSize, action, actorUserId, from, token],
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(pageSize) });
+      if (pageParam) params.set("cursor", pageParam);
+      if (action) params.set("action", action);
+      if (actorUserId) params.set("actor_user_id", actorUserId);
+      if (from) params.set("from", from);
+      return apiFetch<AuditPage>(`/v1/audit?${params}`, { token });
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor,
+    enabled: Boolean(token),
   });
 }
 

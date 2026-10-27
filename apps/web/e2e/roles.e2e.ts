@@ -53,6 +53,7 @@ test("the principal has every page, settings included", async ({ page }) => {
     "Teachers",
     "Rubrics",
     "Upload",
+    "Activity",
     "Settings",
   ]);
   await page.goto("/settings");
@@ -107,4 +108,23 @@ test("a teacher cannot open a colleague's report", async ({ page }) => {
   await expect(page.getByText("Test Colleague")).toHaveCount(0);
   await page.getByRole("button", { name: "Go to lessons" }).click();
   await expect(page.getByRole("heading", { name: "Lessons", level: 1 })).toBeVisible();
+});
+
+test("playing a lesson's audio shows in the owner's activity log", async ({ page }) => {
+  await signInAs(page, "Priya Sharma");
+  await page.goto("/recordings");
+  const analysed = page.getByRole("row").filter({ hasText: "Analysed" });
+  await expect(page.getByRole("row").nth(1)).toBeVisible();
+  test.skip((await analysed.count()) === 0, "The demo school has no analysed lesson yet");
+  const title = (await analysed.first().getByRole("link").first().textContent())?.trim() ?? "";
+  await analysed.first().getByRole("link").first().click();
+  await page.getByRole("button", { name: "Play", exact: true }).click(); // issuing the playback link is audited
+
+  await openMenu(page);
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Activity" }).click();
+  await page.getByLabel("What").selectOption({ label: "Played audio" });
+  const newest = page.getByRole("table", { name: "Activity" }).getByRole("row").nth(1);
+  await expect(newest).toContainText("Priya Sharma");
+  await expect(newest).toContainText(`Played the audio of ${title}`);
+  await expect(newest).toContainText(/Today/);
 });

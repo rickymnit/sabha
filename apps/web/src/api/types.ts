@@ -257,3 +257,20 @@ export interface RubricDetail {
   /** From the version before: `item` is "weight", "definition", "anchors[2]", "examples[1]", "dimension added", ... */
   changes: { dimension: string | null; item: string; old: string | null; new: string | null }[];
 }
+
+/** GET /v1/audit (services/audit_log.py): who did what, newest first (owners and admins). */
+export interface AuditEntryItem {
+  id: string;
+  at: string;
+  action: string;
+  /** `name` is null once the user no longer exists. */
+  actor: { id: string; name: string | null; role: Role };
+  /** `label`: a recording's title, a dispute's recording title or an invited person's name, where there is one. */
+  target: { type: string; id: string; label: string | null };
+  meta: Record<string, unknown>;
+}
+
+export interface AuditPage {
+  items: AuditEntryItem[];
+  next_cursor: string | null;
+}

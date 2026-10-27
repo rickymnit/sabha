@@ -65,6 +65,13 @@ export function navItems(me: Me): NavEntry[] {
       match: (path) => path === "/upload",
     },
     {
+      to: "/activity",
+      label: "Activity",
+      icon: "clock",
+      roles: ADMINS,
+      match: (path) => path === "/activity",
+    },
+    {
       to: "/settings",
       label: "Settings",
       icon: "settings",

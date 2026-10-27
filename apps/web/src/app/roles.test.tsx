@@ -65,8 +65,8 @@ afterEach(() => {
 
 const EMPTY = { items: [], next_cursor: null };
 const MENUS: [string, string[]][] = [
-  ["owner", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload", "Settings"]],
-  ["admin", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload", "Settings"]],
+  ["owner", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload", "Activity", "Settings"]],
+  ["admin", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload", "Activity", "Settings"]],
   ["manager", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload"]],
   ["reviewer", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload"]],
   ["staff", ["Lessons", "Rubrics", "Upload"]],

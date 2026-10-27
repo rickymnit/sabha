@@ -45,6 +45,10 @@ const API: Record<string, unknown> = {
                            latest_score: 3.6, latest_at: "2026-10-22T04:30:00Z", recent_scores: [3.2, 3.6] }], // prettier-ignore
   "/v1/people": [{ id: "p-asha", name: "Asha", unit_id: "unit-6", user_id: null }],
   "/v1/reviews": { items: [], next_cursor: null },
+  "/v1/audit": { items: [{ id: "a1", at: "2026-10-27T05:00:00Z", action: "recording.play",
+                           actor: { id: "u-1", name: "Priya Kapoor", role: "owner" },
+                           target: { type: "recording", id: "r1", label: "Fractions" }, meta: {} }],
+                 next_cursor: null }, // prettier-ignore
   "/v1/disputes": { items: [], next_cursor: null },
   "/v1/rubrics/teaching.school.v0.1": {
     id: "teaching.school.v0.1", type: "teaching", version: "0.1", in_use: true, previous_id: null, changes: [],
@@ -103,6 +107,7 @@ const PAGES: [string, string, string][] = [
   ["/reviews", "reviewer", "Reviews"],
   ["/rubrics/teaching.school.v0.1", "staff", "Teaching rubric"],
   ["/settings", "owner", "Settings"],
+  ["/activity", "admin", "Activity"],
   ["/upload", "staff", "Upload recordings"],
   ["/no-such-page", "staff", "We couldn't find that page"],
 ];
