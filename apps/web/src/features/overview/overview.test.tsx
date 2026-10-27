@@ -37,10 +37,9 @@ describe("overview metrics", () => {
     const cells = within(strip());
     expect(cells.getByText("Lessons analysed").nextSibling).toHaveTextContent("214");
     expect(cells.getByText("Audio processed").nextSibling).toHaveTextContent("162 h");
-    expect(cells.getByText("41.2 h of silence removed")).toBeInTheDocument();
+    expect(cells.getByText("41.2 h of silence skipped")).toBeInTheDocument();
     expect(cells.getByText("Median teaching score").nextSibling).toHaveTextContent("3.5 / 5");
     expect(cells.getByText("From 128 lessons")).toBeInTheDocument();
-    expect(cells.getByRole("link", { name: "Review disputes" })).toHaveAttribute("href", "/reviews");
   });
 
   it("hides a median whose n is 0 instead of showing 0", () => {
@@ -118,10 +117,10 @@ describe("period picker", () => {
 
 describe("overview with what the API serves today", () => {
   it("leaves out numbers the API does not send, and writes the tenant's capitalised words in lower case", () => {
-    const stats = { ...mockOverview(), silence_removed_hours: undefined, open_disputes: undefined };
+    const stats = { ...mockOverview(), silence_n: 0 };
     const labels = { ...mockLabels, recording: "Lesson", recording_plural: "Lessons" };
     renderPage(stats, { labels, rubricHref: undefined });
-    expect(screen.queryByText(/silence removed/)).toBeNull();
+    expect(screen.queryByText(/silence skipped/)).toBeNull();
     expect(screen.queryByText("Open disputes")).toBeNull();
     expect(within(strip()).getByText("From 128 lessons")).toBeInTheDocument();
     expect(screen.queryAllByRole("link")).toHaveLength(0); // no rubric page yet: dimension names are plain text

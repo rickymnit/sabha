@@ -338,6 +338,40 @@ def test_the_overview_counts_real_results_once_each(api: Api) -> None:
     assert overview(api, "asha")["recordings_analysed"] == 2  # her own
 
 
+def test_the_overview_compares_periods_and_units_and_never_widens(api: Api) -> None:
+    day = 24 * 60
+    recording(api, "r-now", "p-asha", "unit-1", 3 * day)
+    recording(api, "r-before", "p-asha", "unit-1", 10 * day)
+    recording(api, "r-ravi", "p-ravi", "unit-2", 2 * day)
+    recording(api, "r-busy", "p-asha", "unit-1", 5, RecordingStatus.TRANSCRIBING)
+    api.db.recordings.update_one({"_id": "r-now"}, {"$set": {
+        "duration_ms": 3_600_000, "speech_ms": 2_700_000,  # 15 minutes of silence skipped
+        "completed_at": utc_now() - timedelta(minutes=50), "status_changed_at": utc_now() - timedelta(minutes=30),
+    }})  # fmt: skip
+    analysis(api, "r-now", "v1", 3.0, 2 * day)
+    analysis(api, "r-before", "v1", 4.0, 9 * day)  # the previous 7-day period
+    call = analysis(api, "r-ravi", "v1", 5.0, day, person="p-ravi")
+    api.db.analyses.update_one({"_id": call}, {"$set": {"ticket_status": "resolved"}})
+
+    owner = overview(api, "owner")
+    assert [p["recordings_analysed"] for p in owner["series"]][-2:] == [1, 2]  # previous, this period
+    assert owner["series"][-1]["recordings_analysed"] == owner["recordings_analysed"] == 2
+    assert (owner["silence_hours"], owner["silence_n"]) == (0.25, 1)
+    assert (owner["tickets"], owner["tickets_resolved"]) == (1, 1)
+    assert [u["id"] for u in owner["units"]] == ["unit-1", "unit-2"]
+    (clarity,) = owner["coaching"]
+    assert {u["unit_id"]: u["median"] for u in clarity["by_unit"]} == {"unit-1": 3.0, "unit-2": 5.0}
+    assert [w["n"] for w in clarity["weekly"]][-2:] == [1, 2]
+    assert [p["id"] for p in owner["processing"]] == ["r-busy"]
+    assert owner["turnaround"] == [{"type": "teaching", "minutes": 20.0, "n": 1}]
+
+    end = utc_now() + timedelta(minutes=1)
+    params = {"from": (end - timedelta(days=7)).isoformat(), "to": end.isoformat(), "unit_id": "unit-2"}
+    assert api.get("owner", f"/v1/overview?{urlencode(params)}").json()["recordings_analysed"] == 1
+    manager = api.get("manager", f"/v1/overview?{urlencode(params)}").json()  # unit-2 is not theirs
+    assert (manager["recordings_analysed"], [u["id"] for u in manager["units"]]) == (0, ["unit-1"])
+
+
 def test_the_overview_period_is_checked(api: Api) -> None:
     assert overview(api, "owner", days=1)["recordings_analysed"] == 0  # an empty period is not an error
     end = utc_now()

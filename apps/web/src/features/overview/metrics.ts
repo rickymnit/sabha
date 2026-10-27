@@ -31,8 +31,8 @@ export function overviewMetrics(stats: OverviewStats, typeNames: TypeNames, labe
       label: "Audio processed",
       value: formatHours(stats.audio_hours),
       suffix: " h",
-      ...(typeof stats.silence_removed_hours === "number"
-        ? { footText: `${formatHours(stats.silence_removed_hours)} h of silence removed` }
+      ...(stats.silence_n && typeof stats.silence_hours === "number"
+        ? { footText: `${formatHours(stats.silence_hours)} h of silence skipped` }
         : {}),
     },
   ];
@@ -44,15 +44,6 @@ export function overviewMetrics(stats: OverviewStats, typeNames: TypeNames, labe
       value: t.median.toFixed(1),
       suffix: " / 5",
       footText: `From ${t.n} ${(t.n === 1 ? labels.recording : labels.recording_plural).toLowerCase()}`,
-    });
-  }
-  if (typeof stats.open_disputes === "number") {
-    metrics.push({
-      id: "disputes",
-      label: "Open disputes",
-      value: String(stats.open_disputes),
-      footText: "Review disputes",
-      footHref: "/reviews",
     });
   }
   return metrics;

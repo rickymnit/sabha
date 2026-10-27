@@ -27,13 +27,13 @@ export function mockOverview(): OverviewStats {
     to: "2026-10-12T18:30:00.000Z",
     recordings_analysed: 214,
     audio_hours: 162.4,
-    silence_removed_hours: 41.2,
+    silence_hours: 41.2,
+    silence_n: 1,
     median_overall_by_type: [
       { type: "teaching", median: 3.5, n: 128 },
       { type: "reception", median: 3.9, n: 46 },
       { type: "sales", median: 3.1, n: 0 },
     ],
-    open_disputes: 7,
     coaching: [
       {
         rubric_id: "teaching.school.v1.0",
@@ -76,9 +76,9 @@ export function emptyOverview(): OverviewStats {
     ...mockOverview(),
     recordings_analysed: 0,
     audio_hours: 0,
-    silence_removed_hours: 0,
+    silence_hours: 0,
+    silence_n: 1,
     median_overall_by_type: [],
-    open_disputes: 0,
     coaching: [],
   };
 }
