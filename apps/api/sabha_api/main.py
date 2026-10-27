@@ -30,6 +30,7 @@ from sabha_api.routers import (
     erasure,
     events,
     health,
+    inbox,
     me,
     overview,
     reanalysis,
@@ -119,6 +120,7 @@ def create_app(
     app.include_router(retry.router)
     app.include_router(erasure.router)
     app.include_router(search.router)
+    app.include_router(inbox.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

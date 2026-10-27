@@ -91,6 +91,33 @@ export interface PersonItem {
   unit_id: string | null;
 }
 
+/** GET /v1/inbox: what waits for the caller's decision (sabha_api/services/inbox.py), newest first. */
+export interface InboxItem {
+  kind: "dispute" | "review" | "failed" | "follow_up";
+  /** Unique in the list. */
+  id: string;
+  recording_id: string;
+  recording_title: string;
+  recording_type: ConversationType;
+  person_name: string | null;
+  unit: string | null;
+  at: string;
+  dispute_id?: string | null;
+  dimension_name?: string | null;
+  ai_score?: number | null;
+  proposed_score?: number | null;
+  /** review and failed: the reason code, and the same in plain words. */
+  reason?: string | null;
+  note?: string | null;
+  follow_up?: string | null;
+  ticket_category?: string | null;
+}
+
+export interface Inbox {
+  items: InboxItem[];
+  counts: Partial<Record<InboxItem["kind"], number>>;
+}
+
 /** GET /v1/search: names only, from what the caller may see. */
 export interface SearchResults {
   people: PersonItem[];

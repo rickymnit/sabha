@@ -221,6 +221,11 @@ routes:
     anonymous: 401
     others: 200
 
+  GET /v1/inbox:
+    # The bell and "Needs your decision" (UI v2): only what each caller may act on (filtered; test_results.py).
+    anonymous: 401
+    others: 200
+
   GET /v1/search:
     # Header search by name (UI v2): only what each caller may see (filtered; tested in apps/api/tests/test_results.py).
     anonymous: 401

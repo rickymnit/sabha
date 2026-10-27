@@ -19,6 +19,7 @@ import {
   type BulkReanalysisRequest,
   type BulkReanalysisResult,
   type DevUser,
+  type Inbox,
   type Me,
   type PersonItem,
   type ProcessingInfo,
@@ -364,6 +365,17 @@ export function useRecordingCounts(): UseQueryResult<RecordingCounts, ApiError> 
   return useQuery({
     queryKey: ["recordings", "counts", token],
     queryFn: () => apiFetch<RecordingCounts>("/v1/recordings/counts", { token }),
+    enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/inbox: the bell and "Needs your decision". Under ["recordings"], so live status and the review and
+ * dispute decisions (which refresh the lists) refresh it too. */
+export function useInbox(): UseQueryResult<Inbox, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["recordings", "inbox", token],
+    queryFn: () => apiFetch<Inbox>("/v1/inbox", { token }),
     enabled: Boolean(token),
   });
 }

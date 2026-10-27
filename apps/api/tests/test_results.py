@@ -22,6 +22,8 @@ from sabha_api.services.results import metric_name, recording_title, shown_ticke
 from sabha_core.indexes import ensure_indexes
 from sabha_core.models import (
     Analysis,
+    DeadLetter,
+    Dispute,
     IdentityLink,
     Person,
     Recording,
@@ -232,6 +234,41 @@ def test_search_finds_names_only_among_what_the_caller_may_see(api: Api) -> None
     assert found("asha", "ravi") == ([], [])  # staff see only their own
     assert found("owner", ".*") == ([], [])  # the text is escaped, never read as a pattern
     assert api.get("owner", "/v1/search?q=a").status_code == 422  # at least two characters
+
+
+def test_the_inbox_lists_only_what_each_caller_may_act_on(api: Api) -> None:
+    recording(api, "r-review", "p-asha", "unit-1", 50, RecordingStatus.NEEDS_REVIEW)
+    api.db.recordings.update_one({"_id": "r-review"}, {"$set": {"status_reason": "unclear_roles"}})
+    recording(api, "r-failed", "p-asha", "unit-1", 40, RecordingStatus.FAILED)
+    recording(api, "r-closed", "p-asha", "unit-1", 35, RecordingStatus.FAILED)
+    for rid, closed in (("r-failed", None), ("r-closed", utc_now())):
+        insert(api.db, "dlq", DeadLetter(tenant_id=T, recording_id=rid, stage="transcribe", task="t",
+                                         error_code="x", attempts=3, abandoned_at=closed))  # fmt: skip
+    recording(api, "r-call", "p-ravi", "unit-2", 30)
+    call = analysis(api, "r-call", "v1", 3.0, 20, person="p-ravi")
+    api.db.analyses.update_one({"_id": call}, {"$set": {"conversation_type": "reception",
+                                                        "ticket_status": "follow_up_needed",
+                                                        "ticket_follow_up": "Accounts call back"}})  # fmt: skip
+    recording(api, "r-lesson", "p-asha", "unit-1", 25)
+    lesson = analysis(api, "r-lesson", "v1", 2.0, 15)
+    for did, raised_by, dimension in (("d-asha", "u-asha", "concept_clarity"),
+                                      ("d-manager", "u-manager", "recap_and_closure")):  # fmt: skip
+        insert(api.db, "disputes", Dispute(
+            id=did, tenant_id=T, analysis_id=lesson, recording_id="r-lesson", person_id="p-asha", unit_id="unit-1",
+            dimension=dimension, dimension_name=dimension, ai_score=2, current_score=2,
+            proposed_score=3, comment="I checked.", raised_by=raised_by,
+        ))  # fmt: skip
+
+    def kinds(sub: str) -> list[str]:
+        response = api.get(sub, "/v1/inbox")
+        assert response.status_code == 200, response.text
+        return sorted(item["id"] for item in response.json()["items"])
+
+    assert kinds("owner") == ["dispute:d-asha", "dispute:d-manager", "failed:r-failed", "follow_up:r-call",
+                              "review:r-review"]  # fmt: skip
+    # unit-1 only; never the dispute they raised; failed recordings are for owners and admins
+    assert kinds("manager") == ["dispute:d-asha", "review:r-review"]
+    assert kinds("asha") == []  # staff decide nothing here, and Ravi's call is not theirs
 
 
 def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:

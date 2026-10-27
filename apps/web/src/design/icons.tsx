@@ -21,9 +21,17 @@ export type IconName =
   | "alert"
   | "file"
   | "clock"
-  | "arrowLeft";
+  | "arrowLeft"
+  | "bell"
+  | "message"
+  | "phone";
 
 const paths: Record<IconName, ReactNode> = {
+  bell: <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2 2 0 0 0 4 0" />,
+  message: <path d="M4 5h16v11H9l-5 4V5ZM8 9.5h8M8 12.5h5" />,
+  phone: (
+    <path d="M5 4h3.5l1.5 4.5-2.2 1.4a11 11 0 0 0 6.3 6.3l1.4-2.2L20 15.5V19a1.5 1.5 0 0 1-1.6 1.5C10.6 20 4 13.4 3.5 5.6A1.5 1.5 0 0 1 5 4Z" />
+  ),
   overview: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1.5" />

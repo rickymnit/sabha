@@ -215,7 +215,7 @@ async def raise_dispute(
     return dispute_out(dispute)
 
 
-def _visible_disputes(principal: Principal) -> dict[str, Any]:
+def visible_disputes(principal: Principal) -> dict[str, Any]:
     if principal.role in VIEW_ALL:
         return {}
     return {"unit_id": {"$in": list(principal.unit_ids)}}
@@ -232,7 +232,7 @@ async def dispute_queue(
     units: TenantRepo[Unit], scores: TenantRepo[Score],
 ) -> DisputePage:  # fmt: skip
     require_resolver(principal)
-    conditions = [c for c in (_visible_disputes(principal), after_cursor(cursor), {"status": status}) if c]
+    conditions = [c for c in (visible_disputes(principal), after_cursor(cursor), {"status": status}) if c]
     found = await disputes.find({"$and": conditions}, sort=[("created_at", -1), ("_id", -1)], limit=limit + 1)
     page, more = found[:limit], len(found) > limit
     names = {p.id: p.name for p in await people.find({"_id": {"$in": [d.person_id for d in page if d.person_id]}})}
@@ -261,7 +261,7 @@ async def resolve(
     entries: TenantRepo[AuditEntry], transactions: Transactions,
 ) -> DisputeOut:  # fmt: skip
     require_resolver(principal)
-    dispute = await disputes.find_one({"_id": dispute_id, **_visible_disputes(principal)})
+    dispute = await disputes.find_one({"_id": dispute_id, **visible_disputes(principal)})
     if dispute is None:
         raise NotFoundError("This dispute does not exist or you cannot see it.")
     if dispute.raised_by == principal.user_id:

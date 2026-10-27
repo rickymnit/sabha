@@ -13,6 +13,7 @@ import { useSession } from "../session/session";
 import { capitalise, roleTitle, unitNames } from "./format";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
 import { AppLoading } from "./AppLoading";
+import { InboxBell } from "../features/inbox/InboxBell";
 import { HeaderSearch } from "./HeaderSearch";
 import { PlanUsage } from "./PlanUsage";
 
@@ -128,6 +129,7 @@ function Header({ me }: { me: Me }) {
       <div className="mx-auto flex max-w-[1360px] items-center gap-2.5">
         <HeaderSearch me={me} />
         <div className="ml-auto flex items-center gap-2.5">
+          <InboxBell me={me} />
           <Button icon={<Icon name="upload" size={16} />} onClick={() => navigate("/upload")}>
             Upload
           </Button>
