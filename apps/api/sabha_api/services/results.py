@@ -30,7 +30,7 @@ from pydantic import BaseModel
 
 from sabha_api.auth import Principal, Role
 from sabha_api.errors import BadRequestError, NotFoundError
-from sabha_core.models import Analysis, Person, Recording, Score, Transcript, Unit
+from sabha_core.models import Analysis, Person, Recording, Score, SpeakerSpan, Transcript, Unit
 from sabha_core.profiles import ConversationType
 from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
@@ -221,6 +221,9 @@ class RecordingOut(BaseModel):
     completed_at: datetime | None
     overall_score: float | None  # the latest analysis, when there is one
     audio_deleted_at: datetime | None  # retention (P7.3) deleted the audio; transcript and scores stay
+    # "Who spoke when" for list rows (UI v2), ORIGINAL timeline. None: no transcript yet, the list did not ask for
+    # it, or the roles are a guess waiting for a reviewer (a guess is never shown, golden rule 5).
+    speaker_strip: list[SpeakerSpan] | None = None
 
 
 class RecordingPage(BaseModel):
@@ -288,12 +291,25 @@ async def _latest_analyses(analyses: TenantRepo[Analysis], recording_ids: list[s
     return latest
 
 
+async def _strips(transcripts: TenantRepo[Transcript], recording_ids: list[str]) -> dict[str, list[SpeakerSpan]]:
+    found = await transcripts.find({"recording_id": {"$in": recording_ids}}, sort=[("created_at", 1)])
+    strips: dict[str, list[SpeakerSpan]] = {}
+    for doc in found:  # ascending, so the newest transcript wins
+        if doc.roles_need_review:
+            strips.pop(doc.recording_id, None)
+        else:
+            strips[doc.recording_id] = doc.speaker_strip
+    return strips
+
+
 async def recording_out(
-    recordings: list[Recording], people: TenantRepo[Person], analyses: TenantRepo[Analysis]
-) -> list[RecordingOut]:
+    recordings: list[Recording], people: TenantRepo[Person], analyses: TenantRepo[Analysis],
+    transcripts: TenantRepo[Transcript] | None = None,
+) -> list[RecordingOut]:  # fmt: skip
     person_ids = sorted({r.person_id for r in recordings if r.person_id})
     names = {p.id: p.name for p in await people.find({"_id": {"$in": person_ids}})} if person_ids else {}
     latest = await _latest_analyses(analyses, [r.id for r in recordings]) if recordings else {}
+    strips = await _strips(transcripts, [r.id for r in recordings]) if transcripts and recordings else {}
     return [
         RecordingOut(
             id=r.id, title=recording_title(r.file_name, r.id), type=r.type.value, status=r.status.value,
@@ -302,6 +318,7 @@ async def recording_out(
             unit_id=r.unit_id, file_name=r.file_name, duration_ms=r.duration_ms, created_at=r.created_at,
             status_changed_at=r.status_changed_at, completed_at=r.completed_at,
             overall_score=latest[r.id].overall_score if r.id in latest else None, audio_deleted_at=r.audio_deleted_at,
+            speaker_strip=strips.get(r.id),
         )
         for r in recordings
     ]  # fmt: skip
@@ -321,6 +338,7 @@ async def list_recordings(
     person_id: str | None = None,
     type: ConversationType | None = None,
     status: RecordingStatus | None = None,
+    transcripts: TenantRepo[Transcript] | None = None,
 ) -> RecordingPage:
     # Every condition is AND-ed with the visibility filter, so the narrowing filters can never widen it.
     conditions: list[dict[str, Any]] = [await visible_filter(principal, people), after_cursor(cursor)]
@@ -335,7 +353,7 @@ async def list_recordings(
     found = await recordings.find(query, sort=[("created_at", -1), ("_id", -1)], limit=limit + 1)
     items, more = found[:limit], len(found) > limit
     next_cursor = encode_cursor(items[-1].created_at, items[-1].id) if more and items else None
-    return RecordingPage(items=await recording_out(items, people, analyses), next_cursor=next_cursor)
+    return RecordingPage(items=await recording_out(items, people, analyses, transcripts), next_cursor=next_cursor)
 
 
 class RecordingCounts(BaseModel):

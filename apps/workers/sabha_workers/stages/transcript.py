@@ -10,7 +10,8 @@
    the heuristics are unsure it asks the LLM tie-breaker if one is configured (sabha_workers.stages.roles_llm).
    Writes `roles@v1.json`.
 4. Assembles `transcript@v1.json` with sabha_asr.assembly: utterances with role, speaker label, text and times on
-   the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it.
+   the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it, with the
+   list rows' "who spoke when" strip (`speaker_strip`).
    Meetings have no one to find: every voice is a "participant" (method "all_participants"), never reviewed.
 5. Roles still unclear: the transcript is kept (with the best guess, for the reviewer) and NeedsReviewError
    `unclear_roles` stops the pipeline. A guess is never analysed (golden rule 5).
@@ -23,7 +24,7 @@ speakers or the rubric go back for review rather than being guessed around.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -31,7 +32,7 @@ from sabha_analytics.rubric import Rubric
 from sabha_asr.assembly import WordTiming, assemble_transcript
 from sabha_asr.roles import RoleAssignment, RoleTieBreaker, SpeakerRole, assign_roles
 from sabha_asr.words import Turn, Word
-from sabha_core.models import Tenant, Transcript
+from sabha_core.models import SpeakerSpan, Tenant, Transcript
 from sabha_core.profiles import ConversationType
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
@@ -39,6 +40,9 @@ from sabha_workers.rubrics import NoRubric
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext
 
 ALL_PARTICIPANTS = "all_participants"  # roles method for meetings: every voice is a participant
+STRIP_MAX_SPANS = 60  # a list row's strip is about 140px wide; more spans would only blur and bloat the list
+STRIP_MERGE_GAP_MS = 1_000  # turns of one side this close together are drawn as one span
+STRIP_MIN_SPEECH = 0.25  # a time slot with less speech than this share is drawn as silence
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,50 @@ def language_mix(spans: Sequence[dict[str, Any]]) -> dict[str, float]:
         totals[name] = totals.get(name, 0) + span["end_ms"] - span["start_ms"]
     whole = sum(totals.values())
     return {name: round(ms / whole, 4) for name, ms in sorted(totals.items())} if whole else {}
+
+
+def speaker_strip(
+    utterances: Sequence[Mapping[str, Any]], staff_role: str | None, duration_ms: int | None
+) -> list[SpeakerSpan]:
+    """The "who spoke when" strip for list rows: utterances (ORIGINAL timeline) as staff or other, at most
+    STRIP_MAX_SPANS spans. Neighbouring turns of one side less than STRIP_MERGE_GAP_MS apart become one span. If that
+    still leaves too many, the recording is cut into STRIP_MAX_SPANS equal slots, each drawn as the side that spoke
+    most in it (silence when under STRIP_MIN_SPEECH of the slot), and equal neighbours are joined. `staff_role` None
+    (meetings: nobody is analysed) makes everyone "other"."""
+    turns = sorted(
+        (int(u["start_ms"]), int(u["end_ms"]), "staff" if u["role"] == staff_role else "other")
+        for u in utterances
+        if u["end_ms"] > u["start_ms"]
+    )
+    spans: list[list[Any]] = []
+    for start, end, kind in turns:
+        last = spans[-1] if spans else None
+        if last is not None and last[2] == kind and start - last[1] <= STRIP_MERGE_GAP_MS:
+            last[1] = max(last[1], end)
+        else:
+            spans.append([start, end, kind])
+    if len(spans) > STRIP_MAX_SPANS:
+        spans = _slotted(turns, duration_ms or max(end for _, end, _ in turns))
+    return [SpeakerSpan(start_ms=a, end_ms=b, speaker=k) for a, b, k in spans]
+
+
+def _slotted(turns: Sequence[tuple[int, int, str]], duration_ms: int) -> list[list[Any]]:
+    width = duration_ms / STRIP_MAX_SPANS
+    spans: list[list[Any]] = []
+    for i in range(STRIP_MAX_SPANS):
+        lo, hi = i * width, (i + 1) * width
+        talk = {"staff": 0.0, "other": 0.0}
+        for start, end, kind in turns:
+            talk[kind] += max(0.0, min(end, hi) - max(start, lo))
+        kind = max(talk, key=lambda k: talk[k])
+        if talk["staff"] + talk["other"] < STRIP_MIN_SPEECH * width:
+            continue
+        a, b = round(lo), round(hi)
+        if spans and spans[-1][2] == kind and spans[-1][1] == a:
+            spans[-1][1] = b
+        else:
+            spans.append([a, b, kind])
+    return spans
 
 
 def confirmed_assignment(confirmed: dict[str, str], turns: Sequence[Turn], roles: tuple[str, str]) -> RoleAssignment:
@@ -127,6 +175,8 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
             word_timing=asr.word_timing, word_count=transcript["word_count"],
             utterance_count=len(transcript["utterances"]), language_mix=language_mix(asr.languages),
             roles=roles, roles_method=",".join(methods), rubric_id=rubric.id, role_choices=list(rubric.roles[:2]),
+            speaker_strip=speaker_strip(transcript["utterances"], None if meeting else rubric.roles[0],
+                                        recording.duration_ms),
             roles_need_review=assignment.needs_review_reason is not None,
         )
     )  # fmt: skip

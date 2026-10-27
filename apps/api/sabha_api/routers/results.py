@@ -48,13 +48,14 @@ Reader = Annotated[service.ArtefactReader, Depends(artefact_reader)]
 
 @recordings_router.get("", response_model=service.RecordingPage)
 async def list_recordings(
-    principal: Caller, recordings: Recordings, people: People, analyses: Analyses,
+    principal: Caller, recordings: Recordings, people: People, analyses: Analyses, transcripts: Transcripts,
     cursor: str | None = None, limit: Limit = 20, person_id: str | None = None, type: ConversationType | None = None,
 ) -> service.RecordingPage:  # fmt: skip
-    """The recordings you may see, newest first, with each one's status and latest overall score. `person_id` and
-    `type` narrow the list; they never show more than you may see."""
+    """The recordings you may see, newest first, with each one's status, latest overall score and "who spoke when"
+    strip. `person_id` and `type` narrow the list; they never show more than you may see."""
     return await service.list_recordings(principal, cursor=cursor, limit=limit, recordings=recordings, people=people,
-                                         analyses=analyses, person_id=person_id, type=type)  # fmt: skip
+                                         analyses=analyses, person_id=person_id, type=type,
+                                         transcripts=transcripts)  # fmt: skip
 
 
 @recordings_router.get("/counts", response_model=service.RecordingCounts)

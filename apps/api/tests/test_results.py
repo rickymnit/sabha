@@ -27,6 +27,7 @@ from sabha_core.models import (
     Recording,
     Role,
     Score,
+    SpeakerSpan,
     Tenant,
     Transcript,
     Unit,
@@ -197,6 +198,22 @@ def test_the_list_shows_the_person_and_latest_score(api: Api) -> None:
     assert item["person"] == {"id": "p-asha", "name": "Asha"} and item["overall_score"] == 3.8
     assert item["status"] == "COMPLETED" and item["status_note"] is None
     assert item["title"] == "r-asha"
+
+
+def test_the_list_shows_who_spoke_when_but_never_a_guess_awaiting_review(api: Api) -> None:
+    recording(api, "r-sure", "p-asha", "unit-1", 30)
+    recording(api, "r-guess", "p-asha", "unit-1", 20)
+    strip = [SpeakerSpan(start_ms=0, end_ms=9_000, speaker="staff"), SpeakerSpan(start_ms=9_000, end_ms=12_000,
+                                                                                  speaker="other")]  # fmt: skip
+    for rid, guess in (("r-sure", False), ("r-guess", True)):
+        insert(api.db, "transcripts", Transcript(
+            tenant_id=T, recording_id=rid, version="transcript@v1", storage_key=f"{T}/{rid}/t.json",
+            asr_model="sarvam/saaras:v4", word_timing="approximate", word_count=10, utterance_count=2,
+            roles_need_review=guess, speaker_strip=strip, rubric_id="teaching.school.v0.1",
+        ))  # fmt: skip
+    strips = {i["id"]: i["speaker_strip"] for i in api.get("owner", "/v1/recordings").json()["items"]}
+    assert strips["r-sure"] == [s.model_dump() for s in strip]
+    assert strips["r-guess"] is None
 
 
 def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:

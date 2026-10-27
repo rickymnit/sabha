@@ -21,7 +21,14 @@ from sabha_llm.types import CompletionResult, Usage
 from sabha_workers.rubrics import NoRubric, rubric_for
 from sabha_workers.stages.roles_llm import LlmRoleTieBreaker
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext
-from sabha_workers.stages.transcript import AsrOutput, TranscriptDeps, finish_transcript, language_mix
+from sabha_workers.stages.transcript import (
+    STRIP_MAX_SPANS,
+    AsrOutput,
+    TranscriptDeps,
+    finish_transcript,
+    language_mix,
+    speaker_strip,
+)
 
 RUBRICS = Path(__file__).resolve().parents[3] / "rubrics"
 TENANT = Tenant.from_profile("school", name="Sunrise Public School", plan=Plan.PILOT, id="t1")
@@ -281,3 +288,22 @@ def test_the_tie_breaker_is_told_a_walk_in_is_a_visit_at_the_desk() -> None:
 )
 def test_the_tie_breaker_never_guesses(gateway: FakeGateway) -> None:
     assert tie_break(gateway) is None
+
+
+def test_speaker_strip_merges_close_turns_and_falls_back_to_time_slots() -> None:
+    utterances = [
+        {"role": "teacher", "start_ms": 0, "end_ms": 4_000},
+        {"role": "teacher", "start_ms": 4_500, "end_ms": 9_000},  # 500 ms gap: same span
+        {"role": "students", "start_ms": 9_000, "end_ms": 10_000},
+    ]
+    assert [(s.start_ms, s.end_ms, s.speaker) for s in speaker_strip(utterances, "teacher", 10_000)] == [
+        (0, 9_000, "staff"),
+        (9_000, 10_000, "other"),
+    ]
+    # 200 alternating turns cannot merge: 60 equal slots, each the side that spoke most, equal neighbours joined
+    many = [{"role": "teacher" if i % 2 else "students", "start_ms": i * 1_000, "end_ms": i * 1_000 + 900}
+            for i in range(200)]  # fmt: skip
+    strip = speaker_strip(many, "teacher", 200_000)
+    assert 0 < len(strip) <= STRIP_MAX_SPANS
+    assert strip[0].start_ms == 0 and strip[-1].end_ms == 200_000
+    assert speaker_strip(utterances, None, 10_000)[0].speaker == "other"  # meetings: nobody is the staff member

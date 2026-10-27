@@ -265,6 +265,16 @@ class Recording(TenantDoc):
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
+class SpeakerSpan(BaseModel):
+    """One stretch of the "who spoke when" strip: the analysed staff member or anyone else, ORIGINAL timeline."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    speaker: Literal["staff", "other"]
+
+
 class Transcript(TenantDoc):
     """A recording's canonical transcript (P3.7): the file is `storage_key` (transcript@v1.json, ORIGINAL timeline).
 
@@ -285,6 +295,8 @@ class Transcript(TenantDoc):
     roles_need_review: bool = False
     # The rubric's two roles, staff first ("teacher", "students"): what a reviewer chooses between (ADR 0007).
     role_choices: list[str] = Field(default_factory=list)
+    # The list rows' "who spoke when" strip (UI v2): utterances merged into at most STRIP_MAX_SPANS spans.
+    speaker_strip: list[SpeakerSpan] = Field(default_factory=list)
     rubric_id: str = Field(min_length=1)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 

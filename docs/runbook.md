@@ -51,3 +51,10 @@ Change a customer's period with Sabha's admin tooling (owners see it read-only i
 **Erasure on request.** The owner erases a recording (on its page) or a person with all their recordings and their
 login (from People, the person's list): Sabha shows the count first and asks for the name. Activity keeps a
 `data.erase` entry with the reason and counts. Whole-organisation erasure is not in the app; ask engineering.
+
+**Backfill after an upgrade.** Fields added after recordings were processed (the list rows' speaker strips, UI v2)
+are filled in from the files already in storage. It only touches documents still missing them, so it is safe to run
+again. Run it once on each environment after deploying the UI v2 changes:
+
+    uv run python scripts/admin/backfill.py --dry-run
+    uv run python scripts/admin/backfill.py

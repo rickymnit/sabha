@@ -1,7 +1,7 @@
 // Response shapes of the API, field for field (snake_case) with apps/api/sabha_api: routers/me.py,
 // services/results.py and services/recordings.py. The report payload itself is features/report/types.ts.
 
-import type { ConversationType } from "../design";
+import type { ConversationType, SpeakerSegment } from "../design";
 import type { Labels, TimeRange } from "../features/report/types";
 
 export type Role = "owner" | "admin" | "manager" | "reviewer" | "staff";
@@ -54,6 +54,8 @@ export interface RecordingItem {
   overall_score: number | null;
   /** When retention deleted the audio (P7.3); the transcript and scores stay. */
   audio_deleted_at: string | null;
+  /** Who spoke when, on the original timeline; null with no transcript yet or while the roles await a reviewer. */
+  speaker_strip?: SpeakerSegment[] | null;
 }
 
 export interface RecordingPage {
