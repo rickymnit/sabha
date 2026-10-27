@@ -8,10 +8,11 @@ import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-
 
 import { useDisputes, useLiveEvents, useMe, useRecordingCounts, useReviews, useUsage } from "../api/hooks";
 import type { Me } from "../api/types";
-import { Avatar, Button, EmptyState, Icon, Logo, NavItem, Skeleton, SkeletonGroup } from "../design";
+import { Avatar, Button, EmptyState, Icon, Logo, NavItem } from "../design";
 import { useSession } from "../session/session";
 import { capitalise, roleTitle, unitNames } from "./format";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
+import { AppLoading } from "./AppLoading";
 import { PlanUsage } from "./PlanUsage";
 
 /** A sidebar link that changes page without reloading (keeps cmd/ctrl-click for a new tab). */
@@ -119,17 +120,7 @@ export function Layout() {
     if ((event.target as HTMLElement).closest("a")) setMenuOpen(false);
   };
 
-  if (me.isPending) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-page">
-        <Logo size={40} />
-        <SkeletonGroup label="Loading your workspace" className="flex w-64 flex-col gap-2">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-2/3" />
-        </SkeletonGroup>
-      </div>
-    );
-  }
+  if (me.isPending) return <AppLoading label="Loading your workspace" />;
   if (me.isError) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-page p-4">

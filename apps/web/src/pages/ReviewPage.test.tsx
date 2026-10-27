@@ -82,7 +82,8 @@ describe("reviews", () => {
     const menu = screen.getByRole("navigation", { name: "Main" });
     expect(await within(menu).findByText("1 waiting", { exact: false })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("link", { name: "Waves" }));
-    expect(router.state.location.pathname).toBe("/reviews/r9");
+    // Pages load when first opened (app/routes.tsx), so the address changes once the review page is ready.
+    await waitFor(() => expect(router.state.location.pathname).toBe("/reviews/r9"));
   });
 
   it("asks who the teacher is and sends the chosen voice", async () => {
