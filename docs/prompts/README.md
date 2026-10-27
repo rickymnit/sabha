@@ -33,11 +33,10 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | --- | --- | --- |
 | P6.8 role views (partly built) | `week-6.md` | Rubric editing and publishing (needs P5.9 calibration and real rater scores), the plans and billing page (needs a billing system); keyboard focus order is checked only by axe so far |
 | P6.2 app shell (partly built) | `week-1.md` | Tenant switcher (when a person belongs to several organisations), Playwright smoke test |
-| P1.8 audit log (partly built) | `week-2.md` | `GET /v1/audit` and the immutability tests |
 | P2.7 notifications (partly built) | `week-5.md` | Webhook settings and the delivery task (signing is built); emails are done |
 | P7.2 limits and quotas (partly built) | `week-5.md` | Limiter in the auth dependency, lane by duration, admission ETA, the 80 % warning email (quota checks on upload are done) |
-| P7.3 backups, retention, erasure | `week-6.md` | Not started |
-| P7.8 admin ops (partly built), P8.6 usage export | `week-7.md` | Admin endpoints and UI, replay and abandon, usage export for invoicing |
+| P7.3 backups, retention, erasure (partly built) | `week-6.md` | Week 8: Atlas continuous backup, bucket lifecycle for exports, the restore drill on staging |
+| P7.8 admin ops (partly built), P8.6 usage export | `week-7.md` | Pause/resume per tenant, demo seed data, usage export for invoicing (retry, close and processing details are done) |
 
 **2. Quality (needs real, annotated recordings)**
 
