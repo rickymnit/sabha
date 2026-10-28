@@ -23,6 +23,7 @@ import {
   cx,
   type ConversationType,
 } from "../design";
+import { CostPreview } from "../features/costs/CostPreview";
 import { useSession } from "../session/session";
 import { capitalise } from "../app/format";
 import { uploadRecording } from "./upload/upload";
@@ -49,6 +50,8 @@ function remember(consentRef: string) {
 
 function FileRow({
   item,
+  type,
+  onDuration,
   onRemove,
   onRetry,
   onForce,
@@ -56,6 +59,8 @@ function FileRow({
   onOpen,
 }: {
   item: QueueItem;
+  type: ConversationType;
+  onDuration: (ms: number | null) => void;
   onRemove: () => void;
   onRetry: () => void;
   onForce: () => void;
@@ -85,6 +90,7 @@ function FileRow({
           <span className="min-w-0 truncate font-semibold text-ink">{file.name}</span>
           <span className="shrink-0 text-small text-muted">{formatSize(file.size)}</span>
         </div>
+        {state.kind !== "invalid" && <CostPreview file={file} type={type} onDuration={onDuration} />}
         {state.kind === "ready" && <span className="text-small text-muted">Ready to upload</span>}
         {state.kind === "uploading" && (
           <ProgressBar
@@ -149,6 +155,7 @@ export function UploadPage() {
   const input = useRef<HTMLInputElement>(null);
   const [items, dispatch] = useReducer(queueReducer, []);
   const [dragging, setDragging] = useState(false);
+  const durations = useRef(new Map<string, number | null>()); // file key -> length the browser read (cost estimate)
   const [running, setRunning] = useState(false);
   const [type, setType] = useState<ConversationType>(me.tenant.enabled_types[0] ?? "teaching");
   const [personId, setPersonId] = useState("");
@@ -182,6 +189,7 @@ export function UploadPage() {
         personId: chosenPerson || null,
         consentRef: consent || null,
         token,
+        expectedDurationMs: durations.current.get(item.key) ?? null,
         onProgress: (sent, total) =>
           dispatch({ type: "set", key: item.key, state: { kind: "uploading", sent, total } }),
       });
@@ -295,6 +303,8 @@ export function UploadPage() {
                   <FileRow
                     key={item.key}
                     item={item}
+                    type={type}
+                    onDuration={(ms) => durations.current.set(item.key, ms)}
                     onRemove={() => dispatch({ type: "remove", key: item.key })}
                     onRetry={() => dispatch({ type: "retry", key: item.key })}
                     onForce={() => void force(item)}

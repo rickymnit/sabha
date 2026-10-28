@@ -26,6 +26,7 @@ from sabha_api.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from sabha_api.resources import Resources, open_resources
 from sabha_api.routers import (
     audit,
+    costs,
     disputes,
     erasure,
     events,
@@ -121,6 +122,7 @@ def create_app(
     app.include_router(erasure.router)
     app.include_router(search.router)
     app.include_router(inbox.router)
+    app.include_router(costs.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

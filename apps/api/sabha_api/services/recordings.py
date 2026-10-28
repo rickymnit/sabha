@@ -45,7 +45,7 @@ from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import ApiError, ConflictError, ForbiddenError, NotFoundError
-from sabha_core.models import AuditEntry, OutboxEvent, Person, Recording, Tenant, Unit, new_id, utc_now
+from sabha_core.models import AuditEntry, CostEstimate, OutboxEvent, Person, Recording, Tenant, Unit, new_id, utc_now
 from sabha_core.outbox import READY, record_event_async, record_transition_async
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
@@ -77,6 +77,8 @@ class RecordingIn(BaseModel):
     content_type: str
     consent_ref: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
     recorded_at: datetime | None = None
+    # The length the browser measured before uploading; with it the expected cost is worked out and kept (costs.py).
+    expected_duration_ms: int | None = Field(default=None, ge=1, le=24 * 3_600_000)
 
     @field_validator("content_type")
     @classmethod
@@ -267,6 +269,7 @@ async def create(
     units: TenantRepo[Unit],
     entries: TenantRepo[AuditEntry],
     transactions: Transactions,
+    cost_estimate: CostEstimate | None = None,
 ) -> UploadOut:
     if body.type not in tenant.enabled_types:
         raise TypeNotEnabledError(f"{body.type} recordings are not enabled for your organisation.")
@@ -302,6 +305,7 @@ async def create(
         part_size=part_size,
         part_count=part_count,
         created_by=principal.user_id,
+        cost_estimate=cost_estimate,
     )
     try:
         async with transactions.run() as session:

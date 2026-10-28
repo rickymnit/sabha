@@ -89,7 +89,8 @@ class Setup:
         ctx = StageContext("t1", recording, "t1/r1/transcribe@v1/", self.store, 1)
         spans = [{"start_ms": 0, "end_ms": 45_000, "language": "hi-IN"},
                  {"start_ms": 45_000, "end_ms": 60_000, "language": "en-IN"}]  # fmt: skip
-        return finish_transcript(ctx, AsrOutput(asr_words, "sarvam/saaras:v4", "approximate", spans, MAP), deps)
+        billed = {"sarvam/saaras:v4": 61_000}  # the compact audio plus a chunk overlap
+        return finish_transcript(ctx, AsrOutput(asr_words, "sarvam/saaras:v4", "approximate", spans, MAP, billed), deps)
 
     def transcript(self) -> dict[str, Any]:
         data: dict[str, Any] = json.loads(self.store.get("t1/r1/transcribe@v1/transcript@v1.json"))
@@ -117,6 +118,7 @@ def test_a_clear_teacher_gets_roles_and_an_original_time_transcript() -> None:
     assert (doc.roles, doc.roles_need_review, doc.rubric_id) == ({"S0": "teacher", "S1": "students"}, False,
                                                                  "teaching.school.v0.1")  # fmt: skip
     assert doc.language_mix == {"en-IN": 0.25, "hi-IN": 0.75} and doc.word_count == len(LECTURE)
+    assert (doc.asr_billed_ms, doc.asr_cost_inr) == (61_000, 0.4982)  # Rs 0.49/min, Sarvam's published price
     assert meta["speakers"] == 2 and meta["rubric"] == "teaching.school.v0.1"
 
 

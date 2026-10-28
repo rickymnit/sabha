@@ -28,6 +28,8 @@ export interface UploadInput {
   personId: string | null;
   consentRef: string | null;
   token: string | undefined;
+  /** The length the browser measured; the server keeps the expected cost worked out from it. */
+  expectedDurationMs?: number | null;
   /** Bytes uploaded so far, after each part. */
   onProgress?: (sent: number, total: number) => void;
   /** For tests: fetch for the part PUTs, and a pause between retries. */
@@ -98,6 +100,7 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       size_bytes: file.size,
       content_type: contentTypeOf(file),
       consent_ref: input.consentRef,
+      ...(input.expectedDurationMs ? { expected_duration_ms: input.expectedDurationMs } : {}),
     },
   });
   const etags = new Map<number, string>();

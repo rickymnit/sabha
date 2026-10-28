@@ -116,6 +116,11 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     openai_base_url: str | None = None
 
+    # Cost display: rupees per US dollar for the LLM cost (OpenAI prices in USD), and where and when it was taken.
+    # Unset: LLM cost is shown in dollars only, never converted with an assumed rate (golden rule 6).
+    usd_inr_rate: float | None = Field(default=None, gt=0)
+    usd_inr_source: str | None = None
+
     # Observability
     otel_exporter_otlp_endpoint: str | None = None  # tracing is off when unset
     sentry_dsn: SecretStr | None = None

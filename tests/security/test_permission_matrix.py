@@ -368,6 +368,12 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /v1/people/summary": lambda a, who: a.client.get("/v1/people/summary", headers=a.headers(who)),
     "GET /v1/search": lambda a, who: a.client.get("/v1/search?q=as", headers=a.headers(who)),
     "GET /v1/inbox": lambda a, who: a.client.get("/v1/inbox", headers=a.headers(who)),
+    "GET /v1/costs/estimate": lambda a, who: a.client.get(
+        "/v1/costs/estimate?type=teaching&duration_ms=600000", headers=a.headers(who)
+    ),
+    "GET /v1/recordings/{recording_id}/cost": lambda a, who: a.client.get(
+        f"/v1/recordings/{DONE}/cost", headers=a.headers(who)
+    ),
     "GET /v1/reviews": lambda a, who: a.client.get("/v1/reviews", headers=a.headers(who)),
     "GET /v1/recordings/{recording_id}/speakers": lambda a, who: a.client.get(
         f"/v1/recordings/{DONE}/speakers", headers=a.headers(who)

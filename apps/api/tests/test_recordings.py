@@ -19,9 +19,24 @@ from pymongo.database import Database
 
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import IdentityLink, OutboxEvent, Person, RelayState, Role, Tenant, Unit, User
+from sabha_core.models import (
+    Analysis,
+    IdentityLink,
+    LlmCall,
+    OutboxEvent,
+    Person,
+    Recording,
+    RelayState,
+    Role,
+    Tenant,
+    Transcript,
+    Unit,
+    User,
+)
+from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.repo import COLLECTIONS, SyncSystemRepo
+from sabha_core.state import RecordingStatus
 from sabha_workers.relay import Relay
 
 pytestmark = pytest.mark.integration
@@ -112,6 +127,9 @@ def api(
         s3_access_key_id=s3_storage.access_key_id,
         s3_secret_access_key=s3_storage.secret_access_key,
         upload_part_size_bytes=PART,
+        asr_provider="sarvam",  # priced at Sarvam's published rate (sabha_asr.pricing); never called here
+        sarvam_api_key="test-key",  # pragma: allowlist secret  (a placeholder; nothing is sent to Sarvam)
+        usd_inr_rate=90.0,
     )
     seed(db, client.app.state.settings.oidc_issuer)
     return Api(client, db, fake_idp, s3_storage.client())
@@ -131,6 +149,67 @@ def problem(response: httpx.Response, status: int, code: str) -> None:
 
 
 # --- Create ---
+
+
+def test_the_upload_keeps_its_expected_cost_and_the_actual_comes_from_usage(api: Api) -> None:
+    def cost(path: str) -> dict[str, Any]:
+        response = api.client.get(path, headers=api.headers("owner-a"))
+        assert response.status_code == 200, response.text
+        body: dict[str, Any] = response.json()
+        return body
+
+    # No history yet: speech-to-text at Sarvam's published Rs 0.49/min for the whole length; no LLM figure, no total
+    first = cost("/v1/costs/estimate?type=teaching&duration_ms=600000")["estimate"]
+    assert (first["asr_inr"], first["llm_inr"], first["total_inr"], first["history_n"]) == (4.9, None, None, 0)
+
+    # History: a finished 10-minute lesson, 6 minutes of speech, whose analysis cost $0.02
+    api.db.recordings.insert_one(Recording(
+        id="r-done", tenant_id="tenant-a", type=ConversationType.TEACHING, status=RecordingStatus.COMPLETED,
+        consent_ref="c", duration_ms=600_000, speech_ms=360_000,
+    ).model_dump(by_alias=True))  # fmt: skip
+    api.db.analyses.insert_one(Analysis(
+        tenant_id="tenant-a", recording_id="r-done", version="v1", conversation_type=ConversationType.TEACHING,
+        rubric_id="teaching.school.v0.1", rubric_version="0.1", rubric_hash="h", report_key="k", status="COMPLETED",
+        verified_share=1.0, cost_usd=0.02,
+    ).model_dump(by_alias=True))  # fmt: skip
+
+    created = api.create("owner-a", {**LESSON, "expected_duration_ms": 1_200_000})
+    rid = created.json()["recording_id"]
+    kept = cost(f"/v1/recordings/{rid}/cost")["estimate"]
+    # 20 min x 60 % speech x Rs 0.49 = 5.88; $0.002/min x 20 min x Rs 90 = 3.60
+    assert (kept["asr_inr"], kept["llm_inr"], kept["total_inr"]) == (5.88, 3.6, 9.48)
+    assert (kept["speech_share"], kept["history_n"], kept["usd_inr_rate"]) == (0.6, 1, 90.0)
+
+    # Actual: what was sent to speech-to-text, and the LLM calls' recorded cost
+    api.db.transcripts.insert_one(Transcript(
+        tenant_id="tenant-a", recording_id=rid, version="transcript@v1", storage_key="k", asr_model="m",
+        word_timing="approximate", word_count=1, utterance_count=1, rubric_id="teaching.school.v0.1",
+        asr_billed_ms=780_000, asr_cost_inr=6.37,
+    ).model_dump(by_alias=True))  # fmt: skip
+    for usd in (0.01, 0.015):
+        api.db.llm_calls.insert_one(LlmCall(
+            tenant_id="tenant-a", recording_id=rid, task="score", provider="openai", model="gpt-6-luna",
+            prompt_hash="p", status="ok", cost_usd=usd, latency_ms=1, attempt=1,
+        ).model_dump(by_alias=True))  # fmt: skip
+    actual = cost(f"/v1/recordings/{rid}/cost")["actual"]
+    assert (actual["asr_inr"], actual["llm_inr"], actual["total_inr"], actual["final"]) == (6.37, 2.25, 8.62, False)
+
+    # One call without a price: the LLM part is unknown rather than understated
+    api.db.llm_calls.insert_one(
+        LlmCall(
+            tenant_id="tenant-a",
+            recording_id=rid,
+            task="score",
+            provider="x",
+            model="y",
+            prompt_hash="p",
+            status="ok",
+            latency_ms=1,
+            attempt=1,
+        ).model_dump(by_alias=True)
+    )
+    actual = cost(f"/v1/recordings/{rid}/cost")["actual"]
+    assert (actual["llm_inr"], actual["total_inr"], actual["llm_unpriced_calls"]) == (None, None, 1)
 
 
 def test_create_returns_presigned_parts_and_records_the_recording(api: Api) -> None:

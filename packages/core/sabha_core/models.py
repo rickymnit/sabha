@@ -216,6 +216,22 @@ class AudioInfo(BaseModel):
     channels: int = Field(ge=1)
 
 
+class CostEstimate(BaseModel):
+    """What a recording was expected to cost when it was uploaded (sabha_api.services.costs), kept as it was so the
+    actual cost can be compared with it. Rupees; a part is None when its price or history was missing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    duration_ms: int = Field(ge=0)  # the length the browser measured before uploading
+    asr_inr: float | None = None
+    llm_inr: float | None = None
+    total_inr: float | None = None  # None unless both parts are known
+    speech_share: float = Field(ge=0, le=1)  # of the recording expected to be sent to speech-to-text
+    history_n: int = Field(ge=0)  # earlier recordings of this type the LLM part and speech share come from
+    usd_inr_rate: float | None = None
+    made_at: UtcDatetime = Field(default_factory=utc_now)
+
+
 class Recording(TenantDoc):
     """A recorded conversation. Status changes only through sabha_core.state.transition (CLAUDE.md).
 
@@ -264,6 +280,8 @@ class Recording(TenantDoc):
     # instead of the tenant's default. The analyze stage writes run n to analyze@<version>-run<n>/.
     analysis_run: int = Field(default=1, ge=1)
     rubric_id: str | None = None
+    # Cost display (owner's request, 2026-10-28): the estimate made at upload, frozen.
+    cost_estimate: CostEstimate | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
@@ -299,6 +317,10 @@ class Transcript(TenantDoc):
     role_choices: list[str] = Field(default_factory=list)
     # The list rows' "who spoke when" strip (UI v2): utterances merged into at most STRIP_MAX_SPANS spans.
     speaker_strip: list[SpeakerSpan] = Field(default_factory=list)
+    # Speech-to-text cost: the audio sent to the provider (chunk overlaps included) and its cost from the published
+    # price (sabha_asr.pricing), or None when a model has no price (golden rule 6).
+    asr_billed_ms: int | None = Field(default=None, ge=0)
+    asr_cost_inr: float | None = Field(default=None, ge=0)
     rubric_id: str = Field(min_length=1)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 

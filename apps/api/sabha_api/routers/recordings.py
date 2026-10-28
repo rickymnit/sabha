@@ -15,9 +15,18 @@ from sabha_api.auth.directory import Directory, directory
 from sabha_api.deps import Transactions, tenant_repo, transactions
 from sabha_api.errors import NotFoundError, NotReadyError
 from sabha_api.idempotency import HEADER, idempotent
+from sabha_api.services import costs, usage
 from sabha_api.services import recordings as service
-from sabha_api.services import usage
-from sabha_core.models import AuditEntry, IdempotencyRecord, OutboxEvent, Person, Recording, Transcript, Unit
+from sabha_core.models import (
+    Analysis,
+    AuditEntry,
+    IdempotencyRecord,
+    OutboxEvent,
+    Person,
+    Recording,
+    Transcript,
+    Unit,
+)
 from sabha_core.repo import TenantRepo
 
 router = APIRouter(prefix="/v1/recordings", tags=["recordings"])
@@ -48,6 +57,7 @@ async def create_recording(
     units: Annotated[TenantRepo[Unit], Depends(tenant_repo("units", Unit))],
     entries: Annotated[TenantRepo[AuditEntry], Depends(tenant_repo("audit_log", AuditEntry))],
     transcripts: Annotated[TenantRepo[Transcript], Depends(tenant_repo("transcripts", Transcript))],
+    analyses: Annotated[TenantRepo[Analysis], Depends(tenant_repo("analyses", Analysis))],
     txn: Annotated[Transactions, Depends(transactions)],
     idempotency_key: Annotated[str | None, Header(alias=HEADER)] = None,
 ) -> JSONResponse:
@@ -59,6 +69,10 @@ async def create_recording(
         if tenant is None:
             raise NotFoundError("Your organisation could not be found.")
         await usage.check_uploads(tenant, recordings, transcripts)
+        estimate = None
+        if body.expected_duration_ms is not None:  # what the upload page showed, kept to compare with the actual cost
+            estimate = await costs.estimate(body.type, body.expected_duration_ms, request.app.state.settings,
+                                            recordings=recordings, analyses=analyses)  # fmt: skip
         out = await service.create(
             principal,
             body,
@@ -71,6 +85,7 @@ async def create_recording(
             units=units,
             entries=entries,
             transactions=txn,
+            cost_estimate=estimate,
         )
         return 201, out.model_dump(mode="json")
 

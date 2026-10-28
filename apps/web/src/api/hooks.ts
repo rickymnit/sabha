@@ -5,6 +5,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+import type { ConversationType } from "../design";
+import type { CostResponse, EstimateResponse } from "../features/costs/types";
 import type { DisputeDraft, DisputePage, Resolution } from "../features/disputes/types";
 import type { OverviewStats } from "../features/overview/types";
 import type { AnalysisPayload } from "../features/report/types";
@@ -370,6 +372,30 @@ export function useRecordingCounts(): UseQueryResult<RecordingCounts, ApiError> 
   return useQuery({
     queryKey: ["recordings", "counts", token],
     queryFn: () => apiFetch<RecordingCounts>("/v1/recordings/counts", { token }),
+    enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/costs/estimate: what a recording of this type and length is expected to cost. */
+export function useCostEstimate(
+  type: ConversationType,
+  durationMs: number | null,
+): UseQueryResult<EstimateResponse, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["costs", "estimate", type, durationMs, token],
+    queryFn: () => apiFetch<EstimateResponse>(`/v1/costs/estimate?type=${type}&duration_ms=${durationMs}`, { token }),
+    enabled: Boolean(token) && durationMs !== null && durationMs > 0,
+    staleTime: 60_000,
+  });
+}
+
+/** GET /v1/recordings/{id}/cost. Under ["recording", id], so live status refreshes it as the recording moves. */
+export function useRecordingCost(id: string): UseQueryResult<CostResponse, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["recording", id, "cost", token],
+    queryFn: () => apiFetch<CostResponse>(`/v1/recordings/${encodeURIComponent(id)}/cost`, { token }),
     enabled: Boolean(token),
   });
 }

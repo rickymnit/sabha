@@ -221,6 +221,23 @@ routes:
     anonymous: 401
     others: 200
 
+  GET /v1/costs/estimate:
+    # Expected cost of an upload in rupees (owner, 2026-10-28: every role sees costs); this organisation's history.
+    anonymous: 401
+    others: 200
+
+  GET /v1/recordings/{recording_id}/cost:
+    # Expected and actual cost of one recording, for anyone who may see it (every role, owner 2026-10-28).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404
+    reviewer_unit: 200
+    staff_uploader: 200
+    staff_colleague: 404
+    other_tenant: 404
+
   GET /v1/inbox:
     # The bell and "Needs your decision" (UI v2): only what each caller may act on (filtered; test_results.py).
     anonymous: 401

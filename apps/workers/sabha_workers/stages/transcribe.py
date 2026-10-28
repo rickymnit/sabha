@@ -210,7 +210,12 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
             "words": len(words),
         }
         log.info("transcribed", extra={"recording_id": ctx.recording.id, **meta})
-        asr_output = AsrOutput(words, "+".join(models), parts[0].word_timing, languages, segment_map)
+        # What each model was sent, overlaps included: what the provider bills (by audio duration).
+        billed: dict[str, int] = {}
+        for i, part in enumerate(parts):
+            batch = chunks[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
+            billed[part.model_id] = billed.get(part.model_id, 0) + sum(c.duration_ms for c in batch)
+        asr_output = AsrOutput(words, "+".join(models), parts[0].word_timing, languages, segment_map, billed)
         return {**meta, **finish_transcript(ctx, asr_output, transcript)}
 
     return work

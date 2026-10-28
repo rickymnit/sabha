@@ -23,6 +23,7 @@ import type { Me, TranscriptResponse } from "../api/types";
 import { Button, EmptyState, Icon, Skeleton, SkeletonGroup, useToast } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
 import { EraseDialog } from "../features/erasure/EraseDialog";
+import { CostCard } from "../features/costs/CostCard";
 import { ProcessingPanel, ReasonDialog, STAGE_NAMES } from "../features/processing";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
 import { RecordingReport } from "../features/report";
@@ -250,6 +251,7 @@ export function RecordingPage() {
         canDispute={"can_dispute" in analysis.data && analysis.data.can_dispute === true}
         onSubmitDispute={submitDispute}
       />
+      <CostCard recordingId={id} />
       {isAdmin && processing.data && <ProcessingPanel info={processing.data} />}
       {me.user.role === "owner" && (
         <div className="flex justify-end">

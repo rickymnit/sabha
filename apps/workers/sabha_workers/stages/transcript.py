@@ -25,11 +25,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from sabha_analytics.rubric import Rubric
 from sabha_asr.assembly import WordTiming, assemble_transcript
+from sabha_asr.pricing import cost_inr
 from sabha_asr.roles import RoleAssignment, RoleTieBreaker, SpeakerRole, assign_roles
 from sabha_asr.words import Turn, Word
 from sabha_core.models import SpeakerSpan, Tenant, Transcript
@@ -61,6 +62,7 @@ class AsrOutput:
     word_timing: WordTiming
     languages: Sequence[dict[str, Any]]  # {start_ms, end_ms, language} on the compact timeline
     segment_map: SegmentMap
+    billed_ms: Mapping[str, int] = field(default_factory=dict)  # audio sent per ASR model id, overlaps included
 
 
 def language_mix(spans: Sequence[dict[str, Any]]) -> dict[str, float]:
@@ -168,6 +170,8 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
     key = ctx.prefix + "transcript@v1.json"
     ctx.artefacts.put(key, json.dumps(transcript, ensure_ascii=False).encode(), "application/json")
     methods = sorted({speaker.method for speaker in assignment.speakers.values()})
+    costs = [cost_inr(model, ms) for model, ms in asr.billed_ms.items()]
+    asr_cost = None if not costs or any(c is None for c in costs) else round(sum(c for c in costs if c), 4)
     deps.save(
         ctx.tenant_id,
         Transcript(
@@ -178,6 +182,7 @@ def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -
             speaker_strip=speaker_strip(transcript["utterances"], None if meeting else rubric.roles[0],
                                         recording.duration_ms),
             roles_need_review=assignment.needs_review_reason is not None,
+            asr_billed_ms=sum(asr.billed_ms.values()) or None, asr_cost_inr=asr_cost,
         )
     )  # fmt: skip
     if assignment.needs_review_reason is not None:
