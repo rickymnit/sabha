@@ -24,7 +24,10 @@ export function unitWords(labels: Labels) {
 
 /** Top-level units by name, each with the units under it by name. */
 export function unitTree(units: Units): UnitNode[] {
-  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "en", { numeric: true });
+  // Units without a number first ("LKG", "UKG"), then numbered ones by number ("Class 2" before "Class 10")
+  const numbered = (name: string) => /\d/.test(name);
+  const byName = (a: { name: string }, b: { name: string }) =>
+    Number(numbered(a.name)) - Number(numbered(b.name)) || a.name.localeCompare(b.name, "en", { numeric: true });
   const tops = units.filter((u) => !u.parent_id || !units.some((p) => p.id === u.parent_id));
   return tops.sort(byName).map((top) => ({
     id: top.id,
