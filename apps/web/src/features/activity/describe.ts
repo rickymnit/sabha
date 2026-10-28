@@ -32,6 +32,10 @@ export function actionChoices(labels: Labels): { value: string; label: string }[
     { value: "recording.reanalyze", label: `Re-analysed a ${thing}` },
     { value: "settings.update", label: "Changed settings" },
     { value: "user.invite", label: "Invited people" },
+    { value: "person.create", label: `Added ${labels.person_plural.toLowerCase()}` },
+    { value: "person.update", label: `Changed ${labels.person_plural.toLowerCase()}` },
+    { value: "unit.create", label: "Added groups" },
+    { value: "unit.rename", label: "Renamed groups" },
   ];
 }
 
@@ -103,6 +107,18 @@ export function describe(entry: AuditEntryItem, labels: Labels): Description {
         ...(role ? { after: ` as ${/^[aeiou]/i.test(role) ? "an" : "a"} ${role.toLowerCase()}` } : {}),
       };
     }
+    case "person.create":
+      return { text: `added a ${labels.person.toLowerCase()},`, target: entry.target.label ?? "someone" };
+    case "person.update":
+      return { text: "changed", target: entry.target.label ?? `a ${labels.person.toLowerCase()}` };
+    case "unit.create":
+      return { text: "added", target: typeof entry.meta.name === "string" ? quoted(entry.meta.name) : "a group" };
+    case "unit.rename":
+      return {
+        text: "renamed",
+        target: typeof entry.meta.before === "string" ? quoted(entry.meta.before) : "a group",
+        ...(typeof entry.meta.after === "string" ? { after: ` to ${quoted(entry.meta.after)}` } : {}),
+      };
     default:
       return { text: entry.action.replaceAll(".", " ").replaceAll("_", " "), target: entry.target.label };
   }

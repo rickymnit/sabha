@@ -161,7 +161,7 @@ def test_health_probes_log_at_debug(client: TestClient, caplog: pytest.LogCaptur
 
 def test_unmatched_paths_are_not_logged_by_path(client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.DEBUG, logger="sabha.access"):
-        client.get("/v1/people/9876543210")
+        client.get("/v1/no-such-thing/9876543210")
         client.get("/docs")
     unmatched, docs = [r.__dict__["route"] for r in caplog.records if r.name == "sabha.access"]
     assert (unmatched, docs) == ("<unmatched>", "/docs")

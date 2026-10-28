@@ -313,7 +313,7 @@ def test_me_returns_the_user_role_and_tenant_labels(api: Api) -> None:
         "unit_ids": [],
     }
     tenant = body["tenant"]
-    assert tenant["units"] == [{"id": "unit-a", "name": "Primary"}]
+    assert tenant["units"] == [{"id": "unit-a", "name": "Primary", "parent_id": None}]
     assert (tenant["id"], tenant["name"], tenant["profile"]) == ("tenant-a", "Green Valley School", "school")
     assert {"person", "recording", "unit"} <= set(tenant["labels"])
     assert "teaching" in tenant["enabled_types"]

@@ -96,6 +96,19 @@ class Tenant(Document):
     kms_key_id: str | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _labels_from_profile(cls, data: Any) -> Any:
+        """Words added after a tenant was created (the unit levels, 2026-10-28) come from its profile until the
+        owner renames them; the tenant's own words always win."""
+        if isinstance(data, dict) and isinstance(data.get("labels"), dict) and data.get("profile"):
+            try:
+                defaults = get_profile(ProfileName(data["profile"])).labels.model_dump()
+            except ValueError:
+                return data
+            data = {**data, "labels": {**defaults, **data["labels"]}}
+        return data
+
     @field_validator("name", mode="before")
     @classmethod
     def _strip_name(cls, value: object) -> object:
@@ -163,8 +176,19 @@ class Person(TenantDoc):
     """A staff member whose conversations are analysed. May or may not also be a User."""
 
     name: str = Field(min_length=1)
+    # The units this person works in (a teacher's class-sections, owner 2026-10-28); `unit_id` is the first of them,
+    # their home unit, which older code and documents use.
+    unit_ids: list[str] = Field(default_factory=list)
     unit_id: str | None = None
     user_id: str | None = None
+
+    @model_validator(mode="after")
+    def _home_unit(self) -> Self:
+        if self.unit_ids and self.unit_id not in self.unit_ids:
+            self.unit_id = self.unit_ids[0]
+        elif self.unit_id and not self.unit_ids:
+            self.unit_ids = [self.unit_id]
+        return self
 
 
 class IdentityLink(TenantDoc):

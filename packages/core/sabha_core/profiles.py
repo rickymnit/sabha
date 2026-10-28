@@ -59,6 +59,12 @@ class Labels(_Frozen):
     recording_plural: str = Field(min_length=1)
     unit: str = Field(min_length=1)  # the group people belong to (the units collection)
     manager: str = Field(min_length=1)
+    # The two levels of units (owner, 2026-10-28): a top-level unit ("Class") and the ones under it ("Section").
+    # Defaults keep older stored labels valid; Tenant fills them from its profile when they are missing.
+    unit_group: str = Field(default="Group", min_length=1)
+    unit_group_plural: str = Field(default="Groups", min_length=1)
+    unit_sub: str = Field(default="Subgroup", min_length=1)
+    unit_sub_plural: str = Field(default="Subgroups", min_length=1)
 
 
 class ConsentDefaults(_Frozen):
@@ -128,6 +134,10 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             recording_plural="Lessons",
             unit="Campus and section",
             manager="Principal or coordinator",
+            unit_group="Class",
+            unit_group_plural="Classes",
+            unit_sub="Section",
+            unit_sub_plural="Sections",
         ),
         default_rubrics={  # only rubrics that exist in rubrics/
             _T.TEACHING: "teaching.school.v0.1",
@@ -157,6 +167,10 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             recording_plural="Lectures",
             unit="Department",
             manager="Head of department",
+            unit_group="Department",
+            unit_group_plural="Departments",
+            unit_sub="Batch",
+            unit_sub_plural="Batches",
         ),
         default_rubrics=dict.fromkeys(ConversationType),  # no college rubrics exist yet
         consent=ConsentDefaults(
@@ -181,6 +195,10 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             recording_plural="Conversations",
             unit="Team or branch",
             manager="Sales manager",
+            unit_group="Branch",
+            unit_group_plural="Branches",
+            unit_sub="Team",
+            unit_sub_plural="Teams",
         ),
         default_rubrics={
             **dict.fromkeys(ConversationType),

@@ -23,6 +23,8 @@ import {
   Table,
 } from "../design";
 import { capitalise, formatWhen } from "../app/format";
+import { unitLabel } from "../app/units";
+import { PersonDialog } from "../features/organisation/PersonDialog";
 import { formatScore } from "../features/report/format";
 
 function trendLabel(person: PersonSummary, things: string): string {
@@ -40,16 +42,21 @@ export function PeoplePage() {
   const navigate = useNavigate();
   const people = usePeopleSummary();
   const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<PersonSummary | "new" | null>(null);
+  const isAdmin = me.user.role === "owner" || me.user.role === "admin"; // who adds and edits people (owner, 2026-10-28)
   const units = new Map(me.tenant.units.map((u) => [u.id, u.name]));
+  // "Class 6 · A, Class 7 · B": every unit the person works in, home first
+  const where = (p: PersonSummary) =>
+    (p.unit_ids?.length ? p.unit_ids : p.unit_id ? [p.unit_id] : [])
+      .map((id) => unitLabel(me.tenant.units, id))
+      .filter(Boolean)
+      .join(", ");
   const plural = labels.person_plural.toLowerCase();
   const things = labels.recording_plural.toLowerCase();
 
   const needle = query.trim().toLowerCase();
   const rows = (people.data ?? []).filter(
-    (p) =>
-      !needle ||
-      p.name.toLowerCase().includes(needle) ||
-      (p.unit_id ? (units.get(p.unit_id) ?? "").toLowerCase().includes(needle) : false),
+    (p) => !needle || p.name.toLowerCase().includes(needle) || where(p).toLowerCase().includes(needle),
   );
   const open = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -65,7 +72,20 @@ export function PeoplePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={capitalise(labels.person_plural)} description={description} />
+      <PageHeader
+        title={capitalise(labels.person_plural)}
+        description={description}
+        actions={
+          isAdmin && (
+            <Button icon={<Icon name="people" size={16} />} onClick={() => setEditing("new")}>
+              Add {labels.person.toLowerCase()}
+            </Button>
+          )
+        }
+      />
+      {editing && (
+        <PersonDialog me={me} person={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />
+      )}
       {people.isError ? (
         <Panel>
           <EmptyState
@@ -150,7 +170,7 @@ export function PeoplePage() {
                         >
                           {p.name}
                         </a>
-                        <span className="text-small text-muted">{p.unit_id ? units.get(p.unit_id) : ""}</span>
+                        <span className="text-small text-muted">{where(p)}</span>
                       </div>
                     </div>
                   ),
@@ -187,6 +207,21 @@ export function PeoplePage() {
                   className: "whitespace-nowrap",
                   render: (p) => (p.last_analysed_at ? formatWhen(p.last_analysed_at) : "—"),
                 },
+                ...(isAdmin
+                  ? [
+                      {
+                        key: "edit",
+                        header: <span className="sr-only">Edit</span>,
+                        align: "right" as const,
+                        render: (p: PersonSummary) => (
+                          // above the row's link, which covers the whole row
+                          <Button variant="ghost" className="relative z-10" onClick={() => setEditing(p)}>
+                            Edit<span className="sr-only"> {p.name}</span>
+                          </Button>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           )}

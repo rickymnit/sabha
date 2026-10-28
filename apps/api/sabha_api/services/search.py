@@ -38,6 +38,6 @@ async def search(
     found = await recordings.find({"$and": [visible, {"file_name": pattern}]},
                                   sort=[("created_at", -1), ("_id", -1)], limit=LIMIT)  # fmt: skip
     return SearchOut(
-        people=[PersonOut(id=p.id, name=p.name, unit_id=p.unit_id) for p in found_people],
+        people=[PersonOut(id=p.id, name=p.name, unit_id=p.unit_id, unit_ids=p.unit_ids) for p in found_people],
         recordings=await recording_out(found, people, analyses, transcripts),
     )

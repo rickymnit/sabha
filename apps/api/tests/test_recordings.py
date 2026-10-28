@@ -151,6 +151,16 @@ def problem(response: httpx.Response, status: int, code: str) -> None:
 # --- Create ---
 
 
+def test_a_lesson_is_filed_under_one_of_the_teachers_class_sections(api: Api) -> None:
+    api.db.units.insert_one(Unit(id="unit-a2", tenant_id="tenant-a", name="Second").model_dump(by_alias=True))
+    api.db.people.update_one({"_id": "p-other"}, {"$set": {"unit_id": "unit-a", "unit_ids": ["unit-a", "unit-a2"]}})
+    filed = api.create("owner-a", {**LESSON, "person_id": "p-other", "unit_id": "unit-a2"})
+    assert filed.status_code == 201, filed.text
+    assert api.db.recordings.find_one({"_id": filed.json()["recording_id"]})["unit_id"] == "unit-a2"  # type: ignore[index]  # just inserted
+    api.db.units.insert_one(Unit(id="unit-x", tenant_id="tenant-a", name="Not taught").model_dump(by_alias=True))
+    problem(api.create("owner-a", {**LESSON, "person_id": "p-other", "unit_id": "unit-x"}), 422, "unit_not_taught")
+
+
 def test_the_upload_keeps_its_expected_cost_and_the_actual_comes_from_usage(api: Api) -> None:
     def cost(path: str) -> dict[str, Any]:
         response = api.client.get(path, headers=api.headers("owner-a"))

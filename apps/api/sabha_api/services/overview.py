@@ -34,6 +34,7 @@ from sabha_api.services.results import recording_title, visible_filter
 from sabha_core.models import Analysis, Person, Recording, Score, Unit, utc_now
 from sabha_core.repo import TenantRepo
 from sabha_core.state import RecordingStatus
+from sabha_core.units import subtree
 
 MAX_DAYS = 366
 SERIES_PERIODS = 8
@@ -136,21 +137,6 @@ def check_period(start: datetime, end: datetime) -> tuple[datetime, datetime]:
     return start, end
 
 
-def subtree(units: Iterable[Unit], unit_id: str) -> set[str]:
-    """The unit and every unit under it, at any depth (a circular parent chain is walked once)."""
-    children: dict[str, list[str]] = {}
-    for u in units:
-        if u.parent_id:
-            children.setdefault(u.parent_id, []).append(u.id)
-    found, todo = {unit_id}, [unit_id]
-    while todo:
-        for child in children.get(todo.pop(), []):
-            if child not in found:
-                found.add(child)
-                todo.append(child)
-    return found
-
-
 def roots_of(units: Iterable[Unit]) -> dict[str, str]:
     """Each unit's top-level unit (itself when it has no parent). A broken chain (a missing or circular parent)
     stops at the last unit found."""
@@ -202,7 +188,7 @@ async def overview(
     visible = await visible_filter(principal, people)
     conditions = [visible] if visible else []
     if unit_id is not None:
-        conditions.append({"unit_id": {"$in": sorted(subtree(all_units, unit_id))}})
+        conditions.append({"unit_id": {"$in": sorted(subtree(all_units, [unit_id]))}})
     scope: dict[str, object] = {"$and": conditions} if conditions else {}
     # The switcher: every top-level unit for those who see everything, the top of their own units for managers and
     # reviewers, none for staff (who see only their own recordings).

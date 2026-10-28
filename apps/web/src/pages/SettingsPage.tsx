@@ -26,29 +26,45 @@ import {
 import type { Labels } from "../features/report/types";
 import { TYPE_INFO } from "../app/conversationTypes";
 import { capitalise } from "../app/format";
+import { unitWords } from "../app/units";
+import { ClassesPanel } from "../features/organisation/ClassesPanel";
 
 const EDITORS = ["owner", "admin"];
 
 /** What each word means, for the person renaming it (Setup.dc.html:144-147). */
-const WORDS: { key: keyof Labels; label: string; hint: string }[] = [
+type Words = Required<Labels>;
+
+const WORDS: { key: keyof Words; label: string; hint: string }[] = [
   { key: "person", label: "Person analysed", hint: "One of the staff whose conversations are analysed" },
   { key: "person_plural", label: "Several of them", hint: "The menu item and lists" },
   { key: "recording", label: "A recording", hint: "One analysed conversation" },
   { key: "recording_plural", label: "Several recordings", hint: "The menu item and lists" },
   { key: "unit", label: "Group", hint: "Where people belong: a class, branch or team" },
   { key: "manager", label: "Manager", hint: "Who coaches them" },
+  { key: "unit_group", label: "Top-level group", hint: "For example a class, department or branch" },
+  { key: "unit_group_plural", label: "Several top-level groups", hint: "Lists and headings" },
+  { key: "unit_sub", label: "Group within it", hint: "For example a section, batch or team" },
+  { key: "unit_sub_plural", label: "Several groups within one", hint: "Lists and headings" },
 ];
 const MAX_WORD = 40;
 const MAX_NAME = 120;
 
 interface Draft {
   name: string;
-  labels: Labels;
+  labels: Words;
   types: ConversationType[];
 }
 
 function draftOf(settings: TenantSettings): Draft {
-  return { name: settings.name, labels: { ...settings.labels }, types: [...settings.enabled_types] };
+  const words = unitWords(settings.labels);
+  const labels: Words = {
+    unit_group: words.group,
+    unit_group_plural: words.groups,
+    unit_sub: words.sub,
+    unit_sub_plural: words.subs,
+    ...settings.labels,
+  };
+  return { name: settings.name, labels, types: [...settings.enabled_types] };
 }
 
 /** Only what changed, trimmed; empty when nothing did. */
@@ -90,7 +106,7 @@ export function SettingsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="Your organisation's name, the words used across the product and the conversations you analyse."
+        description="Your organisation's name, the words used across the product, the conversations you analyse, and how people are grouped."
       />
       {settings.isError ? (
         <Panel>
@@ -112,6 +128,7 @@ export function SettingsPage() {
       ) : (
         <SettingsForm settings={settings.data} />
       )}
+      <ClassesPanel me={me} />
     </div>
   );
 }

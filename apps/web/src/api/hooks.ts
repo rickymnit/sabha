@@ -507,6 +507,45 @@ export function useUpdateSettings() {
   });
 }
 
+/** Units (classes and sections) and people (teachers), for owners and admins: POST/PATCH /v1/units and /v1/people.
+ * Units come from GET /v1/me and people from the people lists, so those are refreshed after each change. */
+export function useOrganisation() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  const refresh = async () => {
+    await Promise.all(
+      [["me"], ["people"], ["people-summary"]].map((key) => queryClient.invalidateQueries({ queryKey: key })),
+    );
+  };
+  const create = (path: string) => (body: object) =>
+    apiFetch<{ id: string }>(path, {
+      method: "POST",
+      token,
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body,
+    });
+  return {
+    createUnit: useMutation({
+      mutationFn: create("/v1/units") as (body: { name: string; parent_id: string | null }) => Promise<{ id: string }>,
+      onSuccess: refresh,
+    }),
+    renameUnit: useMutation({
+      mutationFn: ({ id, name }: { id: string; name: string }) =>
+        apiFetch(`/v1/units/${encodeURIComponent(id)}`, { method: "PATCH", token, body: { name } }),
+      onSuccess: refresh,
+    }),
+    createPerson: useMutation({
+      mutationFn: create("/v1/people") as (body: { name: string; unit_ids: string[] }) => Promise<{ id: string }>,
+      onSuccess: refresh,
+    }),
+    changePerson: useMutation({
+      mutationFn: ({ id, ...body }: { id: string; name?: string; unit_ids?: string[] }) =>
+        apiFetch(`/v1/people/${encodeURIComponent(id)}`, { method: "PATCH", token, body }),
+      onSuccess: refresh,
+    }),
+  };
+}
+
 /** The local dev sign-in's people (dev mode only). */
 export function useDevUsers(enabled: boolean): UseQueryResult<DevUser[], ApiError> {
   return useQuery({

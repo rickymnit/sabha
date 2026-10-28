@@ -28,6 +28,8 @@ export interface UploadInput {
   personId: string | null;
   consentRef: string | null;
   token: string | undefined;
+  /** Which of the person's units (class-section) it was recorded in; the person's home unit when left out. */
+  unitId?: string | null;
   /** The length the browser measured; the server keeps the expected cost worked out from it. */
   expectedDurationMs?: number | null;
   /** Bytes uploaded so far, after each part. */
@@ -101,6 +103,7 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       content_type: contentTypeOf(file),
       consent_ref: input.consentRef,
       ...(input.expectedDurationMs ? { expected_duration_ms: input.expectedDurationMs } : {}),
+      ...(input.unitId ? { unit_id: input.unitId } : {}),
     },
   });
   const etags = new Map<number, string>();

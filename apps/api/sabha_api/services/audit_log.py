@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sabha_api.auth import Role
 from sabha_api.errors import BadRequestError
 from sabha_api.services.results import recording_title
-from sabha_core.models import AuditEntry, Dispute, Recording, User
+from sabha_core.models import AuditEntry, Dispute, Person, Recording, Unit, User
 from sabha_core.repo import TenantRepo
 
 ALLOWED = (Role.OWNER, Role.ADMIN)
@@ -75,6 +75,8 @@ async def list_entries(
     disputes: TenantRepo[Dispute],
     cursor: str | None,
     limit: int,
+    people: TenantRepo[Person] | None = None,
+    units: TenantRepo[Unit] | None = None,
     action: str | None = None,
     actor_user_id: str | None = None,
     target_id: str | None = None,
@@ -93,7 +95,7 @@ async def list_entries(
     kept = [c for c in conditions if c]
     found = await entries.find({"$and": kept} if kept else {}, sort=[("at", -1), ("_id", -1)], limit=limit + 1)
     page, more = found[:limit], len(found) > limit
-    names, labels = await _names(page, users), await _labels(page, users, recordings, disputes)
+    names, labels = await _names(page, users), await _labels(page, users, recordings, disputes, people, units)
     return AuditPage(
         items=[
             EntryOut(
@@ -120,6 +122,8 @@ async def _labels(
     users: TenantRepo[User],
     recordings: TenantRepo[Recording],
     disputes: TenantRepo[Dispute],
+    people: TenantRepo[Person] | None = None,
+    units: TenantRepo[Unit] | None = None,
 ) -> dict[tuple[str, str], str]:
     """(target type, id) -> what to show for it."""
 
@@ -138,4 +142,8 @@ async def _labels(
     )
     labels |= {("recording", rid): title for rid, title in titles.items()}
     labels |= {("dispute", d.id): titles[d.recording_id] for d in found_disputes if d.recording_id in titles}
+    if people is not None and (ids := of("person")):
+        labels |= {("person", p.id): p.name for p in await people.find({"_id": {"$in": ids}})}
+    if units is not None and (ids := of("unit")):
+        labels |= {("unit", u.id): u.name for u in await units.find({"_id": {"$in": ids}})}
     return labels

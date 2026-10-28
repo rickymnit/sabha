@@ -114,7 +114,8 @@ async def visible_person(principal: Principal, person_id: str, people: TenantRep
 class PersonOut(BaseModel):
     id: str
     name: str
-    unit_id: str | None
+    unit_id: str | None  # the home unit, the first of unit_ids
+    unit_ids: list[str] = []  # every unit the person works in (a teacher's class-sections)
 
 
 def people_filter(principal: Principal) -> dict[str, Any]:
@@ -122,15 +123,16 @@ def people_filter(principal: Principal) -> dict[str, Any]:
     or only themselves (staff)."""
     if principal.role in VIEW_ALL:
         return {}
-    if principal.role in UNIT_SCOPED:
-        return {"unit_id": {"$in": list(principal.unit_ids)}}
+    if principal.role in UNIT_SCOPED:  # anyone who works in one of their units, not only those based there
+        units = list(principal.unit_ids)
+        return {"$or": [{"unit_id": {"$in": units}}, {"unit_ids": {"$in": units}}]}
     return {"user_id": principal.user_id}
 
 
 async def visible_people(principal: Principal, people: TenantRepo[Person]) -> list[PersonOut]:
     """The people this caller may see and upload for (people_filter), by name."""
     found = await people.find(people_filter(principal), sort=[("name", 1)])
-    return [PersonOut(id=p.id, name=p.name, unit_id=p.unit_id) for p in found]
+    return [PersonOut(id=p.id, name=p.name, unit_id=p.unit_id, unit_ids=p.unit_ids) for p in found]
 
 
 RECENT_SCORES = 10

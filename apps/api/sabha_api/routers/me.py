@@ -29,6 +29,7 @@ class MeUser(BaseModel):
 class MeUnit(BaseModel):
     id: str
     name: str
+    parent_id: str | None = None  # the unit it sits under (a section's class); None for a top-level unit
 
 
 class MeTenant(BaseModel):
@@ -66,6 +67,8 @@ async def me(
             profile=tenant.profile,
             labels=tenant.labels.model_dump(),
             enabled_types=[t.value for t in tenant.enabled_types],
-            units=[MeUnit(id=u.id, name=u.name) for u in await units.find({}, sort=[("name", 1)])],
+            units=[
+                MeUnit(id=u.id, name=u.name, parent_id=u.parent_id) for u in await units.find({}, sort=[("name", 1)])
+            ],
         ),
     )

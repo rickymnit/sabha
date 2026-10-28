@@ -17,7 +17,8 @@ export interface Me {
     labels: Labels & Record<string, string>;
     enabled_types: ConversationType[];
     /** Every unit's name, so lists can say "Class 6" rather than an id. */
-    units: { id: string; name: string }[];
+    /** parent_id: the unit it sits under (a section's class); null for a top-level unit. */
+    units: { id: string; name: string; parent_id?: string | null }[];
   };
 }
 
@@ -88,7 +89,10 @@ export interface TranscriptResponse {
 export interface PersonItem {
   id: string;
   name: string;
+  /** The home unit: the first of unit_ids. */
   unit_id: string | null;
+  /** Every unit the person works in (a teacher's class-sections). */
+  unit_ids?: string[];
 }
 
 /** GET /v1/inbox: what waits for the caller's decision (sabha_api/services/inbox.py), newest first. */

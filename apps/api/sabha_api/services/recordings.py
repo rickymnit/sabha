@@ -125,6 +125,10 @@ class UnsupportedFormatError(ApiError):
     status, code, title = 422, "unsupported_format", "Unsupported format"
 
 
+class UnitNotTaughtError(ApiError):
+    status, code, title = 422, "unit_not_taught", "Not one of this person's units"
+
+
 class FileTooLargeError(ApiError):
     status, code, title = 422, "file_too_large", "File too large"
 
@@ -282,6 +286,8 @@ async def create(
         raise FileTooLargeError("This file needs more upload parts than storage allows.")
     person = await _person_for(principal, body.person_id, people)
     unit_id = body.unit_id or (person.unit_id if person else None)
+    if person is not None and person.unit_ids and body.unit_id is not None and body.unit_id not in person.unit_ids:
+        raise UnitNotTaughtError("Choose one of the units this person works in.")
     if principal.role in UNIT_SCOPED and unit_id is not None and unit_id not in principal.unit_ids:
         raise PersonNotAllowedError("You can upload only for your units.")
     if body.unit_id is not None and await units.find_one({"_id": body.unit_id}) is None:

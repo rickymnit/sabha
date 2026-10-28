@@ -291,6 +291,42 @@ def test_inbox_follow_ups_are_verified_and_never_crowded_out_by_other_units(api:
     assert ids == ["follow_up:r-mine"]
 
 
+def test_a_manager_of_a_class_sees_its_sections_and_who_teaches_there(api: Api) -> None:
+    insert(api.db, "units", Unit(id="unit-1a", tenant_id=T, name="A", parent_id="unit-1"))
+    insert(api.db, "units", Unit(id="unit-2a", tenant_id=T, name="A", parent_id="unit-2"))
+    # Meena is based in unit-2 but also teaches section 1-A; Ravi only teaches in unit-2's section
+    insert(api.db, "people", Person(id="p-meena", tenant_id=T, name="Meena", unit_ids=["unit-2", "unit-1a"]))
+    api.db.people.update_one({"_id": "p-ravi"}, {"$set": {"unit_id": "unit-2a", "unit_ids": ["unit-2a"]}})
+    recording(api, "r-1a", "p-meena", "unit-1a", 30)
+    recording(api, "r-2a", "p-ravi", "unit-2a", 20)
+
+    assert ids(api.get("manager", "/v1/recordings")) == ["r-1a"]  # unit-1's section, never unit-2's
+    assert sorted(p["id"] for p in api.get("manager", "/v1/people").json()) == ["p-asha", "p-meena"]
+    assert sorted(ids(api.get("owner", "/v1/recordings"))) == ["r-1a", "r-2a"]
+
+
+def test_owners_set_up_classes_sections_and_teachers(api: Api) -> None:
+    def post(path: str, body: dict[str, Any], sub: str = "owner") -> httpx.Response:
+        headers = {"Authorization": f"Bearer {api.idp.token(sub)}", "Idempotency-Key": uuid.uuid4().hex}
+        return api.client.post(path, json=body, headers=headers)
+
+    section = post("/v1/units", {"name": "B", "parent_id": "unit-1"})
+    assert section.status_code == 201, section.text
+    assert post("/v1/units", {"name": " b ", "parent_id": "unit-1"}).json()["code"] == "unit_exists"  # any case
+    assert post("/v1/units", {"name": "B", "parent_id": "unit-2"}).status_code == 201  # another class's B is fine
+    deeper = post("/v1/units", {"name": "X", "parent_id": section.json()["id"]})
+    assert (deeper.status_code, deeper.json()["code"]) == (422, "unit_too_deep")  # two levels only
+    assert post("/v1/units", {"name": "C", "parent_id": "unit-1"}, sub="manager").status_code == 403
+
+    teacher = post("/v1/people", {"name": "Kavita Rao", "unit_ids": [section.json()["id"], "unit-2"]}).json()
+    assert (teacher["unit_id"], teacher["unit_ids"]) == (section.json()["id"], [section.json()["id"], "unit-2"])
+    changed = api.client.patch(f"/v1/people/{teacher['id']}", json={"unit_ids": ["unit-2"]},
+                               headers={"Authorization": f"Bearer {api.idp.token('owner')}"})  # fmt: skip
+    assert (changed.json()["unit_id"], changed.json()["unit_ids"]) == ("unit-2", ["unit-2"])
+    actions = [e["action"] for e in api.db.audit_log.find({}, sort=[("at", 1)])]
+    assert actions.count("unit.create") == 2 and actions[-2:] == ["person.create", "person.update"]
+
+
 def test_the_list_says_in_plain_words_why_a_recording_stopped(api: Api) -> None:
     recording(api, "r-1", "p-asha", "unit-1", 30, RecordingStatus.FAILED)
     api.db.recordings.update_one({"_id": "r-1"}, {"$set": {"status_reason": "no_speech"}})

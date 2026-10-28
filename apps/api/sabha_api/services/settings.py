@@ -44,7 +44,7 @@ class PlanLimitError(ApiError):
 
 
 class LabelsIn(BaseModel):
-    """Any of the six words; words left out keep their current value."""
+    """Any of the words; words left out keep their current value."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -54,6 +54,10 @@ class LabelsIn(BaseModel):
     recording_plural: Word | None = None
     unit: Word | None = None
     manager: Word | None = None
+    unit_group: Word | None = None
+    unit_group_plural: Word | None = None
+    unit_sub: Word | None = None
+    unit_sub_plural: Word | None = None
 
     @field_validator("*", mode="before")
     @classmethod
@@ -133,7 +137,7 @@ async def update(
         if not after:
             return settings_out(tenant)
         stored = dict(after)
-        if "labels" in after:  # written whole, so the record always has all six words
+        if "labels" in after:  # written whole, so the record always has every word
             stored["labels"] = Labels.model_validate({**tenant.labels.model_dump(), **after["labels"]}).model_dump()
         await tenant_repo.update_settings(stored, session=session)
         await audit(entries, principal, request, action="settings.update", target_type="tenant", target_id=tenant.id,

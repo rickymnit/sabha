@@ -95,7 +95,10 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     assert me.status_code == 200, me.text
     assert me.json()["user"]["role"] == "staff"  # role and tenant come from our own records, as with Auth0
     assert me.json()["user"]["title"] == "Teacher, Class 6"
-    assert me.json()["tenant"]["units"] == [{"id": "unit-6", "name": "Class 6"}, {"id": "unit-7", "name": "Class 7"}]
+    assert me.json()["tenant"]["units"] == [
+        {"id": "unit-6", "name": "Class 6", "parent_id": None},
+        {"id": "unit-7", "name": "Class 7", "parent_id": None},
+    ]
     assert client.post("/dev-idp/token", json={"subject": "dev-nobody"}).status_code == 404
     hidden = client.post("/dev-idp/token", json={"subject": "e2e-teacher"}).json()["access_token"]
     e2e_me = client.get("/v1/me", headers={"Authorization": f"Bearer {hidden}"}).json()  # still signs in by subject

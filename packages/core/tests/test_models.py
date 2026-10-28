@@ -139,3 +139,12 @@ def test_preprocess_fields_are_optional_and_checked() -> None:
         AudioInfo(codec="mp3", sample_rate=0, channels=2)
     with pytest.raises(ValidationError):
         Recording(type=ConversationType.TEACHING, tenant_id="t1", duration_ms=-1)
+
+
+def test_words_added_later_come_from_the_profile_and_the_tenants_own_words_win() -> None:
+    stored = Tenant.from_profile("school", name="Sunrise", plan=Plan.PILOT).model_dump(by_alias=True)
+    for key in ("unit_group", "unit_group_plural", "unit_sub", "unit_sub_plural"):
+        del stored["labels"][key]  # a tenant saved before these words existed
+    stored["labels"]["unit_sub"] = "Division"  # ...or one whose owner renamed a word
+    labels = Tenant.model_validate(stored).labels
+    assert (labels.unit_group, labels.unit_group_plural, labels.unit_sub) == ("Class", "Classes", "Division")

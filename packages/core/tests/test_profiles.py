@@ -44,6 +44,10 @@ def test_school_defaults() -> None:
         "recording_plural": "Lessons",
         "unit": "Campus and section",
         "manager": "Principal or coordinator",
+        "unit_group": "Class",
+        "unit_group_plural": "Classes",
+        "unit_sub": "Section",
+        "unit_sub_plural": "Sections",
     }
     assert school.default_rubrics == {
         T.TEACHING: "teaching.school.v0.1",
@@ -74,6 +78,10 @@ def test_college_defaults() -> None:
         "recording_plural": "Lectures",
         "unit": "Department",
         "manager": "Head of department",
+        "unit_group": "Department",
+        "unit_group_plural": "Departments",
+        "unit_sub": "Batch",
+        "unit_sub_plural": "Batches",
     }
     assert college.default_rubrics == dict.fromkeys(ConversationType)
     assert college.consent == ConsentDefaults(
@@ -98,6 +106,10 @@ def test_company_defaults() -> None:
         "recording_plural": "Conversations",
         "unit": "Team or branch",
         "manager": "Sales manager",
+        "unit_group": "Branch",
+        "unit_group_plural": "Branches",
+        "unit_sub": "Team",
+        "unit_sub_plural": "Teams",
     }
     assert company.default_rubrics == {
         **dict.fromkeys(ConversationType),

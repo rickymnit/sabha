@@ -23,8 +23,9 @@ from pymongo.errors import DuplicateKeyError
 from sabha_api.auth.oidc import Identity, TokenVerifier
 from sabha_api.auth.principal import Principal
 from sabha_api.errors import ForbiddenError, NotReadyError
-from sabha_core.models import IdentityLink, Tenant, User
+from sabha_core.models import IdentityLink, Tenant, Unit, User
 from sabha_core.repo import SystemRepo, TenantRepo
+from sabha_core.units import subtree
 
 
 class EmailNotVerifiedError(ForbiddenError):
@@ -60,7 +61,11 @@ class Directory:
             raise UserDisabledError("Your account has been disabled. Ask your administrator.")
         if user.status == "invited":
             await users.update_one({"_id": user.id, "status": "invited"}, {"$set": {"status": "active"}})
-        return Principal(user_id=user.id, tenant_id=link.tenant_id, role=user.role, unit_ids=tuple(user.unit_ids))
+        unit_ids = user.unit_ids
+        if unit_ids:  # a manager of "Class 6" also manages its sections, wherever access is checked
+            units = TenantRepo(self._db, "units", link.tenant_id, Unit)
+            unit_ids = sorted(subtree(await units.find({}), unit_ids))
+        return Principal(user_id=user.id, tenant_id=link.tenant_id, role=user.role, unit_ids=tuple(unit_ids))
 
     async def tenant(self, tenant_id: str) -> Tenant | None:
         return await self._tenants.find_one({"_id": tenant_id})

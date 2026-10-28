@@ -297,6 +297,11 @@ export interface Labels {
   recording_plural: string;
   unit: string;
   manager: string;
+  /** The two levels of units (a school's "Class" and "Section"); optional for older fixtures, see app/units.ts. */
+  unit_group?: string;
+  unit_group_plural?: string;
+  unit_sub?: string;
+  unit_sub_plural?: string;
 }
 
 /** Who is looking at the report; admins see notes about hidden, unverified output. */

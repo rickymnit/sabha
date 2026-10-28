@@ -10,7 +10,8 @@ import { useDisputes, useLiveEvents, useMe, useRecordingCounts, useReviews, useU
 import type { Me } from "../api/types";
 import { Avatar, Button, EmptyState, Icon, Logo, NavItem, initials } from "../design";
 import { useSession } from "../session/session";
-import { capitalise, roleTitle, unitNames } from "./format";
+import { capitalise, roleTitle } from "./format";
+import { unitLabel, unitTree, unitWords } from "./units";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
 import { AppLoading } from "./AppLoading";
 import { InboxBell } from "../features/inbox/InboxBell";
@@ -46,7 +47,18 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   const { signOut } = useSession();
   const labels = me.tenant.labels;
   const type = params.get("type");
-  const units = unitNames(me, 1);
+  // "3 classes" for everyone in the organisation; a manager's own units by name ("Class 6 · A")
+  const tops = unitTree(me.tenant.units).length;
+  const words = unitWords(me.tenant.labels);
+  const units = me.user.unit_ids.length
+    ? me.user.unit_ids
+        .slice(0, 2)
+        .map((id) => unitLabel(me.tenant.units, id))
+        .filter(Boolean)
+        .join(", ") + (me.user.unit_ids.length > 2 ? ` and ${me.user.unit_ids.length - 2} more` : "")
+    : tops
+      ? `${tops} ${(tops === 1 ? words.group : words.groups).toLowerCase()}`
+      : "";
   const resolver = RESOLVERS.includes(me.user.role);
   const reviews = useReviews(resolver);
   const disputes = useDisputes(resolver);

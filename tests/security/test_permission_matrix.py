@@ -301,6 +301,34 @@ def fresh_analysis(api: Api) -> str:
 DISPUTE = {"dimension_key": "concept_clarity", "proposed_score": 5, "comment": "The definitions were checked twice."}
 
 
+def fresh(api: Api, collection: str, doc: Any) -> str:
+    api.db[collection].insert_one(doc.model_dump(by_alias=True))
+    return str(doc.id)
+
+
+def create_unit(api: Api, caller: str) -> httpx.Response:
+    """A fresh section under unit-1 (names are unique among siblings, so each call uses a new one)."""
+    body = {"name": f"Section {uuid.uuid4().hex[:6]}", "parent_id": "unit-1"}
+    return api.client.post("/v1/units", json=body, headers=api.headers(caller, create=True))
+
+
+def rename_unit(api: Api, caller: str) -> httpx.Response:
+    unit_id = fresh(api, "units", Unit(tenant_id="tenant-a", name=f"Class {uuid.uuid4().hex[:6]}"))
+    return api.client.patch(f"/v1/units/{unit_id}", json={"name": f"Renamed {uuid.uuid4().hex[:6]}"},
+                            headers=api.headers(caller))  # fmt: skip
+
+
+def create_person(api: Api, caller: str) -> httpx.Response:
+    body = {"name": "New teacher", "unit_ids": ["unit-1"]}
+    return api.client.post("/v1/people", json=body, headers=api.headers(caller, create=True))
+
+
+def change_person(api: Api, caller: str) -> httpx.Response:
+    person_id = fresh(api, "people", Person(tenant_id="tenant-a", name="Teacher", unit_ids=["unit-1"]))
+    return api.client.patch(f"/v1/people/{person_id}", json={"unit_ids": ["unit-2", "unit-1"]},
+                            headers=api.headers(caller))  # fmt: skip
+
+
 def raise_dispute(api: Api, caller: str) -> httpx.Response:
     path = f"/v1/analyses/{fresh_analysis(api)}/disputes"
     return api.client.post(path, json=DISPUTE, headers=api.headers(caller, create=True))
@@ -368,6 +396,10 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /v1/people/summary": lambda a, who: a.client.get("/v1/people/summary", headers=a.headers(who)),
     "GET /v1/search": lambda a, who: a.client.get("/v1/search?q=as", headers=a.headers(who)),
     "GET /v1/inbox": lambda a, who: a.client.get("/v1/inbox", headers=a.headers(who)),
+    "POST /v1/units": create_unit,
+    "PATCH /v1/units/{unit_id}": rename_unit,
+    "POST /v1/people": create_person,
+    "PATCH /v1/people/{person_id}": change_person,
     "GET /v1/costs/estimate": lambda a, who: a.client.get(
         "/v1/costs/estimate?type=teaching&duration_ms=600000", headers=a.headers(who)
     ),

@@ -24,6 +24,7 @@ import {
   type ConversationType,
 } from "../design";
 import { CostPreview } from "../features/costs/CostPreview";
+import { unitLabel, unitWords } from "../app/units";
 import { useSession } from "../session/session";
 import { capitalise } from "../app/format";
 import { uploadRecording } from "./upload/upload";
@@ -165,6 +166,10 @@ export function UploadPage() {
   const staffSelf = me.user.role === "staff";
   const onlyPerson = people.data?.length === 1 ? people.data[0] : undefined;
   const chosenPerson = personId || onlyPerson?.id || "";
+  // Which of the person's class-sections these lessons were taught in (owner, 2026-10-28); the first is their home
+  const personUnits = people.data?.find((p) => p.id === chosenPerson)?.unit_ids ?? [];
+  const [unitChoice, setUnitChoice] = useState("");
+  const chosenUnit = personUnits.includes(unitChoice) ? unitChoice : (personUnits[0] ?? "");
   const summary = summarise(items);
   const consent = consentOnFile ? consentRef.trim() : "";
   const consentMissing = consentOnFile && consent === "";
@@ -187,6 +192,7 @@ export function UploadPage() {
         file: item.file,
         type,
         personId: chosenPerson || null,
+        unitId: chosenUnit || null,
         consentRef: consent || null,
         token,
         expectedDurationMs: durations.current.get(item.key) ?? null,
@@ -351,6 +357,20 @@ export function UploadPage() {
               {people.data?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
+                </option>
+              ))}
+            </Select>
+          )}
+          {personUnits.length > 1 && (
+            <Select
+              label={`${unitWords(labels).group} and ${unitWords(labels).sub.toLowerCase()}`}
+              value={chosenUnit}
+              disabled={running}
+              onChange={(e) => setUnitChoice(e.target.value)}
+            >
+              {personUnits.map((id) => (
+                <option key={id} value={id}>
+                  {unitLabel(me.tenant.units, id)}
                 </option>
               ))}
             </Select>

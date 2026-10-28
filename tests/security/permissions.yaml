@@ -238,6 +238,39 @@ routes:
     staff_colleague: 404
     other_tenant: 404
 
+  POST /v1/units:
+    # Classes and sections (owner, 2026-10-28): owners and admins only. A fresh section under unit-1 per call;
+    # other_tenant has no unit-1 (422 unknown_unit).
+    anonymous: 401
+    owner: 201
+    admin: 201
+    other_tenant: 422
+    others: 403
+
+  PATCH /v1/units/{unit_id}:
+    # Rename a unit of tenant A, made fresh per call; other_tenant cannot see it (404).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 404
+    others: 403
+
+  POST /v1/people:
+    # Add a teacher (a record, no login; owner 2026-10-28): owners and admins. other_tenant has no unit-1 (422).
+    anonymous: 401
+    owner: 201
+    admin: 201
+    other_tenant: 422
+    others: 403
+
+  PATCH /v1/people/{person_id}:
+    # Change a teacher's units; a fresh person of tenant A per call, which other_tenant cannot see (404).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 404
+    others: 403
+
   GET /v1/inbox:
     # The bell and "Needs your decision" (UI v2): only what each caller may act on (filtered; test_results.py).
     anonymous: 401
