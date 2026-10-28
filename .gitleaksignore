@@ -1,3 +1,11 @@
 # Deliberate fake credentials in tests, ignored one by one (fingerprint = commit:file:rule:line).
 5bb774c5e07ba64890d7f4b75cc2bdf92bbdba63:eval/goldset/tests/test_import_tasks.py:jwt:290
 5bb774c5e07ba64890d7f4b75cc2bdf92bbdba63:eval/goldset/tests/test_import_tasks.py:generic-api-key:268
+# test_usage.py: "recording(api, duration_ms=...)" reads as an API key to the generic rule; there is no secret (2026-10-28).
+4400005c210b40b5370b50eaba6bc60f7d1f7b9f:apps/api/tests/test_usage.py:generic-api-key:120
+4400005c210b40b5370b50eaba6bc60f7d1f7b9f:apps/api/tests/test_usage.py:generic-api-key:121
+4400005c210b40b5370b50eaba6bc60f7d1f7b9f:apps/api/tests/test_usage.py:generic-api-key:175
+4400005c210b40b5370b50eaba6bc60f7d1f7b9f:apps/api/tests/test_usage.py:generic-api-key:186
+4400005c210b40b5370b50eaba6bc60f7d1f7b9f:apps/api/tests/test_usage.py:generic-api-key:193
+669a5722590d0db88e0c2cbd74493f3e1e313150:apps/api/tests/test_usage.py:generic-api-key:107
+669a5722590d0db88e0c2cbd74493f3e1e313150:apps/api/tests/test_usage.py:generic-api-key:110
