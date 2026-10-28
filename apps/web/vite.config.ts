@@ -14,6 +14,7 @@ export default defineConfig({
     proxy: {
       "/v1": api,
       "/dev-idp": api,
+      "/auth": api, // local password sign-in (POST /auth/login)
       "/health": api,
     },
   },

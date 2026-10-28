@@ -2,13 +2,13 @@
 // Dev mode: choose one of the demo accounts the local sign-in seeded (scripts/admin/dev_seed.py).
 // OIDC mode: one button that goes to the identity provider.
 
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { useDevUsers } from "../api/hooks";
 import { ApiError } from "../api/client";
 import type { DevUser } from "../api/types";
-import { Avatar, Button, Icon, Logo, Skeleton, SkeletonGroup } from "../design";
+import { Avatar, Button, Icon, Input, Logo, Skeleton, SkeletonGroup } from "../design";
 import { takeSessionEnded } from "../session/ended";
 import { useSession } from "../session/session";
 
@@ -117,6 +117,69 @@ function AccountRow({
   );
 }
 
+/** The local password sign-in: the username and password set in the API's .env (LOGIN_USERNAME). */
+function PasswordForm({ endedNote, onSignedIn }: { endedNote: ReactNode; onSignedIn: () => void }) {
+  const session = useSession();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await session.signInWithPassword?.(username.trim(), password);
+      onSignedIn();
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.status === 401
+          ? "The username or password is wrong."
+          : e instanceof ApiError && e.message
+            ? e.message
+            : "Sign-in failed. Check that the Sabha server is running, then try again.",
+      );
+      setPassword("");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Shell>
+      <div className="flex flex-col gap-1">
+        <h1 className="m-0 text-title font-bold">Sign in to Sabha</h1>
+        <p className="m-0 text-muted">Enter your username and password.</p>
+      </div>
+      {endedNote}
+      {error && (
+        <p role="alert" className="m-0 rounded border border-danger-tint bg-danger-tint px-3 py-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
+      <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
+        <Input
+          label="Username"
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+        <Input
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Button type="submit" fullWidth disabled={busy || !username.trim() || !password}>
+          {busy ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+    </Shell>
+  );
+}
+
 export function LoginPage() {
   const session = useSession();
   const navigate = useNavigate();
@@ -137,6 +200,10 @@ export function LoginPage() {
   );
 
   if (session.token) return <Navigate to={from} replace />;
+
+  if (session.mode === "password") {
+    return <PasswordForm endedNote={endedNote} onSignedIn={() => navigate(from, { replace: true })} />;
+  }
 
   if (!dev) {
     return (

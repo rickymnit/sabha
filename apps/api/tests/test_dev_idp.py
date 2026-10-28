@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 from pymongo import MongoClient
 
+from sabha_api.auth.password import hash_password, verify_password
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
 from sabha_core.repo import COLLECTIONS
@@ -102,3 +103,63 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     forged = token[:-4] + ("AAAA" if not token.endswith("AAAA") else "BBBB")
     assert client.get("/v1/me", headers={"Authorization": f"Bearer {forged}"}).status_code == 401
     assert not any(path.startswith("/dev-idp") for path in client.get("/openapi.json").json()["paths"])
+
+
+# --- Local password sign-in (owner's choice, 2026-10-28) ---
+
+LOGIN = {"login_username": "tester", "login_as": "owner@demo-school.example"}
+PASSWORD = "made-up-for-tests"  # pragma: allowlist secret  (a test value, not anyone's password)
+
+
+def test_password_hashes_check_and_never_hold_the_password() -> None:
+    stored = hash_password(PASSWORD)
+    assert PASSWORD not in stored and stored != hash_password(PASSWORD)  # salted
+    assert verify_password(PASSWORD, stored)
+    assert not verify_password(PASSWORD.upper(), stored)
+    assert not verify_password(PASSWORD, "not-a-hash")
+
+
+@pytest.mark.parametrize(
+    ("env", "extra", "message"),
+    [
+        ("staging", {"s3_region": "ap-south-1"}, "for local use only"),
+        ("local", {"dev_login": True}, "not both"),
+        ("local", {"login_as": None}, "set together"),
+    ],
+)
+def test_password_login_is_local_only_and_never_beside_the_dev_list(
+    env: AppEnv, extra: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        fields = {**BASE, **LOGIN, "login_password_hash": "scrypt$x", **extra}  # pragma: allowlist secret
+        Settings(_env_file=None, app_env=env, **fields)  # type: ignore[call-arg]  # _env_file: pydantic-settings
+
+
+@pytest.mark.integration
+def test_password_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]],
+                                     shared_db: str, s3_storage: Any) -> None:  # fmt: skip
+    db = mongo_replica_set[shared_db]
+    for collection in COLLECTIONS:
+        db[collection].delete_many({})
+    _seed_module().seed(db, ISSUER)
+    client = make_client(
+        resources=open_resources, app_env="local", oidc_issuer=ISSUER, oidc_audience="sabha-local",
+        login_password_hash=hash_password(PASSWORD), **LOGIN,
+        mongo_uri=f"{mongo_uri}&replicaSet=rs0", mongo_db=shared_db, redis_url="redis://127.0.0.1:1/0",
+        s3_endpoint_url=s3_storage.endpoint_url, s3_access_key_id=s3_storage.access_key_id,
+        s3_secret_access_key=s3_storage.secret_access_key,
+    )  # fmt: skip
+    assert client.get("/dev-idp/users").status_code == 404  # the list that skips the password is not mounted
+
+    wrong_password = {
+        "username": "tester",
+        "password": "nope",  # pragma: allowlist secret  (a deliberately wrong test value)
+    }
+    for wrong in (wrong_password, {"username": "Tester", "password": PASSWORD}):
+        refused = client.post("/auth/login", json=wrong)
+        assert (refused.status_code, refused.json()["code"]) == (401, "unauthorized")
+        assert refused.json()["detail"] == "The username or password is wrong."  # never says which
+
+    token = client.post("/auth/login", json={"username": "tester", "password": PASSWORD}).json()["access_token"]
+    me = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert (me["user"]["email"], me["user"]["role"]) == ("owner@demo-school.example", "owner")

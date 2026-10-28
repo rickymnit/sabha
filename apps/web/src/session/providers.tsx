@@ -14,17 +14,34 @@ function readStoredToken(): string | undefined {
   }
 }
 
-export function DevSessionProvider({ children }: { children: ReactNode }) {
+/** The API's local sign-in: "dev" (pick a seeded person) or "password" (LOGIN_USERNAME in the API's .env). */
+export function DevSessionProvider({ mode = "dev", children }: { mode?: "dev" | "password"; children: ReactNode }) {
   const [token, setToken] = useState<string | undefined>(readStoredToken);
-  const signInAs = useCallback(async (subject: string) => {
-    const answer = await apiFetch<{ access_token: string }>("/dev-idp/token", { method: "POST", body: { subject } });
+  const keep = useCallback((accessToken: string) => {
     try {
-      sessionStorage.setItem(DEV_TOKEN_KEY, answer.access_token);
+      sessionStorage.setItem(DEV_TOKEN_KEY, accessToken);
     } catch {
       // keep it in memory only
     }
-    setToken(answer.access_token);
+    setToken(accessToken);
   }, []);
+  const signInAs = useCallback(
+    async (subject: string) => {
+      const answer = await apiFetch<{ access_token: string }>("/dev-idp/token", { method: "POST", body: { subject } });
+      keep(answer.access_token);
+    },
+    [keep],
+  );
+  const signInWithPassword = useCallback(
+    async (username: string, password: string) => {
+      const answer = await apiFetch<{ access_token: string }>("/auth/login", {
+        method: "POST",
+        body: { username, password },
+      });
+      keep(answer.access_token);
+    },
+    [keep],
+  );
   const signOut = useCallback(() => {
     try {
       sessionStorage.removeItem(DEV_TOKEN_KEY);
@@ -34,8 +51,11 @@ export function DevSessionProvider({ children }: { children: ReactNode }) {
     setToken(undefined);
   }, []);
   const value = useMemo<Session>(
-    () => ({ mode: "dev", token, ready: true, signInAs, signOut }),
-    [token, signInAs, signOut],
+    () =>
+      mode === "password"
+        ? { mode, token, ready: true, signInWithPassword, signOut }
+        : { mode, token, ready: true, signInAs, signOut },
+    [mode, token, signInAs, signInWithPassword, signOut],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

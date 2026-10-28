@@ -39,7 +39,7 @@ export function ApiErrors() {
 }
 
 function WithSession({ mode, children }: { mode: AuthMode; children: ReactNode }) {
-  if (mode === "dev") return <DevSessionProvider>{children}</DevSessionProvider>;
+  if (mode === "dev" || mode === "password") return <DevSessionProvider mode={mode}>{children}</DevSessionProvider>;
   return (
     <AuthProvider config={readAuthConfig(import.meta.env)}>
       <OidcSessionProvider>{children}</OidcSessionProvider>

@@ -138,6 +138,12 @@ class Settings(BaseSettings):
 
     # Local dev sign-in (sabha_api.auth.dev_idp) while Auth0 is not set up: APP_ENV=local only, refused elsewhere.
     dev_login: bool = False
+    # Local password sign-in (owner's choice, 2026-10-28): one username and a scrypt hash of its password
+    # (scripts/admin/hash_password.py), signing in as the Sabha user with the email LOGIN_AS. APP_ENV=local only,
+    # and never together with DEV_LOGIN, whose "Sign in as..." list would bypass the password.
+    login_username: str | None = None
+    login_password_hash: SecretStr | None = None
+    login_as: str | None = None
 
     # Rubric files (P3.6, P5.7): <rubrics_dir>/<rubric id>.yaml. Relative paths are from the working directory (the
     # repo root in development); the worker images set /app/rubrics.
@@ -263,6 +269,13 @@ class Settings(BaseSettings):
     def _check_combinations(self) -> Settings:
         if self.dev_login and self.app_env != "local":
             raise ValueError("DEV_LOGIN is for local development only (APP_ENV=local)")
+        login = (self.login_username, self.login_password_hash, self.login_as)
+        if any(login) and not all(login):
+            raise ValueError("LOGIN_USERNAME, LOGIN_PASSWORD_HASH and LOGIN_AS are set together or not at all")
+        if all(login) and self.app_env != "local":
+            raise ValueError("the password sign-in (LOGIN_USERNAME) is for local use only (APP_ENV=local)")
+        if all(login) and self.dev_login:
+            raise ValueError("set DEV_LOGIN or LOGIN_USERNAME, not both: the dev sign-in list skips the password")
         if self.diarizer == "fake" and self.app_env != "test":
             raise ValueError("DIARIZER=fake is for tests only (APP_ENV=test)")
         if (self.langfuse_public_key is None) != (self.langfuse_secret_key is None):

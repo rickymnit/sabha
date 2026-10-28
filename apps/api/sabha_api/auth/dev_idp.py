@@ -18,6 +18,8 @@ user, tenant and role from its own records. The routes are left out of the OpenA
 
 from __future__ import annotations
 
+import hmac
+import logging
 import time
 from collections.abc import Mapping
 from typing import Annotated, Any
@@ -30,10 +32,13 @@ from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
 
 from sabha_api.auth.oidc import TokenVerifier
+from sabha_api.auth.password import verify_password
 from sabha_api.deps import _database
-from sabha_api.errors import NotFoundError
+from sabha_api.errors import NotFoundError, UnauthorizedError
 from sabha_core.models import IdentityLink, Tenant, User
 from sabha_core.repo import SystemRepo, TenantRepo
+
+log = logging.getLogger(__name__)
 
 TOKEN_TTL_S = 8 * 3600
 HIDDEN_TENANT_PREFIX = "e2e-"
@@ -125,3 +130,38 @@ async def token(body: TokenIn, request: Request, db: Db) -> TokenOut:
         if link.subject == body.subject:
             return TokenOut(access_token=idp.token(body.subject, user.email))
     raise NotFoundError("No one with that sign-in exists here; run scripts/admin/dev_seed.py.")
+
+
+# --- Local password sign-in (owner's choice, 2026-10-28) ---
+#
+# One username and password from .env (LOGIN_USERNAME, LOGIN_PASSWORD_HASH), signing in as the Sabha user whose email
+# is LOGIN_AS. APP_ENV=local only (settings), and never with the "Sign in as..." list above, which would skip the
+# password: when this is on, only /auth/login is mounted. The token is the same as the dev sign-in's, so the API still
+# finds the user, tenant and role from its own records.
+
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+password_router = APIRouter(prefix="/auth", tags=["dev"], include_in_schema=False)
+
+
+@password_router.post("/login", response_model=TokenOut)
+async def login(body: LoginIn, request: Request, db: Db) -> TokenOut:
+    settings = request.app.state.settings
+    expected = settings.login_password_hash.get_secret_value() if settings.login_password_hash else ""
+    # Both are always checked, so a wrong username takes as long as a wrong password and says the same.
+    name_ok = hmac.compare_digest(body.username.encode(), (settings.login_username or "").encode())
+    password_ok = verify_password(body.password, expected)
+    if not (name_ok and password_ok):
+        log.warning("password sign-in refused", extra={"username_matched": name_ok})
+        raise UnauthorizedError("The username or password is wrong.")
+    idp = _idp(request)
+    wanted = (settings.login_as or "").strip().lower()
+    for link, user, _ in await _users(db, idp.issuer):
+        if user.email.lower() == wanted and link.subject:
+            log.info("password sign-in", extra={"user_id": user.id, "tenant_id": user.tenant_id})
+            return TokenOut(access_token=idp.token(link.subject, user.email))
+    raise NotFoundError("LOGIN_AS is not a Sabha user who can sign in here; run scripts/admin/dev_seed.py.")

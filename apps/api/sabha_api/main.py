@@ -90,7 +90,9 @@ def create_app(
         responses=PROBLEM_RESPONSES,
     )
     app.state.settings = settings
-    app.state.dev_idp = DevIdp(settings.oidc_issuer, settings.oidc_audience) if settings.dev_login else None
+    password_login = settings.login_username is not None  # local password sign-in (dev_idp.password_router)
+    local_signer = settings.dev_login or password_login
+    app.state.dev_idp = DevIdp(settings.oidc_issuer, settings.oidc_audience) if local_signer else None
     default_verifier = (
         app.state.dev_idp.verifier()
         if app.state.dev_idp is not None
@@ -104,6 +106,8 @@ def create_app(
     app.include_router(health.router)
     if settings.dev_login:  # APP_ENV=local only (settings); not in the OpenAPI document
         app.include_router(dev_idp.router)
+    if password_login:  # APP_ENV=local only, never with DEV_LOGIN (settings); not in the OpenAPI document
+        app.include_router(dev_idp.password_router)
     app.include_router(me.router)
     app.include_router(users.router)
     app.include_router(recordings.router)

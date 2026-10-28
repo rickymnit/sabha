@@ -85,7 +85,10 @@ Sign-in uses Auth0 ([ADR 0002](docs/adr/0002-auth.md)). Set `OIDC_ISSUER`, `OIDC
 `.env`, and the matching `VITE_OIDC_*` values in `apps/web/.env.local` (copy
 [`apps/web/.env.example`](apps/web/.env.example)). [`docs/setup/auth.md`](docs/setup/auth.md) explains how to create
 the Auth0 tenant and applications. Until the Auth0 tenant exists, use the local dev sign-in instead (`APP_ENV=local`,
-`DEV_LOGIN=true`, see [`apps/web/README.md`](apps/web/README.md)): you pick a seeded user on the sign-in page.
+`DEV_LOGIN=true`, see [`apps/web/README.md`](apps/web/README.md)): you pick a seeded user on the sign-in page. Or, for a username and
+password instead of the list, set `LOGIN_USERNAME`, `LOGIN_PASSWORD_HASH` (from
+`uv run python scripts/admin/hash_password.py`) and `LOGIN_AS` in `.env` with `DEV_LOGIN=false`, and
+`VITE_AUTH_MODE=password` in `apps/web/.env.local` (local only; [ADR 0002](docs/adr/0002-auth.md) addendum).
 
 In development the web app also serves demo pages on mock data, with no sign-in: `/dev/components`,
 `/dev/transcript`, `/dev/report`, `/dev/reviews` and `/dev/overview`.
