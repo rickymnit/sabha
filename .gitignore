@@ -37,3 +37,6 @@ eval/raters/scores/
 # Playwright output (apps/web/e2e)
 test-results/
 playwright-report/
+
+# Celery beat state, written where `make beat` runs
+celerybeat-schedule*
