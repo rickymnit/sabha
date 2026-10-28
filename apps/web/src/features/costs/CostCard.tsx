@@ -66,7 +66,12 @@ export function CostCard({ recordingId }: { recordingId: string }) {
         </table>
       </div>
       <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-caption text-muted">
-        {!estimate && <li>No estimate was made: the length could not be read when this was uploaded.</li>}
+        {!estimate && (
+          <li>No estimate was kept: this was uploaded before costs were shown, or its length could not be read.</li>
+        )}
+        {actual.final && actual.asr_audio_minutes == null && (
+          <li>Speech-to-text cost was not recorded: this was transcribed before costs were tracked.</li>
+        )}
         {estimate && (
           <li>
             Expected from a {Math.round((estimate.duration_ms / 60_000) * 10) / 10}-minute file,{" "}
