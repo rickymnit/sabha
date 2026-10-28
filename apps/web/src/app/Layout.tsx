@@ -57,7 +57,11 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   const planUsage = typeof usage.data?.used_hours === "number" ? usage.data : undefined;
   const waiting = (reviews.data?.items.length ?? 0) + (disputes.data?.items.filter((d) => !d.raised_by_me).length ?? 0);
   return (
-    <nav id={id} aria-label="Main" className="flex h-full flex-col gap-6 px-3.5 py-5">
+    <nav
+      id={id}
+      aria-label="Main"
+      className="flex h-full flex-col gap-6 overflow-y-auto overscroll-contain px-3.5 py-5"
+    >
       <div className="hidden px-2 md:block">
         <Logo />
       </div>
