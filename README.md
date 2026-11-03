@@ -7,11 +7,13 @@ claim is backed by a timestamped quote.
 One multi-tenant product serves schools, colleges and companies. An organisation profile changes labels, default
 rubrics and rules, never code. The 8-week pilot covers **teaching and reception in schools**.
 
-> **Status (29 October 2026).** The pipeline runs end to end on a developer machine: upload in the web app,
+> **Status (3 November 2026).** The pipeline runs end to end on a developer machine: upload in the web app,
 > preprocessing, silence detection, speaker diarisation, speech recognition (Sarvam AI), LLM scoring (OpenAI
-> `gpt-6-luna`) with verified quotes, and the report. The web app covers recordings, people with their classes and
-> sections, overview, reviews and disputes, re-analysis, live status, rubrics, settings, activity (audit log) and
-> cost per recording. Besides school teaching and reception, there are draft rubrics for sales meetings, team
+> `gpt-6-luna`) with verified quotes, and the report. Meeting transcripts from Google Meet can be uploaded instead
+> of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)). The web app covers recordings, people with their
+> classes and sections, overview, reviews and disputes, re-analysis, sharing a report with the person analysed,
+> live status, rubrics, settings, activity (audit log) and cost per recording. Overview, Recordings and the report
+> follow the v2 design; Reviews, the teacher's own view, Upload and the sales report are being restyled next. Besides school teaching and reception, there are draft rubrics for sales meetings, team
 > meetings and company reception. It has run only on test recordings, not real school data. Not built yet: staging
 > and production on AWS, the Auth0 tenant (local sign-in is used meanwhile), monitoring, webhooks, calibration on
 > real rater scores, and consent records in the app (parked for the law team). See
@@ -76,6 +78,10 @@ make workers                         # one Celery worker for every queue
 make beat                            # scheduler: stale-upload cleanup and stuck-job sweeper
 pnpm -C apps/web dev                 # web app on http://localhost:5180
 ```
+
+Every command for running Sabha by hand on one machine (start, check, logs, stop, restart after code changes,
+troubleshooting) is in [`commands.md`](commands.md). The API reloads by itself after a code change; the relay and
+workers must be restarted.
 
 `uv run python scripts/admin/dev_seed.py` creates a local test school, a demo company and users. A full run needs `OPENAI_API_KEY`
 and `SARVAM_API_KEY` in `.env`.
@@ -145,7 +151,7 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 
 | Path | Contents |
 | --- | --- |
-| [`apps/api`](apps/api) | FastAPI service: sign-in, users and invites, classes and teachers, uploads, recordings, results, overview, inbox, search, reviews, disputes, re-analysis, live events, rubrics, settings, usage, costs, audit log, erasure |
+| [`apps/api`](apps/api) | FastAPI service: sign-in, users and invites, classes and teachers, uploads, recordings (filters, counts, CSV export, sharing), results, overview, inbox, search, reviews, disputes, re-analysis, live events, rubrics, settings, usage, costs, audit log, erasure |
 | [`apps/workers`](apps/workers) | Celery workers: pipeline stages in `stages/`, outbox relay, notifications, cleanup and the fair GPU scheduler |
 | [`apps/web`](apps/web) | React 18 + TypeScript + Vite app. Design tokens and components are in `src/design/` |
 | [`packages/core`](packages/core) | `sabha_core`: settings, tenant-scoped repository, models, state machine, time mapping, profiles |
@@ -188,7 +194,10 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | LLM gateway, PII redaction, scoring, grounding, synthesis, analyze stage (P5.1, P5.2, P5.4 to P5.7) | Done |
 | Reception: ticket, hold metric, not-applicable dimensions, rubric v0.2 (P5.8) | Done. Teaching rubric is v0.1 |
 | Sales meetings (rubric v0.2, deal card), team meetings scored as a whole with notes ([ADR 0008](docs/adr/0008-meetings.md)), company reception (rubric v0.1) | Done as drafts for the owner's review. Demo company "Brightpath Software" in the dev seed |
-| Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done. Restyled to the v2 design for tokens, sidebar and Overview; other pages in progress |
+| Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done |
+| UI v2 redesign (`docs/design/v2/`) | Done: tokens, sidebar, Overview, Recordings (tabs with counts, filters by type, class, person, date and score, bulk re-analyse and share, Retry or Close, CSV export) and the report (coaching steps, two-lane timeline with zoom, rubric levels, transcript alongside). Next: Reviews, the teacher's own view, Upload, sales report |
+| Sharing a report with the person analysed | Done. Emails them a link and shows the manager's note; it does not change who may see the report (owner's decision, 2026-11-03) |
+| Meeting transcripts uploaded instead of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)) | Done. Google Meet `.txt`; times are approximate, to about a minute |
 | Classes and sections (two-level units), teachers with the class-sections they teach | Done (owners and admins) |
 | Reviews: queue, "who is the speaker?", resolve ([ADR 0007](docs/adr/0007-review-outcomes.md)) | Done |
 | Disputes: raise, queue, decide, email; the reviewer's score replaces the AI's (P6.7) | Done |
@@ -198,7 +207,7 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Plans and audio-hour allowances, upload pause at the limit, cost in rupees per recording (P6.2, P7.2) | Done. Rate limiter and the 80 % warning email remain |
 | Audit log and Activity page, retry or close a failed recording (P1.8, P7.8) | Done. Pause per tenant and usage export remain |
 | Audio retention, erasure on request, nightly database export and restore drill (P7.3) | Done locally. Atlas backup and bucket lifecycle come with AWS |
-| Status emails (P2.7) | Done. Webhooks not wired yet |
+| Status emails (P2.7) | Done, including "report shared" and dispute decisions. Webhooks not wired yet |
 | Evaluation tools: gold set, WER, role accuracy, AI-human agreement, grounding, rater kit (P4.1 to P4.6) | Tools done. No real gold set yet, so no quality figures |
 | Model bake-off, calibration, CI eval gate, NeMo Sortformer on GPU (P5.3, P5.9, P4.7, P3.4b) | Not started. Needs real annotated recordings (and a GPU) |
 | Consent records in the app (P6.9) | Parked for the law team. Consent is still required at upload (golden rule 9) |
@@ -223,7 +232,7 @@ that cost ideas can be weighed against facts. Every figure below comes from our 
 
 ### Measured so far
 
-Three test recordings on a developer laptop (WSL, 3 GB RAM, no GPU). These are single runs on test audio, not
+Four test recordings on a developer laptop (WSL, 3 GB RAM, no GPU). These are single runs on test audio, not
 averages over real school recordings.
 
 | Recording | LLM calls and cost | Preprocess | Diarisation | Transcription | Analysis |
@@ -231,6 +240,7 @@ averages over real school recordings.
 | 3 min lesson, 2026-10-22, `o3-mini` (since shut down) | 4 calls, $0.066 | 11 s | 172 s | 5 s | 70 s |
 | 19.8 min lecture, 2026-10-26, `gpt-6-luna` | 4 calls, $0.0068 | 74 s | 1,326 s | 49 s | ended `analysis_failed` |
 | 28.2 min lecture, 2026-10-26, `gpt-6-luna` | 4 calls, $0.0066 | 117 s | 1,676 s | 49 s | ended `analysis_failed` |
+| 28.2 min lecture, 2026-11-03, `gpt-6-luna` | 6 calls, $0.0097 | about 2 min | about 28 min | 46 s | about 2 min, completed |
 
 What these show:
 
@@ -242,7 +252,9 @@ What these show:
   1 segmentation call.
 - **The prompt cache did not hit.** The second scoring call repeats the same 10,000-token prefix but recorded
   `cached_tokens: 0` and a cache write instead. With `gpt-6-luna`, a cache write costs more than plain input.
-- These runs predate the cost card, so their Sarvam cost was not recorded. Since 2026-10-28 every recording shows
+- The 2026-11-03 run cost ₹12.46 in all, from its cost card: speech recognition ₹11.53 (23.5 minutes of speech
+  sent, out of 28.2 recorded) and LLM ₹0.94. Speech recognition was about 93% of the cost.
+- The October runs predate the cost card, so their Sarvam cost was not recorded. Since 2026-10-28 every recording shows
   an expected cost at upload and its actual cost in rupees when done (speech recognition from Sarvam's published
   price, LLM from `llm_calls`, converted at `USD_INR_RATE` when it is set).
 
