@@ -286,6 +286,7 @@ export function TranscriptList({
         {!following && currentIndex >= 0 && (
           <Button
             variant="ghost"
+            className={compact ? "order-last -ml-3 basis-full justify-start" : undefined}
             onClick={() => {
               setFollowing(true);
               scrollToLine(currentIndex, "center");

@@ -25,7 +25,8 @@ import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
 import { ReportTimeline } from "./ReportTimeline";
-import { SeekModeContext } from "./seekMode";
+import { PlayingFromContext, SeekModeContext, usePlayingFrom } from "./seekMode";
+import { SmallPauseIcon } from "./icons";
 import { TicketPanel } from "./TicketPanel";
 import { VoicesPanel } from "./VoicesPanel";
 import { RubricAccordion } from "./RubricPanels";
@@ -182,19 +183,29 @@ function ReportBody({
   const playerRef = useRef<AudioPlayerHandle>(null);
   const transcriptRef = useRef<HTMLElement>(null);
   const [currentMs, setCurrentMs] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
+  // The time last asked for: asking for it again while it plays pauses, and once more carries on.
+  const [lastSeek, setLastSeek] = useState<number | null>(null);
   // With audio, the player reports the new position through onTimeUpdate, which moves the playhead and transcript.
   // Without (an uploaded transcript, or deleted audio), a time goes straight to its line in the transcript.
   const noAudio = Boolean(audioNote);
   const seek = useCallback(
     (ms: number) => {
       if (!noAudio) {
-        playerRef.current?.seek(ms);
+        const player = playerRef.current;
+        if (player && ms === lastSeek) {
+          if (playing) player.pause();
+          else player.play();
+          return;
+        }
+        setLastSeek(ms);
+        player?.seek(ms);
         return;
       }
       setCurrentMs(ms);
       transcriptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     },
-    [noAudio],
+    [noAudio, lastSeek, playing],
   );
 
   const highlights = useMemo(
@@ -245,132 +256,135 @@ function ReportBody({
 
   return (
     <SeekModeContext.Provider value={noAudio ? "go" : "play"}>
-      <section
-        aria-labelledby={timelineHeadingId}
-        className="flex min-w-0 flex-col rounded-panel border border-line bg-surface px-5 pb-5 pt-4.5"
-      >
-        <ReportTimeline
-          heading={
-            <h2 id={timelineHeadingId} className="m-0 text-lg font-semibold">
-              Who spoke when
-            </h2>
-          }
-          player={
-            audioNote ? (
-              <p className="m-0 rounded border border-line-subtle bg-surface-subtle px-3 py-2 text-sm text-muted">
-                {audioNote}
-              </p>
-            ) : (
-              <AudioPlayer
-                ref={playerRef}
-                label={`${labels.recording} audio`}
-                getUrl={getPlaybackUrl}
-                durationMs={recording.duration_ms}
-                onTimeUpdate={setCurrentMs}
-                showShortcutHint={false}
-              />
-            )
-          }
-          utterances={utterances}
-          roles={roles}
-          durationMs={recording.duration_ms}
-          removedSilence={recording.removed_silence}
-          phases={analysis.phases}
-          evidence={selected?.evidence ?? []}
-          dimensionName={selected?.name}
-          currentMs={currentMs}
-          onSeek={seek}
-          recordingWord={recordingWord}
-        />
-      </section>
-
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
-        <div className="flex min-w-0 flex-col gap-5">
-          <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
-
-          {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={seek} />}
-
-          {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
-
-          {analysis.meeting_notes && meeting && (
-            <MeetingNotesPanel notes={analysis.meeting_notes} voiceName={meeting.voiceName} onSeek={seek} />
-          )}
-
-          {meeting && transcript && (
-            <VoicesPanel
-              key={JSON.stringify(meeting.names)}
-              transcript={transcript}
-              voices={meeting.voices}
-              names={meeting.names}
-              onSave={meeting.onSaveNames}
-            />
-          )}
-
-          {notApplicable.length > 0 && (
-            <Card as="section" aria-label="Not applicable" data-testid="not-applicable-note">
-              <p className="m-0 text-sm font-semibold text-ink">
-                Not applicable to this {labels.recording.toLowerCase()}
-              </p>
-              {notApplicable.map((d) => (
-                <p key={d.key} className="m-0 text-ink-2">
-                  <span className="font-semibold">{d.name}:</span> {d.rationale} It is left out of the overall score.
-                </p>
-              ))}
-            </Card>
-          )}
-
-          {viewerRole === "admin" && hidden.length > 0 && (
-            <Card as="section" tone="warning" aria-label="Hidden dimensions" data-testid="admin-hidden-note">
-              <p className="m-0 text-sm font-semibold text-warning-ink">Visible to admins only</p>
-              <p className="m-0 text-ink-2">
-                {hidden.length === 1 ? "1 dimension is" : `${hidden.length} dimensions are`} hidden because their quotes
-                could not be verified in the transcript: {joinList(hidden.map((d) => d.name))}.{" "}
-                {hidden.length === 1 ? "It is" : "They are"} left out of the overall score.
-              </p>
-              {analysis.reasons.map((r, i) => (
-                <p key={i} className="m-0 text-caption text-muted">
-                  {r.message} ({r.code})
-                </p>
-              ))}
-            </Card>
-          )}
-
-          <RubricAccordion
-            dimensions={dimensions}
-            openKey={openKey}
-            onToggle={(key) => {
-              setPinKey(key);
-              setChosenKey(openKey === key ? null : key);
-            }}
-            speakers={speakers}
-            onSeek={seek}
-            provenance={
-              // The model id means nothing to most readers; administrators see it for support questions.
-              viewerRole === "admin"
-                ? `Scored against the ${rubricLabel} rubric by ${analysis.model.ids.join(", ")}`
-                : `Scored against the ${rubricLabel} rubric`
+      <PlayingFromContext.Provider value={playing && !noAudio ? lastSeek : null}>
+        <section
+          aria-labelledby={timelineHeadingId}
+          className="flex min-w-0 flex-col rounded-panel border border-line bg-surface px-5 pb-5 pt-4.5"
+        >
+          <ReportTimeline
+            heading={
+              <h2 id={timelineHeadingId} className="m-0 text-lg font-semibold">
+                Who spoke when
+              </h2>
             }
-            levels={levels}
-            disputeLabel={disputeLabel}
+            player={
+              audioNote ? (
+                <p className="m-0 rounded border border-line-subtle bg-surface-subtle px-3 py-2 text-sm text-muted">
+                  {audioNote}
+                </p>
+              ) : (
+                <AudioPlayer
+                  ref={playerRef}
+                  label={`${labels.recording} audio`}
+                  getUrl={getPlaybackUrl}
+                  durationMs={recording.duration_ms}
+                  onTimeUpdate={setCurrentMs}
+                  onPlayingChange={setPlaying}
+                  showShortcutHint={false}
+                />
+              )
+            }
+            utterances={utterances}
+            roles={roles}
+            durationMs={recording.duration_ms}
+            removedSilence={recording.removed_silence}
+            phases={analysis.phases}
+            evidence={selected?.evidence ?? []}
+            dimensionName={selected?.name}
+            currentMs={currentMs}
+            onSeek={seek}
             recordingWord={recordingWord}
-            onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
           />
-          {onSubmitDispute && (
-            <DisputeDialog
-              open={disputeOpen}
-              dimensions={dimensions
-                .filter((d) => !d.dispute_open)
-                .map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
-              initialKey={selected?.key}
-              onSubmit={onSubmitDispute}
-              onClose={() => setDisputeOpen(false)}
-            />
-          )}
+        </section>
 
-          {analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
+          <div className="flex min-w-0 flex-col gap-5">
+            <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+
+            {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={seek} />}
+
+            {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
+
+            {analysis.meeting_notes && meeting && (
+              <MeetingNotesPanel notes={analysis.meeting_notes} voiceName={meeting.voiceName} onSeek={seek} />
+            )}
+
+            {meeting && transcript && (
+              <VoicesPanel
+                key={JSON.stringify(meeting.names)}
+                transcript={transcript}
+                voices={meeting.voices}
+                names={meeting.names}
+                onSave={meeting.onSaveNames}
+              />
+            )}
+
+            {notApplicable.length > 0 && (
+              <Card as="section" aria-label="Not applicable" data-testid="not-applicable-note">
+                <p className="m-0 text-sm font-semibold text-ink">
+                  Not applicable to this {labels.recording.toLowerCase()}
+                </p>
+                {notApplicable.map((d) => (
+                  <p key={d.key} className="m-0 text-ink-2">
+                    <span className="font-semibold">{d.name}:</span> {d.rationale} It is left out of the overall score.
+                  </p>
+                ))}
+              </Card>
+            )}
+
+            {viewerRole === "admin" && hidden.length > 0 && (
+              <Card as="section" tone="warning" aria-label="Hidden dimensions" data-testid="admin-hidden-note">
+                <p className="m-0 text-sm font-semibold text-warning-ink">Visible to admins only</p>
+                <p className="m-0 text-ink-2">
+                  {hidden.length === 1 ? "1 dimension is" : `${hidden.length} dimensions are`} hidden because their
+                  quotes could not be verified in the transcript: {joinList(hidden.map((d) => d.name))}.{" "}
+                  {hidden.length === 1 ? "It is" : "They are"} left out of the overall score.
+                </p>
+                {analysis.reasons.map((r, i) => (
+                  <p key={i} className="m-0 text-caption text-muted">
+                    {r.message} ({r.code})
+                  </p>
+                ))}
+              </Card>
+            )}
+
+            <RubricAccordion
+              dimensions={dimensions}
+              openKey={openKey}
+              onToggle={(key) => {
+                setPinKey(key);
+                setChosenKey(openKey === key ? null : key);
+              }}
+              speakers={speakers}
+              onSeek={seek}
+              provenance={
+                // The model id means nothing to most readers; administrators see it for support questions.
+                viewerRole === "admin"
+                  ? `Scored against the ${rubricLabel} rubric by ${analysis.model.ids.join(", ")}`
+                  : `Scored against the ${rubricLabel} rubric`
+              }
+              levels={levels}
+              disputeLabel={disputeLabel}
+              recordingWord={recordingWord}
+              onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
+            />
+            {onSubmitDispute && (
+              <DisputeDialog
+                open={disputeOpen}
+                dimensions={dimensions
+                  .filter((d) => !d.dispute_open)
+                  .map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
+                initialKey={selected?.key}
+                onSubmit={onSubmitDispute}
+                onClose={() => setDisputeOpen(false)}
+              />
+            )}
+
+            {analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
+          </div>
+          {transcriptPanel}
         </div>
-        {transcriptPanel}
-      </div>
+      </PlayingFromContext.Provider>
     </SeekModeContext.Provider>
   );
 }
@@ -392,6 +406,7 @@ function OverallPanel({
   const scope = comparison ? comparison.scope.charAt(0).toUpperCase() + comparison.scope.slice(1) : "";
   const band = overall === null ? "mid" : scoreBand(overall);
   const firstName = recording.person.name.split(" ")[0] ?? recording.person.name;
+  const playingFrom = usePlayingFrom();
   return (
     <section
       aria-labelledby={headingId}
@@ -470,7 +485,12 @@ function OverallPanel({
                   onClick={() => onSeek(s.start_ms)}
                   className="min-w-[54px] shrink-0 rounded-md border border-primary-border bg-primary-tint-subtle px-2 py-1 text-center text-small font-semibold tabular-nums text-primary-hover hover:bg-primary-tint"
                 >
-                  <span className="sr-only">Play from </span>
+                  <span className="sr-only">{playingFrom === s.start_ms ? "Pause, playing from " : "Play from "}</span>
+                  {playingFrom === s.start_ms && (
+                    <span className="mr-1 inline-flex align-[-1px]">
+                      <SmallPauseIcon />
+                    </span>
+                  )}
                   {formatClock(s.start_ms)}
                 </button>
                 <span className="pt-0.5">{s.text}</span>

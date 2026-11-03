@@ -1,5 +1,13 @@
 // Small icons for the report page (Analysis.dc.html:215, :230). Decorative: callers label the controls.
 
+export function SmallPauseIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+    </svg>
+  );
+}
+
 export function SmallPlayIcon() {
   return (
     <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

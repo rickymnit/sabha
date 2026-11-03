@@ -6,8 +6,8 @@ import { useId, type ReactNode } from "react";
 
 import { cx } from "../../design";
 import { formatClock } from "../transcript";
-import { SmallGoIcon, SmallPlayIcon } from "./icons";
-import { useSeekMode } from "./seekMode";
+import { SmallGoIcon, SmallPauseIcon, SmallPlayIcon } from "./icons";
+import { usePlayingFrom, useSeekMode } from "./seekMode";
 import type { CardEvidence, DealCard, Labels } from "./types";
 
 type ChipStyle = { text: string; tone: string };
@@ -36,6 +36,7 @@ function Chip({ text, tone }: { text: string; tone: string }) {
 
 export function Quote({ evidence, onSeek }: { evidence: CardEvidence; onSeek: (ms: number) => void }) {
   const go = useSeekMode() === "go";
+  const pausable = usePlayingFrom() === evidence.start_ms;
   const time = formatClock(evidence.start_ms);
   return (
     <span className="flex items-start gap-2 text-small text-muted">
@@ -43,9 +44,11 @@ export function Quote({ evidence, onSeek }: { evidence: CardEvidence; onSeek: (m
         type="button"
         onClick={() => onSeek(evidence.start_ms)}
         className="inline-flex shrink-0 items-center gap-1 rounded border border-line-input bg-surface px-1.5 py-0.5 text-primary hover:bg-primary-tint-subtle"
-        aria-label={go ? `Go to ${time} in the transcript` : `Play from ${time}`}
+        aria-label={
+          go ? `Go to ${time} in the transcript` : pausable ? `Pause, playing from ${time}` : `Play from ${time}`
+        }
       >
-        {go ? <SmallGoIcon /> : <SmallPlayIcon />}
+        {go ? <SmallGoIcon /> : pausable ? <SmallPauseIcon /> : <SmallPlayIcon />}
         {go ? `Go to ${time}` : time}
       </button>
       <q className="pt-0.5 italic">{evidence.quote}</q>

@@ -10,3 +10,13 @@ export const SeekModeContext = createContext<SeekMode>("play");
 export function useSeekMode(): SeekMode {
   return useContext(SeekModeContext);
 }
+
+/**
+ * The time (ms) the audio is playing from after a time button was pressed, or null when paused. A time button
+ * whose time matches shows a pause icon: pressing it again pauses, and once more carries on from there.
+ */
+export const PlayingFromContext = createContext<number | null>(null);
+
+export function usePlayingFrom(): number | null {
+  return useContext(PlayingFromContext);
+}

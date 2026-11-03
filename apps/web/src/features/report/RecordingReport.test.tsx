@@ -125,6 +125,30 @@ describe("RecordingReport", () => {
     expect(audio.currentTime).toBeCloseTo(firstQuote.start_ms / 1000, 3);
   });
 
+  it("pressing a playing quote's time again pauses it, and once more carries on from there", async () => {
+    const report = mockReport(lesson, "completed");
+    const { audio } = await renderReport(report);
+    const user = userEvent.setup();
+    const time = () =>
+      within(screen.getByRole("region", { name: "Rubric scores" })).getByRole("button", { name: /evidence 1\b/ });
+    await user.click(time());
+    await act(async () => {});
+    expect(audio.paused).toBe(false);
+    expect(time()).toHaveAccessibleName(/^Pause evidence 1/);
+    const at = audio.currentTime;
+
+    await user.click(time());
+    await act(async () => {});
+    expect(audio.paused).toBe(true);
+    expect(time()).toHaveAccessibleName(/^Play evidence 1/);
+
+    audio.currentTime = at + 5; // it had played on a little before the pause
+    await user.click(time());
+    await act(async () => {});
+    expect(audio.paused).toBe(false);
+    expect(audio.currentTime).toBe(at + 5); // carried on, not back to the quote
+  });
+
   it("without audio (an uploaded transcript), a quote's button goes to its line in the transcript", async () => {
     const report = mockReport(lesson, "completed");
     render(

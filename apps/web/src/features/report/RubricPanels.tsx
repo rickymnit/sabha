@@ -6,8 +6,8 @@ import { useId } from "react";
 import { Button, ScoreBar, ScoreChip, cx } from "../../design";
 import { formatClock } from "../transcript";
 import { formatPercent } from "./format";
-import { CheckIcon, SmallGoIcon, SmallPlayIcon } from "./icons";
-import { useSeekMode } from "./seekMode";
+import { CheckIcon, SmallGoIcon, SmallPauseIcon, SmallPlayIcon } from "./icons";
+import { usePlayingFrom, useSeekMode } from "./seekMode";
 import { displayedScore, type VerifiedDimension } from "./types";
 
 export interface RubricScoreListProps {
@@ -211,6 +211,7 @@ export function RubricAccordion({
 }: RubricAccordionProps) {
   const headingId = useId();
   const mode = useSeekMode();
+  const playingFrom = usePlayingFrom();
   return (
     <section
       aria-labelledby={headingId}
@@ -321,11 +322,21 @@ export function RubricAccordion({
                             </div>
                             <Button
                               variant="secondary"
-                              icon={mode === "go" ? <SmallGoIcon /> : <SmallPlayIcon />}
+                              icon={
+                                mode === "go" ? (
+                                  <SmallGoIcon />
+                                ) : playingFrom === e.start_ms ? (
+                                  <SmallPauseIcon />
+                                ) : (
+                                  <SmallPlayIcon />
+                                )
+                              }
                               aria-label={
                                 mode === "go"
                                   ? `Go to evidence ${i + 1} at ${time} in the transcript`
-                                  : `Play evidence ${i + 1} from ${time}`
+                                  : playingFrom === e.start_ms
+                                    ? `Pause evidence ${i + 1}, playing from ${time}`
+                                    : `Play evidence ${i + 1} from ${time}`
                               }
                               onClick={() => onSeek(e.start_ms)}
                               className="flex-none px-3 text-sm"

@@ -35,6 +35,8 @@ export interface AudioPlayerProps {
   durationMs?: number;
   /** Called as playback moves and after every seek, in milliseconds. */
   onTimeUpdate?: (ms: number) => void;
+  /** Called when playback starts or stops. */
+  onPlayingChange?: (playing: boolean) => void;
   /** Accessible name of the player group. */
   label?: string;
   /** How long before `expires_at` to fetch a new URL (capped at half the URL's lifetime). Default one minute. */
@@ -74,6 +76,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
     getUrl,
     durationMs,
     onTimeUpdate,
+    onPlayingChange,
     label = "Audio player",
     refreshMarginMs = 60_000,
     shortcuts = true,
@@ -85,6 +88,11 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(funct
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [timeMs, setTimeMs] = useState(0);
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  useEffect(() => {
+    onPlayingChangeRef.current = onPlayingChange;
+  });
+  useEffect(() => onPlayingChangeRef.current?.(playing), [playing]);
   const [mediaDurationMs, setMediaDurationMs] = useState<number | null>(null);
   const [rate, setRate] = useState(1);
   const [failed, setFailed] = useState(false);
