@@ -28,6 +28,8 @@ import {
   type PersonSummary,
   type RecordingDetail,
   type RecordingCounts,
+  type RecordingQuery,
+  type ShareResult,
   type RecordingPage,
   type RubricDetail,
   type RubricListItem,
@@ -96,6 +98,103 @@ export function useRecordings(filters: RecordingFilters = {}, pageSize = 20) {
     enabled: Boolean(token),
     refetchInterval: (query) =>
       query.state.data?.pages.some((page) => page.items.some((item) => IN_PROGRESS.has(item.status))) ? poll() : false,
+  });
+}
+
+function recordingParams(query: RecordingQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value) params.set(key, String(value));
+  return params;
+}
+
+/** One page of GET /v1/recordings with the page's filters, for Previous / Next paging by cursor. */
+export function useRecordingsPage(
+  query: RecordingQuery,
+  cursor: string | null,
+  pageSize = 10,
+): UseQueryResult<RecordingPage, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["recordings", "page", query, cursor, pageSize, token],
+    queryFn: () => {
+      const params = recordingParams(query);
+      params.set("limit", String(pageSize));
+      if (cursor) params.set("cursor", cursor);
+      return apiFetch<RecordingPage>(`/v1/recordings?${params}`, { token });
+    },
+    enabled: Boolean(token),
+    placeholderData: (previous) => previous,
+    refetchInterval: (q) => (q.state.data?.items.some((item) => IN_PROGRESS.has(item.status)) ? poll() : false),
+  });
+}
+
+/** GET /v1/recordings/export.csv with the page's filters, saved as a file. Audited by the API. */
+export function useExportRecordings() {
+  const { token } = useSession();
+  return useMutation({
+    mutationFn: async (query: RecordingQuery) => {
+      let response: Response;
+      try {
+        response = await fetch(`/v1/recordings/export.csv?${recordingParams(query)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      } catch {
+        throw new ApiError(0, "network_error", "No connection", "The server could not be reached.");
+      }
+      if (!response.ok) throw new ApiError(response.status, `http_${response.status}`, "Export failed", "");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `recordings-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+
+/** POST /v1/recordings/share: email the people analysed a link, with a note shown on their report. */
+export function useShareRecordings() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: { recording_ids: string[]; note: string | null }) =>
+      apiFetch<ShareResult>("/v1/recordings/share", {
+        method: "POST",
+        token,
+        body: request,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      }),
+    onSuccess: async () => {
+      await Promise.all(["recording", "recordings"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
+    },
+  });
+}
+
+/** POST /v1/recordings/{id}/reanalyze for several recordings, one after another; resolves with how many started. */
+export function useReanalyseMany() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, reason }: { ids: string[]; reason: string }) => {
+      let started = 0;
+      for (const id of ids) {
+        await apiFetch(`/v1/recordings/${encodeURIComponent(id)}/reanalyze`, {
+          method: "POST",
+          token,
+          body: { reason },
+          headers: { "Idempotency-Key": crypto.randomUUID() },
+        });
+        started += 1;
+      }
+      return started;
+    },
+    onSettled: async () => {
+      await Promise.all(
+        ["recording", "analysis", "analysis-history", "recordings", "disputes"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
   });
 }
 

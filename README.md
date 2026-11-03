@@ -7,13 +7,15 @@ claim is backed by a timestamped quote.
 One multi-tenant product serves schools, colleges and companies. An organisation profile changes labels, default
 rubrics and rules, never code. The 8-week pilot covers **teaching and reception in schools**.
 
-> **Status: pilot week 2 (October 2026).** The pipeline runs end to end on a developer machine: upload in the web
-> app, preprocessing, silence detection, speaker diarisation, speech recognition (Sarvam AI), LLM scoring
-> (OpenAI `gpt-6-luna`) with verified quotes, and the report, recordings list, people, overview and review pages on
-> real data. It has run only on test recordings, not real school data. Not built yet: staging and production on AWS,
-> the Auth0 tenant (local dev sign-in is used meanwhile), disputes, consent records in the app, retention and
-> erasure, monitoring, and the sales, meeting and company-reception profiles. See [Project status](#project-status)
-> and [Running costs](#running-costs).
+> **Status (29 October 2026).** The pipeline runs end to end on a developer machine: upload in the web app,
+> preprocessing, silence detection, speaker diarisation, speech recognition (Sarvam AI), LLM scoring (OpenAI
+> `gpt-6-luna`) with verified quotes, and the report. The web app covers recordings, people with their classes and
+> sections, overview, reviews and disputes, re-analysis, live status, rubrics, settings, activity (audit log) and
+> cost per recording. Besides school teaching and reception, there are draft rubrics for sales meetings, team
+> meetings and company reception. It has run only on test recordings, not real school data. Not built yet: staging
+> and production on AWS, the Auth0 tenant (local sign-in is used meanwhile), monitoring, webhooks, calibration on
+> real rater scores, and consent records in the app (parked for the law team). See
+> [Project status](#project-status) and [Running costs](#running-costs).
 
 ## How it works
 
@@ -75,7 +77,7 @@ make beat                            # scheduler: stale-upload cleanup and stuck
 pnpm -C apps/web dev                 # web app on http://localhost:5180
 ```
 
-`uv run python scripts/admin/dev_seed.py` creates a local test school and users. A full run needs `OPENAI_API_KEY`
+`uv run python scripts/admin/dev_seed.py` creates a local test school, a demo company and users. A full run needs `OPENAI_API_KEY`
 and `SARVAM_API_KEY` in `.env`.
 
 `make env` (run by `make setup`) never overwrites an existing `.env`. It fills in random local storage credentials.
@@ -124,11 +126,26 @@ Stop the services with `make down`. Data volumes are kept.
 | `make eval-wer HYP_DIR=<dir>` | Word error rate and role accuracy of system transcripts against the hold-out gold set |
 | `make eval-kappa RUBRIC=<yaml> AI_DIR=<dir> SCORES="<files>"` | AI-human agreement and grounding on the calibration hold-out set |
 
+### Admin scripts
+
+Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py` and `expire_audio.py` take
+`--dry-run`; use it first.
+
+| Script | What it does |
+| --- | --- |
+| `create_tenant.py` | Create a workspace from a profile (school, college or company) and invite its first owner. There is no self-sign-up |
+| `dev_seed.py` | Local only: "Demo School" and the fictional "Brightpath Software", one user per role |
+| `set_plan.py` | Change a workspace's plan or monthly audio-hour allowance |
+| `hash_password.py` | Make the password hash for the local password sign-in |
+| `backfill.py` | Fill in fields added after recordings were processed (speaker strips, speech time, reception tickets) |
+| `expire_audio.py` | Run audio retention by hand (the worker scheduler runs it nightly) |
+| `restore_drill.py` | Load a database backup into a scratch database and check it; record the result in [`docs/runbook.md`](docs/runbook.md) |
+
 ## Repository layout
 
 | Path | Contents |
 | --- | --- |
-| [`apps/api`](apps/api) | FastAPI service: sign-in, users and invites, uploads, recordings, results, overview, reviews |
+| [`apps/api`](apps/api) | FastAPI service: sign-in, users and invites, classes and teachers, uploads, recordings, results, overview, inbox, search, reviews, disputes, re-analysis, live events, rubrics, settings, usage, costs, audit log, erasure |
 | [`apps/workers`](apps/workers) | Celery workers: pipeline stages in `stages/`, outbox relay, notifications, cleanup and the fair GPU scheduler |
 | [`apps/web`](apps/web) | React 18 + TypeScript + Vite app. Design tokens and components are in `src/design/` |
 | [`packages/core`](packages/core) | `sabha_core`: settings, tenant-scoped repository, models, state machine, time mapping, profiles |
@@ -139,7 +156,7 @@ Stop the services with `make down`. Data volumes are kept.
 | [`eval`](eval) | Gold-set tooling and evaluation scripts. The only source of quality numbers |
 | [`infra`](infra) | Docker Compose files, Label Studio for annotators, and Terraform (to come) |
 | [`docs`](docs) | ADRs, setup guides, design references, prompts per week, school guides, rater kit, rubric review sheets, legal drafts |
-| [`scripts`](scripts) | Developer helpers: environment check and local bucket setup |
+| [`scripts`](scripts) | Developer helpers (environment check, local bucket setup, synthetic audio) and admin scripts in `scripts/admin/` (see below) |
 | [`tests`](tests) | Cross-package security tests: tenant isolation and raw collection access |
 
 ## Stack
@@ -150,7 +167,7 @@ client in the API, the sync client in workers), S3 via boto3, ffmpeg, Silero VAD
 ([ADR 0006](docs/adr/0006-asr-sarvam.md)), OpenAI `gpt-6-luna` for LLM judgements
 ([`docs/llm-providers.md`](docs/llm-providers.md)), PII redaction in `packages/llm` (regular expressions; Presidio was
 considered, see P5.2), Langfuse, React 18 with Vite, Tailwind and TanStack Query, and Auth0 over OIDC for sign-in
-([ADR 0002](docs/adr/0002-auth.md)). Infrastructure uses Docker Compose, Terraform and GitHub Actions. Reasons for
+([ADR 0002](docs/adr/0002-auth.md)). Infrastructure uses Docker Compose and Terraform. Reasons for
 each choice are in [ADR 0001](docs/adr/0001-repo-and-stack.md).
 
 ## Project status
@@ -160,7 +177,7 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 
 | Area | State |
 | --- | --- |
-| Monorepo, tooling, CI, local services, settings (P1.1, P1.2, P0.5) | Done. Image publishing stays off until staging |
+| Monorepo, tooling, local services, settings (P1.1, P0.5) | Done. GitHub Actions removed on 2026-11-02 ([ADR 0010](docs/adr/0010-no-github-actions.md)) |
 | API: errors, request ids, health, rate limits, quotas, permission matrix for every route (P1.4, P7.2, P7.4) | Done |
 | Sign-in: Auth0 token checks, web sign-in with PKCE, users, invites, `/v1/me` (P1.5) | Done. The Auth0 tenant itself is set up in week 8; local dev sign-in meanwhile |
 | Tenant-scoped repository, models, indexes, isolation tests (P1.6) | Done |
@@ -170,12 +187,21 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Speech recognition through Sarvam AI, speaker roles, transcript (P3.1, P3.5 to P3.7) | Done |
 | LLM gateway, PII redaction, scoring, grounding, synthesis, analyze stage (P5.1, P5.2, P5.4 to P5.7) | Done |
 | Reception: ticket, hold metric, not-applicable dimensions, rubric v0.2 (P5.8) | Done. Teaching rubric is v0.1 |
-| Read API and web app on real data: recordings, report, upload, people, overview (P5.7b, P6.2, P6.4b, P6.6) | Done |
-| Reviews: queue, "who is the speaker?", resolve (ADR 0007) | Done |
+| Sales meetings (rubric v0.2, deal card), team meetings scored as a whole with notes ([ADR 0008](docs/adr/0008-meetings.md)), company reception (rubric v0.1) | Done as drafts for the owner's review. Demo company "Brightpath Software" in the dev seed |
+| Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done. Restyled to the v2 design for tokens, sidebar and Overview; other pages in progress |
+| Classes and sections (two-level units), teachers with the class-sections they teach | Done (owners and admins) |
+| Reviews: queue, "who is the speaker?", resolve ([ADR 0007](docs/adr/0007-review-outcomes.md)) | Done |
+| Disputes: raise, queue, decide, email; the reviewer's score replaces the AI's (P6.7) | Done |
+| Re-analysis of one or many recordings, every version kept (P2.8) | Done. Choosing a rubric version is in the API only |
+| Live status over server-sent events (P2.6) | Done |
+| Settings, rubrics pages, role views, accessibility checks, browser tests per role (P1.7, P6.8) | Done. Rubric editing waits for calibration |
+| Plans and audio-hour allowances, upload pause at the limit, cost in rupees per recording (P6.2, P7.2) | Done. Rate limiter and the 80 % warning email remain |
+| Audit log and Activity page, retry or close a failed recording (P1.8, P7.8) | Done. Pause per tenant and usage export remain |
+| Audio retention, erasure on request, nightly database export and restore drill (P7.3) | Done locally. Atlas backup and bucket lifecycle come with AWS |
 | Status emails (P2.7) | Done. Webhooks not wired yet |
 | Evaluation tools: gold set, WER, role accuracy, AI-human agreement, grounding, rater kit (P4.1 to P4.6) | Tools done. No real gold set yet, so no quality figures |
-| Sales calls, meetings, company reception (new organisation profiles and rubrics) | Not started. Next priority |
-| Disputes API, consent records in the app, retention and erasure, re-analysis | Not started |
+| Model bake-off, calibration, CI eval gate, NeMo Sortformer on GPU (P5.3, P5.9, P4.7, P3.4b) | Not started. Needs real annotated recordings (and a GPU) |
+| Consent records in the app (P6.9) | Parked for the law team. Consent is still required at upload (golden rule 9) |
 | AWS staging and production, Terraform, monitoring, Auth0 tenant | Planned for week 8 |
 
 ## Running costs
@@ -189,7 +215,7 @@ that cost ideas can be weighed against facts. Every figure below comes from our 
 | Item | Paid per | What we know |
 | --- | --- | --- |
 | LLM: OpenAI `gpt-6-luna` | Token | $0.10 per million input tokens, $0.50 per million output, cached input $0.01, cache writes $0.125 (OpenAI model page, 2026-10-24). Every call is recorded with tokens and cost in `llm_calls` |
-| Speech recognition: Sarvam AI REST API | Audio sent | Audio goes in chunks of at most 30 s, after silence is removed. Price not yet recorded in [ADR 0006](docs/adr/0006-asr-sarvam.md) |
+| Speech recognition: Sarvam AI REST API (`saaras:v4`) | Minute of audio sent | ₹0.49 per minute pay as you go; ₹0.45, ₹0.41 and ₹0.38 on the Pro, Growth and Business plans (sarvam.ai/api-pricing, 2026-10-28; in [`sabha_asr/pricing.py`](packages/asr/sabha_asr/pricing.py)). Audio goes in chunks of at most 30 s, after silence is removed |
 | Diarisation: pyannote on CPU | Compute time | Open model, no licence fee. The slowest stage by far (see below) |
 | Preprocessing and VAD: ffmpeg, Silero | Compute time | Open source, runs on CPU |
 | Hosting: AWS `ap-south-1` (S3 with 3 buckets, servers for API, workers, Redis), MongoDB Atlas Mumbai | Month | Not priced yet. Must stay in India (golden rule 12) |
@@ -216,7 +242,9 @@ What these show:
   1 segmentation call.
 - **The prompt cache did not hit.** The second scoring call repeats the same 10,000-token prefix but recorded
   `cached_tokens: 0` and a cache write instead. With `gpt-6-luna`, a cache write costs more than plain input.
-- The Sarvam cost per recording is not recorded yet.
+- These runs predate the cost card, so their Sarvam cost was not recorded. Since 2026-10-28 every recording shows
+  an expected cost at upload and its actual cost in rupees when done (speech recognition from Sarvam's published
+  price, LLM from `llm_calls`, converted at `USD_INR_RATE` when it is set).
 
 ### Savings already built in
 
@@ -225,6 +253,9 @@ What these show:
 - Numbers (talk share, questions, pace, silence) are computed in code, not by the LLM.
 - Every stage is idempotent: a retry skips work whose output already exists, and duplicate uploads are detected
   by checksum.
+- Monthly audio-hour allowances per plan: Starter uploads pause at the limit (`scripts/admin/set_plan.py` changes
+  one customer's).
+- Original audio is deleted by a nightly job after the workspace's retention period (90 days by default).
 - Daily token budgets per tenant and overall exist in the gateway (`LLM_TENANT_DAILY_TOKEN_BUDGET`,
   `LLM_GLOBAL_DAILY_TOKEN_BUDGET`) but are not set yet.
 - Priority lanes and a fair scheduler share processing capacity between tenants
@@ -241,24 +272,23 @@ quality figures come only from evaluation on real, human-rated recordings. The f
 
 - Is a GPU (for diarisation, and later NeMo Sortformer) cheaper per recording hour than CPU, at pilot volume?
 - Should diarisation run on a cheaper or spot machine, since reports are not needed in real time?
-- What does Sarvam charge per audio hour, and would a self-hosted speech model in India cost less?
+- Would a Sarvam plan, or a self-hosted speech model in India, cost less than pay as you go at pilot volume?
 - Would OpenAI's Batch API or a lower reasoning effort cut LLM cost without hurting agreement with raters?
 - Why does the prompt cache not hit between the two scoring calls, and is caching worth it with `gpt-6-luna`?
-- How long should audio and artefacts be kept, and when can they move to cheaper S3 storage classes?
+- Audio is kept 90 days by default. How long should artefacts be kept, and when can they move to cheaper S3
+  storage classes?
 - Expected pilot volume (recordings per school per week, average length) is not set yet, so monthly totals
   cannot be worked out.
 
 
-## Continuous integration
+## Checks before pushing
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and every push to `main`:
+There is no CI: pushes to GitHub run nothing ([ADR 0010](docs/adr/0010-no-github-actions.md)). Run the checks
+locally before pushing:
 
-- **Python:** ruff, mypy and pytest with coverage. Integration tests run against real MongoDB in Docker.
-- **Web:** eslint, prettier, tsc, vitest and a production build.
-- **Security:** pip-audit, `pnpm audit` and gitleaks over the full history.
-
-The job that builds and pushes images to `ghcr.io` runs only when the repository variable `PUBLISH_IMAGES` is
-`true`.
+- `make lint`: ruff, mypy, eslint and tsc.
+- `make test`: Python tests (integration tests against real MongoDB in Docker) and web unit tests.
+- pre-commit runs detect-secrets on every commit.
 
 ## Contributing
 

@@ -1,5 +1,6 @@
 // /login. A brand panel (what Sabha does, in three true statements) beside the sign-in card.
 // Dev mode: choose one of the demo accounts the local sign-in seeded (scripts/admin/dev_seed.py).
+// Password mode: username and password, then which organisation to enter when the login may enter several.
 // OIDC mode: one button that goes to the identity provider.
 
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -7,10 +8,24 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { useDevUsers } from "../api/hooks";
 import { ApiError } from "../api/client";
-import type { DevUser } from "../api/types";
+import type { DevUser, OrganisationChoice, OrganisationPick } from "../api/types";
 import { Avatar, Button, Icon, Input, Logo, Skeleton, SkeletonGroup } from "../design";
 import { takeSessionEnded } from "../session/ended";
 import { useSession } from "../session/session";
+
+const PROFILE_WORD: Record<OrganisationChoice["profile"], string> = {
+  school: "School",
+  college: "College",
+  company: "Company",
+};
+
+const ROLE_WORD: Record<OrganisationChoice["role"], string> = {
+  owner: "Owner",
+  admin: "Administrator",
+  manager: "Manager",
+  reviewer: "Reviewer",
+  staff: "Staff",
+};
 
 // Demo accounts in the order someone showing Sabha would pick them: the head of the school first.
 const ROLE_ORDER: DevUser["role"][] = ["owner", "manager", "reviewer", "staff", "admin"];
@@ -117,6 +132,80 @@ function AccountRow({
   );
 }
 
+/** After the password: one card per organisation the login may enter (LOGIN_AS in the API's .env). */
+function OrganisationPicker({
+  pick,
+  onChosen,
+  onBack,
+}: {
+  pick: OrganisationPick;
+  onChosen: () => void;
+  onBack: () => void;
+}) {
+  const session = useSession();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const choose = async (tenantId: string) => {
+    setBusy(tenantId);
+    setError(null);
+    try {
+      await session.chooseOrganisation?.(pick.ticket, tenantId);
+      onChosen();
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.status === 401
+          ? "Your sign-in has expired. Please sign in again."
+          : "Couldn't open that organisation. Please try again.",
+      );
+      setBusy(null);
+    }
+  };
+  return (
+    <Shell>
+      <div className="flex flex-col gap-1">
+        <h1 className="m-0 text-title font-bold">Choose an organisation</h1>
+        <p className="m-0 text-muted">Pick where you want to work. You can switch by signing out.</p>
+      </div>
+      {error && (
+        <p role="alert" className="m-0 rounded border border-danger-tint bg-danger-tint px-3 py-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {pick.organisations.map((org) => (
+          <li key={org.tenant_id}>
+            {/* prettier-ignore */}
+            <button
+              type="button"
+              disabled={busy !== null}
+              aria-label={`Open ${org.tenant_name}`}
+              onClick={() => void choose(org.tenant_id)}
+              className="flex min-h-[68px] w-full items-center gap-3 rounded-card border border-line-subtle bg-surface px-4 py-3 text-left hover:border-primary-border hover:bg-primary-tint-subtle disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Avatar name={org.tenant_name} size={40} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-semibold text-ink">{org.tenant_name}</span>
+                <span className="truncate text-small text-muted">
+                  {PROFILE_WORD[org.profile]} · {org.user_name}, {ROLE_WORD[org.role]}
+                </span>
+              </span>
+              {busy === org.tenant_id ? (
+                <span className="text-small text-muted">Opening…</span>
+              ) : (
+                <Icon name="chevronRight" className="text-muted-2" />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <Button variant="secondary" className="self-start" onClick={onBack} disabled={busy !== null}>
+        <Icon name="arrowLeft" />
+        Back to sign-in
+      </Button>
+    </Shell>
+  );
+}
+
 /** The local password sign-in: the username and password set in the API's .env (LOGIN_USERNAME). */
 function PasswordForm({ endedNote, onSignedIn }: { endedNote: ReactNode; onSignedIn: () => void }) {
   const session = useSession();
@@ -124,13 +213,17 @@ function PasswordForm({ endedNote, onSignedIn }: { endedNote: ReactNode; onSigne
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pick, setPick] = useState<OrganisationPick | null>(null);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await session.signInWithPassword?.(username.trim(), password);
-      onSignedIn();
+      const choices = await session.signInWithPassword?.(username.trim(), password);
+      if (choices) {
+        setPick(choices);
+        setPassword("");
+      } else onSignedIn();
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 401
@@ -144,6 +237,7 @@ function PasswordForm({ endedNote, onSignedIn }: { endedNote: ReactNode; onSigne
       setBusy(false);
     }
   };
+  if (pick) return <OrganisationPicker pick={pick} onChosen={onSignedIn} onBack={() => setPick(null)} />;
   return (
     <Shell>
       <div className="flex flex-col gap-1">

@@ -139,3 +139,35 @@ export function evidenceLines(
   });
   return lines;
 }
+
+export interface LaneSpan {
+  start_ms: number;
+  end_ms: number;
+}
+
+/**
+ * Speech per lane for the two-lane timeline (UI v2, docs/design/v2/03-lesson-report.png): the analysed person's
+ * turns in one lane, everyone else's in the other. Turns closer than `mergeGapMs` are drawn as one block.
+ */
+export function laneSpans(
+  utterances: readonly Utterance[],
+  isStaff: (role: string) => boolean,
+  mergeGapMs: number,
+): { staff: LaneSpan[]; others: LaneSpan[] } {
+  const staff: LaneSpan[] = [];
+  const others: LaneSpan[] = [];
+  for (const u of utterances) {
+    const lane = isStaff(u.role) ? staff : others;
+    const last = lane.at(-1);
+    if (last && u.start_ms - last.end_ms <= mergeGapMs) last.end_ms = Math.max(last.end_ms, u.end_ms);
+    else lane.push({ start_ms: u.start_ms, end_ms: u.end_ms });
+  }
+  return { staff, others };
+}
+
+/** A `spanMs` window of the recording around `centreMs`, kept inside it; the whole recording when it is shorter. */
+export function zoomWindow(centreMs: number, durationMs: number, spanMs: number): TimeRange {
+  if (durationMs <= spanMs) return { start_ms: 0, end_ms: durationMs };
+  const start = Math.min(Math.max(0, centreMs - spanMs / 2), durationMs - spanMs);
+  return { start_ms: Math.round(start), end_ms: Math.round(start + spanMs) };
+}

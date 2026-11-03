@@ -16,17 +16,20 @@ import {
   useRaiseDispute,
   useReanalyse,
   useRecording,
+  useRubric,
+  useShareRecordings,
   useTranscript,
 } from "../api/hooks";
 import { useSession } from "../session/session";
 import type { Me, TranscriptResponse } from "../api/types";
-import { Button, EmptyState, Icon, Skeleton, SkeletonGroup, useToast } from "../design";
+import { Button, EmptyState, Icon, Menu, Skeleton, SkeletonGroup, useToast, type MenuItem } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
 import { EraseDialog } from "../features/erasure/EraseDialog";
 import { CostCard } from "../features/costs/CostCard";
 import { ProcessingPanel, ReasonDialog, STAGE_NAMES } from "../features/processing";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
-import { RecordingReport } from "../features/report";
+import { CoachingSteps, RecordingReport, SharedNote } from "../features/report";
+import { ShareDialog } from "../features/share/ShareDialog";
 import type { PlaybackUrl } from "../features/transcript";
 import { formatDateTime, viewerRole } from "../app/format";
 import { RESOLVERS } from "../app/nav";
@@ -55,6 +58,9 @@ export function RecordingPage() {
   const [deciding, setDeciding] = useState<"retry" | "abandon" | null>(null);
   const erasure = useErasure();
   const [erasing, setErasing] = useState(false);
+  const share = useShareRecordings();
+  const [sharing, setSharing] = useState(false);
+  const rubric = useRubric(analysis.data && "rubric" in analysis.data ? analysis.data.rubric.id : undefined);
   const analysisId = analysis.data && "analysis_id" in analysis.data ? analysis.data.analysis_id : undefined;
   const submitDispute = useCallback(
     async (draft: DisputeDraft) => {
@@ -149,6 +155,32 @@ export function RecordingPage() {
   const stageName = failure ? (STAGE_NAMES[failure.stage] ?? failure.stage).toLowerCase() : "";
   const canReanalyse = isAdmin && recording.data.status === "COMPLETED" && !version;
   const recordingWord = me.tenant.labels.recording.toLowerCase();
+  const detail = recording.data;
+  const firstName = detail.person?.name.split(" ")[0] ?? "";
+  const staffViewer = me.user.role === "staff";
+  const canShare = !staffViewer && !isMeeting && detail.status === "COMPLETED" && Boolean(detail.person) && !version;
+  const menu: MenuItem[] = [
+    ...(canReanalyse ? [{ label: `Re-analyse this ${recordingWord}`, onSelect: () => setReanalysing(true) }] : []),
+    ...(me.user.role === "owner"
+      ? [{ label: `Erase this ${recordingWord}`, danger: true, onSelect: () => setErasing(true) }]
+      : []),
+  ];
+  const actions =
+    menu.length > 0 || canShare ? (
+      <>
+        <Menu label="More actions" items={menu} />
+        {canShare && <Button onClick={() => setSharing(true)}>Share with {firstName}</Button>}
+      </>
+    ) : undefined;
+  const readyAt = analysis.data && "created_at" in analysis.data ? analysis.data.created_at : undefined;
+  const banner = staffViewer ? (
+    detail.share_note && detail.shared_by_name ? (
+      <SharedNote from={detail.shared_by_name} note={detail.share_note} />
+    ) : undefined
+  ) : canShare && readyAt ? (
+    <CoachingSteps readyAt={readyAt} sharedAt={detail.shared_at} firstName={firstName} />
+  ) : undefined;
+  const levels = (key: string) => rubric.data?.dimensions.find((d) => d.key === key)?.scale;
   return (
     <div className="flex flex-col gap-4">
       {canReview && (
@@ -198,14 +230,9 @@ export function RecordingPage() {
           onClose={() => setDeciding(null)}
         />
       )}
-      {(versions.length > 1 || canReanalyse) && (
+      {versions.length > 1 && (
         <div className="flex flex-wrap items-center justify-end gap-3">
           <VersionPicker versions={versions} selected={version} onSelect={setVersion} />
-          {canReanalyse && (
-            <Button variant="secondary" onClick={() => setReanalysing(true)}>
-              Re-analyse
-            </Button>
-          )}
         </div>
       )}
       {shownVersion && (
@@ -243,23 +270,38 @@ export function RecordingPage() {
         viewerRole={viewerRole(me.user.role)}
         getPlaybackUrl={getPlaybackUrl}
         audioNote={
-          recording.data.audio_deleted_at
-            ? `The audio was deleted on ${formatDateTime(recording.data.audio_deleted_at).split(",")[0]}, as your organisation keeps audio for a limited time. The transcript and scores stay.`
-            : undefined
+          recording.data.source === "transcript"
+            ? `This ${recordingWord} was uploaded as a meeting transcript, so there is no audio to play. Times are approximate, to about a minute.`
+            : recording.data.audio_deleted_at
+              ? `The audio was deleted on ${formatDateTime(recording.data.audio_deleted_at).split(",")[0]}, as your organisation keeps audio for a limited time. The transcript and scores stay.`
+              : undefined
         }
         meeting={meeting}
         canDispute={"can_dispute" in analysis.data && analysis.data.can_dispute === true}
         onSubmitDispute={submitDispute}
+        actions={actions}
+        banner={banner}
+        levels={levels}
+        disputeLabel={staffViewer ? "Dispute this score" : "Ask for a score review"}
       />
+      {sharing && detail.person && (
+        <ShareDialog
+          who={firstName}
+          recordingWord={recordingWord}
+          count={1}
+          onSubmit={async (note) => {
+            await share.mutateAsync({ recording_ids: [id], note });
+            toast.show({
+              tone: "success",
+              title: `Shared with ${firstName}`,
+              message: "They get an email with a link.",
+            });
+          }}
+          onClose={() => setSharing(false)}
+        />
+      )}
       <CostCard recordingId={id} />
       {isAdmin && processing.data && <ProcessingPanel info={processing.data} />}
-      {me.user.role === "owner" && (
-        <div className="flex justify-end">
-          <Button variant="ghost" className="text-danger" onClick={() => setErasing(true)}>
-            Erase this {recordingWord}
-          </Button>
-        </div>
-      )}
       {erasing && (
         <EraseDialog
           what={`this ${recordingWord}`}

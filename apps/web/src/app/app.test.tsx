@@ -102,25 +102,27 @@ describe("the app shell", () => {
 });
 
 describe("the list's filters", () => {
-  it("searches titles and filters by type", async () => {
+  it("narrows by tab and score through the API, and keeps them in the address", async () => {
     const fetchMock = stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
     renderAt("/recordings", signedIn);
     await screen.findByRole("link", { name: "Fractions" });
-    await userEvent.type(screen.getByRole("searchbox", { name: "Search lessons" }), "deci");
-    expect(screen.getByRole("link", { name: "Decimals" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Fractions" })).toBeNull();
-    await userEvent.clear(screen.getByRole("searchbox", { name: "Search lessons" }));
-    await userEvent.click(screen.getByRole("button", { name: "Reception" }));
-    // The type is narrowed by the API (so it holds across pages), not by hiding loaded rows.
+    await userEvent.click(
+      within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: /^Reception/ }),
+    );
+    // Narrowed by the API (so it holds across pages), not by hiding loaded rows.
     await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.includes("type=reception"))).toBe(true));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Score" }), "below_3");
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.includes("score=below_3"))).toBe(true));
   });
 
   it("offers to clear filters that match nothing", async () => {
-    stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
-    renderAt("/recordings", signedIn);
-    await userEvent.type(await screen.findByRole("searchbox", { name: "Search lessons" }), "zzz");
-    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByRole("link", { name: "Fractions" })).toBeInTheDocument();
+    const fetchMock = stubApi({ "/v1/me": ME, "/v1/recordings": { items: [], next_cursor: null } });
+    renderAt("/recordings?score=good", signedIn);
+    expect(await screen.findByRole("heading", { name: "No lessons match" })).toBeInTheDocument();
+    fetchMock.mockClear();
+    await userEvent.click(screen.getAllByRole("button", { name: "Clear filters" })[0]!);
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.startsWith("/v1/recordings?"))).toBe(true));
+    expect(fetchMock.mock.calls.every(([path]) => !path.includes("score="))).toBe(true);
   });
 
   it("invites the first upload when there is nothing yet", async () => {
@@ -178,7 +180,7 @@ describe("the people page", () => {
     expect(screen.getByText("3.4")).toBeInTheDocument();
     expect(screen.getByText("No scores yet")).toBeInTheDocument(); // nothing invented for someone new
     await userEvent.click(screen.getByRole("link", { name: "Asha Rao" }));
-    expect(await screen.findByRole("button", { name: "Show everyone" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     const listCall = fetchMock.mock.calls.map(([path]) => path).find((path) => path.includes("person_id="));
     expect(listCall).toContain("person_id=p-asha"); // the API narrows the list, so it holds across pages
   });
@@ -285,5 +287,40 @@ describe("sign-in button", () => {
     renderAt("/login", { ...signedOut, signInAs });
     await userEvent.click(await screen.findByRole("button", { name: "Sign in as Ravi" }));
     expect(signInAs).toHaveBeenCalledWith("dev-ravi");
+  });
+});
+
+describe("password sign-in with several organisations", () => {
+  it("asks which organisation to open after the password, then opens it", async () => {
+    stubApi({
+      "/auth/login": { access_token: null, ticket: "ticket-1", organisations: [
+        { tenant_id: "demo-school", tenant_name: "Demo School", profile: "school", user_name: "Priya Sharma",
+          role: "owner" },
+        { tenant_id: "demo-company", tenant_name: "Brightpath Software", profile: "company", user_name: "Kabir Mehta",
+          role: "owner" },
+      ] },
+      "/auth/organisation": { access_token: "tok-company" },
+      "/v1/me": ME,
+      "/v1/recordings": PAGE,
+    }); // prettier-ignore
+    const router = createMemoryRouter(routes, { initialEntries: ["/login"] });
+    render(
+      <DevSessionProvider mode="password">
+        <ToastProvider>
+          <QueryClientProvider client={createQueryClient()}>
+            <RouterProvider router={router} />
+          </QueryClientProvider>
+        </ToastProvider>
+      </DevSessionProvider>,
+    );
+    await userEvent.type(screen.getByLabelText("Username"), "SysAdmin");
+    await userEvent.type(screen.getByLabelText("Password"), "secret");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("heading", { name: "Choose an organisation" })).toBeInTheDocument();
+    expect(sessionStorage.getItem(DEV_TOKEN_KEY)).toBeNull(); // not signed in until one is chosen
+    await userEvent.click(screen.getByRole("button", { name: "Open Brightpath Software" }));
+    await waitFor(() => expect(sessionStorage.getItem(DEV_TOKEN_KEY)).toBe("tok-company"));
+    await waitFor(() => expect(router.state.location.pathname).not.toBe("/login"));
   });
 });

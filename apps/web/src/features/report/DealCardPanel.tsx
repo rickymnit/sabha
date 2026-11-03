@@ -6,7 +6,8 @@ import { useId, type ReactNode } from "react";
 
 import { cx } from "../../design";
 import { formatClock } from "../transcript";
-import { SmallPlayIcon } from "./icons";
+import { SmallGoIcon, SmallPlayIcon } from "./icons";
+import { useSeekMode } from "./seekMode";
 import type { CardEvidence, DealCard, Labels } from "./types";
 
 type ChipStyle = { text: string; tone: string };
@@ -34,16 +35,18 @@ function Chip({ text, tone }: { text: string; tone: string }) {
 }
 
 export function Quote({ evidence, onSeek }: { evidence: CardEvidence; onSeek: (ms: number) => void }) {
+  const go = useSeekMode() === "go";
+  const time = formatClock(evidence.start_ms);
   return (
     <span className="flex items-start gap-2 text-small text-muted">
       <button
         type="button"
         onClick={() => onSeek(evidence.start_ms)}
         className="inline-flex shrink-0 items-center gap-1 rounded border border-line-input bg-surface px-1.5 py-0.5 text-primary hover:bg-primary-tint-subtle"
-        aria-label={`Play from ${formatClock(evidence.start_ms)}`}
+        aria-label={go ? `Go to ${time} in the transcript` : `Play from ${time}`}
       >
-        <SmallPlayIcon />
-        {formatClock(evidence.start_ms)}
+        {go ? <SmallGoIcon /> : <SmallPlayIcon />}
+        {go ? `Go to ${time}` : time}
       </button>
       <q className="pt-0.5 italic">{evidence.quote}</q>
     </span>
@@ -107,7 +110,7 @@ export function DealCardPanel({ card, labels, onSeek }: DealCardPanelProps) {
         </Section>
 
         <div className="flex min-w-0 flex-col gap-6">
-          {card.current_setup.length > 0 && (
+          {card.current_setup && card.current_setup.length > 0 && (
             <Section title="What they use today">
               <ul className="m-0 flex list-none flex-col gap-3 p-0">
                 {card.current_setup.map((item) => (

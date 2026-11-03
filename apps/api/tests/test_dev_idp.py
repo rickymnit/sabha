@@ -138,20 +138,25 @@ def test_password_login_is_local_only_and_never_beside_the_dev_list(
         Settings(_env_file=None, app_env=env, **fields)  # type: ignore[call-arg]  # _env_file: pydantic-settings
 
 
-@pytest.mark.integration
-def test_password_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]],
-                                     shared_db: str, s3_storage: Any) -> None:  # fmt: skip
+def _password_client(make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]],
+                     shared_db: str, s3_storage: Any, login_as: str) -> Any:  # fmt: skip
     db = mongo_replica_set[shared_db]
     for collection in COLLECTIONS:
         db[collection].delete_many({})
     _seed_module().seed(db, ISSUER)
-    client = make_client(
+    return make_client(
         resources=open_resources, app_env="local", oidc_issuer=ISSUER, oidc_audience="sabha-local",
-        login_password_hash=hash_password(PASSWORD), **LOGIN,
+        login_password_hash=hash_password(PASSWORD), login_username="tester", login_as=login_as,
         mongo_uri=f"{mongo_uri}&replicaSet=rs0", mongo_db=shared_db, redis_url="redis://127.0.0.1:1/0",
         s3_endpoint_url=s3_storage.endpoint_url, s3_access_key_id=s3_storage.access_key_id,
         s3_secret_access_key=s3_storage.secret_access_key,
     )  # fmt: skip
+
+
+@pytest.mark.integration
+def test_password_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]],
+                                     shared_db: str, s3_storage: Any) -> None:  # fmt: skip
+    client = _password_client(make_client, mongo_uri, mongo_replica_set, shared_db, s3_storage, LOGIN["login_as"])
     assert client.get("/dev-idp/users").status_code == 404  # the list that skips the password is not mounted
 
     wrong_password = {
@@ -166,3 +171,28 @@ def test_password_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_rep
     token = client.post("/auth/login", json={"username": "tester", "password": PASSWORD}).json()["access_token"]
     me = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"}).json()
     assert (me["user"]["email"], me["user"]["role"]) == ("owner@demo-school.example", "owner")
+
+
+@pytest.mark.integration
+def test_with_several_organisations_the_password_alone_signs_in_to_none(
+    make_client: Any, mongo_uri: str, mongo_replica_set: MongoClient[dict[str, Any]], shared_db: str, s3_storage: Any
+) -> None:
+    login_as = "owner@demo-school.example, Kabir@Brightpath.example, nobody@nowhere.example"
+    client = _password_client(make_client, mongo_uri, mongo_replica_set, shared_db, s3_storage, login_as)
+
+    answer = client.post("/auth/login", json={"username": "tester", "password": PASSWORD}).json()
+    assert answer["access_token"] is None  # not signed in until an organisation is chosen
+    assert [(o["tenant_id"], o["user_name"]) for o in answer["organisations"]] == [
+        ("demo-school", "Priya Sharma"), ("demo-company", "Kabir Mehta"),
+    ]  # in LOGIN_AS order; an email that is no one here is left out  # fmt: skip
+    ticket = answer["ticket"]
+    assert client.get("/v1/me", headers={"Authorization": f"Bearer {ticket}"}).status_code == 401  # not a token
+
+    token = client.post("/auth/organisation", json={"ticket": ticket, "tenant_id": "demo-company"}).json()
+    me = client.get("/v1/me", headers={"Authorization": f"Bearer {token['access_token']}"}).json()
+    assert (me["tenant"]["id"], me["user"]["name"]) == ("demo-company", "Kabir Mehta")
+
+    other = client.post("/auth/organisation", json={"ticket": ticket, "tenant_id": "e2e-school"})
+    assert other.status_code == 404  # only organisations LOGIN_AS names
+    forged = client.post("/auth/organisation", json={"ticket": ticket[:-4] + "AAAA", "tenant_id": "demo-school"})
+    assert forged.status_code == 401

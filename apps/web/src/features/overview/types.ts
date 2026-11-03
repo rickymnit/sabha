@@ -52,6 +52,8 @@ export interface ProcessingItem {
   type: ConversationType;
   stage: StageCount["stage"];
   person_name: string | null;
+  /** When the upload finished (ISO); null for older recordings. */
+  uploaded_at?: string | null;
 }
 
 export interface Turnaround {

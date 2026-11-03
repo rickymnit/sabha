@@ -183,7 +183,7 @@ UI v2 rule (owner, 2026-10-27; the coaching legend in `v2/01-overview.png`), in 
 
 | Low (`danger`) | Mid (`warning`) | Good (`success`) |
 | --- | --- | --- |
-| below 3.0 | 3.0 to 3.7 | 3.8 and above |
+| below 3.0 | 3.0 to 3.79 | 3.8 and above |
 
 The cut is on the one-decimal value people see, so 3.75 (shown as 3.8) is good. It replaces the v1 rule (good
 from 4.0).

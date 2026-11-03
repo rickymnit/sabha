@@ -179,6 +179,53 @@ def test_the_list_narrows_by_person_and_type_but_never_widens(api: Api) -> None:
     assert api.get("owner", "/v1/recordings?type=karaoke").status_code == 422
 
 
+def test_the_page_filters_narrow_by_unit_score_and_decision_but_never_widen(api: Api) -> None:
+    insert(api.db, "units", Unit(id="unit-1a", tenant_id=T, name="A", parent_id="unit-1"))
+    recording(api, "r-low", "p-asha", "unit-1a", 4)  # in a section under unit-1
+    recording(api, "r-good", "p-asha", "unit-1", 3)
+    recording(api, "r-ravi", "p-ravi", "unit-2", 2)
+    recording(api, "r-stuck", "p-ravi", "unit-2", 1, RecordingStatus.FAILED)
+    analysis(api, "r-low", "v1", 3.9, 20)
+    analysis(api, "r-low", "v2", 2.9, 10)  # the latest decides the band
+    analysis(api, "r-good", "v1", 3.76, 10)  # shows as 3.8
+    analysis(api, "r-ravi", "v1", 2.5, 10, person="p-ravi")
+    insert(api.db, "dlq", DeadLetter(tenant_id=T, recording_id="r-stuck", stage="transcribe", task="sabha.transcribe",
+                                     error_code="provider_auth", attempts=5, args={}))  # fmt: skip
+    assert ids(api.get("owner", "/v1/recordings?unit_id=unit-1")) == ["r-good", "r-low"]
+    assert ids(api.get("owner", "/v1/recordings?score=below_3")) == ["r-ravi", "r-low"]
+    assert ids(api.get("owner", "/v1/recordings?score=good")) == ["r-good"]
+    assert ids(api.get("owner", "/v1/recordings?tab=decision")) == ["r-stuck"]
+    assert ids(api.get("manager", "/v1/recordings?unit_id=unit-2")) == []  # not the manager's unit
+    assert ids(api.get("manager", "/v1/recordings?score=below_3")) == ["r-low"]
+    counts = api.get("manager", "/v1/recordings/counts").json()
+    assert (counts["total"], counts["below_3"], counts["needs_decision"]) == (2, 1, 0)
+    (stuck,) = api.get("owner", "/v1/recordings?tab=decision").json()["items"]
+    assert stuck["retryable"] is True
+    csv = api.get("manager", "/v1/recordings/export.csv?score=below_3")
+    assert csv.headers["content-type"].startswith("text/csv")
+    assert [line.split(",")[0] for line in csv.text.strip().splitlines()] == ["Title", "r-low"]
+    assert api.db.audit_log.count_documents({"action": "recordings.export"}) == 1
+
+
+def test_sharing_emails_only_what_the_caller_may_see_and_is_finished(api: Api) -> None:
+    recording(api, "r-asha", "p-asha", "unit-1", 3)
+    recording(api, "r-busy", "p-asha", "unit-1", 2, RecordingStatus.TRANSCRIBING)
+    recording(api, "r-ravi", "p-ravi", "unit-2", 1)
+    body = {"recording_ids": ["r-asha", "r-busy", "r-ravi"], "note": "Lovely analogy."}
+
+    def share(sub: str) -> httpx.Response:
+        headers = {"Authorization": f"Bearer {api.idp.token(sub)}", "Idempotency-Key": uuid.uuid4().hex}
+        return api.client.post("/v1/recordings/share", json=body, headers=headers)
+
+    out = share("manager").json()
+    assert out == {"shared": ["r-asha"], "skipped": ["r-busy"]}  # r-ravi is not the manager's: not even skipped
+    shared = api.db.recordings.find_one({"_id": "r-asha"}) or {}
+    assert shared["share_note"] == "Lovely analogy." and shared["shared_by"] == "u-manager"
+    assert api.db.outbox.count_documents({"type": "recording.shared", "payload.recording_id": "r-asha"}) == 1
+    assert (api.db.recordings.find_one({"_id": "r-ravi"}) or {})["shared_at"] is None
+    assert share("asha").status_code == 403
+
+
 def test_the_list_pages_with_a_cursor(api: Api) -> None:
     for minutes in range(5):
         recording(api, f"r{minutes}", "p-asha", "unit-1", minutes)

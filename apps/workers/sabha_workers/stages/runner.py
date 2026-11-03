@@ -77,6 +77,7 @@ class StageSpec:
     done_to: RecordingStatus  # the status once it has finished
     entry_from: RecordingStatus | None = None  # moved from here into `working` when the stage starts
     per_run: bool = False  # re-run by re-analysis (P2.8): run n > 1 writes to <version>-run<n>
+    imported: bool = False  # the entry step is an imported transcript skipping the audio stages (ADR 0009)
 
 
 class ArtefactStore(Protocol):
@@ -198,7 +199,8 @@ class StageRunner:
             return Outcome("stopped")
         if spec.entry_from is not None and recording.status is spec.entry_from:
             try:
-                self._move(tenant_id, recording_id, spec.entry_from, spec.working, f"{spec.name}_started")
+                self._move(tenant_id, recording_id, spec.entry_from, spec.working, f"{spec.name}_started",
+                           imported=spec.imported)  # fmt: skip
             except (ConcurrentTransition, ConsentRequired) as exc:
                 log.info("could not start the stage", extra={"recording_id": recording_id, "reason": str(exc)})
             recording = recordings.find_one({"_id": recording_id})
@@ -249,12 +251,13 @@ class StageRunner:
 
     def _move(
         self, tenant_id: str, recording_id: str, src: RecordingStatus, dst: RecordingStatus, reason: str,
-        meta: dict[str, Any] | None = None,
+        meta: dict[str, Any] | None = None, imported: bool = False,
     ) -> None:  # fmt: skip
         recordings = self._repo("recordings", tenant_id, Recording)
         outbox = self._repo("outbox", tenant_id, OutboxEvent)
         with self._client.start_session() as session, session.start_transaction():
-            record_transition(recordings, outbox, recording_id, src, dst, session=session, reason=reason, meta=meta)
+            record_transition(recordings, outbox, recording_id, src, dst, session=session, reason=reason, meta=meta,
+                              imported=imported)  # fmt: skip
 
     def _stop(
         self,

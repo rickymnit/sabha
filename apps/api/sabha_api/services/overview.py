@@ -89,6 +89,7 @@ class ProcessingItem(BaseModel):
     type: str
     stage: Stage
     person_name: str | None
+    uploaded_at: datetime | None  # upload complete; with the type's turnaround the web app shows "ready about"
 
 
 class Turnaround(BaseModel):
@@ -267,7 +268,8 @@ async def overview(
     person_ids = sorted({r.person_id for r in busy if r.person_id})
     person_names = {p.id: p.name for p in await people.find({"_id": {"$in": person_ids}})} if person_ids else {}
     processing = [ProcessingItem(id=r.id, title=recording_title(r.file_name, r.id), type=r.type.value,
-                                 stage=STAGES[r.status.value], person_name=person_names.get(r.person_id or ""))
+                                 stage=STAGES[r.status.value], person_name=person_names.get(r.person_id or ""),
+                                 uploaded_at=r.completed_at)
                   for r in busy]  # fmt: skip
 
     since = utc_now() - timedelta(days=TURNAROUND_DAYS)

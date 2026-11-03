@@ -47,7 +47,7 @@ Read this file fully before any task. If a request conflicts with a rule below, 
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
 | Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |
 | Auth | OIDC with Auth0 (`docs/adr/0002-auth.md`); JWT validated in the API; roles and tenants from our own records |
-| Infra | Docker Compose (dev, staging, prod pilot), Terraform for AWS, GitHub Actions |
+| Infra | Docker Compose (dev, staging, prod pilot), Terraform for AWS; no CI (ADR 0010) |
 | Observability | OpenTelemetry, Prometheus, Grafana, Sentry, structured JSON logs |
 
 ## Repo layout
@@ -116,5 +116,5 @@ make eval-kappa   # eval/kappa.py on the calibration hold-out split
 
 ## Definition of done
 
-Merged to main with passing CI, deployed to staging, visible in the Friday demo, and documented
+Merged to main with `make lint` and `make test` passing locally, deployed to staging, visible in the Friday demo, and documented
 (README, runbook or ADR) where someone else would need it.

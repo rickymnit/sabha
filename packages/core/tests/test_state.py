@@ -13,6 +13,7 @@ import pytest
 
 from sabha_core.state import (
     ALLOWED_TRANSITIONS,
+    IMPORT_TRANSITIONS,
     REANALYSIS_TRANSITIONS,
     RETRY_TRANSITIONS,
     TERMINAL_STATUSES,
@@ -119,6 +120,28 @@ def test_leaving_needs_review_needs_the_review_flag() -> None:
     with pytest.raises(InvalidTransition):  # the flags do not combine into other ways out
         check_transition(S.NEEDS_REVIEW, S.ANALYZING, review=True, reanalysis=True)
     assert next_statuses(S.NEEDS_REVIEW, review=True) == frozenset({S.TRANSCRIBING, S.FAILED})
+
+
+IMPORT = (S.UPLOADED, S.TRANSCRIBING)
+
+
+@pytest.mark.parametrize(("from_status", "to_status"), ALL_PAIRS, ids=str)
+def test_an_imported_transcript_unlocks_only_uploaded_to_transcribing(
+    from_status: RecordingStatus, to_status: RecordingStatus
+) -> None:
+    assert set(IMPORT_TRANSITIONS) == {IMPORT}
+    if (from_status, to_status) in EXPECTED or (from_status, to_status) == IMPORT:
+        check_transition(from_status, to_status, imported=True)  # must not raise
+    else:
+        with pytest.raises(InvalidTransition):
+            check_transition(from_status, to_status, imported=True)
+
+
+def test_skipping_to_transcribing_needs_the_imported_flag() -> None:
+    with pytest.raises(InvalidTransition, match="imported transcript"):
+        check_transition(S.UPLOADED, S.TRANSCRIBING)
+    assert S.TRANSCRIBING not in next_statuses(S.UPLOADED)
+    assert next_statuses(S.UPLOADED, imported=True) == frozenset({S.PREPROCESSING, S.TRANSCRIBING})
 
 
 def test_completed_to_analyzing_needs_the_reanalysis_flag() -> None:

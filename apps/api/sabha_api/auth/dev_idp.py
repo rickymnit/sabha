@@ -65,6 +65,25 @@ class DevIdp:
                   "iat": now, "exp": now + TOKEN_TTL_S}  # fmt: skip
         return jwt.encode(claims, self._key, algorithm="RS256", headers={"kid": KID})
 
+    def ticket(self, subject: str, ttl_s: int) -> str:
+        """A short-lived proof of a password sign-in, for choosing an organisation. Its audience is not the API's, so
+        the TokenVerifier never accepts it as an access token."""
+        now = int(time.time())
+        claims = {"iss": self.issuer, "aud": self._ticket_audience, "sub": subject, "iat": now, "exp": now + ttl_s}
+        return jwt.encode(claims, self._key, algorithm="RS256", headers={"kid": KID})
+
+    def ticket_is_valid(self, ticket: str) -> bool:
+        try:
+            jwt.decode(ticket, self._key.public_key(), algorithms=["RS256"], audience=self._ticket_audience,
+                       issuer=self.issuer, options={"require": ["exp", "sub"]})  # fmt: skip
+        except jwt.PyJWTError:
+            return False
+        return True
+
+    @property
+    def _ticket_audience(self) -> str:
+        return f"{self.audience}:choose-organisation"
+
     def verifier(self) -> TokenVerifier:
         return TokenVerifier(self.issuer, self.audience, fetch=self.fetch)
 
@@ -134,10 +153,16 @@ async def token(body: TokenIn, request: Request, db: Db) -> TokenOut:
 
 # --- Local password sign-in (owner's choice, 2026-10-28) ---
 #
-# One username and password from .env (LOGIN_USERNAME, LOGIN_PASSWORD_HASH), signing in as the Sabha user whose email
-# is LOGIN_AS. APP_ENV=local only (settings), and never with the "Sign in as..." list above, which would skip the
-# password: when this is on, only /auth/login is mounted. The token is the same as the dev sign-in's, so the API still
+# One username and password from .env (LOGIN_USERNAME, LOGIN_PASSWORD_HASH), signing in as a Sabha user named in
+# LOGIN_AS. APP_ENV=local only (settings), and never with the "Sign in as..." list above, which would skip the
+# password: when this is on, only /auth/... is mounted. The token is the same as the dev sign-in's, so the API still
 # finds the user, tenant and role from its own records.
+#
+# LOGIN_AS may list several emails, one per organisation (2026-11-02). With one, /auth/login returns the token. With
+# more, it returns the organisations and a short-lived ticket (signed by the same key, its own audience so it is never
+# accepted as an access token); the web app shows a picker and trades the ticket for a token at /auth/organisation.
+
+TICKET_TTL_S = 5 * 60
 
 
 class LoginIn(BaseModel):
@@ -145,11 +170,40 @@ class LoginIn(BaseModel):
     password: str
 
 
+class OrganisationChoice(BaseModel):
+    tenant_id: str
+    tenant_name: str
+    profile: str
+    user_name: str
+    role: str
+
+
+class LoginOut(BaseModel):
+    access_token: str | None = None  # one organisation: signed in already
+    token_type: str = "Bearer"  # noqa: S105  # the OAuth token type, not a secret
+    expires_in: int = TOKEN_TTL_S
+    ticket: str | None = None  # several: trade it at /auth/organisation within TICKET_TTL_S
+    organisations: list[OrganisationChoice] = []
+
+
+class ChooseIn(BaseModel):
+    ticket: str
+    tenant_id: str
+
+
 password_router = APIRouter(prefix="/auth", tags=["dev"], include_in_schema=False)
 
 
-@password_router.post("/login", response_model=TokenOut)
-async def login(body: LoginIn, request: Request, db: Db) -> TokenOut:
+async def _allowed(request: Request, db: AsyncDatabase[dict[str, Any]]) -> list[tuple[IdentityLink, User, Tenant]]:
+    """The users LOGIN_AS names, in its order (one row per email that is an active user who can sign in here)."""
+    idp = _idp(request)
+    rows = {user.email.lower(): (link, user, tenant) for link, user, tenant in await _users(db, idp.issuer)}
+    wanted = request.app.state.settings.login_as_emails
+    return [rows[email] for email in wanted if email in rows]
+
+
+@password_router.post("/login", response_model=LoginOut)
+async def login(body: LoginIn, request: Request, db: Db) -> LoginOut:
     settings = request.app.state.settings
     expected = settings.login_password_hash.get_secret_value() if settings.login_password_hash else ""
     # Both are always checked, so a wrong username takes as long as a wrong password and says the same.
@@ -159,9 +213,30 @@ async def login(body: LoginIn, request: Request, db: Db) -> TokenOut:
         log.warning("password sign-in refused", extra={"username_matched": name_ok})
         raise UnauthorizedError("The username or password is wrong.")
     idp = _idp(request)
-    wanted = (settings.login_as or "").strip().lower()
-    for link, user, _ in await _users(db, idp.issuer):
-        if user.email.lower() == wanted and link.subject:
-            log.info("password sign-in", extra={"user_id": user.id, "tenant_id": user.tenant_id})
-            return TokenOut(access_token=idp.token(link.subject, user.email))
-    raise NotFoundError("LOGIN_AS is not a Sabha user who can sign in here; run scripts/admin/dev_seed.py.")
+    allowed = await _allowed(request, db)
+    if not allowed:
+        raise NotFoundError("LOGIN_AS is not a Sabha user who can sign in here; run scripts/admin/dev_seed.py.")
+    if len(allowed) == 1:
+        link, user, _ = allowed[0]
+        log.info("password sign-in", extra={"user_id": user.id, "tenant_id": user.tenant_id})
+        return LoginOut(access_token=idp.token(link.subject or "", user.email))
+    return LoginOut(
+        ticket=idp.ticket(settings.login_username, TICKET_TTL_S),
+        organisations=[
+            OrganisationChoice(tenant_id=tenant.id, tenant_name=tenant.name, profile=tenant.profile,
+                               user_name=user.name, role=user.role)
+            for _, user, tenant in allowed
+        ],
+    )  # fmt: skip
+
+
+@password_router.post("/organisation", response_model=TokenOut)
+async def choose_organisation(body: ChooseIn, request: Request, db: Db) -> TokenOut:
+    idp = _idp(request)
+    if not idp.ticket_is_valid(body.ticket):
+        raise UnauthorizedError("Your sign-in has expired. Please sign in again.")
+    for link, user, tenant in await _allowed(request, db):
+        if tenant.id == body.tenant_id:
+            log.info("password sign-in", extra={"user_id": user.id, "tenant_id": tenant.id})
+            return TokenOut(access_token=idp.token(link.subject or "", user.email))
+    raise NotFoundError("That organisation is not one you can sign in to.")

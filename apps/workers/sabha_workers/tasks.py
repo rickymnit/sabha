@@ -45,7 +45,7 @@ from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
 from sabha_workers.retention import expire_audio
 from sabha_workers.rubrics import rubric_for
-from sabha_workers.stages import analyze, diarize, preprocess, transcribe
+from sabha_workers.stages import analyze, diarize, imported, preprocess, transcribe
 from sabha_workers.stages.roles_llm import LlmRoleTieBreaker
 from sabha_workers.stages.runner import PermanentError, S3Artefacts, StageContext, StageRunner, StageSpec, Work
 from sabha_workers.stages.transcript import TranscriptDeps
@@ -61,6 +61,10 @@ SPECS: dict[str, StageSpec] = {
     "transcribe": StageSpec("transcribe", working=S.TRANSCRIBING, done_to=S.ANALYZING),
     "analyze": StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED, per_run=True),
 }
+# An imported transcript (ADR 0009): the upload's event starts it like any recording, but it goes straight from
+# UPLOADED to the transcribe stage, which reads the file (sabha_workers.stages.imported) instead of the speech.
+IMPORT_SPEC = StageSpec("transcribe", working=S.TRANSCRIBING, done_to=S.ANALYZING, entry_from=S.UPLOADED,
+                        imported=True)  # fmt: skip
 
 
 def not_built(stage: str) -> Work:
@@ -138,6 +142,13 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
     )  # fmt: skip
     originals = preprocess.S3Originals(s3, settings.s3_bucket_audio)
 
+    def record_import(tenant_id: str, recording_id: str, duration_ms: int, names: dict[str, str],
+                      recorded_at: datetime | None) -> None:  # fmt: skip
+        fields: dict[str, Any] = {"duration_ms": duration_ms, "voice_names": names}
+        if recorded_at is not None:
+            fields["recorded_at"] = recorded_at
+        SyncTenantRepo(db, "recordings", tenant_id, Recording).update_one({"_id": recording_id}, {"$set": fields})
+
     @cache
     def diarizer() -> Diarizer:  # loaded on the first diarize task only (pyannote is an optional install)
         if settings.diarizer == "fake":  # APP_ENV=test only (settings): one speaker for the whole file
@@ -207,13 +218,25 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         llm_cost=llm_cost,
     )
 
+    speech = transcribe.make_work(transcriber, settings.artefact_version_preprocess, transcript_deps)
+    from_file = imported.make_work(originals, record_import, transcript_deps)
+
+    def transcribe_work(ctx: StageContext) -> dict[str, Any] | None:
+        return from_file(ctx) if ctx.recording.source == "transcript" else speech(ctx)
+
     built = {
         "preprocess": preprocess.make_work(originals, record_audio, vad, params),
         "diarize": diarize.make_work(diarizer, settings.artefact_version_preprocess, settings.diarization_device),
-        "transcribe": transcribe.make_work(transcriber, settings.artefact_version_preprocess, transcript_deps),
+        "transcribe": transcribe_work,
         "analyze": analyze.make_work(analyze_deps),
     }
     return {name: built.get(name) or not_built(name) for name in SPECS}
+
+
+def is_imported(db: Database[dict[str, Any]], tenant_id: str, recording_id: str) -> bool:
+    """Whether the recording is an imported transcript (ADR 0009), which skips the audio stages."""
+    recording = SyncTenantRepo(db, "recordings", tenant_id, Recording).find_one({"_id": recording_id})
+    return recording is not None and recording.source == "transcript"
 
 
 def register(app: Celery) -> None:
@@ -223,8 +246,10 @@ def register(app: Celery) -> None:
         @app.task(bind=True, name=f"sabha.{name}", acks_late=True, reject_on_worker_lost=True, max_retries=None)
         def run(self: Task, tenant_id: str, recording_id: str, event_id: str | None = None) -> str:
             rt = runtime()
-            outcome = rt.runner.run(SPECS[name], rt.works[name], tenant_id, recording_id,
-                                    attempt=self.request.retries + 1)  # fmt: skip
+            spec, work = SPECS[name], rt.works[name]
+            if name == "preprocess" and is_imported(rt.db, tenant_id, recording_id):
+                spec, work = IMPORT_SPEC, rt.works["transcribe"]
+            outcome = rt.runner.run(spec, work, tenant_id, recording_id, attempt=self.request.retries + 1)
             if outcome.result == "retry":
                 raise self.retry(countdown=outcome.retry_in)
             return outcome.result

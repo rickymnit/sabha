@@ -44,6 +44,17 @@ const pinLabels = () =>
     .queryAllByRole("button", { name: /^Play evidence/ })
     .map((b) => b.getAttribute("aria-label"));
 
+/** The rubric accordion's row buttons. */
+const rowButtons = () =>
+  within(screen.getByRole("region", { name: "Rubric scores" }))
+    .getAllByRole("button")
+    .filter((b) => b.hasAttribute("aria-expanded"));
+
+/** Opens a rubric row unless it is open already (the lowest score starts open). */
+async function openRow(user: ReturnType<typeof userEvent.setup>, row: HTMLElement) {
+  if (row.getAttribute("aria-expanded") !== "true") await user.click(row);
+}
+
 describe("visibleDimensions (golden rule 5 in the UI)", () => {
   const verified: Dimension = {
     key: "a",
@@ -89,12 +100,12 @@ describe("RecordingReport", () => {
     await renderReport(report);
     const user = userEvent.setup();
     const before = pinLabels();
-    const buttons = within(screen.getByRole("region", { name: "Rubric scores" })).getAllByRole("button");
-    const other = buttons.find((b) => b.getAttribute("aria-pressed") === "false")!;
+    const buttons = rowButtons();
+    const other = buttons.find((b) => b.getAttribute("aria-expanded") === "false")!;
 
     await user.click(other);
 
-    expect(other).toHaveAttribute("aria-pressed", "true");
+    expect(other).toHaveAttribute("aria-expanded", "true");
     expect(pinLabels()).not.toEqual(before);
     expect(pinLabels().length).toBeGreaterThan(0);
   });
@@ -103,9 +114,7 @@ describe("RecordingReport", () => {
     const report = mockReport(lesson, "completed");
     const { audio } = await renderReport(report);
     const user = userEvent.setup();
-    const selectedKey = within(screen.getByRole("region", { name: "Rubric scores" }))
-      .getAllByRole("button")
-      .find((b) => b.getAttribute("aria-pressed") === "true")!;
+    const selectedKey = rowButtons().find((b) => b.getAttribute("aria-expanded") === "true")!;
     const dimension = visibleDimensions(report.dimensions).find((d) => selectedKey.textContent?.includes(d.name))!;
     const firstQuote = dimension.evidence[0]!;
 
@@ -114,6 +123,38 @@ describe("RecordingReport", () => {
     await act(async () => {});
 
     expect(audio.currentTime).toBeCloseTo(firstQuote.start_ms / 1000, 3);
+  });
+
+  it("without audio (an uploaded transcript), a quote's button goes to its line in the transcript", async () => {
+    const report = mockReport(lesson, "completed");
+    render(
+      <RecordingReport
+        recording={lesson.recording}
+        analysis={report}
+        transcript={lesson.transcript}
+        labels={lesson.labels}
+        roles={lesson.roles}
+        viewerRole="admin"
+        getPlaybackUrl={getPlaybackUrl}
+        audioNote="This lesson was uploaded as a meeting transcript, so there is no audio to play."
+      />,
+    );
+    await act(async () => {});
+    expect(screen.queryByTestId("playhead")).toBeNull();
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    const buttons = screen.getAllByRole("button", { name: /^Go to evidence 1 at / });
+    const detail = buttons.find((b) => /^Go to \d+:\d\d$/.test(b.textContent ?? ""));
+    expect(buttons).toHaveLength(2); // the timeline pin and the button beside the quote
+    expect(detail).toBeDefined();
+    expect(screen.queryByRole("button", { name: /^Play evidence/ })).toBeNull();
+
+    await userEvent.click(detail!);
+
+    expect(scrolled).toHaveBeenCalled();
+    // The report now points at the quote's time (the transcript list follows it to that line).
+    expect(screen.getByTestId("playhead")).toBeInTheDocument();
+    expect(getPlaybackUrl).not.toHaveBeenCalled();
   });
 
   it("tells admins which dimensions were hidden, and staff nothing", async () => {
@@ -177,10 +218,10 @@ describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
     await act(async () => {});
     const user = userEvent.setup();
     const scores = screen.getByRole("region", { name: "Rubric scores" });
-    await user.click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
+    await openRow(user, within(scores).getByRole("button", { name: new RegExp(first!.name) }));
     expect(screen.getByText("Dispute waiting for a reviewer")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dispute this score" })).toBeNull();
-    await user.click(within(scores).getByRole("button", { name: new RegExp(second!.name) }));
+    await openRow(user, within(scores).getByRole("button", { name: new RegExp(second!.name) }));
     await user.click(screen.getByRole("button", { name: "Dispute this score" }));
     const dialog = screen.getByRole("dialog", { name: "Dispute a score" });
     expect(within(dialog).queryByRole("option", { name: new RegExp(first!.name) })).toBeNull();
@@ -195,7 +236,7 @@ describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
       dimensions: report.dimensions.map((d) => (d.key === first!.key ? { ...first!, override } : d)),
     });
     const scores = screen.getByRole("region", { name: "Rubric scores" });
-    await userEvent.setup().click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
+    await openRow(userEvent.setup(), within(scores).getByRole("button", { name: new RegExp(first!.name) }));
     expect(screen.getByTestId("override-note")).toHaveTextContent("score set to 2 by an admin");
   });
 
@@ -213,7 +254,7 @@ describe("RecordingReport disputes and reviewed scores (P6.7)", () => {
     };
     await renderReport({ ...report, dimensions: report.dimensions.map((d) => (d.key === first!.key ? reviewed : d)) });
     const scores = screen.getByRole("region", { name: "Rubric scores" });
-    await userEvent.setup().click(within(scores).getByRole("button", { name: new RegExp(first!.name) }));
+    await openRow(userEvent.setup(), within(scores).getByRole("button", { name: new RegExp(first!.name) }));
     expect(within(scores).getByText("Reviewed")).toBeInTheDocument();
     expect(screen.getByTestId("override-note")).toHaveTextContent(`AI score was ${first!.score}`);
   });

@@ -30,7 +30,7 @@ export interface ScoreChipProps {
   className?: string;
 }
 
-/** A 1–5 score coloured by band (scoreBand): below 3.0 danger, 3.0 to 3.7 warning, 3.8 and above success. */
+/** A 1–5 score coloured by band (scoreBand): below 3.0 danger, 3.0 to 3.79 warning, 3.8 and above success. */
 export function ScoreChip({
   score,
   max = 5,

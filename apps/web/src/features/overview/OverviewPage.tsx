@@ -30,7 +30,7 @@ export interface OverviewPageProps {
   preset: RangePreset;
   range: DayRange;
   onRangeChange: (preset: RangePreset, range: DayRange) => void;
-  /** What the previous period is called in "Up 32 on last week". */
+  /** What the previous period is called in "Up 32 vs prev. 7 days". */
   compare: string;
   /** The chosen top-level unit, or ALL_UNITS (metrics.ts). */
   unit: string;
@@ -49,6 +49,13 @@ export interface OverviewPageProps {
   recent?: ReactNode;
 }
 
+/** "in the last 7 days" for the fixed periods; a custom period names its dates instead. */
+const PRESET_WORDS: Partial<Record<RangePreset, string>> = {
+  "7d": " in the last 7 days",
+  "30d": " in the last 30 days",
+  month: " this month",
+};
+
 function greeting(now: Date): string {
   const hour = Number(new Intl.DateTimeFormat("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" })
     .format(now)); // prettier-ignore
@@ -60,8 +67,13 @@ export function OverviewPage(props: OverviewPageProps) {
   const today = (now ?? (() => new Date()))();
   const units = stats?.units ?? [];
   const things = labels.recording_plural.toLowerCase();
+  const across =
+    stats && unit === ALL_UNITS && units.length > 1
+      ? ` across ${units.length} ${(labels.unit_group_plural ?? "groups").toLowerCase()}`
+      : "";
+  const when = PRESET_WORDS[preset] ?? `, ${describeRange(range)}`;
   const summary = stats
-    ? `${stats.recordings_analysed} ${stats.recordings_analysed === 1 ? labels.recording.toLowerCase() : things} analysed, ${describeRange(range)}.`
+    ? `${stats.recordings_analysed} ${stats.recordings_analysed === 1 ? labels.recording.toLowerCase() : things} analysed${across}${when}.`
     : describeRange(range);
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -181,13 +193,14 @@ function Cell({ value }: { value: { median: number; n: number } | undefined }) {
 
 function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: OverviewStats }) {
   const rows = coachingRows(stats);
+  const weeks = Math.max(1, ...rows.map((r) => r.weekly?.length ?? 0));
   const main = mainType(stats);
   const byUnit = !stats.unit_id && (stats.units?.length ?? 0) > 1 ? (stats.units ?? []) : [];
   const legend = (
     <ul className="m-0 flex list-none flex-wrap gap-3 p-0 text-small text-muted" aria-label="Colours">
       {[
         ["bg-danger-tint", "Below 3.0"],
-        ["bg-warning-tint", "3.0 to 3.7"],
+        ["bg-warning-tint", "3.0 to 3.79"],
         ["bg-success-tint", "3.8 and above"],
       ].map(([swatch, text]) => (
         <li key={text} className="flex items-center gap-1.5">
@@ -208,10 +221,10 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
         <p className="m-0 px-5 py-4 text-sm text-muted">Not enough verified scores in this period yet.</p>
       ) : (
         <div className="overflow-x-auto px-5 py-3">
-          <table className="w-full min-w-[560px] border-separate border-spacing-x-1.5 border-spacing-y-1 text-table">
+          <table className="w-full min-w-[560px] table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1 text-table">
             <thead>
               <tr className="text-left text-small font-medium text-muted">
-                <th scope="col" className="py-1.5 font-medium">
+                <th scope="col" className="w-[30%] py-1.5 font-medium">
                   Rubric point
                 </th>
                 {byUnit.length ? (
@@ -225,8 +238,8 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
                     Median
                   </th>
                 )}
-                <th scope="col" className="w-36 py-1.5 font-medium">
-                  Trend, 8 weeks
+                <th scope="col" className="w-48 py-1.5 font-medium">
+                  {weeks} weeks ago → now
                 </th>
               </tr>
             </thead>
@@ -251,6 +264,8 @@ function CoachingRow({ item, units, labels }: { item: CoachingItem; units: { id:
   const weekly = item.weekly ?? [];
   const values = weekly.map((w) => (w.median === null ? null : w.median / 5));
   const said = weekly.map((w) => (w.median === null ? "none" : w.median.toFixed(1))).join(", ");
+  const known = weekly.flatMap((w) => (w.median === null ? [] : [w.median]));
+  const [first, last] = [known[0], known.at(-1)];
   return (
     <tr>
       <th scope="row" className="py-1 text-left font-normal text-ink">
@@ -272,7 +287,14 @@ function CoachingRow({ item, units, labels }: { item: CoachingItem; units: { id:
       )}
       <td className="py-1">
         {weekly.length > 0 && (
-          <BarSpark values={values} label={`Weekly median: ${said}`} height={22} highlightLast={false} />
+          <span className="flex items-center gap-2.5">
+            <BarSpark values={values} label={`Weekly median: ${said}`} height={22} />
+            {first !== undefined && last !== undefined && (
+              <span className="whitespace-nowrap text-small tabular-nums text-muted" aria-hidden="true">
+                {first.toFixed(1)} → {last.toFixed(1)}
+              </span>
+            )}
+          </span>
         )}
       </td>
     </tr>

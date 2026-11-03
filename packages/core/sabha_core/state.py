@@ -9,6 +9,9 @@ NEEDS_REVIEW -> TRANSCRIBING once the speaker roles are confirmed (the transcrip
 scored), and NEEDS_REVIEW -> FAILED when the reviewer closes the recording as not usable. FAILED is left only by
 an owner's or admin's retry (`retry=True`, P7.8): back to where the failed stage starts (`retry_status`), so the
 stage runs again and the stages before it are not repeated (their artefacts exist, golden rule 3).
+An imported transcript (`Recording.source == "transcript"`, ADR 0009) has no audio to clean, split by speaker or
+transcribe: it goes UPLOADED -> TRANSCRIBING (`imported=True`), where its file is read instead of the speech. The
+update also requires the recording's source to be "transcript", so an audio recording can never skip its stages.
 
 `transition()` (sync, for workers) and `transition_async()` (for the API) apply a change through the
 tenant-scoped repository with a conditional update: the recording must still be in `from_status`, so of two
@@ -80,6 +83,10 @@ REVIEW_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozens
 """A reviewer's outcomes (`review=True`): roles confirmed, or closed as not usable. As (from, to) pairs."""
 
 
+IMPORT_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset({(_S.UPLOADED, _S.TRANSCRIBING)})
+"""An imported transcript skipping the audio stages (`imported=True`; ADR 0009), as (from, to) pairs."""
+
+
 RETRY_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset(
     {(_S.FAILED, _S.UPLOADED), (_S.FAILED, _S.DIARIZING), (_S.FAILED, _S.TRANSCRIBING), (_S.FAILED, _S.ANALYZING)}
 )
@@ -130,8 +137,9 @@ class RecordingNotFound(TransitionError):
 
 
 def next_statuses(
-    from_status: RecordingStatus | str, *, reanalysis: bool = False, review: bool = False, retry: bool = False
-) -> frozenset[RecordingStatus]:
+    from_status: RecordingStatus | str, *, reanalysis: bool = False, review: bool = False, retry: bool = False,
+    imported: bool = False,
+) -> frozenset[RecordingStatus]:  # fmt: skip
     """The statuses a recording may move to from `from_status`. Raises ValueError for an unknown status."""
     source = RecordingStatus(from_status)
     allowed = ALLOWED_TRANSITIONS[source]
@@ -141,12 +149,14 @@ def next_statuses(
         allowed = allowed | {target for start, target in REVIEW_TRANSITIONS if start is source}
     if retry:
         allowed = allowed | {target for start, target in RETRY_TRANSITIONS if start is source}
+    if imported:
+        allowed = allowed | {target for start, target in IMPORT_TRANSITIONS if start is source}
     return allowed
 
 
 def check_transition(
     from_status: RecordingStatus | str, to_status: RecordingStatus | str, *, reanalysis: bool = False,
-    review: bool = False, retry: bool = False,
+    review: bool = False, retry: bool = False, imported: bool = False,
 ) -> None:  # fmt: skip
     """Raise InvalidTransition unless the table allows `from_status -> to_status`; otherwise return None.
 
@@ -154,7 +164,7 @@ def check_transition(
     Plain strings (as stored in MongoDB) are accepted; an unknown status raises ValueError.
     """
     source, target = RecordingStatus(from_status), RecordingStatus(to_status)
-    allowed = next_statuses(source, reanalysis=reanalysis, review=review, retry=retry)
+    allowed = next_statuses(source, reanalysis=reanalysis, review=review, retry=retry, imported=imported)
     if target in allowed:
         return
     if (source, target) in REANALYSIS_TRANSITIONS:
@@ -163,6 +173,8 @@ def check_transition(
         message = f"{source} -> {target} is allowed only as a review outcome (review=True)"
     elif (source, target) in RETRY_TRANSITIONS:
         message = f"{source} -> {target} is allowed only as a retry (retry=True)"
+    elif (source, target) in IMPORT_TRANSITIONS:
+        message = f"{source} -> {target} is allowed only for an imported transcript (imported=True)"
     elif not allowed:
         message = f"cannot move a recording from {source} to {target}: there are no transitions out of {source}"
         if any(start is source for start, _ in REANALYSIS_TRANSITIONS):
@@ -179,6 +191,7 @@ def check_transition(
 
 # --- Applying a transition (database part) ---
 
+TRANSCRIPT_SOURCE = "transcript"  # Recording.source of an imported transcript (ADR 0009)
 _NO_CONSENT_NEEDED = frozenset({_S.UPLOADED})  # an upload may complete before consent is recorded (P2.2)
 
 
@@ -193,14 +206,17 @@ def _plan(
     reanalysis: bool,
     review: bool,
     retry: bool,
+    imported: bool,
     now: datetime | None,
 ) -> tuple[dict[str, Any], dict[str, Any], OutboxEvent]:
     from sabha_core.models import OutboxEvent, utc_now
 
-    check_transition(from_status, to_status, reanalysis=reanalysis, review=review, retry=retry)
+    check_transition(from_status, to_status, reanalysis=reanalysis, review=review, retry=retry, imported=imported)
     source, target = RecordingStatus(from_status), RecordingStatus(to_status)
     at = now or utc_now()
     filter: dict[str, Any] = {"_id": recording_id, "status": source.value}
+    if (source, target) in IMPORT_TRANSITIONS:
+        filter["source"] = TRANSCRIPT_SOURCE
     if target not in _NO_CONSENT_NEEDED:
         filter["consent_ref"] = {"$type": "string", "$ne": ""}
     update = {"$set": {"status": target.value, "status_reason": reason, "status_changed_at": at}}
@@ -219,11 +235,15 @@ def _plan(
     return filter, update, event
 
 
-def _refusal(recording: Recording | None, recording_id: str, source: RecordingStatus) -> TransitionError:
+def _refusal(
+    recording: Recording | None, recording_id: str, source: RecordingStatus, target: RecordingStatus
+) -> TransitionError:
     if recording is None:
         return RecordingNotFound(f"no recording {recording_id!r} in this tenant")
     if recording.status is not source:
         return ConcurrentTransition(f"recording {recording_id!r} is {recording.status}, not {source}")
+    if (source, target) in IMPORT_TRANSITIONS and recording.source != TRANSCRIPT_SOURCE:
+        return InvalidTransition(source, target, f"recording {recording_id!r} is not an imported transcript")
     return ConsentRequired(f"recording {recording_id!r} has no consent_ref; it cannot move past UPLOADED")
 
 
@@ -238,6 +258,7 @@ def transition(
     reanalysis: bool = False,
     review: bool = False,
     retry: bool = False,
+    imported: bool = False,
     session: ClientSession | None = None,
     now: datetime | None = None,
 ) -> OutboxEvent:
@@ -249,12 +270,12 @@ def transition(
     filter, update, event = _plan(
         recording_id, from_status, to_status,
         tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, review=review, retry=retry,
-        now=now,
+        imported=imported, now=now,
     )  # fmt: skip
     if recordings.update_one(filter, update, session=session) == 1:
         return event
     current = recordings.find_one({"_id": recording_id}, session=session)
-    raise _refusal(current, recording_id, RecordingStatus(from_status))
+    raise _refusal(current, recording_id, RecordingStatus(from_status), RecordingStatus(to_status))
 
 
 async def transition_async(
@@ -268,6 +289,7 @@ async def transition_async(
     reanalysis: bool = False,
     review: bool = False,
     retry: bool = False,
+    imported: bool = False,
     session: AsyncClientSession | None = None,
     now: datetime | None = None,
 ) -> OutboxEvent:
@@ -275,9 +297,9 @@ async def transition_async(
     filter, update, event = _plan(
         recording_id, from_status, to_status,
         tenant_id=recordings.tenant_id, reason=reason, meta=meta, reanalysis=reanalysis, review=review, retry=retry,
-        now=now,
+        imported=imported, now=now,
     )  # fmt: skip
     if await recordings.update_one(filter, update, session=session) == 1:
         return event
     current = await recordings.find_one({"_id": recording_id}, session=session)
-    raise _refusal(current, recording_id, RecordingStatus(from_status))
+    raise _refusal(current, recording_id, RecordingStatus(from_status), RecordingStatus(to_status))

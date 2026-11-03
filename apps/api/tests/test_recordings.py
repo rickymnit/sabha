@@ -294,6 +294,19 @@ def test_oversize_files_are_refused(api: Api) -> None:
     problem(api.create("owner-a", {**LESSON, "size_bytes": 1024**3 + 1}), 422, "file_too_large")
 
 
+def test_a_meeting_transcript_is_uploaded_as_a_transcript_not_audio(api: Api) -> None:
+    body = {**LESSON, "file_name": "Demo \u2013 2026_11_02 11_18 IST.txt", "size_bytes": 27_000,
+            "content_type": "text/plain"}  # fmt: skip
+    response = api.create("owner-a", body)
+    assert response.status_code == 201, response.text
+    doc = api.db.recordings.find_one({"_id": response.json()["recording_id"]})
+    assert doc is not None and doc["source"] == "transcript"
+    audio = api.db.recordings.find_one({"_id": api.create("owner-a", LESSON).json()["recording_id"]})
+    assert audio is not None and audio["source"] == "audio"
+    problem(api.create("owner-a", {**body, "size_bytes": 5 * 1024 * 1024 + 1}), 422, "file_too_large")
+    problem(api.create("owner-a", {**body, "content_type": "audio/mpeg"}), 422, "unsupported_format")
+
+
 def test_people_and_units_must_belong_to_the_tenant(api: Api) -> None:
     problem(api.create("owner-a", {**LESSON, "person_id": "p-b"}), 422, "unknown_person")
     problem(api.create("owner-a", {**LESSON, "unit_id": "nope"}), 422, "unknown_unit")

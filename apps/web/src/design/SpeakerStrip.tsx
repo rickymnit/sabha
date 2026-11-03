@@ -22,6 +22,8 @@ export interface SpeakerStripRowProps extends BaseProps {
   size: "row";
   /** Accessible name, for example "Teacher 84% of speech, students 16%". */
   label: string;
+  /** Small text under the bar, for example "Teacher 62%"; hidden from screen readers (the label says it). */
+  caption?: string;
 }
 
 export interface SpeakerStripCardProps extends Omit<BaseProps, "durationMs"> {
@@ -64,16 +66,41 @@ function Spans({
   );
 }
 
+/** The key above a table of row strips: blue for staff, amber for everyone else. */
+export function SpeakerLegend({ staff, others, className }: { staff: string; others: string; className?: string }) {
+  return (
+    <ul className={cx("m-0 flex list-none flex-wrap gap-3 p-0 text-small text-muted", className)} aria-label="Colours">
+      <li className="flex items-center gap-1.5">
+        <span aria-hidden="true" className={cx("h-2 w-3 rounded-sm", fills.staff)} />
+        {staff}
+      </li>
+      <li className="flex items-center gap-1.5">
+        <span aria-hidden="true" className={cx("h-2 w-3 rounded-sm", fills.other)} />
+        {others}
+      </li>
+    </ul>
+  );
+}
+
 export function SpeakerStrip(props: SpeakerStripProps) {
   if (props.size === "row") {
-    const { segments, durationMs, label, className } = props;
-    return (
+    const { segments, durationMs, label, caption, className } = props;
+    const bar = (
       <span
         role="img"
         aria-label={label}
-        className={cx("relative block h-1.5 w-full overflow-hidden rounded-full bg-track", className)}
+        className={cx("relative block h-1.5 w-full overflow-hidden rounded-full bg-track", !caption && className)}
       >
         <Spans segments={segments} durationMs={durationMs} mergeGapPct={0.6} />
+      </span>
+    );
+    if (!caption) return bar;
+    return (
+      <span className={cx("flex flex-col gap-1", className)}>
+        {bar}
+        <span aria-hidden="true" className="text-caption text-muted">
+          {caption}
+        </span>
       </span>
     );
   }

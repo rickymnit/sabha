@@ -13,7 +13,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from itertools import product
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from pymongo import AsyncMongoClient, MongoClient
@@ -62,9 +62,10 @@ def recordings(db: Database[dict[str, Any]], tenant_id: str = "tenant-a") -> Syn
 
 
 def make(
-    db: Database[dict[str, Any]], status: S, *, consent_ref: str | None = "consent-2026-27", tenant: str = "tenant-a"
-) -> str:
-    recording = Recording(type=ConversationType.TEACHING, status=status, consent_ref=consent_ref)
+    db: Database[dict[str, Any]], status: S, *, consent_ref: str | None = "consent-2026-27", tenant: str = "tenant-a",
+    source: Literal["audio", "transcript"] = "audio",
+) -> str:  # fmt: skip
+    recording = Recording(type=ConversationType.TEACHING, status=status, consent_ref=consent_ref, source=source)
     return recordings(db, tenant).insert_one(recording).id
 
 
@@ -157,6 +158,27 @@ def test_retrying_preprocessing_goes_back_to_uploaded(db: Database[dict[str, Any
     event = transition(recordings(db), recording_id, S.FAILED, S.UPLOADED, reason="retry", retry=True,
                        meta={"ready": True, "retry": True}, now=NOW)  # fmt: skip
     assert (status_of(db, recording_id), event.type) == ("UPLOADED", "recording.uploaded")
+
+
+def test_only_an_imported_transcript_skips_to_transcribing(db: Database[dict[str, Any]]) -> None:
+    imported = make(db, S.UPLOADED, source="transcript")
+    with pytest.raises(InvalidTransition):
+        transition(recordings(db), imported, S.UPLOADED, S.TRANSCRIBING, reason="import_started", now=NOW)
+    event = transition(recordings(db), imported, S.UPLOADED, S.TRANSCRIBING, reason="import_started", imported=True,
+                       now=NOW)  # fmt: skip
+    assert (status_of(db, imported), event.type) == ("TRANSCRIBING", "recording.transcribing")
+    audio = make(db, S.UPLOADED)  # an audio recording never skips its stages, even with the flag
+    with pytest.raises(InvalidTransition, match="not an imported transcript"):
+        transition(recordings(db), audio, S.UPLOADED, S.TRANSCRIBING, reason="import_started", imported=True, now=NOW)
+    assert status_of(db, audio) == "UPLOADED"
+
+
+def test_an_imported_transcript_needs_consent_too(db: Database[dict[str, Any]]) -> None:
+    recording_id = make(db, S.UPLOADED, consent_ref=None, source="transcript")
+    with pytest.raises(ConsentRequired):
+        transition(recordings(db), recording_id, S.UPLOADED, S.TRANSCRIBING, reason="import_started", imported=True,
+                   now=NOW)  # fmt: skip
+    assert status_of(db, recording_id) == "UPLOADED"
 
 
 # --- Consent first (golden rule 9) ---

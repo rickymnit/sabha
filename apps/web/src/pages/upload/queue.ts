@@ -4,8 +4,14 @@
 
 import { MAX_HASH_BYTES, type UploadOutcome } from "./upload";
 
-export const ACCEPTED_EXTENSIONS = ["mp3", "m4a", "wav", "webm", "ogg", "mp4"] as const;
-export const ACCEPT_ATTRIBUTE = ".mp3,.m4a,.wav,.webm,.ogg,.mp4,audio/*,video/mp4";
+export const ACCEPTED_EXTENSIONS = ["mp3", "m4a", "wav", "webm", "ogg", "mp4", "txt"] as const;
+export const ACCEPT_ATTRIBUTE = ".mp3,.m4a,.wav,.webm,.ogg,.mp4,.txt,audio/*,video/mp4,text/plain";
+/** A meeting transcript (Google Meet .txt) is read as text instead of audio (ADR 0009); the server allows 5 MB. */
+export const TRANSCRIPT_MAX_BYTES = 5 * 1024 * 1024;
+
+export function isTranscript(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".txt");
+}
 
 export type ItemState =
   | { kind: "ready" }
@@ -42,9 +48,12 @@ export function checkFile(file: File): string | null {
   const extension = file.name.includes(".") ? (file.name.split(".").pop()?.toLowerCase() ?? "") : "";
   const known = (ACCEPTED_EXTENSIONS as readonly string[]).includes(extension);
   if (!known && !file.type.startsWith("audio/") && file.type !== "video/mp4") {
-    return "This is not an audio or video file Sabha can read. Use MP3, M4A, WAV, OGG, WEBM or MP4.";
+    return "Sabha cannot read this file. Use MP3, M4A, WAV, OGG, WEBM or MP4, or a meeting transcript (.txt).";
   }
   if (file.size === 0) return "This file is empty.";
+  if (isTranscript(file) && file.size > TRANSCRIPT_MAX_BYTES) {
+    return `Larger than ${formatSize(TRANSCRIPT_MAX_BYTES)}, which is too big for a meeting transcript.`;
+  }
   if (file.size > MAX_HASH_BYTES) {
     return `Larger than ${formatSize(MAX_HASH_BYTES)}. Split it, or export it as MP3, which is much smaller.`;
   }

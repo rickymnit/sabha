@@ -20,6 +20,7 @@ const TYPES_BY_EXTENSION: Record<string, string> = {
   webm: "audio/webm",
   ogg: "audio/ogg",
   mp4: "video/mp4",
+  txt: "text/plain",
 };
 
 export interface UploadInput {

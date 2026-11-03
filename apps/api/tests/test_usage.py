@@ -222,10 +222,10 @@ def test_counts_follow_what_each_caller_may_see(api: Api) -> None:
     recording(api, type="reception")
     recording(api, person="p-ravi", unit="unit-2")
     recording(api, tenant=B, type="sales")
-    assert api.get("owner", "/v1/recordings/counts").json() == {"by_type": {"teaching": 3, "reception": 1}}
-    assert api.get("manager", "/v1/recordings/counts").json() == {"by_type": {"teaching": 2, "reception": 1}}
-    assert api.get("asha", "/v1/recordings/counts").json() == {"by_type": {"teaching": 2, "reception": 1}}
-    assert api.get("owner-b", "/v1/recordings/counts").json() == {"by_type": {"sales": 1}}
+    assert api.get("owner", "/v1/recordings/counts").json()["by_type"] == {"teaching": 3, "reception": 1}
+    assert api.get("manager", "/v1/recordings/counts").json()["by_type"] == {"teaching": 2, "reception": 1}
+    assert api.get("asha", "/v1/recordings/counts").json()["by_type"] == {"teaching": 2, "reception": 1}
+    assert api.get("owner-b", "/v1/recordings/counts").json()["by_type"] == {"sales": 1}
 
 
 def test_counts_match_the_list_they_open(api: Api) -> None:
@@ -237,4 +237,4 @@ def test_counts_match_the_list_they_open(api: Api) -> None:
 
 
 def test_counts_are_empty_with_no_recordings(api: Api) -> None:
-    assert api.get("owner", "/v1/recordings/counts").json() == {"by_type": {}}
+    assert api.get("owner", "/v1/recordings/counts").json()["by_type"] == {}

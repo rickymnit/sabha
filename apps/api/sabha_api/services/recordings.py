@@ -1,12 +1,14 @@
 """Creating recordings and their direct-to-storage multipart uploads (plan task P2.1).
 
-The API never touches audio bytes (golden rule 2). It checks the request, records the recording (status CREATED),
-starts an S3 multipart upload for `{tenant_id}/{recording_id}/original/<safe name>` (sabha_core.storage) and hands
-back presigned URLs, one per part. The browser PUTs each part to its URL, then calls complete (P2.2).
+The API never touches audio bytes (golden rule 2), nor a transcript's. It checks the request, records the
+recording (status CREATED), starts an S3 multipart upload for `{tenant_id}/{recording_id}/original/<safe name>`
+(sabha_core.storage) and hands back presigned URLs, one per part. The browser PUTs each part to its URL, then
+calls complete (P2.2).
 
 Rules:
 - The type must be enabled for the tenant (422 `type_not_enabled`).
-- File extension and content type: mp3, m4a, wav, ogg, webm or mp4 with a matching type (422 `unsupported_format`).
+- File extension and content type: mp3, m4a, wav, ogg, webm or mp4 with a matching type (422 `unsupported_format`),
+  or a meeting transcript as .txt (text/plain, at most TRANSCRIPT_MAX_BYTES): `source` "transcript" (ADR 0009).
 - At most UPLOAD_MAX_BYTES, 1 GiB by default (422 `file_too_large`).
 - Person and unit must exist in the tenant (422 `unknown_person` / `unknown_unit`).
 - Who may upload for whom (tests/security/permissions.yaml, decided 2026-10-19): staff only their own recordings
@@ -63,7 +65,10 @@ ALLOWED_FORMATS: dict[str, frozenset[str]] = {
     "ogg": frozenset({"audio/ogg", "application/ogg"}),
     "webm": frozenset({"audio/webm", "video/webm"}),
     "mp4": frozenset({"video/mp4", "audio/mp4"}),
+    "txt": frozenset({"text/plain"}),  # a meeting transcript (Google Meet), read instead of audio (ADR 0009)
 }
+TRANSCRIPT_FORMATS = frozenset({"txt"})
+TRANSCRIPT_MAX_BYTES = 5 * 1024 * 1024  # the worker refuses larger files too (sabha_workers.stages.imported)
 
 
 class RecordingIn(BaseModel):
@@ -224,13 +229,15 @@ class UploadStorage:
         return urls, expires
 
 
-def _check_format(file_name: str, content_type: str) -> None:
+def _check_format(file_name: str, content_type: str) -> str:
+    """The file's extension, once it and its content type are allowed."""
     extension = file_name.rpartition(".")[2].lower() if "." in file_name else ""
     allowed = ALLOWED_FORMATS.get(extension)
     if allowed is None:
         raise UnsupportedFormatError(f"Upload {', '.join(ALLOWED_FORMATS)} files.")
     if content_type not in allowed:
         raise UnsupportedFormatError(f"A .{extension} file should have content type {' or '.join(sorted(allowed))}.")
+    return extension
 
 
 UNIT_SCOPED = frozenset({Role.MANAGER, Role.REVIEWER})  # upload only for people in their own units
@@ -277,9 +284,11 @@ async def create(
 ) -> UploadOut:
     if body.type not in tenant.enabled_types:
         raise TypeNotEnabledError(f"{body.type} recordings are not enabled for your organisation.")
-    _check_format(body.file_name, body.content_type)
+    transcript = _check_format(body.file_name, body.content_type) in TRANSCRIPT_FORMATS
     if body.size_bytes > settings.upload_max_bytes:
         raise FileTooLargeError(f"Files may be at most {settings.upload_max_bytes} bytes.")
+    if transcript and body.size_bytes > TRANSCRIPT_MAX_BYTES:
+        raise FileTooLargeError(f"Transcripts may be at most {TRANSCRIPT_MAX_BYTES} bytes.")
     part_size = settings.upload_part_size_bytes
     part_count = math.ceil(body.size_bytes / part_size)
     if part_count > MAX_PARTS:
@@ -299,6 +308,7 @@ async def create(
     recording = Recording(
         id=recording_id,
         type=body.type,
+        source="transcript" if transcript else "audio",
         consent_ref=body.consent_ref,
         person_id=person.id if person else None,
         unit_id=unit_id,
@@ -323,7 +333,7 @@ async def create(
                 action="recording.create",
                 target_type="recording",
                 target_id=recording_id,
-                meta={"type": body.type.value, "size_bytes": body.size_bytes},
+                meta={"type": body.type.value, "size_bytes": body.size_bytes, "source": recording.source},
                 session=session,
             )
     except BaseException:

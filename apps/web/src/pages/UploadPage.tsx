@@ -28,7 +28,15 @@ import { unitLabel, unitWords } from "../app/units";
 import { useSession } from "../session/session";
 import { capitalise } from "../app/format";
 import { uploadRecording } from "./upload/upload";
-import { ACCEPT_ATTRIBUTE, formatSize, queueReducer, summarise, summaryText, type QueueItem } from "./upload/queue";
+import {
+  ACCEPT_ATTRIBUTE,
+  formatSize,
+  isTranscript,
+  queueReducer,
+  summarise,
+  summaryText,
+  type QueueItem,
+} from "./upload/queue";
 
 const CONSENT_KEY = "sabha.upload.consent_ref";
 
@@ -91,7 +99,12 @@ function FileRow({
           <span className="min-w-0 truncate font-semibold text-ink">{file.name}</span>
           <span className="shrink-0 text-small text-muted">{formatSize(file.size)}</span>
         </div>
-        {state.kind !== "invalid" && <CostPreview file={file} type={type} onDuration={onDuration} />}
+        {state.kind !== "invalid" &&
+          (isTranscript(file) ? (
+            <span className="text-small text-muted">Meeting transcript: read as text, no audio to process</span>
+          ) : (
+            <CostPreview file={file} type={type} onDuration={onDuration} />
+          ))}
         {state.kind === "ready" && <span className="text-small text-muted">Ready to upload</span>}
         {state.kind === "uploading" && (
           <ProgressBar
@@ -263,9 +276,11 @@ export function UploadPage() {
             >
               <Icon name="upload" size={26} />
             </span>
-            <h2 className="m-0 text-xl font-semibold">Drag recordings here</h2>
+            <h2 className="m-0 text-xl font-semibold">Drag recordings or transcripts here</h2>
             <p className="m-0 text-muted">
               MP3, M4A, WAV, OGG, WEBM or MP4, up to {formatSize(512 * 1024 * 1024)} per file.
+              <br />
+              Have a transcript from Google Meet? Upload its .txt file instead.
             </p>
             <Button disabled={running} onClick={() => input.current?.click()}>
               Choose files

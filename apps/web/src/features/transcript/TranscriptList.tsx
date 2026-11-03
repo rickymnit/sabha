@@ -37,6 +37,14 @@ export interface TranscriptListProps {
   highlights?: ReadonlyMap<number, readonly number[]>;
   /** Height of the scrolling area (any CSS length). Default min(70vh, 640px). */
   height?: string;
+  /**
+   * Every change of `currentMs` is a jump the reader asked for (no audio: "Go to 0:42"), so the list scrolls to
+   * the line even after the reader scrolled away. With audio, playback moves `currentMs` all the time and a reader
+   * who scrolled away keeps their place.
+   */
+  followJumps?: boolean;
+  /** A narrow column (UI v2 report sidebar): the speaker sits above the words, and the toolbar is search only. */
+  compact?: boolean;
   className?: string;
 }
 
@@ -66,6 +74,8 @@ export function TranscriptList({
   label = "Transcript lines",
   highlights,
   height = "min(70vh, 640px)",
+  followJumps = false,
+  compact = false,
   className,
 }: TranscriptListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -80,6 +90,9 @@ export function TranscriptList({
   const pendingFocusRef = useRef(false);
 
   const currentIndex = currentMs === null ? -1 : lineAt(utterances, currentMs);
+  useEffect(() => {
+    if (followJumps && currentMs !== null) setFollowing(true);
+  }, [followJumps, currentMs]);
   // One line is in the tab order: the focused one while focus is in the list, otherwise the playing one.
   const tabLine = Math.min(utterances.length - 1, focusInside || currentIndex < 0 ? focusIndex : currentIndex);
 
@@ -245,9 +258,9 @@ export function TranscriptList({
               setQuery("");
             }
           }}
-          className="min-w-[200px] max-w-sm flex-1"
+          className={compact ? "min-w-0 flex-1" : "min-w-[200px] max-w-sm flex-1"}
         />
-        <span aria-live="polite" className="min-w-[88px] text-sm text-muted">
+        <span aria-live="polite" className={cx("text-sm text-muted", compact ? "sr-only" : "min-w-[88px]")}>
           {trimmedQuery ? (matches.length ? `${active + 1} of ${matches.length}` : "No matches") : ""}
         </span>
         <div className="flex gap-1">
@@ -281,7 +294,7 @@ export function TranscriptList({
             Back to the playing line
           </Button>
         )}
-        <p className="m-0 ml-auto text-caption text-muted">
+        <p className={cx("m-0 ml-auto text-caption text-muted", compact && "hidden")}>
           <span className="underline decoration-muted-2 decoration-dotted underline-offset-4">Dotted underline</span>:
           words the speech recogniser was unsure of
         </p>
@@ -323,6 +336,7 @@ export function TranscriptList({
                   evidence={highlights?.get(item.index)}
                   tabbable={item.index === tabLine}
                   wideTime={hasHours}
+                  compact={compact}
                   matches={matchesByLine.get(item.index)}
                   activeMatch={active}
                   onActivate={activate}
@@ -346,6 +360,7 @@ interface LineProps {
   evidence: readonly number[] | undefined;
   tabbable: boolean;
   wideTime: boolean;
+  compact: boolean;
   matches: LineMatch[] | undefined;
   activeMatch: number;
   onActivate: (index: number) => void;
@@ -360,6 +375,7 @@ const Line = memo(function Line({
   evidence,
   tabbable,
   wideTime,
+  compact,
   matches,
   activeMatch,
   onActivate,
@@ -386,7 +402,8 @@ const Line = memo(function Line({
       className={cx(
         // Current line: Analysis.dc.html:255 (warning-surface background, 3px reception-amber bar).
         // On narrow screens the text wraps under the time and role instead of squeezing beside them.
-        "flex cursor-pointer flex-wrap gap-x-4 gap-y-0.5 border-l-[3px] px-5 py-2.5 focus-visible:outline-offset-[-2px] sm:flex-nowrap",
+        "flex cursor-pointer flex-wrap gap-x-4 gap-y-0.5 border-l-[3px] px-5 py-2.5 focus-visible:outline-offset-[-2px]",
+        compact ? "gap-x-3 sm:flex-nowrap" : "sm:flex-nowrap",
         // Evidence lines take the same highlight as the design's evidence line, plus a numbered badge.
         current ? "border-type-reception bg-warning-surface" : "border-transparent",
         evidence ? "bg-warning-surface" : !current && "hover:bg-surface-subtle",
@@ -396,10 +413,17 @@ const Line = memo(function Line({
         <span className="sr-only">Play from </span>
         {formatClock(utterance.start_ms)}
       </span>
-      <span className={cx("w-24 shrink-0 text-sm font-semibold", roleClass)}>
-        {roleInfo?.label ?? utterance.speaker_label}
-      </span>
+      {!compact && (
+        <span className={cx("w-24 shrink-0 text-sm font-semibold", roleClass)}>
+          {roleInfo?.label ?? utterance.speaker_label}
+        </span>
+      )}
       <span className="min-w-0 max-w-[80ch] basis-full text-ink sm:flex-1 sm:basis-0">
+        {compact && (
+          <span className={cx("block text-small font-semibold", roleClass)}>
+            {roleInfo?.label ?? utterance.speaker_label}
+          </span>
+        )}
         {evidence && (
           <span className="mr-2 inline-flex gap-1 align-[1px]">
             {evidence.map((n) => (

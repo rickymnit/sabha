@@ -55,8 +55,16 @@ export interface RecordingItem {
   overall_score: number | null;
   /** When retention deleted the audio (P7.3); the transcript and scores stay. */
   audio_deleted_at: string | null;
+  /** "transcript": uploaded as a meeting transcript, so there is no audio and times are approximate. */
+  source?: "audio" | "transcript";
   /** Who spoke when, on the original timeline; null with no transcript yet or while the roles await a reviewer. */
   speaker_strip?: SpeakerSegment[] | null;
+  /** When it was recorded, if known (else created_at). */
+  recorded_at?: string | null;
+  /** When a manager last shared the report with the person (UI v2). */
+  shared_at?: string | null;
+  /** Failed and not yet closed: owners and admins may retry or close it. */
+  retryable?: boolean;
 }
 
 export interface RecordingPage {
@@ -65,6 +73,9 @@ export interface RecordingPage {
 }
 
 export interface RecordingDetail extends RecordingItem {
+  /** The note a manager sent when sharing the report, and who sent it. */
+  share_note?: string | null;
+  shared_by_name?: string | null;
   type_label: string;
   unit_name: string | null;
   recorded_at: string;
@@ -192,6 +203,20 @@ export interface DevUser {
   tenant_name: string;
 }
 
+/** Password sign-in with several organisations in LOGIN_AS: the ones to choose from (POST /auth/login). */
+export interface OrganisationChoice {
+  tenant_id: string;
+  tenant_name: string;
+  profile: "school" | "college" | "company";
+  user_name: string;
+  role: Role;
+}
+
+export interface OrganisationPick {
+  ticket: string;
+  organisations: OrganisationChoice[];
+}
+
 /** Recording states that are still moving through the pipeline (the list and page refresh while any are). */
 export const IN_PROGRESS: ReadonlySet<ApiStatus> = new Set([
   "CREATED",
@@ -267,6 +292,26 @@ export interface UsageSummary {
 /** GET /v1/recordings/counts: the recordings of each type the signed-in person may see. */
 export interface RecordingCounts {
   by_type: Partial<Record<ConversationType, number>>;
+  total?: number;
+  /** The Recordings tabs: needs review, open disputes and failed not yet closed; latest score below 3.0. */
+  needs_decision?: number | null;
+  below_3?: number | null;
+}
+
+/** The Recordings page's filters (GET /v1/recordings, /export.csv; services/recording_filters.py). */
+export interface RecordingQuery {
+  type?: ConversationType | null;
+  person_id?: string | null;
+  unit_id?: string | null;
+  score?: "below_3" | "mid" | "good" | null;
+  recorded_from?: string | null;
+  recorded_to?: string | null;
+  tab?: "decision" | null;
+}
+
+export interface ShareResult {
+  shared: string[];
+  skipped: string[];
 }
 
 /** GET /v1/rubrics and /v1/rubrics/{id} (services/rubrics.py): read-only, for everyone signed in. */

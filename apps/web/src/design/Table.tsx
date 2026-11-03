@@ -28,7 +28,8 @@ export type TableProps<Row> = Naming & {
   /** Shown in a single full-width row when there are no rows. */
   empty?: ReactNode;
   /** Extra classes for each body row, for example a hover tint when the row links somewhere. */
-  rowClassName?: string;
+  /** Classes for every body row, or per row. */
+  rowClassName?: string | ((row: Row) => string);
   className?: string;
 };
 
@@ -98,7 +99,7 @@ export function Table<Row>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)} className={rowClassName}>
+              <tr key={rowKey(row)} className={typeof rowClassName === "function" ? rowClassName(row) : rowClassName}>
                 {columns.map((col, i) => (
                   <td
                     key={col.key}

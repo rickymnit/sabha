@@ -54,7 +54,7 @@ function delta(now: number, before: number | null, unit: string, compare: string
   const diff = Number((now - before).toFixed(places));
   if (diff === 0) return [`Same as ${compare}`, "same"];
   const size = Math.abs(diff).toFixed(places);
-  return [`${diff > 0 ? "Up" : "Down"} ${size}${unit} on ${compare}`, diff > 0 ? "up" : "down"];
+  return [`${diff > 0 ? "Up" : "Down"} ${size}${unit} vs ${compare}`, diff > 0 ? "up" : "down"];
 }
 
 const tone = (trend: Trend, upIsGood = true): Tile["footTone"] =>
@@ -62,7 +62,7 @@ const tone = (trend: Trend, upIsGood = true): Tile["footTone"] =>
 
 /**
  * The four tiles: recordings analysed, audio processed, the main type's median score and, with reception switched
- * on and tickets this period, calls resolved. `compare` names the previous period ("last week").
+ * on and tickets this period, calls resolved. `compare` names the previous period ("prev. 7 days").
  */
 export function overviewTiles(
   stats: OverviewStats,
@@ -124,7 +124,7 @@ export function overviewTiles(
   if (enabledTypes.includes("reception") && share !== null) {
     const pct = Math.round(share * 100);
     const beforeShare = before ? resolvedShare(before) : null;
-    const [foot, trend] = delta(pct, beforeShare === null ? null : Math.round(beforeShare * 100), " points", compare);
+    const [foot, trend] = delta(pct, beforeShare === null ? null : Math.round(beforeShare * 100), " pts", compare);
     const shares = series.map(resolvedShare);
     tiles.push({
       id: "resolved",

@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "react-oidc-context";
 
 import { apiFetch } from "../api/client";
+import type { OrganisationPick } from "../api/types";
 import { DEV_TOKEN_KEY, SessionContext, type Session } from "./session";
 
 function readStoredToken(): string | undefined {
@@ -34,9 +35,23 @@ export function DevSessionProvider({ mode = "dev", children }: { mode?: "dev" | 
   );
   const signInWithPassword = useCallback(
     async (username: string, password: string) => {
-      const answer = await apiFetch<{ access_token: string }>("/auth/login", {
+      const answer = await apiFetch<{ access_token: string | null } & Partial<OrganisationPick>>("/auth/login", {
         method: "POST",
         body: { username, password },
+      });
+      if (answer.access_token) {
+        keep(answer.access_token);
+        return null;
+      }
+      return { ticket: answer.ticket ?? "", organisations: answer.organisations ?? [] };
+    },
+    [keep],
+  );
+  const chooseOrganisation = useCallback(
+    async (ticket: string, tenantId: string) => {
+      const answer = await apiFetch<{ access_token: string }>("/auth/organisation", {
+        method: "POST",
+        body: { ticket, tenant_id: tenantId },
       });
       keep(answer.access_token);
     },
@@ -53,9 +68,9 @@ export function DevSessionProvider({ mode = "dev", children }: { mode?: "dev" | 
   const value = useMemo<Session>(
     () =>
       mode === "password"
-        ? { mode, token, ready: true, signInWithPassword, signOut }
+        ? { mode, token, ready: true, signInWithPassword, chooseOrganisation, signOut }
         : { mode, token, ready: true, signInAs, signOut },
-    [mode, token, signInAs, signInWithPassword, signOut],
+    [mode, token, signInAs, signInWithPassword, chooseOrganisation, signOut],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

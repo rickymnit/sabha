@@ -23,14 +23,15 @@ import base64
 import binascii
 import json
 import re
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
 from sabha_api.auth import Principal, Role
 from sabha_api.errors import BadRequestError, NotFoundError
-from sabha_core.models import Analysis, Person, Recording, Score, SpeakerSpan, Transcript, Unit
+from sabha_core.models import Analysis, DeadLetter, Person, Recording, Score, SpeakerSpan, Transcript, Unit
 from sabha_core.profiles import ConversationType
 from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
@@ -226,9 +227,13 @@ class RecordingOut(BaseModel):
     completed_at: datetime | None
     overall_score: float | None  # the latest analysis, when there is one
     audio_deleted_at: datetime | None  # retention (P7.3) deleted the audio; transcript and scores stay
+    source: Literal["audio", "transcript"] = "audio"  # a meeting transcript has no audio to play (ADR 0009)
     # "Who spoke when" for list rows (UI v2), ORIGINAL timeline. None: no transcript yet, the list did not ask for
     # it, or the roles are a guess waiting for a reviewer (a guess is never shown, golden rule 5).
     speaker_strip: list[SpeakerSpan] | None = None
+    recorded_at: datetime | None = None  # when it was recorded, if known; else see created_at
+    shared_at: datetime | None = None  # a manager shared the report with the person (UI v2)
+    retryable: bool = False  # failed with an open dead letter: owners and admins may retry or close it
 
 
 class RecordingPage(BaseModel):
@@ -309,8 +314,13 @@ async def _strips(transcripts: TenantRepo[Transcript], recording_ids: list[str])
 
 async def recording_out(
     recordings: list[Recording], people: TenantRepo[Person], analyses: TenantRepo[Analysis],
-    transcripts: TenantRepo[Transcript] | None = None,
+    transcripts: TenantRepo[Transcript] | None = None, dlq: TenantRepo[DeadLetter] | None = None,
 ) -> list[RecordingOut]:  # fmt: skip
+    failed = [r.id for r in recordings if r.status is RecordingStatus.FAILED]
+    open_letters: set[str] = set()
+    if dlq is not None and failed:
+        letters = await dlq.find({"recording_id": {"$in": failed}, "replayed_at": None, "abandoned_at": None})
+        open_letters = {d.recording_id for d in letters}
     person_ids = sorted({r.person_id for r in recordings if r.person_id})
     names = {p.id: p.name for p in await people.find({"_id": {"$in": person_ids}})} if person_ids else {}
     latest = await _latest_analyses(analyses, [r.id for r in recordings]) if recordings else {}
@@ -323,7 +333,9 @@ async def recording_out(
             unit_id=r.unit_id, file_name=r.file_name, duration_ms=r.duration_ms, created_at=r.created_at,
             status_changed_at=r.status_changed_at, completed_at=r.completed_at,
             overall_score=latest[r.id].overall_score if r.id in latest else None, audio_deleted_at=r.audio_deleted_at,
-            speaker_strip=strips.get(r.id),
+            source=r.source,
+            speaker_strip=strips.get(r.id), recorded_at=r.recorded_at, shared_at=r.shared_at,
+            retryable=r.id in open_letters,
         )
         for r in recordings
     ]  # fmt: skip
@@ -344,9 +356,12 @@ async def list_recordings(
     type: ConversationType | None = None,
     status: RecordingStatus | None = None,
     transcripts: TenantRepo[Transcript] | None = None,
+    extra: Sequence[Mapping[str, Any]] = (),
+    dlq: TenantRepo[DeadLetter] | None = None,
 ) -> RecordingPage:
     # Every condition is AND-ed with the visibility filter, so the narrowing filters can never widen it.
     conditions: list[dict[str, Any]] = [await visible_filter(principal, people), after_cursor(cursor)]
+    conditions.extend(dict(c) for c in extra)  # the page's filters (services.recording_filters)
     if person_id is not None:
         conditions.append({"person_id": person_id})
     if type is not None:
@@ -358,20 +373,30 @@ async def list_recordings(
     found = await recordings.find(query, sort=[("created_at", -1), ("_id", -1)], limit=limit + 1)
     items, more = found[:limit], len(found) > limit
     next_cursor = encode_cursor(items[-1].created_at, items[-1].id) if more and items else None
-    return RecordingPage(items=await recording_out(items, people, analyses, transcripts), next_cursor=next_cursor)
+    return RecordingPage(items=await recording_out(items, people, analyses, transcripts, dlq), next_cursor=next_cursor)
 
 
 class RecordingCounts(BaseModel):
     by_type: dict[str, int]  # only types with at least one recording
+    total: int = 0
+    # The Recordings page's other tabs (services.recording_filters); None when the caller did not ask for them.
+    needs_decision: int | None = None
+    below_3: int | None = None
 
 
 async def count_recordings(
-    principal: Principal, *, recordings: TenantRepo[Recording], people: TenantRepo[Person]
-) -> RecordingCounts:
-    """Per type, the recordings `list_recordings` would show this caller (the same visibility filter)."""
+    principal: Principal, *, recordings: TenantRepo[Recording], people: TenantRepo[Person],
+    tabs: Mapping[str, Mapping[str, Any]] | None = None,
+) -> RecordingCounts:  # fmt: skip
+    """Per type, the recordings `list_recordings` would show this caller (the same visibility filter), and with
+    `tabs` ({"needs_decision": condition, "below_3": condition}) how many of them each tab holds."""
     visible = await visible_filter(principal, people)
     rows = await recordings.aggregate([{"$match": visible}, {"$group": {"_id": "$type", "n": {"$sum": 1}}}])
-    return RecordingCounts(by_type={row["_id"]: row["n"] for row in sorted(rows, key=lambda r: str(r["_id"]))})
+    by_type = {row["_id"]: row["n"] for row in sorted(rows, key=lambda r: str(r["_id"]))}
+    counted: dict[str, int] = {}
+    for name, condition in (tabs or {}).items():
+        counted[name] = await recordings.count({"$and": [c for c in (visible, dict(condition)) if c]})
+    return RecordingCounts(by_type=by_type, total=sum(by_type.values()), **counted)
 
 
 async def transcript_for(
@@ -385,7 +410,8 @@ async def transcript_for(
     return TranscriptOut(
         recording_id=recording.id, transcript=content, roles=doc.roles, roles_need_review=doc.roles_need_review,
         language_mix=doc.language_mix,
-        playback_url=None if recording.audio_deleted_at else reader.playback_url(playback + "playback.opus"),
+        playback_url=None if recording.audio_deleted_at or recording.source == "transcript"
+        else reader.playback_url(playback + "playback.opus"),
         playback_expires_in_s=reader.expiry_s,
     )  # fmt: skip
 
@@ -608,6 +634,8 @@ class RecordingDetail(RecordingOut):
     languages: list[str]  # language names, from the transcript
     removed_silence: list[Range]  # on the original timeline (golden rule 4)
     voice_names: dict[str, str]  # meetings: names given to the anonymous voices ("S1" -> "Riya")
+    share_note: str | None = None  # the note a manager sent with the report (UI v2 sharing)
+    shared_by_name: str | None = None
 
 
 def silence_gaps(segment_map: SegmentMap, duration_ms: int | None) -> list[Range]:
@@ -623,7 +651,7 @@ def silence_gaps(segment_map: SegmentMap, duration_ms: int | None) -> list[Range
 
 async def recording_detail(
     recording: Recording, base: RecordingOut, *, settings: Settings, units: TenantRepo[Unit],
-    transcripts: TenantRepo[Transcript], reader: ArtefactReader,
+    transcripts: TenantRepo[Transcript], reader: ArtefactReader, shared_by_name: str | None = None,
 ) -> RecordingDetail:  # fmt: skip
     unit = await units.find_one({"_id": recording.unit_id}) if recording.unit_id else None
     transcript = await transcripts.find_one({"recording_id": recording.id})
@@ -633,7 +661,8 @@ async def recording_detail(
     segments = await reader.json(pre + "segments@v1.json")
     segment_map = None if segments is None else SegmentMap.from_records(segments)
     return RecordingDetail(
-        **base.model_dump(), type_label=recording.type.value.capitalize(),
+        **base.model_dump(exclude={"recorded_at"}), type_label=recording.type.value.capitalize(),
+        share_note=recording.share_note if recording.shared_at else None, shared_by_name=shared_by_name,
         unit_name=unit.name if unit else None, recorded_at=recording.recorded_at or recording.created_at,
         voice_names=recording.voice_names,
         speech_ms=None if segment_map is None else segment_map.compact_length_ms, languages=languages,

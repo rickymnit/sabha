@@ -6,6 +6,7 @@ export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, Panel, type CardProps, type CardTone, type PanelProps } from "./Panel";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { cx } from "./cx";
+export { Menu, type MenuItem } from "./Menu";
 export { Dialog, type DialogProps } from "./Dialog";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { Field, type FieldProps } from "./Field";
@@ -34,6 +35,7 @@ export { Avatar, Logo, type AvatarProps, type LogoProps } from "./Logo";
 export { ChoiceCards, type ChoiceCardOption, type ChoiceCardsProps } from "./ChoiceCards";
 export { Sparkline, type SparklineProps } from "./Sparkline";
 export {
+  SpeakerLegend,
   SpeakerStrip,
   type SpeakerStripCardProps,
   type SpeakerStripLanesProps,

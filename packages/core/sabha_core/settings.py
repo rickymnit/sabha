@@ -140,7 +140,8 @@ class Settings(BaseSettings):
     dev_login: bool = False
     # Local password sign-in (owner's choice, 2026-10-28): one username and a scrypt hash of its password
     # (scripts/admin/hash_password.py), signing in as the Sabha user with the email LOGIN_AS. APP_ENV=local only,
-    # and never together with DEV_LOGIN, whose "Sign in as..." list would bypass the password.
+    # and never together with DEV_LOGIN, whose "Sign in as..." list would bypass the password. LOGIN_AS may list
+    # several emails separated by commas, one per organisation; sign-in then asks which one (2026-11-02).
     login_username: str | None = None
     login_password_hash: SecretStr | None = None
     login_as: str | None = None
@@ -264,6 +265,12 @@ class Settings(BaseSettings):
         if not _VERSION_TAG.match(value):
             raise ValueError("artefact versions may contain only letters, digits, '.', '_' and '-'")
         return value
+
+    @property
+    def login_as_emails(self) -> list[str]:
+        """LOGIN_AS split on commas, lower-cased, in order, without blanks or repeats."""
+        emails = (e.strip().lower() for e in (self.login_as or "").split(","))
+        return list(dict.fromkeys(e for e in emails if e))
 
     @model_validator(mode="after")
     def _check_combinations(self) -> Settings:

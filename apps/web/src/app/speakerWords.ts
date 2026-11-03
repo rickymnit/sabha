@@ -1,0 +1,23 @@
+// The words around "who spoke when" strips in lists (UI v2, docs/design/v2/01-overview.png, 02-recordings.png): the
+// caption under each row ("Teacher 62%", "Staff 45%") and the legend above the table ("Staff speaking", "Students
+// or callers"). The staff word comes from the tenant's labels; a reception call's staff are front-desk staff.
+
+import type { Me, RecordingItem } from "../api/types";
+import type { ConversationType } from "../design";
+import { capitalise } from "./format";
+
+type Labels = Me["tenant"]["labels"];
+
+/** Who the blue side is in one recording. */
+export function staffWord(type: RecordingItem["type"], labels: Labels): string {
+  return type === "reception" ? "Staff" : capitalise(labels.person);
+}
+
+const OTHERS: Partial<Record<ConversationType, string>> = { teaching: "students", reception: "callers" };
+
+/** The amber side across the types switched on: "Students or callers", or "Others". */
+export function othersWord(enabled: readonly string[]): string {
+  const words = [...new Set(enabled.map((t) => OTHERS[t as ConversationType] ?? "others"))];
+  const last = words.pop() ?? "others";
+  return capitalise(words.length ? `${words.join(", ")} or ${last}` : last);
+}

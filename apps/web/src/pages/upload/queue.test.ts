@@ -16,8 +16,17 @@ describe("checkFile", () => {
     expect(checkFile(new File(["x"], "recording", { type: "audio/x-wav" }))).toBeNull();
   });
 
+  it("accepts a meeting transcript up to 5 MB", () => {
+    expect(checkFile(new File(["00:00:04"], "Demo – 2026_11_02 11_18 IST.txt", { type: "text/plain" }))).toBeNull();
+    const big = new File(["x"], "Demo.txt", { type: "text/plain" });
+    Object.defineProperty(big, "size", { value: 5 * 1024 * 1024 + 1 });
+    expect(checkFile(big)).toMatch(/too big for a meeting transcript/);
+  });
+
   it("says in plain words why a file cannot go up", () => {
-    expect(checkFile(new File(["x"], "notes.txt", { type: "text/plain" }))).toMatch(/not an audio or video file/);
+    expect(checkFile(new File(["x"], "notes.pdf", { type: "application/pdf" }))).toMatch(
+      /^Sabha cannot read this file/,
+    );
     expect(checkFile(audio("empty.mp3", 0))).toBe("This file is empty.");
     expect(checkFile(audio("Annual day.wav", MAX_HASH_BYTES + 1))).toMatch(/^Larger than 512 MB\. Split it/);
   });
@@ -38,11 +47,11 @@ describe("queueReducer", () => {
 
   it("adds files once each, checking them as they arrive", () => {
     const a = audio("a.mp3");
-    let items = queueReducer([], { type: "add", files: [a, new File(["x"], "b.txt")], makeKey });
+    let items = queueReducer([], { type: "add", files: [a, new File(["x"], "b.pdf")], makeKey });
     items = queueReducer(items, { type: "add", files: [a], makeKey }); // picked again: still once
     expect(items.map((i) => [i.file.name, i.state.kind])).toEqual([
       ["a.mp3", "ready"],
-      ["b.txt", "invalid"],
+      ["b.pdf", "invalid"],
     ]);
   });
 

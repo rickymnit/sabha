@@ -2,11 +2,12 @@
 
 `work(ctx)`:
 
-1. Reads the transcribe stage's `transcript@v1.json` and the preprocess segment map. Missing: `missing_input`.
+1. Reads the transcribe stage's `transcript@v1.json` and the preprocess segment map (an imported transcript's is in
+   the transcribe folder; ADR 0009). Missing: `missing_input`.
 2. Finds the rubric (sabha_workers.rubrics; none: `no_rubric`) and prepares the transcript for the LLM: utterance
    ids, and redaction of PII and of the staff member's name pattern (sabha_analytics.grounding; golden rule 8).
 3. Computes the metrics in code (sabha_analytics.metrics; golden rule 5: numbers never come from the LLM) and keeps
-   the ones the rubric lists.
+   the ones the rubric lists. An imported transcript has no silence metrics: the file cannot tell silence apart.
 4. Runs sabha_analytics.report.analyse through the LLM gateway: per-dimension judgements with quotes that the
    grounding verifier must find in the transcript, the overall score from verified dimensions only, synthesis,
    the timeline phases, and for reception the call's ticket. The report is checked against analysis@v1.
@@ -37,7 +38,7 @@ from typing import Any
 from pymongo.database import Database
 
 from sabha_analytics.grounding import prepare_transcript
-from sabha_analytics.metrics import compute_metrics, select_metrics
+from sabha_analytics.metrics import SILENCE_METRIC_KEYS, compute_metrics, select_metrics
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse
 from sabha_analytics.rubric import Rubric
@@ -109,7 +110,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
         pre = artefact_prefix(ctx.tenant_id, recording.id, "preprocess", deps.preprocess_version)
         asr = artefact_prefix(ctx.tenant_id, recording.id, "transcribe", deps.transcribe_version)
         document = _get_json(ctx, asr + "transcript@v1.json")
-        segment_map = SegmentMap.from_json(json.dumps(_get_json(ctx, pre + "segments@v1.json")))
+        imported = recording.source == "transcript"  # ADR 0009: its one-segment map is in the transcribe folder
+        segment_map = SegmentMap.from_json(json.dumps(_get_json(ctx, (asr if imported else pre) + "segments@v1.json")))
         if recording.duration_ms is None:
             raise PermanentError("missing_input", "the recording has no duration (preprocess did not record it)")
         tenant = deps.tenant(ctx.tenant_id)
@@ -128,6 +130,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
                                   segment_stats=stats(segment_map, recording.duration_ms),
                                   roles=list(rubric.roles))  # fmt: skip
         selected = select_metrics(metrics, rubric.computed_metrics)
+        if imported:  # a transcript says nothing about silence, so no silence figure is shown (golden rule 5)
+            selected = tuple(m for m in selected if m.key not in SILENCE_METRIC_KEYS)
         try:
             result = analyse(
                 rubric=rubric, transcript=transcript, metrics=[m.to_record() for m in selected],

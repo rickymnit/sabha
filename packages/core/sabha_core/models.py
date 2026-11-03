@@ -265,6 +265,9 @@ class Recording(TenantDoc):
 
     type: ConversationType
     status: RecordingStatus = RecordingStatus.CREATED
+    # What was uploaded (ADR 0009): an audio recording, or a meeting transcript (Google Meet .txt) whose words and
+    # speakers are read from the file instead of the audio stages.
+    source: Literal["audio", "transcript"] = "audio"
     consent_ref: str | None = None  # golden rule 9: without it nothing moves past UPLOADED
     status_reason: str | None = None
     status_changed_at: UtcDatetime | None = None
@@ -306,6 +309,11 @@ class Recording(TenantDoc):
     rubric_id: str | None = None
     # Cost display (owner's request, 2026-10-28): the estimate made at upload, frozen.
     cost_estimate: CostEstimate | None = None
+    # Sharing (UI v2, owner's decision 2026-11-03): a manager sent the report to the person analysed, with a note.
+    # Sharing never changes who may see the report; it emails the person and marks the coaching step done.
+    shared_at: UtcDatetime | None = None
+    shared_by: str | None = None  # user id
+    share_note: str | None = Field(default=None, max_length=500)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

@@ -8,11 +8,23 @@ import { Button, Dialog } from "../../design";
 export interface ReanalyseDialogProps {
   /** The tenant's word for a recording, for example "lesson". */
   recordingWord: string;
+  /** Several chosen on the Recordings page: how many, and the plural word. */
+  count?: number;
+  recordingsWord?: string;
+  /** The rubric they will be scored with, for example "v1.3". */
+  version?: string;
   onSubmit: (reason: string) => Promise<void>;
   onClose: () => void;
 }
 
-export function ReanalyseDialog({ recordingWord, onSubmit, onClose }: ReanalyseDialogProps) {
+export function ReanalyseDialog({
+  recordingWord,
+  count = 1,
+  recordingsWord,
+  version,
+  onSubmit,
+  onClose,
+}: ReanalyseDialogProps) {
   const reasonId = useId();
   const errorId = useId();
   const [reason, setReason] = useState("");
@@ -35,11 +47,12 @@ export function ReanalyseDialog({ recordingWord, onSubmit, onClose }: ReanalyseD
 
   return (
     <Dialog
-      title={`Re-analyse this ${recordingWord}`}
+      title={count === 1 ? `Re-analyse this ${recordingWord}` : `Re-analyse ${count} ${recordingsWord ?? "recordings"}`}
       description={
         <p className="m-0">
-          Sabha scores it again from its transcript with the current rubric, in a few minutes. The current report is
-          kept as an earlier version, and any open disputes about it are closed. Nobody is emailed.
+          Sabha scores {count === 1 ? "it" : "each one"} again from the transcript with the current rubric
+          {version ? ` (${version})` : ""}, in a few minutes. The current report is kept as an earlier version, and any
+          open disputes about it are closed. Nobody is emailed, and it does not use this month&apos;s audio hours.
         </p>
       }
       onClose={onClose}

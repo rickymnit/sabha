@@ -95,6 +95,8 @@ QUIET_VOICE_SHARE = 0.05
 """Meetings: a voice with less than this share of all speaking time counts as hardly heard."""
 
 RECORDING_METRIC_KEYS = ("duration_s", "silence_share", "longest_silence_s", "long_silence_count", "hold_gap_count")
+SILENCE_METRIC_KEYS = frozenset(RECORDING_METRIC_KEYS) - {"duration_s"}
+"""Metrics read from the gaps between speech; an imported transcript (ADR 0009) has none to measure."""
 VOICE_METRIC_KEYS = ("voice_count", "top_voice_share", "quiet_voice_count")
 """Meetings only (compute_metrics(voices=True)): how the talk was shared among the voices, as aggregates. Never for
 lessons or calls, where counting voices would drift towards analysing students or callers (golden rule 10)."""

@@ -131,14 +131,18 @@ def confirmed_assignment(confirmed: dict[str, str], turns: Sequence[Turn], roles
     return RoleAssignment({label: SpeakerRole(role, 1.0, "reviewer") for label, role in confirmed.items()})
 
 
-def finish_transcript(ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps) -> dict[str, Any]:
+def finish_transcript(
+    ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps, turns: Sequence[Turn] | None = None
+) -> dict[str, Any]:
+    """Steps 1-5 above. `turns` are given for an imported transcript (ADR 0009), which has no diarization."""
     recording = ctx.recording
-    source = artefact_prefix(ctx.tenant_id, recording.id, "diarize", deps.diarize_version)
-    try:
-        diarization = json.loads(ctx.artefacts.get(source + "diarization@v1.json"))
-    except FileNotFoundError as exc:
-        raise PermanentError("missing_input", f"diarization output not found: {exc}") from exc
-    turns = [Turn(t["speaker_label"], t["start_ms"], t["end_ms"]) for t in diarization["compact"]]
+    if turns is None:
+        source = artefact_prefix(ctx.tenant_id, recording.id, "diarize", deps.diarize_version)
+        try:
+            diarization = json.loads(ctx.artefacts.get(source + "diarization@v1.json"))
+        except FileNotFoundError as exc:
+            raise PermanentError("missing_input", f"diarization output not found: {exc}") from exc
+        turns = [Turn(t["speaker_label"], t["start_ms"], t["end_ms"]) for t in diarization["compact"]]
 
     tenant = deps.tenant(ctx.tenant_id)
     if tenant is None:

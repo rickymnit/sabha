@@ -8,6 +8,8 @@ Rules:
 - FAILED and NEEDS_REVIEW: the tenant's admins and owners, with the reason code and a plain explanation.
 - A decided dispute (P6.7): the person who raised it, and the person analysed if they keep report emails on. The
   email says whether the score was changed and links to the report; never the score itself.
+- A shared report (UI v2, recording.shared): the person analysed, if they keep report emails on. The email says who
+  shared it and links to the report; the sharer's note stays in the app.
 - Nothing else is emailed.
 - Each planned email has a delivery key derived from (event_id, recipient), so a retried event never sends the same
   email twice (the notify task records sent keys).
@@ -26,7 +28,7 @@ from typing import Literal
 
 from sabha_core.reasons import REASONS
 
-EmailKind = Literal["report_ready", "needs_attention", "dispute_decided"]
+EmailKind = Literal["report_ready", "needs_attention", "dispute_decided", "report_shared"]
 Decision = Literal["accepted", "rejected"]
 LANGUAGES = ("en", "hi")
 PROBLEM_STATUSES = frozenset({"FAILED", "NEEDS_REVIEW"})
@@ -77,6 +79,13 @@ def plan_dispute_emails(event_id: str, raised_by: str, recipients: Sequence[Reci
     return [PlannedEmail(r, kind, delivery_key(event_id, r.user_id, kind)) for r in chosen]
 
 
+def plan_share_emails(event_id: str, recipients: Sequence[Recipient]) -> list[PlannedEmail]:
+    """The email for a shared report: the person analysed, if they want report emails."""
+    kind: EmailKind = "report_shared"
+    chosen = [r for r in recipients if r.is_subject and r.wants_report_emails]
+    return [PlannedEmail(r, kind, delivery_key(event_id, r.user_id, kind)) for r in chosen]
+
+
 @dataclass(frozen=True)
 class RenderedEmail:
     language: str
@@ -111,6 +120,15 @@ _TEMPLATES: dict[tuple[str, str], tuple[str, str]] = {
         "विवादित स्कोर की समीक्षा हो गई: $title",
         '"$title" ($recording) के विवादित स्कोर की समीक्षा हो गई है। $decision\n\nफ़ैसला और समीक्षक की टिप्पणी यहाँ देखें: $link',
     ),
+    ("report_shared", "en"): (
+        "$sharer shared your $recording report: $title",
+        '$sharer shared the $recording report for "$title" with you, with a note.\n\nOpen it here: $link\n\n'
+        "You need to sign in to see it.",
+    ),
+    ("report_shared", "hi"): (
+        "$sharer ने आपकी $recording रिपोर्ट साझा की: $title",
+        '$sharer ने "$title" की $recording रिपोर्ट आपके साथ साझा की है।\n\nयहाँ देखें: $link\n\nदेखने के लिए साइन इन करना होगा।',
+    ),
 }
 _DECISIONS: dict[tuple[str, str], str] = {
     ("accepted", "en"): "The dispute was accepted and the score was changed.",
@@ -129,6 +147,7 @@ def render_email(
     recording_title: str,
     reason: str | None = None,
     decision: Decision | None = None,
+    sharer: str | None = None,
 ) -> RenderedEmail:
     """Subject, plain text and HTML for one email. There is deliberately no way to pass a score or a quote."""
     lang = language if language in LANGUAGES else "en"
@@ -144,6 +163,7 @@ def render_email(
         "explanation": REASONS[lang].get(reason or "")
         or ("See the recording for details." if lang == "en" else "विवरण रिकॉर्डिंग में देखें।"),
         "decision": _DECISIONS.get((decision or "", lang), ""),
+        "sharer": sharer or ("Your manager" if lang == "en" else "आपके मैनेजर"),
     }
     subject = Template(subject_t).substitute(values)
     text = Template(body_t).substitute(values)

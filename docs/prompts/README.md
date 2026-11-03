@@ -66,7 +66,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | P0.6 LLM provider | OpenAI `gpt-6-luna` since 2026-10-24 (o3-mini was shut down); data residency terms and settings to confirm with OpenAI (`docs/llm-providers.md`) |
 | P0.7 LIS baselines | Dropped: there is no LIS codebase. ASR providers are compared on our own gold set instead |
 | P8.1 consent drafts | With the lawyer; sign-off is a people task (plan 8.5) |
-| P1.2 CI | The `images` job stays off until the repository variable `PUBLISH_IMAGES` is `true`; turn it on once the Celery app (P2.4) exists |
+| P1.2 CI | Dropped 2026-11-02: GitHub Actions removed at the product owner's request (ADR 0010); checks run locally |
 | P1.5 identity and roles (Auth0 sign-in, invites, `GET /v1/me`, `scripts/admin/create_tenant.py`) | "Done when" (log in with Google on dev) needs the Auth0 dev tenant (`docs/setup/auth.md`) |
 | P2.3 state machine and stage runs (`transition()`, `stage_runs`) | Its "Done when" (the complete endpoint uses `transition()`) is met |
 | P2.1 create recording and presigned multipart upload (`POST /v1/recordings`, `/parts`, `sabha_core/storage.py`) | "Done when" (a script uploads 500 MB part by part) is shown at small scale in tests; the full-size run needs P2.2's complete endpoint and staging |
@@ -82,7 +82,7 @@ infrastructure (AWS, Auth0, deploy, CI/CD, monitoring) together in week 8.
 | P3.2 normalise, P3.3 VAD and segment map, P3.4a diarization (CPU), P3.5 speech-to-text, P3.6 roles, P3.7 transcript | Run on more real files once recordings exist; tune `VAD_*`; transcript text search |
 | P5.6 scoring and grounding, P5.7 synthesis and storage, P5.7b analysis API, P5.8 reception | A real lesson and 10 real calls end to end on staging |
 | P6.3 upload screen, P6.4a/P6.4b overview, P7.4 permission tests | Add every new route to `tests/security/permissions.yaml` (the test enforces it) |
-| Sales meetings (rubric `sales.company.v0.2`, deal card), meetings (`meeting.company.v0.1`, ADR 0008) | Added 2026-10-24 to 2026-10-26; no prompt file |
+| Sales meetings (rubric `sales.company.v0.3`, deal card), meetings (`meeting.company.v0.1`, ADR 0008) | Added 2026-10-24 to 2026-10-26; no prompt file |
 | Company reception: walk-in visitors (`reception.company.v0.1`), the ticket on the report with verified quotes | Draft rubric for the owner's review; a full run on audio once Sarvam has credit |
 | P6.7 disputes: raise, the Disputes tab in Reviews, decide, email; the reviewer's score counts in the overall and trends | Calibration records are stored on each dispute; reading them into the calibration loop is P5.9 |
 | P2.8 re-analysis: one recording or many (count first, 100 per request), every version kept, numbers from the latest only | Re-analysis with a chosen rubric version is in the API only (the app always uses the current rubric) |

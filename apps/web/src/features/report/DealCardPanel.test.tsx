@@ -53,4 +53,11 @@ describe("DealCardPanel", () => {
     expect(screen.queryByText(/left out/)).toBeNull();
     expect(screen.queryByText("What they use today")).toBeNull(); // nothing said about it: no empty section
   });
+
+  it("shows a report made before the deal card had a current setup", () => {
+    const older = { ...CARD, current_setup: undefined };
+    render(<DealCardPanel card={older} labels={labels} onSeek={vi.fn()} />);
+    expect(screen.getByRole("region", { name: "Deal card" })).toBeInTheDocument();
+    expect(screen.queryByText("What they use today")).toBeNull();
+  });
 });

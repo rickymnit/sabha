@@ -1,7 +1,8 @@
 """The notify step (plan task P2.7): emails about a recording's status change, once per recipient.
 
 Started by the relay for recording.completed, recording.failed and recording.needs_review events, and for
-dispute.resolved (P6.7), which emails whoever raised the dispute and the person analysed. It reads the
+dispute.resolved (P6.7), which emails whoever raised the dispute and the person analysed, and recording.shared (UI
+v2), which emails the person analysed that a manager shared the report. It reads the
 event (new status and reason), finds the recipients through the tenant-scoped repositories, plans who gets what
 (sabha_workers.notifications.emails.plan_emails), renders each email in the recipient's language with the tenant's
 own words for its nouns, and sends each one once (delivery log in `deliveries`).
@@ -30,12 +31,14 @@ from sabha_workers.notifications.emails import (
     Recipient,
     plan_dispute_emails,
     plan_emails,
+    plan_share_emails,
     render_email,
 )
 from sabha_workers.notifications.ses import EmailSender, PermanentSendError, deliver
 
 log = logging.getLogger("sabha.workers.notify")
 DISPUTE_RESOLVED = "dispute.resolved"
+RECORDING_SHARED = "recording.shared"
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,7 @@ def notify(
         return NotifyResult()
     status, reason = event.payload.get("to_status"), event.payload.get("reason")
     decision: Decision | None = None
+    sharer: str | None = None
     planned: list[PlannedEmail]
     if event.type == DISPUTE_RESOLVED:
         disputes = SyncTenantRepo(db, "disputes", tenant_id, Dispute)
@@ -111,6 +115,11 @@ def notify(
         decision = "accepted" if dispute.status == "accepted" else "rejected"
         planned = plan_dispute_emails(event_id, dispute.raised_by, recipients(db, tenant_id, recording,
                                                                               also=dispute.raised_by))  # fmt: skip
+    elif event.type == RECORDING_SHARED:
+        planned = plan_share_emails(event_id, recipients(db, tenant_id, recording))
+        users = SyncTenantRepo(db, "users", tenant_id, User)
+        by = users.find_one({"_id": event.payload.get("shared_by")})
+        sharer = by.name if by is not None else None
     else:
         planned = plan_emails(event_id, str(status), recipients(db, tenant_id, recording))
     if not planned:
@@ -135,6 +144,7 @@ def notify(
             recording_title=title,
             reason=str(reason) if item.kind == "needs_attention" else None,
             decision=decision,
+            sharer=sharer,
         )
         try:
             if deliver(item, email, sender=sender, delivery_log=delivery_log):

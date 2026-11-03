@@ -160,8 +160,9 @@ export interface CardEvidence {
 
 /** Sales meetings: what the customer needs, their objections, interest and the agreed next step (verified only). */
 export interface DealCard {
-  /** What the customer uses today, what they pay, competitors they mention. */
-  current_setup: { fact: string; evidence: CardEvidence }[];
+  /** What the customer uses today, what they pay, competitors they mention. Absent in reports made before the
+   *  sales rubric v0.2 added it (2026-10-26). */
+  current_setup?: { fact: string; evidence: CardEvidence }[];
   customer_needs: { need: string; evidence: CardEvidence }[];
   objections: { objection: string; response: string; settled: "yes" | "no" | "unclear"; evidence: CardEvidence }[];
   interest_level: { value: string; evidence: CardEvidence | null } | null;

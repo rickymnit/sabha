@@ -10,6 +10,7 @@ import { useInbox, useOverview, useRecordings } from "../api/hooks";
 import type { Me, RecordingItem } from "../api/types";
 import { capitalise, formatWhen } from "../app/format";
 import { RESOLVERS } from "../app/nav";
+import { othersWord, staffWord } from "../app/speakerWords";
 import {
   Avatar,
   Button,
@@ -17,6 +18,7 @@ import {
   Icon,
   Panel,
   ScoreChip,
+  SpeakerLegend,
   SpeakerStrip,
   Table,
   cx,
@@ -44,10 +46,10 @@ const STEP_OF: Record<ProcessingItem["stage"], number> = {
 };
 
 const COMPARE: Record<RangePreset, string> = {
-  "7d": "last week",
-  "30d": "the 30 days before",
-  month: "last month",
-  custom: "the period before",
+  "7d": "prev. 7 days",
+  "30d": "prev. 30 days",
+  month: "prev. month",
+  custom: "prev. period",
 };
 
 const clock = (ms: number | null) => {
@@ -58,6 +60,20 @@ const clock = (ms: number | null) => {
   const ss = String(s % 60).padStart(2, "0");
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 };
+
+const clockIst = new Intl.DateTimeFormat("en-IN", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Kolkata",
+});
+
+/** "ready about 11:42": upload time plus the type's median turnaround; nothing once that time has passed. */
+function readyAbout(item: ProcessingItem, minutes: number | undefined, now: Date): string {
+  if (!item.uploaded_at || minutes === undefined || item.stage === "uploading") return "";
+  const at = new Date(new Date(item.uploaded_at).getTime() + minutes * 60_000);
+  return at > now ? `ready about ${clockIst.format(at)}` : "";
+}
 
 function useOpen() {
   const navigate = useNavigate();
@@ -107,6 +123,8 @@ function Processing({ stats, typeNames }: { stats: OverviewStats; typeNames: Rec
   const items = stats.processing ?? [];
   const running = (stats.in_progress ?? []).filter((s) => s.stage !== "needs_review").reduce((n, s) => n + s.n, 0);
   const typical = [...(stats.turnaround ?? [])].sort((a, b) => b.n - a.n)[0];
+  const minutesFor = (type: ConversationType) => stats.turnaround?.find((t) => t.type === type)?.minutes;
+  const now = new Date();
   return (
     <Panel
       title="Processing now"
@@ -125,10 +143,10 @@ function Processing({ stats, typeNames }: { stats: OverviewStats; typeNames: Rec
           {items.map((item) => {
             const step = STEP_OF[item.stage];
             return (
-              <li key={item.id} className="flex flex-col gap-1.5">
-                <span className="flex justify-between gap-3 text-sm">
-                  <span className="truncate font-semibold text-ink">{item.title}</span>
-                  <span className="shrink-0 text-muted">{STEPS[step]}</span>
+              <li key={item.id} className="flex flex-col gap-1">
+                <span className="truncate text-sm font-semibold text-ink">{item.title}</span>
+                <span className="text-small text-muted">
+                  {[STEPS[step], readyAbout(item, minutesFor(item.type), now)].filter(Boolean).join(", ")}
                 </span>
                 <span
                   role="img"
@@ -172,9 +190,16 @@ function Recent({ me }: { me: Me }) {
       title={`Recent ${things}`}
       actions={
         rows.length > 0 && (
-          <a href="/recordings" onClick={(e) => open(e, "/recordings")} className="text-sm font-semibold no-underline">
-            All {things}
-          </a>
+          <span className="flex flex-wrap items-center gap-4">
+            <SpeakerLegend staff="Staff speaking" others={othersWord(me.tenant.enabled_types)} />
+            <a
+              href="/recordings"
+              onClick={(e) => open(e, "/recordings")}
+              className="text-sm font-semibold no-underline"
+            >
+              All {things}
+            </a>
+          </span>
         )
       }
     >
@@ -229,8 +254,9 @@ function Recent({ me }: { me: Me }) {
                     label={
                       share === null
                         ? "No speaker data yet"
-                        : `${capitalise(labels.person)} ${Math.round(share * 100)}% of speech, others ${100 - Math.round(share * 100)}%`
+                        : `${staffWord(r.type, labels)} ${Math.round(share * 100)}% of speech, others ${100 - Math.round(share * 100)}%`
                     }
+                    {...(share === null ? {} : { caption: `${staffWord(r.type, labels)} ${Math.round(share * 100)}%` })}
                   />
                 );
               },

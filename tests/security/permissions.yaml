@@ -375,6 +375,21 @@ routes:
     other_tenant: 200
     others: 403
 
+  GET /v1/recordings/export.csv:
+    # "Export list" (UI v2, owner's decision 2026-11-03): the caller's visible recordings as CSV, filtered like the
+    # list. Audited as recordings.export.
+    anonymous: 401
+    others: 200
+
+  POST /v1/recordings/share:
+    # Share reports with the people analysed (UI v2, 2026-11-03): an email and a note; access does not change.
+    # Everyone but staff; ids the caller cannot see are skipped silently (manager_other_unit and other_tenant share
+    # nothing), so the answer is 200 with an empty list rather than 404.
+    anonymous: 401
+    staff_uploader: 403
+    staff_colleague: 403
+    others: 200
+
   GET /v1/recordings/counts:
     # Recordings per conversation type for the sidebar: every signed-in caller, counting only what they may see
     # (apps/api/tests/test_usage.py).

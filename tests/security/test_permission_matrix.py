@@ -437,6 +437,12 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
         "/v1/rubrics/teaching.school.v0.1", headers=a.headers(who)
     ),
     "GET /v1/usage": lambda a, who: a.client.get("/v1/usage", headers=a.headers(who)),
+    "GET /v1/recordings/export.csv": lambda a, who: a.client.get("/v1/recordings/export.csv", headers=a.headers(who)),
+    "POST /v1/recordings/share": lambda a, who: a.client.post(
+        "/v1/recordings/share",
+        json={"recording_ids": [DONE], "note": "Well done."},
+        headers=a.headers(who, create=True),
+    ),
     "GET /v1/recordings/counts": lambda a, who: a.client.get("/v1/recordings/counts", headers=a.headers(who)),
     "GET /v1/settings": lambda a, who: a.client.get("/v1/settings", headers=a.headers(who)),
     "PATCH /v1/settings": lambda a, who: a.client.patch(

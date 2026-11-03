@@ -8,6 +8,26 @@ export function SmallPlayIcon() {
   );
 }
 
+/** "Go to" a transcript line when there is no audio to play. */
+export function SmallGoIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
 export function CheckIcon() {
   return (
     <svg
