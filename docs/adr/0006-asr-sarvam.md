@@ -49,3 +49,10 @@ Sarvam's REST API (docs.sarvam.ai, read 2026-10-17) differs from what the pipeli
 - **Dependencies:** `httpx` in `sabha-asr` (sync HTTP for the Celery worker).
 - Adding another provider (for example a self-hosted model chosen by a bake-off) is one adapter, one registry entry
   and the shared contract tests in `packages/asr/tests/test_provider.py`.
+- **Sped-up audio (experimental, 2026-11-04).** `ASR_SPEEDUP=true` with `ASR_SPEEDUP_FACTOR` (above 1.0, at most
+  1.5; default 1.25) speeds each chunk up with ffmpeg `atempo` (pitch kept) before it is sent. Sarvam bills by
+  audio length, so 1.25 sends 48 s per minute of speech. Returned times are multiplied back by the factor, so
+  transcripts stay on the normal timeline; `asr@v1.json` and the stage run record `speed`. It is off by default.
+  Accuracy may drop, above all on fast Hindi-English speech. Before turning it on, transcribe the gold set twice
+  (off and on) and compare both with `eval/wer.py`; keep it only if WER and CER, overall and on the Hinglish
+  mixes, do not get worse. No accuracy or saving figures are assumed here (golden rule 6).

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import uuid
 import wave
@@ -51,6 +52,20 @@ class FlakyProvider(FakeProvider):
         return super().transcribe(chunks)
 
 
+class TimingProvider(FakeProvider):
+    """Also records the length of every chunk it is sent, read from the WAV itself."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.sent_ms: list[int] = []
+
+    def transcribe(self, chunks: Sequence[AudioChunk]) -> list[ChunkResult]:
+        for chunk in chunks:
+            with wave.open(io.BytesIO(chunk.wav), "rb") as wav:
+                self.sent_ms.append(wav.getnframes() * 1000 // wav.getframerate())
+        return super().transcribe(chunks)
+
+
 class SilentProvider(FakeProvider):
     def transcribe(self, chunks: Sequence[AudioChunk]) -> list[ChunkResult]:
         self.calls.append([c.chunk_id for c in chunks])
@@ -62,6 +77,7 @@ def test_a_different_chunk_plan_never_reuses_saved_parts() -> None:
     plan_b = plan_chunks(50_000, [40_000], max_chunk_ms=20_000)
     assert plan_key(plan_a) == plan_key(plan_chunks(50_000, [40_000], max_chunk_ms=30_000))
     assert plan_key(plan_a) != plan_key(plan_b)
+    assert plan_key(plan_a) != plan_key(plan_a, speed=1.25)  # parts of a sped-up run are never mixed with others
 
 
 # --- The stage (MongoDB, RustFS) ---
@@ -120,8 +136,8 @@ class Stage:
             self.artefacts.put(f"t1/{rid}/diarize@v1/diarization@v1.json", json.dumps({"compact": turns}).encode())
         return rid
 
-    def run(self, rid: str, transcriber: Transcriber, attempt: int = 1) -> str:
-        work = make_work(lambda: transcriber, "v1", self.transcript_deps)
+    def run(self, rid: str, transcriber: Transcriber, attempt: int = 1, speed: float = 1.0) -> str:
+        work = make_work(lambda: transcriber, "v1", self.transcript_deps, speed=speed)
         return self.runner.run(TRANSCRIBE, work, "t1", rid, attempt=attempt).result
 
     def doc(self, rid: str) -> dict[str, Any]:
@@ -166,6 +182,24 @@ def test_the_stage_writes_compact_words_and_cost_inputs(stage: Stage) -> None:
     assert meta["speakers"] == 1
     stored = stage.db.transcripts.find_one({"recording_id": rid})
     assert stored is not None and stored["tenant_id"] == "t1"
+
+
+@pytest.mark.integration
+def test_sped_up_audio_bills_less_and_its_word_times_are_scaled_back(stage: Stage) -> None:
+    rid = stage.recording()
+    # 32 s limit at 1.25x: the 40 s of talk goes as one 32 s chunk (no split), the 10 s after the join as 8 s.
+    provider = TimingProvider(max_chunk_ms=32_000)
+    assert stage.run(rid, Transcriber(provider), speed=1.25) == "done"
+
+    assert provider.sent_ms == [32_000, 8_000]
+    output = stage.output(rid)
+    assert (output["speed"], output["chunks"]) == (1.25, 2)
+    # Back on the compact timeline: the fake spreads words over each chunk it was sent, so the first chunk's words
+    # end at 40 s of compact audio and the second chunk's at 50 s.
+    ends = [w["end_ms"] for w in output["words"]]
+    assert 40_000 in ends and max(ends) == MAP.compact_length_ms
+    (run,) = stage.db.stage_runs.find({"recording_id": rid})
+    assert (run["meta"]["sent_audio_s"], run["meta"]["audio_s"], run["meta"]["speed"]) == (40.0, 50.0, 1.25)
 
 
 @pytest.mark.integration

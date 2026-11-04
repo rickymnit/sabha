@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     asr_fallbacks: Annotated[list[str], NoDecode] = Field(default_factory=list)
     asr_model: str | None = None  # the provider's default when unset
     asr_language: str = "unknown"  # a BCP-47 hint such as hi-IN, or "unknown" to detect the language
+    # Experimental: send audio sped up (pitch kept) so fewer minutes are billed. Word times are scaled back, so the
+    # transcript stays on the normal timeline. Keep it on only if eval/wer.py shows no loss on the gold set.
+    asr_speedup: bool = False
+    asr_speedup_factor: float = Field(default=1.25, gt=1.0, le=1.5)
     sarvam_api_key: SecretStr | None = None
     sarvam_base_url: str = "https://api.sarvam.ai"
 

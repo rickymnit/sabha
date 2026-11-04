@@ -218,7 +218,8 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         llm_cost=llm_cost,
     )
 
-    speech = transcribe.make_work(transcriber, settings.artefact_version_preprocess, transcript_deps)
+    speed = settings.asr_speedup_factor if settings.asr_speedup else 1.0
+    speech = transcribe.make_work(transcriber, settings.artefact_version_preprocess, transcript_deps, speed=speed)
     from_file = imported.make_work(originals, record_import, transcript_deps)
 
     def transcribe_work(ctx: StageContext) -> dict[str, Any] | None:

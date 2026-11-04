@@ -15,6 +15,12 @@
 5. Returns cost inputs for the stage run: audio seconds sent (chunk overlaps included), requests, provider, model,
    processing time and real-time factor. Prices are not applied here (billing, P8.6).
 
+Speed-up (experimental, ASR_SPEEDUP): with `speed` above 1, each chunk is sped up with ffmpeg's atempo (pitch kept)
+just before it is sent, so the provider bills fewer seconds. Chunks are planned `speed` times longer in compact time,
+so the sped-up audio still fits the provider's limit. The provider's chunk-relative times are multiplied by `speed`
+as soon as they come back, so parts, merging and everything after work on the compact timeline as usual. asr@v1.json
+and the stage run record the factor. Saved parts are keyed by it, so a changed factor never reuses them.
+
 Errors: a retryable provider failure (timeout, 429, 5xx) is a TransientError, so the runner retries with backoff;
 any other provider failure (bad key, no quota) is PermanentError `asr_failed`. Speech but no words at all:
 NeedsReviewError `no_transcript`.
@@ -43,6 +49,7 @@ from sabha_asr.transcriber import Transcriber
 from sabha_asr.words import Word
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
+from sabha_workers.stages.preprocess import Runner, ffmpeg_timeout_s, run_tool
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext, TransientError, Work
 from sabha_workers.stages.transcript import AsrOutput, TranscriptDeps, finish_transcript
 
@@ -94,9 +101,12 @@ class Part:
                    data["fallback_reason"], results)  # fmt: skip
 
 
-def plan_key(chunks: Sequence[Chunk]) -> str:
-    """Identifies a chunk plan, so saved parts from a different plan (other limit, other audio) are never reused."""
+def plan_key(chunks: Sequence[Chunk], speed: float = 1.0) -> str:
+    """Identifies a chunk plan, so saved parts from a different plan (other limit, other audio, other speed-up) are
+    never reused."""
     text = ";".join(f"{c.start_ms}-{c.end_ms}-{c.owned_start_ms}-{c.owned_end_ms}" for c in chunks)
+    if speed != 1.0:
+        text += f";x{speed}"
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
@@ -119,6 +129,44 @@ def _cut(compact: Path, chunk: Chunk) -> AudioChunk:
     return AudioChunk(f"chunk-{chunk.index:04d}", _wav(pcm), chunk.duration_ms)
 
 
+def sent_ms(chunk: Chunk, speed: float) -> int:
+    """How much audio is sent for `chunk`: its length divided by the speed-up."""
+    return round(chunk.duration_ms / speed)
+
+
+def _speed_up(audio: AudioChunk, chunk: Chunk, speed: float, tmp: Path, run: Runner) -> AudioChunk:
+    """The chunk sped up `speed` times with ffmpeg atempo (pitch kept), trimmed or padded to exactly sent_ms."""
+    source, target = tmp / f"{audio.chunk_id}.wav", tmp / f"{audio.chunk_id}-fast.wav"
+    source.write_bytes(audio.wav)
+    args = [
+        "ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-protocol_whitelist", "file", "-i", str(source),
+        "-af", f"atempo={speed}", "-ar", str(SAMPLE_RATE), "-ac", "1", "-c:a", "pcm_s16le", "-f", "wav", "-y",
+        str(target),
+    ]  # fmt: skip
+    result = run(args, ffmpeg_timeout_s(chunk.duration_ms))
+    if result.returncode != 0:
+        raise PermanentError("speedup_failed", result.stderr.decode("utf-8", errors="replace").strip()[-500:])
+    with wave.open(str(target), "rb") as wav:
+        pcm = wav.readframes(wav.getnframes())
+    duration_ms = sent_ms(chunk, speed)
+    size = duration_ms * _BYTES_PER_MS  # atempo can be a few ms off; a fixed length keeps the time scaling exact
+    pcm = pcm[:size].ljust(size, b"\x00")
+    source.unlink()
+    target.unlink()
+    return AudioChunk(audio.chunk_id, _wav(pcm), duration_ms)
+
+
+def _slow_down(result: ChunkResult, chunk: Chunk, speed: float) -> ChunkResult:
+    """Times from sped-up audio back to the chunk's own (compact) milliseconds, kept inside the chunk."""
+
+    def back(ms: int) -> int:
+        return min(round(ms * speed), chunk.duration_ms)
+
+    words = tuple(Word(w.text, back(w.start_ms), back(w.end_ms), w.confidence) for w in result.words)
+    languages = tuple(LanguageSpan(back(s.start_ms), back(s.end_ms), s.language) for s in result.languages)
+    return ChunkResult(result.chunk_id, result.text, words, languages)
+
+
 def _languages(chunks: Sequence[Chunk], results: Sequence[ChunkResult]) -> list[dict[str, Any]]:
     """Language spans on the compact timeline, each clipped to its chunk's owned region (no double counting)."""
     spans = []
@@ -131,8 +179,16 @@ def _languages(chunks: Sequence[Chunk], results: Sequence[ChunkResult]) -> list[
     return spans
 
 
-def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, transcript: TranscriptDeps) -> Work:
+def make_work(
+    transcriber: Callable[[], Transcriber],
+    preprocess_version: str,
+    transcript: TranscriptDeps,
+    *,
+    speed: float = 1.0,
+    run: Runner = run_tool,
+) -> Work:
     """The transcribe `work` function for StageRunner. `transcriber` returns the (cached) configured Transcriber.
+    `speed` above 1 sends sped-up audio (ASR_SPEEDUP, see the module docstring); `run` runs ffmpeg for it.
 
     After the words, sabha_workers.stages.transcript assigns speaker roles and writes the canonical transcript
     (P3.6, P3.7), so one stage takes the recording from TRANSCRIBING to ANALYZING (or NEEDS_REVIEW)."""
@@ -140,7 +196,8 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
     def work(ctx: StageContext) -> dict[str, Any]:
         source = artefact_prefix(ctx.tenant_id, ctx.recording.id, "preprocess", preprocess_version)
         asr = transcriber()
-        max_chunk_ms = min(p.max_chunk_ms for p in (asr.primary, *asr.fallbacks))
+        # In compact time: a chunk planned `speed` times longer is sent no longer than the provider's limit.
+        max_chunk_ms = int(min(p.max_chunk_ms for p in (asr.primary, *asr.fallbacks)) * speed)
         with tempfile.TemporaryDirectory(prefix="sabha-transcribe-") as tmp:
             compact = Path(tmp) / "compact.wav"
             try:
@@ -152,7 +209,7 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
                                  max_chunk_ms=max_chunk_ms - max_chunk_ms % 2)  # fmt: skip
             if not chunks:
                 raise PermanentError("missing_input", "compact.wav has no audio")
-            key = plan_key(chunks)
+            key = plan_key(chunks, speed)
             parts: list[Part] = []
             resumed = 0
             for first in range(0, len(chunks), BATCH_SIZE):
@@ -164,14 +221,20 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
                     continue
                 except FileNotFoundError:
                     pass
+                audio = [_cut(compact, chunk) for chunk in batch]
+                if speed != 1.0:
+                    audio = [_speed_up(a, c, speed, Path(tmp), run) for a, c in zip(audio, batch, strict=True)]
                 try:
-                    outcome = asr.transcribe([_cut(compact, chunk) for chunk in batch])
+                    outcome = asr.transcribe(audio)
                 except ProviderError as exc:
                     error = TransientError if exc.retryable else PermanentError
                     code = "asr_unavailable" if exc.retryable else "asr_failed"
                     raise error(code, f"{exc.provider}: {exc.reason}") from exc
+                results = outcome.results
+                if speed != 1.0:
+                    results = [_slow_down(r, c, speed) for r, c in zip(results, batch, strict=True)]
                 part = Part(outcome.provider, outcome.model_id, outcome.word_timing, outcome.compute_ms,
-                            outcome.fallback_reason, outcome.results)  # fmt: skip
+                            outcome.fallback_reason, results)  # fmt: skip
                 ctx.artefacts.put(part_key, part.to_json(), "application/json")
                 parts.append(part)
         results = [result for part in parts for result in part.results]
@@ -188,6 +251,7 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
             "provider": providers[0] if len(providers) == 1 else providers,
             "model": models[0] if len(models) == 1 else models,
             "word_timing": parts[0].word_timing,
+            "speed": speed,
             "fallback_reasons": fallbacks,
             "chunks": len(chunks),
             "words": [w.to_record() for w in words],
@@ -201,7 +265,8 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
             "provider": document["provider"],
             "model": document["model"],
             "requests": len(chunks),
-            "sent_audio_s": round(sum(c.duration_ms for c in chunks) / 1000, 1),
+            "sent_audio_s": round(sum(sent_ms(c, speed) for c in chunks) / 1000, 1),
+            "speed": speed,
             "audio_s": round(audio_ms / 1000, 1),
             "processing_s": round(compute_ms / 1000, 1),
             "real_time_factor": round(compute_ms / audio_ms, 4) if audio_ms else None,
@@ -214,7 +279,7 @@ def make_work(transcriber: Callable[[], Transcriber], preprocess_version: str, t
         billed: dict[str, int] = {}
         for i, part in enumerate(parts):
             batch = chunks[i * BATCH_SIZE : (i + 1) * BATCH_SIZE]
-            billed[part.model_id] = billed.get(part.model_id, 0) + sum(c.duration_ms for c in batch)
+            billed[part.model_id] = billed.get(part.model_id, 0) + sum(sent_ms(c, speed) for c in batch)
         asr_output = AsrOutput(words, "+".join(models), parts[0].word_timing, languages, segment_map, billed)
         return {**meta, **finish_transcript(ctx, asr_output, transcript)}
 
