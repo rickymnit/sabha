@@ -147,12 +147,13 @@ def test_the_stage_writes_both_timelines_and_moves_on(stage: Stage) -> None:
 
 
 @pytest.mark.integration
-def test_a_support_call_asks_for_at_most_two_speakers_and_a_lesson_for_no_limit(stage: Stage) -> None:
+def test_a_support_call_asks_for_exactly_two_speakers_and_a_lesson_for_no_limit(stage: Stage) -> None:
     turns = [("agent", 0, 3_000), ("customer", 3_000, 6_000)]
     support, lesson = ScriptedDiarizer(turns), ScriptedDiarizer(turns)
     assert stage.run(stage.recording(kind=ConversationType.SUPPORT), support) == "done"
     assert stage.run(stage.recording(), lesson) == "done"
-    assert [c["max_speakers"] for c in (*support.calls, *lesson.calls)] == [2, None]
+    calls = (*support.calls, *lesson.calls)
+    assert [(c["min_speakers"], c["max_speakers"]) for c in calls] == [(2, 2), (None, None)]
 
 
 @pytest.mark.integration

@@ -2,7 +2,10 @@
 
 `Diarizer.diarize(wav)` takes 16 kHz mono 16-bit PCM (the preprocess stage's compact.wav) and returns speaker turns
 on THAT file's timeline, in whole milliseconds. Labels are S0, S1, ... in order of first appearance, so they do not
-depend on the model's own naming. Turns may overlap (two people talking at once); P3.4b decides how to mark that.
+depend on the model's own naming. Turns from pyannote do not overlap: the pipeline's EXCLUSIVE diarization is used
+(one speaker at a time, the speaker most likely to be talking where two overlap), which pyannote provides for
+lining turns up with transcribed words, and every word Sabha shows is given to a speaker that way (2026-11-04: with
+the overlapping output, words at turn changes went to the wrong speaker on a support call).
 Mapping turns to the original recording is the stage's job (sabha_core.timemap), not the diarizer's.
 
 Implementations:
@@ -59,7 +62,7 @@ class Turn:
 class Diarizer(Protocol):
     @property
     def model_id(self) -> str:
-        """Recorded with the output, e.g. 'pyannote/speaker-diarization-community-1@3533c8cf'."""
+        """Recorded with the output, e.g. 'pyannote/speaker-diarization-community-1@3533c8cf+exclusive'."""
         ...
 
     def diarize(self, wav: Path, *, min_speakers: int | None = None, max_speakers: int | None = None) -> list[Turn]: ...
@@ -119,13 +122,13 @@ class PyannoteDiarizer:
 
     @property
     def model_id(self) -> str:
-        return f"{MODEL_REPO}@{MODEL_REVISION[:8]}"
+        return f"{MODEL_REPO}@{MODEL_REVISION[:8]}+exclusive"
 
     def diarize(self, wav: Path, *, min_speakers: int | None = None, max_speakers: int | None = None) -> list[Turn]:
         samples, duration_ms = read_pcm(wav)
         audio = {"waveform": self._torch.from_numpy(samples)[None, :], "sample_rate": SAMPLE_RATE}
         output = self._pipeline(audio, min_speakers=min_speakers, max_speakers=max_speakers)
-        annotation = output.speaker_diarization
+        annotation = output.exclusive_speaker_diarization  # one speaker at a time (module docstring)
         raw = [
             (str(label), round(segment.start * 1000), round(segment.end * 1000))
             for segment, _, label in annotation.itertracks(yield_label=True)
