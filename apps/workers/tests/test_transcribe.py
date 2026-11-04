@@ -14,8 +14,8 @@ import pytest
 from pymongo import MongoClient
 from pymongo.database import Database
 
-from sabha_asr.chunking import plan_chunks
-from sabha_asr.provider import AudioChunk, ChunkResult, ProviderError
+from sabha_asr.chunking import Chunk, plan_chunks
+from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError
 from sabha_asr.providers.fake import FakeProvider
 from sabha_asr.transcriber import Transcriber
 from sabha_core.indexes import ensure_indexes
@@ -27,7 +27,7 @@ from sabha_core.state import RecordingStatus, transition
 from sabha_core.timemap import Segment, SegmentMap
 from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
-from sabha_workers.stages.transcribe import BATCH_SIZE, make_work, plan_key
+from sabha_workers.stages.transcribe import BATCH_SIZE, make_work, off_language, plan_key
 from sabha_workers.stages.transcript import TranscriptDeps
 
 S = RecordingStatus
@@ -78,6 +78,22 @@ def test_a_different_chunk_plan_never_reuses_saved_parts() -> None:
     assert plan_key(plan_a) == plan_key(plan_chunks(50_000, [40_000], max_chunk_ms=30_000))
     assert plan_key(plan_a) != plan_key(plan_b)
     assert plan_key(plan_a) != plan_key(plan_a, speed=1.25)  # parts of a sped-up run are never mixed with others
+
+
+def test_a_short_chunk_heard_in_another_language_is_asked_again_in_the_main_one() -> None:
+    def heard(index: int, length: int, language: str | None) -> tuple[Chunk, ChunkResult]:
+        start = index * 10_000
+        chunk = Chunk(index, start, start + length, start, start + length)
+        return chunk, ChunkResult(f"chunk-{index:04d}", "x", (), (LanguageSpan(0, length, language),))
+
+    pairs = [
+        heard(0, 20_000, "hi-IN"), heard(1, 8_000, "en-IN"),  # the recording: Hindi with some English
+        heard(2, 1_300, "bn-IN"),  # "thik achhe" heard as Bengali
+        heard(3, 1_500, "en-IN"), heard(4, 9_000, "ta-IN"),  # in the recording's languages / long: kept
+    ]  # fmt: skip
+    chunks, results = zip(*pairs, strict=True)
+    assert off_language(chunks, results) == ("hi-IN", [2])
+    assert off_language(chunks[2:3], results[2:3]) == (None, [])  # no long chunk to judge by
 
 
 # --- The stage (MongoDB, RustFS) ---

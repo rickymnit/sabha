@@ -148,12 +148,17 @@ def test_the_stage_writes_both_timelines_and_moves_on(stage: Stage) -> None:
 
 @pytest.mark.integration
 def test_a_support_call_asks_for_exactly_two_speakers_and_a_lesson_for_no_limit(stage: Stage) -> None:
-    turns = [("agent", 0, 3_000), ("customer", 3_000, 6_000)]
+    turns = [("agent", 0, 3_000), ("customer", 3_000, 3_100), ("customer", 3_100, 6_000)]
     support, lesson = ScriptedDiarizer(turns), ScriptedDiarizer(turns)
     assert stage.run(stage.recording(kind=ConversationType.SUPPORT), support) == "done"
     assert stage.run(stage.recording(), lesson) == "done"
     calls = (*support.calls, *lesson.calls)
     assert [(c["min_speakers"], c["max_speakers"]) for c in calls] == [(2, 2), (None, None)]
+    rid = stage.recording(kind=ConversationType.SUPPORT)
+    flicker = ScriptedDiarizer([("agent", 0, 1_700), ("customer", 1_700, 1_800), ("agent", 1_800, 6_000)])
+    assert stage.run(rid, flicker) == "done"
+    output = json.loads(stage.artefacts.get(f"t1/{rid}/diarize@v1/diarization@v1.json"))
+    assert {t["speaker_label"] for t in output["compact"]} == {"S0"}  # the 0.1 s sliver is dropped
 
 
 @pytest.mark.integration

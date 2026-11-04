@@ -56,6 +56,6 @@ class FakeProvider:
         for chunk in chunks:
             text = self._script.get(chunk.chunk_id, DEFAULT_TEXT)
             words = tuple(spread_words(text, 0, chunk.duration_ms))
-            languages = (LanguageSpan(0, chunk.duration_ms, self._language),)
+            languages = (LanguageSpan(0, chunk.duration_ms, chunk.language or self._language),)
             results.append(ChunkResult(chunk.chunk_id, " ".join(w.text for w in words), words, languages))
         return results

@@ -17,9 +17,12 @@ from sabha_asr.chunking import (
     DEFAULT_MAX_CHUNK_MS,
     DEFAULT_OVERLAP_MS,
     Chunk,
+    SpeakerCuts,
+    chunk_turns,
     compact_joins,
     merge_chunk_words,
     plan_chunks,
+    retime_over_speech,
     speaker_cuts,
 )
 from sabha_asr.words import Turn, Word
@@ -171,20 +174,26 @@ def test_plan_properties(length: int, raw_joins: list[int], max_chunk_ms: int, h
     length=st.integers(min_value=1, max_value=400_000),
     raw_joins=st.lists(st.integers(min_value=0, max_value=400_000), max_size=20),
     raw_cuts=st.lists(st.integers(min_value=0, max_value=400_000), max_size=30),
+    raw_quiet=st.lists(st.integers(min_value=0, max_value=400_000), max_size=30),
     max_chunk_ms=st.integers(min_value=1500, max_value=40_000),
 )
 def test_no_chunk_crosses_a_speaker_change(
-    length: int, raw_joins: list[int], raw_cuts: list[int], max_chunk_ms: int
+    length: int, raw_joins: list[int], raw_cuts: list[int], raw_quiet: list[int], max_chunk_ms: int
 ) -> None:
     overlap_ms = DEFAULT_OVERLAP_MS
     joins = [j for j in raw_joins if j <= length]
     cuts = [c for c in raw_cuts if c <= length]
-    chunks = plan_chunks(length, joins, max_chunk_ms=max_chunk_ms, overlap_ms=overlap_ms, speaker_cuts_ms=cuts)
+    quiet = [c for c in raw_quiet if c <= length]
+    chunks = plan_chunks(length, joins, max_chunk_ms=max_chunk_ms, overlap_ms=overlap_ms, speaker_cuts_ms=cuts,
+                         quiet_cuts_ms=quiet)  # fmt: skip
     assert_tiles(chunks, length)
     boundaries = {c.owned_end_ms for c in chunks}
     for cut in cuts:
         if 0 < cut < length:  # a cut on the boundary itself, or moved to a VAD join no more than half the overlap away
             assert cut in boundaries or any(abs(j - cut) <= overlap_ms // 2 and j in boundaries for j in joins)
+    for before, after in pairwise(chunks):
+        if before.owned_end_ms in quiet:  # a change of speaker in a pause: cut there, with no overlap
+            assert before.end_ms == before.owned_end_ms == after.start_ms
     for c in chunks:
         assert c.duration_ms <= max_chunk_ms
         assert c.start_ms <= c.owned_start_ms < c.owned_end_ms <= c.end_ms
@@ -198,8 +207,34 @@ def test_speaker_cuts_ignore_short_replies_and_cut_between_stretches() -> None:
         Turn("S1", 9_400, 15_000),
         Turn("S0", 14_800, 20_000),  # overlapping speech: cut in the middle of the overlap
     ]
-    assert speaker_cuts(turns) == (9_200, 14_900)
-    assert speaker_cuts(turns, min_run_ms=0) == (5_100, 5_800, 9_200, 14_900)
+    assert speaker_cuts(turns, min_run_ms=1_000) == SpeakerCuts(quiet=(), inside=(9_200, 14_900))
+    assert speaker_cuts(turns) == SpeakerCuts(quiet=(), inside=(5_100, 5_800, 9_200, 14_900))  # 0.5 s counts
+    paused = [Turn("S0", 0, 4_000), Turn("S1", 4_800, 9_000)]  # 0.8 s with nobody talking
+    assert speaker_cuts(paused) == SpeakerCuts(quiet=(4_400,), inside=())
+
+
+def test_a_chunk_one_speaker_dominates_is_one_turn_of_theirs() -> None:
+    chunks = [Chunk(0, 0, 4_000, 0, 4_000), Chunk(1, 4_000, 8_000, 4_000, 8_000)]
+    turns = [
+        Turn("S0", 0, 1_700), Turn("S1", 1_750, 1_900),  # diarizer flicker inside S0's "good afternoon"
+        Turn("S0", 1_900, 4_000),
+        Turn("S1", 4_000, 6_000), Turn("S0", 6_000, 8_000),  # a real 50/50 exchange: the turns are kept
+    ]  # fmt: skip
+    assert chunk_turns(chunks, turns) == [
+        Turn("S0", 0, 4_000), Turn("S1", 4_000, 6_000), Turn("S0", 6_000, 8_000),
+    ]  # fmt: skip
+
+
+def test_phrase_timed_words_move_off_the_pauses() -> None:
+    # Spread evenly over 0-4 s as if nobody paused; the speaker talked 0-1 s and 3-4 s.
+    words = [Word("ek", 0, 1_000, None), Word("do", 1_000, 2_000, None), Word("teen", 2_000, 4_000, None)]
+    moved = retime_over_speech(words, [(0, 1_000), (3_000, 4_000)])
+    assert [(w.text, w.start_ms, w.end_ms) for w in moved] == [
+        ("ek", 0, 500),
+        ("do", 500, 1_000),
+        ("teen", 3_000, 4_000),
+    ]
+    assert retime_over_speech(words, []) == words  # no speech heard: left as it was
 
 
 # --- merge_chunk_words -----------------------------------------------------------------------------------------
@@ -305,5 +340,7 @@ def test_every_word_comes_back_exactly_once_and_is_never_split(audio: tuple[int,
 @given(audio_with_words(), st.lists(st.integers(min_value=0, max_value=10**9), max_size=12))
 def test_speaker_cuts_keep_every_word_exactly_once(audio: tuple[int, list[int], list[Word]], raw: list[int]) -> None:
     length, joins, truth = audio
-    chunks = plan_chunks(length, joins, speaker_cuts_ms=[c % (length + 1) for c in raw])
+    pauses = [(a.end_ms + b.start_ms) // 2 for a, b in pairwise(truth) if b.start_ms > a.end_ms]
+    quiet = [pauses[c % len(pauses)] for c in raw[1::2]] if pauses else []  # only ever in a pause, by contract
+    chunks = plan_chunks(length, joins, speaker_cuts_ms=[c % (length + 1) for c in raw[::2]], quiet_cuts_ms=quiet)
     assert run(chunks, truth) == truth

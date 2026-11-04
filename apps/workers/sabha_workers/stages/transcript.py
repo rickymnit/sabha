@@ -63,6 +63,8 @@ class AsrOutput:
     languages: Sequence[dict[str, Any]]  # {start_ms, end_ms, language} on the compact timeline
     segment_map: SegmentMap
     billed_ms: Mapping[str, int] = field(default_factory=dict)  # audio sent per ASR model id, overlaps included
+    # The turns words are given to speakers by (sabha_asr.chunking.chunk_turns); None: the diarization turns.
+    word_turns: Sequence[Turn] | None = None
 
 
 def language_mix(spans: Sequence[dict[str, Any]]) -> dict[str, float]:
@@ -169,7 +171,7 @@ def finish_transcript(
     ctx.artefacts.put(ctx.prefix + "roles@v1.json", assignment.to_json().encode(), "application/json")
 
     roles = assignment.role_by_speaker()
-    transcript = assemble_transcript(asr.words, turns, roles, asr.segment_map, asr_model=asr.model,
+    transcript = assemble_transcript(asr.words, asr.word_turns or turns, roles, asr.segment_map, asr_model=asr.model,
                                      word_timing=asr.word_timing)  # fmt: skip
     key = ctx.prefix + "transcript@v1.json"
     ctx.artefacts.put(key, json.dumps(transcript, ensure_ascii=False).encode(), "application/json")

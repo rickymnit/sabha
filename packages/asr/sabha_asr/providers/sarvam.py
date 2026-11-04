@@ -78,7 +78,7 @@ class SarvamProvider:
     def _transcribe_one(self, chunk: AudioChunk) -> ChunkResult:
         if chunk.duration_ms > MAX_CHUNK_MS:
             raise ValueError(f"chunk {chunk.chunk_id!r} is {chunk.duration_ms} ms; Sarvam's limit is {MAX_CHUNK_MS} ms")
-        data = {"model": self._model, "language_code": self._language, "with_timestamps": "true"}
+        data = {"model": self._model, "language_code": chunk.language or self._language, "with_timestamps": "true"}
         if self._model == "saaras:v3":
             data["mode"] = "transcribe"
         try:

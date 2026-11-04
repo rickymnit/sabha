@@ -5,6 +5,7 @@ and in the same order, its words with chunk-relative times. Every provider produ
 transcribe stage never branches on which provider is active.
 
 - `AudioChunk.wav` is 16 kHz mono 16-bit PCM WAV, cut from compact.wav (sabha_asr.chunking.plan_chunks).
+  `AudioChunk.language`, when set, is a BCP-47 hint for this chunk only (it overrides the provider's own setting).
 - `ChunkResult.words` are `Word`s in chunk-relative milliseconds; `Word.shifted` moves them to compact time.
 - `ChunkResult.languages` tags spans of the chunk with a BCP-47 language code, or None when not detected.
 - `word_timing` is "word" when the provider times each word, "approximate" when it times phrases only and words are
@@ -30,6 +31,7 @@ class AudioChunk:
     chunk_id: str
     wav: bytes
     duration_ms: int
+    language: str | None = None  # a hint for this chunk only, e.g. "hi-IN"
 
     def __post_init__(self) -> None:
         if not self.chunk_id:

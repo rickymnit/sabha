@@ -10,6 +10,9 @@
    free, the diarizer split one phone call into 4 voices, and the agent's own words were then given to the customer.
    Exactly 2 are asked for (SPEAKER_COUNTS), not at most 2: with two voices on one phone line the diarizer may
    otherwise merge them into one.
+   Turns shorter than MIN_TURN_MS are dropped: the diarizer flickers between speakers inside one word ("good
+   afternoon" came back as turns of 0.1, 0.3, 0.1 and 0.05 s alternating), and such a sliver took the words said
+   over it to the wrong speaker.
 3. Writes `diarization@v1.json` with the turns twice: on the COMPACT timeline (what ASR will see) and on the
    ORIGINAL recording timeline (golden rule 4). A compact turn that crosses a join where silence was cut out
    becomes one original turn per segment it touches, so no original turn spans removed silence.
@@ -38,6 +41,8 @@ log = logging.getLogger("sabha.workers.diarize")
 
 VERSION = "diarization@v1"
 NO_SPEAKERS = "no_speakers"
+MIN_TURN_MS = 250
+"""Shorter turns are flicker, not talk (module docstring, step 2). An unmeasured starting value (eval/roles.py)."""
 SPEAKER_COUNTS = {ConversationType.SUPPORT: 2}
 """Conversation types with a known number of speakers; others are left to the diarizer."""
 
@@ -74,7 +79,8 @@ def make_work(diarizer: Callable[[], Diarizer], preprocess_version: str, device:
             model = diarizer()
             started = time.monotonic()
             count = SPEAKER_COUNTS.get(ctx.recording.type)
-            turns = model.diarize(compact, min_speakers=count, max_speakers=count)
+            turns = [t for t in model.diarize(compact, min_speakers=count, max_speakers=count)
+                     if t.end_ms - t.start_ms >= MIN_TURN_MS]  # fmt: skip
             seconds = time.monotonic() - started
         if not turns:
             raise NeedsReviewError(NO_SPEAKERS, "diarization found no speaker turns in the speech")
