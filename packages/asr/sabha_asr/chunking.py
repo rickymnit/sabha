@@ -13,6 +13,13 @@ Planning (`plan_chunks`):
   the protection instead. The piece is divided into the fewest equal "owned" regions that fit, and each chunk's
   audio extends `overlap_ms / 2` past every split it borders, so neighbouring chunks share exactly `overlap_ms` of
   audio centred on the split. Overlap never reaches past a VAD join.
+- Speaker changes (`speaker_cuts_ms`, from the diarization by `speaker_cuts`) are HARD cuts: no chunk crosses one,
+  so no ASR phrase spans two speakers. The provider times phrases, not words (ADR 0006), and a phrase that ran across
+  a change of speaker had its words spread across both turns, some landing on the wrong speaker. A speaker cut that
+  falls inside speech gets the same protection as a split: each neighbour's audio reaches `overlap_ms / 2` past it,
+  and the owned-region rule below keeps each word once. A speaker cut within `overlap_ms / 2` of a VAD join moves to
+  the join, where no overlap is needed. Chunks that border such a cut are planned that much shorter, so their audio
+  still fits `max_chunk_ms`.
 - Every chunk OWNS [owned_start_ms, owned_end_ms). Owned regions tile the compact audio with no gaps or overlaps.
   At VAD joins a chunk's audio and owned region are the same.
 
@@ -36,7 +43,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 
-from sabha_asr.words import Word
+from sabha_asr.words import Turn, Word
 from sabha_core.timemap import SegmentMap
 
 DEFAULT_MAX_CHUNK_MS = 30_000
@@ -44,6 +51,15 @@ DEFAULT_MAX_CHUNK_MS = 30_000
 
 DEFAULT_OVERLAP_MS = 500
 """Audio shared by two chunks at a split inside speech (P3.5: 0.5 s)."""
+
+DEFAULT_MIN_SPEAKER_RUN_MS = 1_000
+"""A speaker change is cut only between stretches of at least this much talk by each side. Shorter replies ("ji
+sir", "haan") stay inside the other speaker's chunk: a clip that short gives the ASR too little to go on, and cutting
+at every one would multiply requests and overlap. An unmeasured starting value: tune it on the gold set (eval/wer.py,
+eval/roles.py)."""
+
+DEFAULT_RUN_JOIN_GAP_MS = 1_000
+"""Turns of one speaker separated by at most this much are one stretch of talk (as roles.DEFAULT_TURN_JOIN_GAP_MS)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +95,36 @@ def compact_joins(segment_map: SegmentMap) -> tuple[int, ...]:
     )
 
 
+def speaker_cuts(
+    turns: Iterable[Turn],
+    *,
+    min_run_ms: int = DEFAULT_MIN_SPEAKER_RUN_MS,
+    join_gap_ms: int = DEFAULT_RUN_JOIN_GAP_MS,
+) -> tuple[int, ...]:
+    """Compact times where one speaker hands over to another, for `plan_chunks(speaker_cuts_ms=...)`.
+
+    Turns are taken in order of start and joined into stretches of one speaker (gaps up to `join_gap_ms`). Stretches
+    shorter than `min_run_ms` are dropped, and the stretches either side of them joined when they are the same
+    speaker, so a short reply never causes a cut. Between two stretches of different speakers the cut is the midpoint
+    of the gap between them, or of their overlap when they overlap. Sorted, without duplicates.
+    """
+    runs: list[tuple[str, int, int]] = []
+    for turn in sorted(turns, key=lambda t: (t.start_ms, t.end_ms)):
+        if runs and runs[-1][0] == turn.speaker_label and turn.start_ms - runs[-1][2] <= join_gap_ms:
+            runs[-1] = (turn.speaker_label, runs[-1][1], max(runs[-1][2], turn.end_ms))
+        else:
+            runs.append((turn.speaker_label, turn.start_ms, turn.end_ms))
+    kept: list[tuple[str, int, int]] = []
+    for label, start, end in runs:
+        if end - start < min_run_ms:
+            continue
+        if kept and kept[-1][0] == label:
+            kept[-1] = (label, kept[-1][1], max(kept[-1][2], end))
+        else:
+            kept.append((label, start, end))
+    return tuple(sorted({(a[2] + b[1]) // 2 for a, b in pairwise(kept)}))
+
+
 def _split(start_ms: int, end_ms: int, max_chunk_ms: int, overlap_ms: int) -> list[tuple[int, int, int, int]]:
     """Split one piece of speech longer than max_chunk_ms into (start, end, owned_start, owned_end) parts."""
     length = end_ms - start_ms
@@ -101,13 +147,16 @@ def plan_chunks(
     *,
     max_chunk_ms: int = DEFAULT_MAX_CHUNK_MS,
     overlap_ms: int = DEFAULT_OVERLAP_MS,
+    speaker_cuts_ms: Iterable[int] = (),
 ) -> tuple[Chunk, ...]:
     """Plan the ASR chunks for compact audio of `compact_length_ms`. See the module docstring for the rules.
 
     `joins_ms` are the VAD joins in compact time (usually `compact_joins(segment_map)`), in any order; duplicates,
     0 and the compact end are ignored, and a join outside [0, compact_length_ms] raises ValueError. `overlap_ms`
     must be even (it is split equally either side of a split) and `max_chunk_ms` at least twice `overlap_ms` (so
-    the overlap of a split never reaches past a VAD join). Empty audio gives no chunks.
+    the overlap of a split never reaches past a VAD join). `speaker_cuts_ms` are hard cuts at speaker changes
+    (usually `speaker_cuts(turns)`); like joins, those outside (0, compact_length_ms) are ignored or raise. With any
+    speaker cut, `max_chunk_ms` must be at least three times `overlap_ms`. Empty audio gives no chunks.
     """
     length, max_chunk_ms, overlap_ms = (operator.index(v) for v in (compact_length_ms, max_chunk_ms, overlap_ms))
     if length < 0:
@@ -123,27 +172,55 @@ def plan_chunks(
             raise ValueError(f"join at {join} ms is outside the compact audio [0, {length}]")
         if 0 < join < length:
             cuts.add(join)
+    half = overlap_ms // 2
+    hard: set[int] = set()  # speaker changes: no chunk crosses one
+    for raw in speaker_cuts_ms:
+        cut = operator.index(raw)
+        if not 0 <= cut <= length:
+            raise ValueError(f"speaker cut at {cut} ms is outside the compact audio [0, {length}]")
+        if 0 < cut < length:
+            near = [join for join in cuts if abs(join - cut) <= half]
+            hard.add(min(near, key=lambda join: abs(join - cut)) if near else cut)
+    if hard and max_chunk_ms < 3 * overlap_ms:
+        raise ValueError(f"with speaker cuts, max_chunk_ms must be at least 3 * overlap_ms, got {max_chunk_ms}")
     if length == 0:
         return ()
 
-    points = [0, *sorted(cuts), length]
+    def pad(point: int) -> int:
+        """Audio added past a chunk boundary: half the overlap at a speaker cut inside speech, else none."""
+        return half if point in hard and point not in cuts else 0
+
+    points = sorted({0, length, *cuts, *hard})
     planned: list[tuple[int, int, int, int]] = []
     open_start: int | None = None  # the chunk being packed: [open_start, open_end)
     open_end = 0
+
+    def close() -> None:
+        if open_start is not None:
+            audio = (max(0, open_start - pad(open_start)), min(length, open_end + pad(open_end)))
+            planned.append((*audio, open_start, open_end))
+
     for piece_start, piece_end in pairwise(points):
-        if piece_end - piece_start > max_chunk_ms:
-            if open_start is not None:
-                planned.append((open_start, open_end, open_start, open_end))
-                open_start = None
-            planned.extend(_split(piece_start, piece_end, max_chunk_ms, overlap_ms))
-        elif open_start is not None and piece_end - open_start <= max_chunk_ms:
+        if piece_end - piece_start + pad(piece_start) + pad(piece_end) > max_chunk_ms:
+            close()
+            open_start = None
+            padded = pad(piece_start) or pad(piece_end)
+            parts = _split(piece_start, piece_end, max_chunk_ms - (overlap_ms if padded else 0), overlap_ms)
+            start, end, owned_start, owned_end = parts[0]
+            parts[0] = (max(0, start - pad(piece_start)), end, owned_start, owned_end)
+            start, end, owned_start, owned_end = parts[-1]
+            parts[-1] = (start, min(length, end + pad(piece_end)), owned_start, owned_end)
+            planned.extend(parts)
+        elif (
+            open_start is not None
+            and open_end not in hard
+            and piece_end - open_start + pad(open_start) + pad(piece_end) <= max_chunk_ms
+        ):
             open_end = piece_end
         else:
-            if open_start is not None:
-                planned.append((open_start, open_end, open_start, open_end))
+            close()
             open_start, open_end = piece_start, piece_end
-    if open_start is not None:
-        planned.append((open_start, open_end, open_start, open_end))
+    close()
     return tuple(Chunk(index, *bounds) for index, bounds in enumerate(planned))
 
 

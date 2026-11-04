@@ -279,6 +279,20 @@ def test_the_tie_breaker_is_told_a_walk_in_is_a_visit_at_the_desk() -> None:
     assert "front-desk conversation with a walk-in visitor" in system and "phone call" not in system
 
 
+def test_the_tie_breaker_is_told_which_company_the_agent_works_for() -> None:
+    from sabha_asr.roles import RoleAssignment, SpeakerRole
+
+    low = "heuristic_low_confidence"
+    speakers = {"S0": SpeakerRole("support_agent", 0.5, low), "S1": SpeakerRole("customer", 0.5, low)}
+    call = TieBreakRequest("support", ("support_agent", "customer"), RoleAssignment(speakers, "unclear_roles"),
+                           (("S0", "main school log se bol raha hoon"), ("S1", "gurukul jaipur se")),
+                           organisation=("SchoolLog", "school log"))  # fmt: skip
+    gateway = FakeGateway({"staff_speaker": "S0", "confidence": 0.9})
+    LlmRoleTieBreaker(gateway, "t1", "r1")(call)  # type: ignore[arg-type]  # a fake gateway
+    user = gateway.calls[0]["messages"][1].content
+    assert "The support_agent works for SchoolLog (it may be said or written as SchoolLog, school log)" in user
+
+
 @pytest.mark.parametrize(
     "gateway",
     [

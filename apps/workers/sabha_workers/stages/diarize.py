@@ -5,7 +5,9 @@
 1. Reads the preprocess stage's `compact.wav` (speech only) and `segments@v1.json`. Missing: PermanentError
    `missing_input` (the preprocess stage did not finish; replay it).
 2. Runs the configured diarizer (sabha_asr.diarization) on compact.wav. Teaching recordings may have any number of
-   speakers (role assignment, P3.6, groups the students); no speaker limits are passed for now.
+   speakers (role assignment, P3.6, groups the students), so no limit is passed for them. A support call has one
+   agent and one customer (owner's decision, 2026-11-04), so at most 2 speakers are asked for (MAX_SPEAKERS): left
+   free, the diarizer split one phone call into 4 voices, and the agent's own words were then given to the customer.
 3. Writes `diarization@v1.json` with the turns twice: on the COMPACT timeline (what ASR will see) and on the
    ORIGINAL recording timeline (golden rule 4). A compact turn that crosses a join where silence was cut out
    becomes one original turn per segment it touches, so no original turn spans removed silence.
@@ -25,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from sabha_asr.diarization import Diarizer, Turn
+from sabha_core.profiles import ConversationType
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext, Work
@@ -33,6 +36,8 @@ log = logging.getLogger("sabha.workers.diarize")
 
 VERSION = "diarization@v1"
 NO_SPEAKERS = "no_speakers"
+MAX_SPEAKERS = {ConversationType.SUPPORT: 2}
+"""Conversation types with a known most number of speakers; others are left to the diarizer."""
 
 
 def to_original(turns: list[Turn], segment_map: SegmentMap) -> list[Turn]:
@@ -66,7 +71,7 @@ def make_work(diarizer: Callable[[], Diarizer], preprocess_version: str, device:
                 raise PermanentError("missing_input", f"preprocess output not found: {exc}") from exc
             model = diarizer()
             started = time.monotonic()
-            turns = model.diarize(compact)
+            turns = model.diarize(compact, max_speakers=MAX_SPEAKERS.get(ctx.recording.type))
             seconds = time.monotonic() - started
         if not turns:
             raise NeedsReviewError(NO_SPEAKERS, "diarization found no speaker turns in the speech")

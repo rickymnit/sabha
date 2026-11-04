@@ -95,8 +95,8 @@ class Stage:
         self.tmp = tmp
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"diarize": "v1"}, worker="test")
 
-    def recording(self, *, with_inputs: bool = True) -> str:
-        recording = Recording(type=ConversationType.TEACHING, status=S.DIARIZING, consent_ref="c")
+    def recording(self, *, with_inputs: bool = True, kind: ConversationType = ConversationType.TEACHING) -> str:
+        recording = Recording(type=kind, status=S.DIARIZING, consent_ref="c")
         rid = SyncTenantRepo(self.db, "recordings", "t1", Recording).insert_one(recording).id
         if with_inputs:
             compact = self.tmp / f"{rid}.wav"
@@ -144,6 +144,15 @@ def test_the_stage_writes_both_timelines_and_moves_on(stage: Stage) -> None:
     (run,) = stage.db.stage_runs.find({"recording_id": rid})
     assert run["meta"]["speakers"] == 2 and run["meta"]["audio_s"] == 6.0 and run["meta"]["device"] == "cpu"
     assert run["meta"]["real_time_factor"] is not None
+
+
+@pytest.mark.integration
+def test_a_support_call_asks_for_at_most_two_speakers_and_a_lesson_for_no_limit(stage: Stage) -> None:
+    turns = [("agent", 0, 3_000), ("customer", 3_000, 6_000)]
+    support, lesson = ScriptedDiarizer(turns), ScriptedDiarizer(turns)
+    assert stage.run(stage.recording(kind=ConversationType.SUPPORT), support) == "done"
+    assert stage.run(stage.recording(), lesson) == "done"
+    assert [c["max_speakers"] for c in (*support.calls, *lesson.calls)] == [2, None]
 
 
 @pytest.mark.integration

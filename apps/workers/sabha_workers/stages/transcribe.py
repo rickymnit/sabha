@@ -2,9 +2,10 @@
 
 `work(ctx)`:
 
-1. Reads the preprocess stage's `compact.wav` and `segments@v1.json`. Missing: PermanentError `missing_input`.
-2. Plans chunks with sabha_asr.chunking: cut at the VAD joins, at most the provider's limit (Sarvam: 29.5 s), with
-   0.5 s overlap only where a long stretch of talk must be split.
+1. Reads the preprocess stage's `compact.wav` and `segments@v1.json`, and the diarize stage's turns. Missing:
+   PermanentError `missing_input`.
+2. Plans chunks with sabha_asr.chunking: cut at the VAD joins and at every change of speaker (so no ASR phrase spans
+   two speakers), at most the provider's limit (Sarvam: 29.5 s), with 0.5 s overlap where talk must be split.
 3. Sends the chunks through the Transcriber (sabha_asr.transcriber: the configured provider, and fallbacks only
    when ASR_FALLBACKS names them; golden rule 7) in batches of BATCH_SIZE. Each finished batch is saved under
    `parts/` in this stage's folder, so a retry after a failure resumes there instead of sending (and paying for)
@@ -43,10 +44,10 @@ from pathlib import Path
 from typing import Any
 
 from sabha_asr.assembly import WORD_TIMINGS, WordTiming
-from sabha_asr.chunking import Chunk, compact_joins, merge_chunk_words, plan_chunks
+from sabha_asr.chunking import Chunk, compact_joins, merge_chunk_words, plan_chunks, speaker_cuts
 from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError
 from sabha_asr.transcriber import Transcriber
-from sabha_asr.words import Word
+from sabha_asr.words import Turn, Word
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
 from sabha_workers.stages.preprocess import Runner, ffmpeg_timeout_s, run_tool
@@ -195,6 +196,7 @@ def make_work(
 
     def work(ctx: StageContext) -> dict[str, Any]:
         source = artefact_prefix(ctx.tenant_id, ctx.recording.id, "preprocess", preprocess_version)
+        diarized = artefact_prefix(ctx.tenant_id, ctx.recording.id, "diarize", transcript.diarize_version)
         asr = transcriber()
         # In compact time: a chunk planned `speed` times longer is sent no longer than the provider's limit.
         max_chunk_ms = int(min(p.max_chunk_ms for p in (asr.primary, *asr.fallbacks)) * speed)
@@ -202,11 +204,13 @@ def make_work(
             compact = Path(tmp) / "compact.wav"
             try:
                 segment_map = SegmentMap.from_json(ctx.artefacts.get(source + "segments@v1.json"))
+                turns = json.loads(ctx.artefacts.get(diarized + "diarization@v1.json"))["compact"]
                 ctx.artefacts.download(source + "compact.wav", compact)
             except FileNotFoundError as exc:
                 raise PermanentError("missing_input", f"preprocess output not found: {exc}") from exc
+            cuts = speaker_cuts(Turn(t["speaker_label"], t["start_ms"], t["end_ms"]) for t in turns)
             chunks = plan_chunks(segment_map.compact_length_ms, compact_joins(segment_map),
-                                 max_chunk_ms=max_chunk_ms - max_chunk_ms % 2)  # fmt: skip
+                                 max_chunk_ms=max_chunk_ms - max_chunk_ms % 2, speaker_cuts_ms=cuts)  # fmt: skip
             if not chunks:
                 raise PermanentError("missing_input", "compact.wav has no audio")
             key = plan_key(chunks, speed)

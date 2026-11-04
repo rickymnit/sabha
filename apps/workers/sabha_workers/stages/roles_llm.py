@@ -24,7 +24,7 @@ from sabha_llm.types import Message
 log = logging.getLogger("sabha.workers.roles")
 
 TASK = "roles.tiebreak"
-PROMPT_VERSION = "roles.tiebreak@1"
+PROMPT_VERSION = "roles.tiebreak@2"
 METHOD = "llm_tiebreak"
 UNSURE = "unsure"
 MAX_OPENING_CHARS = 6_000
@@ -66,8 +66,15 @@ class LlmRoleTieBreaker:
         }
         kind = WALK_IN_KIND if other_role == VISITOR else KINDS.get(request.recording_type, "conversation")
         system = SYSTEM.format(kind=kind, staff=staff_role, other=other_role)
+        works_for = (
+            f"The {staff_role} works for {request.organisation[0]} (it may be said or written as "
+            f"{', '.join(request.organisation)}); the {other_role} does not.\n"
+            if request.organisation
+            else ""
+        )
         user = (
-            f"Speakers: {', '.join(labels)}.\nOpening, one line per stretch of one speaker:\n\n{_opening(request)}\n\n"
+            f"{works_for}Speakers: {', '.join(labels)}.\n"
+            f"Opening, one line per stretch of one speaker:\n\n{_opening(request)}\n\n"
             f'Which speaker is the {staff_role}? Give staff_speaker (a label, or "{UNSURE}") and your confidence.'
         )
         try:

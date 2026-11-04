@@ -20,8 +20,9 @@ from sabha_asr.chunking import (
     compact_joins,
     merge_chunk_words,
     plan_chunks,
+    speaker_cuts,
 )
-from sabha_asr.words import Word
+from sabha_asr.words import Turn, Word
 from sabha_core.timemap import Segment, SegmentMap
 
 
@@ -165,6 +166,42 @@ def test_plan_properties(length: int, raw_joins: list[int], max_chunk_ms: int, h
             assert not any(after.start_ms < j < before.end_ms for j in cut_points)
 
 
+@settings(max_examples=200, deadline=None)
+@given(
+    length=st.integers(min_value=1, max_value=400_000),
+    raw_joins=st.lists(st.integers(min_value=0, max_value=400_000), max_size=20),
+    raw_cuts=st.lists(st.integers(min_value=0, max_value=400_000), max_size=30),
+    max_chunk_ms=st.integers(min_value=1500, max_value=40_000),
+)
+def test_no_chunk_crosses_a_speaker_change(
+    length: int, raw_joins: list[int], raw_cuts: list[int], max_chunk_ms: int
+) -> None:
+    overlap_ms = DEFAULT_OVERLAP_MS
+    joins = [j for j in raw_joins if j <= length]
+    cuts = [c for c in raw_cuts if c <= length]
+    chunks = plan_chunks(length, joins, max_chunk_ms=max_chunk_ms, overlap_ms=overlap_ms, speaker_cuts_ms=cuts)
+    assert_tiles(chunks, length)
+    boundaries = {c.owned_end_ms for c in chunks}
+    for cut in cuts:
+        if 0 < cut < length:  # a cut on the boundary itself, or moved to a VAD join no more than half the overlap away
+            assert cut in boundaries or any(abs(j - cut) <= overlap_ms // 2 and j in boundaries for j in joins)
+    for c in chunks:
+        assert c.duration_ms <= max_chunk_ms
+        assert c.start_ms <= c.owned_start_ms < c.owned_end_ms <= c.end_ms
+
+
+def test_speaker_cuts_ignore_short_replies_and_cut_between_stretches() -> None:
+    turns = [
+        Turn("S0", 0, 5_000),
+        Turn("S1", 5_200, 5_700),  # "ji sir": too short to cut for, so S0 carries on
+        Turn("S0", 5_900, 9_000),
+        Turn("S1", 9_400, 15_000),
+        Turn("S0", 14_800, 20_000),  # overlapping speech: cut in the middle of the overlap
+    ]
+    assert speaker_cuts(turns) == (9_200, 14_900)
+    assert speaker_cuts(turns, min_run_ms=0) == (5_100, 5_800, 9_200, 14_900)
+
+
 # --- merge_chunk_words -----------------------------------------------------------------------------------------
 
 
@@ -261,4 +298,12 @@ def test_every_word_comes_back_exactly_once_and_is_never_split(audio: tuple[int,
             owner = [chunks[-1]]
         assert len(owner) == 1
         assert owner[0].start_ms <= w.start_ms and w.end_ms <= owner[0].end_ms
+    assert run(chunks, truth) == truth
+
+
+@settings(max_examples=150, deadline=None)
+@given(audio_with_words(), st.lists(st.integers(min_value=0, max_value=10**9), max_size=12))
+def test_speaker_cuts_keep_every_word_exactly_once(audio: tuple[int, list[int], list[Word]], raw: list[int]) -> None:
+    length, joins, truth = audio
+    chunks = plan_chunks(length, joins, speaker_cuts_ms=[c % (length + 1) for c in raw])
     assert run(chunks, truth) == truth

@@ -272,6 +272,9 @@ class TieBreakRequest:
     rubric_roles: tuple[str, str]
     heuristic: RoleAssignment
     opening: tuple[tuple[str, str], ...] = field(default=())  # (speaker_label, text) per stretch of one speaker
+    # The tenant's name and the ways it is said: the staff member works there and the others do not. A school or
+    # company name, not a person's (golden rule 8 is about people's details).
+    organisation: tuple[str, ...] = field(default=())
 
 
 class RoleTieBreaker(Protocol):
@@ -521,8 +524,9 @@ def assign_roles(
     if tie_breaker is None:
         return heuristic
     request = TieBreakRequest(
-        recording_type, role_pair, heuristic, tuple(_speaker_runs(turns, words, params.tie_break_window_ms))
-    )
+        recording_type, role_pair, heuristic, tuple(_speaker_runs(turns, words, params.tie_break_window_ms)),
+        organisation=tuple(dict.fromkeys(name for name in tenant_name_variants if name.strip())),
+    )  # fmt: skip
     answer = tie_breaker(request)
     if answer is None or answer.needs_review_reason is not None:
         return heuristic
