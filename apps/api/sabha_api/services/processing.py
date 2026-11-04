@@ -5,7 +5,8 @@ failure with whether it can still be retried (sabha_api.services.retry), and the
 the ones the gateway stored (golden rule 6): calls without a price are counted, never estimated.
 
 A failed run that is the latest of its stage while the recording is still in that stage is "retrying": the runner
-tries again by itself (a busy or unreachable provider), so it is not shown as a failure.
+tries again by itself (a busy or unreachable provider), so it is not shown as a failure. The latest run of a
+recording waiting for review (NEEDS_REVIEW) is "needs_review": it stopped for a person to decide, not on an error.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ _WORKING = {"preprocess": RecordingStatus.PREPROCESSING, "diarize": RecordingSta
 class StageOut(BaseModel):
     stage: str
     attempt: int
-    status: str  # running, succeeded, failed, retrying (failed, and the stage will try again by itself)
+    status: str  # running, succeeded, failed, retrying (will try again by itself), needs_review (a person decides)
     started_at: datetime
     finished_at: datetime | None
     duration_ms: int | None
@@ -83,8 +84,11 @@ async def processing(
     latest = {r.stage: r.attempt for r in stages}  # sorted by start, so the last run of each stage wins
 
     def shown(r: StageRun) -> str:
-        retrying = r.status == "failed" and latest[r.stage] == r.attempt and recording.status is _WORKING.get(r.stage)
-        return "retrying" if retrying else r.status
+        if r.status != "failed" or latest[r.stage] != r.attempt:
+            return r.status
+        if recording.status is RecordingStatus.NEEDS_REVIEW and r is stages[-1]:
+            return "needs_review"
+        return "retrying" if recording.status is _WORKING.get(r.stage) else r.status
 
     return ProcessingOut(
         stages=[

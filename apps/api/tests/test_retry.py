@@ -270,3 +270,16 @@ def test_a_busy_provider_shows_as_retrying_not_failed(api: Api) -> None:
                          headers={"Authorization": f"Bearer {api.idp.token('admin')}"}).json()  # fmt: skip
     assert [r["status"] for r in out["stages"]] == ["failed", "succeeded", "retrying"]
     assert "tries again by itself" in out["stages"][2]["error"]
+
+
+def test_a_step_that_stopped_for_review_is_not_shown_as_failed(api: Api) -> None:
+    rid = failed(api, dead_letter=False, status=RecordingStatus.NEEDS_REVIEW)
+    now = datetime.now(UTC)
+    for minute, code in enumerate(("asr_failed", "unclear_roles")):
+        insert(api.db, "stage_runs", StageRun(tenant_id=T, recording_id=rid, stage="transcribe", version="v1",
+                                              attempt=minute + 1, status="failed", worker="w", error_code=code,
+                                              started_at=now + timedelta(minutes=minute)))  # fmt: skip
+    out = api.client.get(f"/v1/recordings/{rid}/processing",
+                         headers={"Authorization": f"Bearer {api.idp.token('admin')}"}).json()  # fmt: skip
+    assert [r["status"] for r in out["stages"]] == ["failed", "needs_review"]
+    assert "no credit" in out["stages"][0]["error"]

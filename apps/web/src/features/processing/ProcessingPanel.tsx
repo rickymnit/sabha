@@ -30,7 +30,7 @@ export function ProcessingPanel({ info }: { info: ProcessingInfo }) {
                     ? "bg-success"
                     : run.status === "failed"
                       ? "bg-danger"
-                      : run.status === "retrying"
+                      : run.status === "retrying" || run.status === "needs_review"
                         ? "bg-warning"
                         : "bg-primary",
                 )}
@@ -44,12 +44,13 @@ export function ProcessingPanel({ info }: { info: ProcessingInfo }) {
                     succeeded: "done",
                     failed: "failed",
                     retrying: "did not finish; waiting to try again",
+                    needs_review: "stopped for a person to decide",
                   }[run.status]
                 }
                 {run.duration_ms !== null ? ` in ${seconds(run.duration_ms)}` : ""}, {formatDateTime(run.started_at)}
               </span>
               {run.error && (
-                <span className={cx("basis-full pl-5", run.status === "retrying" ? "text-ink-2" : "text-danger")}>
+                <span className={cx("basis-full pl-5", run.status === "failed" ? "text-danger" : "text-ink-2")}>
                   {run.error}
                 </span>
               )}

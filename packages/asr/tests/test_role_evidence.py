@@ -111,3 +111,16 @@ def test_other_types_keep_their_rules() -> None:
     turns, words = call([("S0", "नमस्ते सनराइज़ स्कूल से प्रिया बोल रही हूँ"), ("S1", "जी फीस के बारे में")])
     result = assign_roles(turns, words, "reception", ("receptionist", "caller"), tenant_name_variants=("सनराइज़ स्कूल",))
     assert result.evidence is None and result.role_by_speaker()["S0"] == "receptionist"
+
+
+def test_the_agent_offering_to_act_is_not_the_customer_asking() -> None:
+    # The agent restates the problem as they offer to fix it; on 2026-11-04 that counted for the customer.
+    turns, words = call([
+        ("S0", "हेलो मैं वैष्णव पब्लिक स्कूल से बोल रही हूँ"),
+        ("S1", "आपकी फीस नहीं आ रही है ना तो वो मैं देख लेता हूँ"),
+        ("S1", "कंसेशन ऐड करवा देता हूं आपको बता देता हूं कैसे करना है"),
+    ])  # fmt: skip
+    evidence = judge(turns, words, SUPPORT_PROFILE, ORGANISATION)
+    assert evidence is not None and evidence.staff == "S1"
+    s1 = {item.cue for item in evidence.items if item.speaker == "S1"}
+    assert s1 == {"offers_to_do_it"}  # not describes_a_problem, requests_a_change or asks_how_to

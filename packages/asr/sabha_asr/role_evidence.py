@@ -65,6 +65,7 @@ class Cue:
     pattern: str | None = None
     organisation: bool | None = None  # True: the organisation's name must be said in the stretch; False: must not
     opening_only: bool = False
+    unless: tuple[str, ...] = ()  # not counted in a stretch that has any of these (an offer to do it, for example)
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +114,15 @@ _REMOTE = ("anydesk", "any desk", "एनीडेस्क", "एनी डे�
            "टीमव्यूअर", "टीम व्यूअर", "रिमोट", "remote")  # fmt: skip
 _ASK = ("दीजिए", "दीजिये", "दे दीजिए", "बताइए", "बताइये", "बता दीजिए", "बोलिए", "भेजिए", "भेज दीजिए", "खोलिए",
         "ओपन कीजिए", "ओपन करिए", "dijiye", "bataiye", "batao", "bhejiye", "kholiye", "share", "शेयर")  # fmt: skip
+# The agent offering to act ("I will add it for you", "I will look into it"), said by a man or a woman. A customer's
+# request or problem is not counted in a stretch with one of these: the agent restates the problem as they offer
+# ("your fee is not showing, isn't it? I'll look into it"), which on 2026-11-04 counted for the customer.
+_OFFERS = ("करवा देता हूं", "करवा देता हूँ", "करवा देती हूं", "करवा देती हूँ", "कर देता हूं", "कर देता हूँ",
+           "कर देती हूं", "कर देती हूँ", "देख लेता हूं", "देख लेता हूँ", "देख लेती हूं", "देख लेती हूँ",
+           "चेक कर लेता", "चेक कर लेती", "चेक करवा लेता", "चेक करवा लेती", "कर दूंगा", "कर दूँगा", "कर दूंगी",
+           "कर दूँगी", "करवा दूंगा", "करवा दूँगा", "करवा दूंगी", "करवा दूँगी", "बता देता हूं कैसे", "बता देता हूँ कैसे",
+           "बता देती हूं कैसे", "बता देती हूँ कैसे", "बताता हूं कैसे", "बताता हूँ कैसे", "बताती हूं कैसे",
+           "बताती हूँ कैसे")  # fmt: skip
 _GIVE = ("लीजिए", "लीजिये", "ले लीजिए", "नोट कीजिए", "नोट करिए", "नोट कर लीजिए", "lijiye", "note kijiye")
 
 SUPPORT_PROFILE = EvidenceProfile(
@@ -138,6 +148,7 @@ SUPPORT_PROFILE = EvidenceProfile(
             ),
         ),
         Cue("asks_for_remote_access_id", "staff", 3, _REMOTE, also=_ASK),
+        Cue("offers_to_do_it", "staff", 3, _OFFERS),
         Cue(
             "asks_which_school",
             "staff",
@@ -269,6 +280,7 @@ SUPPORT_PROFILE = EvidenceProfile(
                 "nahi aa raha",
                 "nahi ho raha",
             ),
+            unless=_OFFERS,
         ),
         Cue("gives_remote_access_id", "other", 3, _REMOTE, also=_GIVE),
         Cue("reads_out_a_long_number", "other", 2, pattern=r"\d{6,}"),
@@ -277,6 +289,7 @@ SUPPORT_PROFILE = EvidenceProfile(
             "other",
             2,
             ("कैसे करें", "कैसे करना", "कैसे होगा", "कैसे करते", "kaise kare", "kaise karna", "how to", "how do i"),
+            unless=_OFFERS,
         ),
         Cue(
             "requests_a_change",
@@ -293,8 +306,15 @@ SUPPORT_PROFILE = EvidenceProfile(
                 "चेंज करवा",
                 "हटवाना",
             ),
+            unless=_OFFERS,
         ),
-        Cue("asks_for_help", "other", 2, ("मदद", "समझा दीजिए", "समझ नहीं आ", "समझ नहीं पा", "बता दीजिए कैसे")),
+        Cue(
+            "asks_for_help",
+            "other",
+            2,
+            ("मदद", "समझा दीजिए", "समझ नहीं आ", "समझ नहीं पा", "बता दीजिए कैसे"),
+            unless=_OFFERS,
+        ),
         Cue("confirms_it_works", "other", 1, ("हाँ हो गया", "अब आ गया", "अब सही", "अब हो गया", "आ गया सर", "हो गया सर")),
     ),
     guidance=(
@@ -340,6 +360,8 @@ def _matches(cue: Cue, text: str, organisation: Sequence[str]) -> bool:
     if cue.pattern is not None and not re.search(cue.pattern, text):
         return False
     if cue.organisation is not None and any(_has(text, name) for name in organisation) is not cue.organisation:
+        return False
+    if cue.unless and any(_has(text, p) for p in cue.unless):
         return False
     return bool(cue.phrases or cue.pattern)
 
