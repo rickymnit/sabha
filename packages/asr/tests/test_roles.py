@@ -185,6 +185,19 @@ def test_reception_outbound_call_receptionist_speaks_second() -> None:
     assert result.speakers["SPEAKER_01"].confidence == 0.75
 
 
+def test_support_call_agent_greets_with_the_company_name_even_when_the_customer_calls_back() -> None:
+    # Support uses the reception call rule (owner's decision 2026-11-04): agent and customer, one each.
+    turns, words = script(
+        [
+            ("SPEAKER_00", 2_000, "Hello, mera fee app band ho raha hai"),
+            ("SPEAKER_01", 4_000, "Hello, Sunrise School support se Priya bol rahi hoon, kaise madad karun?"),
+        ]
+    )
+    result = assign_roles(turns, words, "support", ("support_agent", "customer"), tenant_name_variants=SCHOOL_NAMES)
+    assert roles_of(result) == {"SPEAKER_00": "customer", "SPEAKER_01": "support_agent"}
+    assert result.needs_review_reason is None
+
+
 def test_reception_without_greeting_needs_review() -> None:
     turns, words = script(
         [

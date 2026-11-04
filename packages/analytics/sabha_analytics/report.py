@@ -41,6 +41,7 @@ from sabha_analytics.scoring import (
     TokenUsage,
     score_dimensions,
 )
+from sabha_analytics.support import CaseCardOutcome, outcome_values, write_case_card
 from sabha_analytics.synthesis import (
     LOW_VERIFICATION,
     SYNTHESIS_FAILED,
@@ -130,6 +131,7 @@ def build_report(
     ticket: TicketOutcome | None = None,
     deal_card: DealCardOutcome | None = None,
     meeting_notes: MeetingNotesOutcome | None = None,
+    case_card: CaseCardOutcome | None = None,
 ) -> AnalysisResult:
     """Assemble and check an analysis@v1 report (module docstring)."""
     reasons: list[str] = []
@@ -200,6 +202,8 @@ def build_report(
         "meeting_notes": None
         if meeting_notes is None or meeting_notes.notes is None
         else meeting_notes.notes.to_record(),
+        # Support calls: verified items only (sabha_analytics.support). No card is not a reason for review.
+        "case_card": None if case_card is None or case_card.card is None else case_card.card.to_record(),
     }
     check_report(report, transcript)
     return AnalysisResult(report, status)
@@ -250,12 +254,17 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
     evidence += [
         item["evidence"] for key in ("decisions", "action_items", "open_questions") for item in notes.get(key, [])
     ]
+    case = report.get("case_card") or {}
+    evidence += [case[key]["evidence"] for key in ("product", "problem", "follow_up") if case.get(key)]
+    evidence += [item["evidence"] for item in case.get("steps_tried", [])]
+    if (case.get("outcome") or {}).get("evidence"):
+        evidence.append(case["outcome"]["evidence"])
     for item in evidence:
         utterance = transcript.get(item["utterance_id"])
         if utterance is None or item["quote"] not in utterance.text:
-            problems.append(f"ticket, deal card or notes quote is not the transcript's own wording: {item['quote']!r}")
+            problems.append(f"ticket, card or notes quote is not the transcript's own wording: {item['quote']!r}")
         elif (item["start_ms"], item["end_ms"]) != (utterance.start_ms, utterance.end_ms):
-            problems.append("ticket, deal card or notes evidence times differ from the transcript")
+            problems.append("ticket, card or notes evidence times differ from the transcript")
     if report["overall"]["score"] is None and report["next_status"] != RecordingStatus.NEEDS_REVIEW.value:
         problems.append("no overall score, but the report does not ask for review")
     if problems:
@@ -281,6 +290,7 @@ def analyse(
     reception: bool = False,
     sales: bool = False,
     meeting: bool = False,
+    support: bool = False,
 ) -> AnalysisResult:
     """Score, compute the overall score, synthesise when there is one, and assemble the report.
 
@@ -289,6 +299,8 @@ def analyse(
     conversation into these phases for the timeline. `sales`: also write the meeting's deal card, with the interest
     levels of the rubric's `output_values.interest_level` (ValueError before any model call if it has none).
     `meeting`: also write the meeting's notes (decisions, action items, open questions).
+    `support`: also write the call's case card, with the outcomes of the rubric's `output_values.outcome` (ValueError
+    before any model call if it has none).
     `reception`: also write the call's ticket, with the categories
     and statuses of the rubric's `output_values` (ValueError before any model call if the rubric has none).
     """
@@ -307,6 +319,7 @@ def analyse(
         )
     values = ticket_values(rubric.output_values) if reception else None
     interest = interest_values(rubric.output_values) if sales else None
+    outcomes = outcome_values(rubric.output_values) if support else None
     scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model)
     overall = compute_overall(scoring.dimensions)
     synthesis = None
@@ -329,7 +342,8 @@ def analyse(
     )
     card = write_deal_card(transcript, interest=interest, model=model) if interest is not None else None
     notes = write_meeting_notes(transcript, model=model) if meeting else None
-    steps = [step for step in (classification, synthesis, phases, ticket, card, notes) if step is not None]
+    case = write_case_card(transcript, outcomes=outcomes, model=model) if outcomes is not None else None
+    steps = [step for step in (classification, synthesis, phases, ticket, card, notes, case) if step is not None]
     prompts = (*scoring.prompts, *(p for step in steps for p in step.prompts))
     return build_report(
         rubric=rubric,
@@ -349,4 +363,5 @@ def analyse(
         ticket=ticket,
         deal_card=card,
         meeting_notes=notes,
+        case_card=case,
     )

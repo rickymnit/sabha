@@ -54,6 +54,10 @@ Sales, in person (one rep with one or more people from the customer side; the re
   pitch and the demo: largest talk share AND most long turns). The customer side often speaks first, in its own
   office, so speaking first is not evidence here.
 
+Support (a phone call about the company's products, one agent and one customer, owner's decision 2026-11-04): the
+reception call rule above, unchanged. The agent answers or calls with the company's name ("thank you for calling
+<company> support", "main Priya, <company> se"), as a receptionist does.
+
 A stereo channel hint (`receptionist_channel_speaker`, the speaker label heard on the receptionist's channel) is
   configuration, not inference: when given it wins, with confidence 1.0 and method "channel".
 
@@ -83,7 +87,8 @@ from sabha_core.state import RecordingStatus
 TEACHING = "teaching"
 RECEPTION = "reception"
 SALES = "sales"
-RECORDING_TYPES = frozenset({TEACHING, RECEPTION, SALES})
+SUPPORT = "support"
+RECORDING_TYPES = frozenset({TEACHING, RECEPTION, SALES, SUPPORT})
 VISITOR = "visitor"
 """The other role of a walk-in reception rubric (reception.company): a visitor at the desk, not a caller."""
 

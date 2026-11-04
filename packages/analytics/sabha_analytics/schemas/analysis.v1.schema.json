@@ -113,6 +113,30 @@
         }
       }]
     },
+    "case_card": {
+      "description": "Support calls only: the case card, verified items only (sabha_analytics.support).",
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false,
+        "required": ["product", "problem", "steps_tried", "outcome", "follow_up", "left_out"],
+        "properties": {
+          "product": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["name", "evidence"],
+            "properties": {"name": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
+          "problem": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["problem", "evidence"],
+            "properties": {"problem": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
+          "steps_tried": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,
+            "required": ["step", "by", "evidence"],
+            "properties": {"step": {"type": "string", "minLength": 1}, "by": {"enum": ["support_agent", "customer"]},
+                           "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "outcome": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["value", "evidence"],
+            "properties": {"value": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", "description": "One of the rubric's output_values.outcome."},
+                           "evidence": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/card_evidence"}]}}}]},
+          "follow_up": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["action", "owner", "due", "evidence"],
+            "properties": {"action": {"type": "string", "minLength": 1}, "owner": {"enum": ["support_agent", "customer", "both"]},
+                           "due": {"type": ["string", "null"]}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
+          "left_out": {"type": "integer", "minimum": 0, "description": "Items left out because their quote was not found in the transcript."}
+        }
+      }]
+    },
     "model_ids": {"type": "array", "items": {"type": "string"}},
     "prompts": {
       "type": "object",

@@ -124,7 +124,7 @@ def test_owners_and_admins_read_the_settings(api: Api, sub: str) -> None:
     assert out["labels"]["person"] == "Teacher"
     assert out["labels"]["recording_plural"] == "Lessons"
     assert out["enabled_types"] == ["teaching", "reception"]
-    assert out["max_types"] == 5
+    assert out["max_types"] == 6
     # Every type in the setup screen's order, whether it is on and whether it can be switched on (has a rubric).
     assert out["types"] == [
         {"type": "teaching", "enabled": True, "available": True},
@@ -132,6 +132,7 @@ def test_owners_and_admins_read_the_settings(api: Api, sub: str) -> None:
         {"type": "reception", "enabled": True, "available": True},
         {"type": "meeting", "enabled": False, "available": False},
         {"type": "sales", "enabled": False, "available": False},
+        {"type": "support", "enabled": False, "available": False},
     ]
 
 
@@ -228,9 +229,10 @@ def test_the_plan_limits_how_many_types_are_on(api: Api) -> None:
 def test_a_tenant_over_its_limit_can_still_save_an_unchanged_list(api: Api) -> None:
     # Sabha may set a tenant up with more types than its plan (a trial); resending them is not a change.
     api.db["tenants"].update_one({"_id": B}, {"$set": {"plan": "starter"}})
-    response = api.patch("owner-b", {"name": "Brightpath Software", "enabled_types": ["reception", "meeting", "sales"]})
+    types = ["reception", "meeting", "sales", "support"]  # the company profile's types
+    response = api.patch("owner-b", {"name": "Brightpath Software", "enabled_types": types})
     assert response.status_code == 200, response.text
-    assert response.json()["enabled_types"] == ["reception", "meeting", "sales"]
+    assert response.json()["enabled_types"] == types
 
 
 def test_a_type_switched_off_refuses_uploads_but_keeps_old_recordings(api: Api) -> None:

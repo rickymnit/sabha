@@ -124,6 +124,7 @@ CONVERSATION_KINDS = {
     "teaching": "school lesson",
     "reception": "front-desk call",
     "sales": "sales meeting",
+    "support": "customer support call",
     "meeting": "team meeting",
     "counselling": "counselling session",
 }

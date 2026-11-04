@@ -53,7 +53,7 @@ COMPANY_USERS = [  # (subject suffix, name, job title, role, units, person id)
     ("neha", "Neha Gupta", "Sales rep, South", Role.STAFF, ["team-south"], "p-neha"),
     ("pooja", "Pooja Nair", "Receptionist", Role.STAFF, ["front-desk"], "p-pooja"),
 ]
-COMPANY_TYPES = [ConversationType.RECEPTION, ConversationType.SALES, ConversationType.MEETING]
+COMPANY_TYPES = [ConversationType.RECEPTION, ConversationType.SALES, ConversationType.MEETING, ConversationType.SUPPORT]
 # How the speech recogniser writes the name when it is said inside Hindi speech.
 COMPANY_NAME_VARIANTS = ["Brightpath", "ब्राइट पाथ सॉफ्टवेयर", "ब्राइट पाथ", "ब्राइटपाथ"]
 E2E_TENANT_ID, E2E_TENANT_NAME = "e2e-school", "E2E School"

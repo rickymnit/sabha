@@ -29,7 +29,9 @@ ALL_PROFILES = list(ProfileName)
 def test_profile_names_and_conversation_types() -> None:
     assert [name.value for name in ProfileName] == ["school", "college", "company"]
     # The order the setup screen lists them in (Setup.dc.html, TYPES).
-    assert [t.value for t in ConversationType] == ["teaching", "counselling", "reception", "meeting", "sales"]
+    assert [t.value for t in ConversationType] == [
+        "teaching", "counselling", "reception", "meeting", "sales", "support",
+    ]  # fmt: skip
 
 
 def test_school_defaults() -> None:
@@ -55,12 +57,13 @@ def test_school_defaults() -> None:
         T.RECEPTION: "reception.school.v0.2",
         T.MEETING: None,
         T.SALES: None,
+        T.SUPPORT: None,
     }
     assert school.consent == ConsentDefaults(
         consent_ref_required=True,
         parental_consent_types=frozenset({T.TEACHING}),
         parental_consent_for_minors=True,
-        call_notice_types=frozenset({T.RECEPTION, T.SALES}),
+        call_notice_types=frozenset({T.RECEPTION, T.SALES, T.SUPPORT}),
         staff_consent_required=True,
     )
     assert school.retention_days == 90
@@ -98,7 +101,7 @@ def test_company_defaults() -> None:
     company = get_profile("company")
 
     assert company.name is ProfileName.COMPANY
-    assert company.enabled_types == (T.RECEPTION, T.MEETING, T.SALES)
+    assert company.enabled_types == (T.RECEPTION, T.MEETING, T.SALES, T.SUPPORT)
     assert company.labels.model_dump() == {
         "person": "Sales rep",
         "person_plural": "Team",
@@ -116,12 +119,13 @@ def test_company_defaults() -> None:
         T.RECEPTION: "reception.company.v0.1",
         T.SALES: "sales.company.v0.3",
         T.MEETING: "meeting.company.v0.1",
+        T.SUPPORT: "support.company.v0.1",
     }
     assert company.consent == ConsentDefaults(
         consent_ref_required=True,
         parental_consent_types=frozenset(),
         parental_consent_for_minors=True,
-        call_notice_types=frozenset({T.RECEPTION, T.SALES}),
+        call_notice_types=frozenset({T.RECEPTION, T.SALES, T.SUPPORT}),
         staff_consent_required=False,
     )
     assert company.retention_days == 90
@@ -254,4 +258,4 @@ def test_profile_serialises_to_plain_json_types() -> None:
 
     assert dumped["enabled_types"] == ["teaching", "reception"]
     assert dumped["default_rubrics"]["teaching"] == "teaching.school.v0.1"
-    assert sorted(dumped["consent"]["call_notice_types"]) == ["reception", "sales"]
+    assert sorted(dumped["consent"]["call_notice_types"]) == ["reception", "sales", "support"]

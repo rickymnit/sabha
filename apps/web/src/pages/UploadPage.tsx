@@ -161,7 +161,6 @@ function FileRow({
 
 export function UploadPage() {
   const me = useOutletContext<Me>();
-  const labels = me.tenant.labels;
   const { token } = useSession();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -172,6 +171,9 @@ export function UploadPage() {
   const durations = useRef(new Map<string, number | null>()); // file key -> length the browser read (cost estimate)
   const [running, setRunning] = useState(false);
   const [type, setType] = useState<ConversationType>(me.tenant.enabled_types[0] ?? "teaching");
+  // A support call is analysed for its agent; a company's person word ("Sales rep") does not fit it.
+  const labels =
+    type === "support" ? { ...me.tenant.labels, person: "Agent", person_plural: "Agents" } : me.tenant.labels;
   const [personId, setPersonId] = useState("");
   const [consentOnFile, setConsentOnFile] = useState(() => rememberedConsent() !== "");
   const [consentRef, setConsentRef] = useState(rememberedConsent);

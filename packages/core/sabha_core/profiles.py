@@ -30,6 +30,7 @@ class ConversationType(StrEnum):
     RECEPTION = "reception"
     MEETING = "meeting"
     SALES = "sales"
+    SUPPORT = "support"
 
 
 class ProfileName(StrEnum):
@@ -145,14 +146,16 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             _T.RECEPTION: "reception.school.v0.2",  # reviewed and approved for the pilot (2026-10-20)
             _T.MEETING: None,
             _T.SALES: None,
+            _T.SUPPORT: None,
         },
         consent=ConsentDefaults(
             # Classroom lessons need parental consent (parent-consent-form.md, Scope; Setup.dc.html:148).
             parental_consent_types=frozenset({_T.TEACHING}),
             parental_consent_for_minors=True,  # Setup.dc.html:148
             # Reception: call-recording-notice.md. Sales (the design's "Admissions calls", Setup.dc.html:146) is a
-            # proposal: they are calls with parents too, and it keeps school at least as strict as company.
-            call_notice_types=frozenset({_T.RECEPTION, _T.SALES}),
+            # proposal: they are calls with parents too, and it keeps school at least as strict as company. Support
+            # (2026-11-04, no school rubric yet) for the same reason.
+            call_notice_types=frozenset({_T.RECEPTION, _T.SALES, _T.SUPPORT}),
             staff_consent_required=True,  # staff-consent-and-notice.md
         ),
         retention_days=90,  # P7.3 default; parent-consent-form.md and staff-consent-and-notice.md say 90 days
@@ -185,7 +188,8 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
     ),
     ProfileName.COMPANY: OrgProfile(
         name=ProfileName.COMPANY,
-        enabled_types=(_T.RECEPTION, _T.MEETING, _T.SALES),  # Setup.dc.html:163
+        # Support calls added by the owner (2026-11-04), on for every company.
+        enabled_types=(_T.RECEPTION, _T.MEETING, _T.SALES, _T.SUPPORT),  # Setup.dc.html:163
         labels=Labels(  # Setup.dc.html:164
             person="Sales rep",
             person_plural="Team",
@@ -207,12 +211,14 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             # Draft for review (2026-10-26): walk-in visitors at the front desk, one visitor per recording.
             _T.RECEPTION: "reception.company.v0.1",
             _T.MEETING: "meeting.company.v0.1",  # draft for review (2026-10-26): the meeting is scored, never a person
+            # Draft for review (2026-11-04): phone calls about the company's products, one agent and one customer.
+            _T.SUPPORT: "support.company.v0.1",
         },
         consent=ConsentDefaults(
             parental_consent_types=frozenset(),
             parental_consent_for_minors=True,  # proposal: the design is silent; kept as strict as the others
             # "Customers hear a recording notice at the start of each call" (:168): customer calls are these types.
-            call_notice_types=frozenset({_T.RECEPTION, _T.SALES}),
+            call_notice_types=frozenset({_T.RECEPTION, _T.SALES, _T.SUPPORT}),
             staff_consent_required=False,  # "Staff are covered by your recording policy" (:168)
         ),
         retention_days=90,  # P7.3 default

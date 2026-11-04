@@ -19,6 +19,7 @@ import {
   type Transcript,
 } from "../transcript";
 import { checkedText, formatScore, joinList } from "./format";
+import { CaseCardPanel } from "./CaseCardPanel";
 import { DealCardPanel } from "./DealCardPanel";
 import { MeetingNotesPanel } from "./MeetingNotesPanel";
 import { ReportHeader } from "./ReportHeader";
@@ -304,6 +305,8 @@ function ReportBody({
             {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={seek} />}
 
             {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
+
+            {analysis.case_card && <CaseCardPanel card={analysis.case_card} onSeek={seek} />}
 
             {analysis.meeting_notes && meeting && (
               <MeetingNotesPanel notes={analysis.meeting_notes} voiceName={meeting.voiceName} onSeek={seek} />

@@ -49,6 +49,7 @@ const typeNames: Record<ConversationType, { plural: string; singular: string; co
   counselling: { plural: "Counselling", singular: "Counselling", count: 17 },
   meeting: { plural: "Meetings", singular: "Meeting", count: 12 },
   sales: { plural: "Sales", singular: "Sales", count: 11 },
+  support: { plural: "Support", singular: "Support", count: 9 },
 };
 const typeKeys = Object.keys(typeNames) as ConversationType[];
 

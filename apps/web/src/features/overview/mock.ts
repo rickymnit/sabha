@@ -10,6 +10,7 @@ export const mockTypeNames: TypeNames = {
   counselling: "Counselling",
   meeting: "Meetings",
   sales: "Sales",
+  support: "Support",
 };
 
 export const mockLabels: Labels = {

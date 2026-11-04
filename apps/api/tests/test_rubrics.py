@@ -110,6 +110,7 @@ def test_each_profile_sees_its_own_rubrics(api: Api) -> None:
         "reception": "reception.company.v0.1",
         "meeting": "meeting.company.v0.1",
         "sales": "sales.company.v0.3",
+        "support": "support.company.v0.1",
     }
 
 

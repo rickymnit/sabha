@@ -74,6 +74,7 @@ One blue (owner, 2026-10-27): the primary colour is also the staff speaker's col
 | `type-counselling` | `#1E7A55` | Counselling |
 | `type-meeting` | `#7A4DB8` | Meetings |
 | `type-sales` | `#0F7C8C` | Sales |
+| `type-support` | `#C2417A` | Support (added 2026-11-04; no design mockup, chosen to stay apart from the others) |
 
 ## Typography
 

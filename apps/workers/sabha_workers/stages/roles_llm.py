@@ -35,7 +35,7 @@ SYSTEM = (
     'If the text does not make it clear, answer "unsure" rather than guess.'
 )
 KINDS = {"teaching": "classroom lesson", "reception": "front-desk phone call",
-         "sales": "in-person sales meeting or product demo"}  # fmt: skip
+         "sales": "in-person sales meeting or product demo", "support": "customer support phone call"}  # fmt: skip
 
 
 def _opening(request: TieBreakRequest) -> str:

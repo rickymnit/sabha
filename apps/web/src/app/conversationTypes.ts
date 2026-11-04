@@ -10,4 +10,5 @@ export const TYPE_INFO: Record<ConversationType, { name: string; description: st
   reception: { name: "Reception", description: "Front-desk calls and visits: intent, accuracy, resolution" },
   meeting: { name: "Meetings", description: "Internal meetings: decisions, owners, open issues" },
   sales: { name: "Sales", description: "Sales meetings and calls: discovery, objections, next step" },
+  support: { name: "Support", description: "Support calls about your products: problem, troubleshooting, resolution" },
 };

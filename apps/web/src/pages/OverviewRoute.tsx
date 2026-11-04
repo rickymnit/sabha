@@ -297,7 +297,10 @@ export function OverviewRoute() {
   const overview = useOverview(toQuery(range), unit === ALL_UNITS ? null : unit);
   const inbox = useInbox();
   const typeNames = Object.fromEntries(
-    (["teaching", "reception", "counselling", "meeting", "sales"] as ConversationType[]).map((t) => [t, capitalise(t)]),
+    (["teaching", "reception", "counselling", "meeting", "sales", "support"] as ConversationType[]).map((t) => [
+      t,
+      capitalise(t),
+    ]),
   ) as Record<ConversationType, string>;
 
   if (overview.isError) {

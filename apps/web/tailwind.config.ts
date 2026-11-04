@@ -50,6 +50,7 @@ export default {
         counselling: "#1E7A55",
         meeting: "#7A4DB8",
         sales: "#0F7C8C",
+        support: "#C2417A",
       },
       // Who spoke when: the analysed staff member and everyone else (SpeakerStrip, report timeline).
       speaker: { staff: "#3346D3", other: "#F2A33A" },

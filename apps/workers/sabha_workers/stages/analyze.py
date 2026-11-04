@@ -139,6 +139,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 phase_names=DEFAULT_PHASES.get(recording.type.value),
                 reception=recording.type is ConversationType.RECEPTION,
                 sales=recording.type is ConversationType.SALES,
+                support=recording.type is ConversationType.SUPPORT,
                 meeting=meeting,
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:

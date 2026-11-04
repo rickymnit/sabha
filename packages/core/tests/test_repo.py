@@ -212,7 +212,11 @@ def test_own_tenant_repo_changes_only_its_own_tenant(mongo_uri: str, db: Databas
     tenants = SyncSystemRepo(db, "tenants", Tenant)
     mine, other = tenants.find_one({"_id": "t1"}), tenants.find_one({"_id": "t2"})
     assert mine is not None and mine.name == "Sunrise Public School" and mine.enabled_types == ["teaching"]
-    assert other is not None and other.name == "Brightpath" and other.enabled_types == ["reception", "meeting", "sales"]
+    assert (
+        other is not None
+        and other.name == "Brightpath"
+        and other.enabled_types == ["reception", "meeting", "sales", "support"]
+    )
 
 
 @pytest.mark.parametrize(

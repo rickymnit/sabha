@@ -176,6 +176,23 @@ export interface DealCard {
   left_out: number;
 }
 
+/** Support calls: product, problem, steps tried, outcome and the promised follow-up (verified only). */
+export interface CaseCard {
+  product: { name: string; evidence: CardEvidence } | null;
+  problem: { problem: string; evidence: CardEvidence } | null;
+  steps_tried: { step: string; by: "support_agent" | "customer"; evidence: CardEvidence }[];
+  /** One of the rubric's outcomes, for example "solved"; "unclear" may have no quote. */
+  outcome: { value: string; evidence: CardEvidence | null } | null;
+  follow_up: {
+    action: string;
+    owner: "support_agent" | "customer" | "both";
+    due: string | null;
+    evidence: CardEvidence;
+  } | null;
+  /** Items left out because their quote was not found in the transcript. */
+  left_out: number;
+}
+
 /** Reception calls and walk-in visits: category, outcome and follow-up, on two verified quotes. */
 export interface Ticket {
   /** One of the rubric's categories, for example "appointment_or_meeting". */
@@ -240,6 +257,8 @@ export interface AnalysisReport {
   deal_card?: DealCard | null;
   /** Meetings only. */
   meeting_notes?: MeetingNotes | null;
+  /** Support calls only. */
+  case_card?: CaseCard | null;
 }
 
 export interface AnalysisProcessing {

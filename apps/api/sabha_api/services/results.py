@@ -475,7 +475,9 @@ METRIC_NAMES = {
 }
 ROLE_METRIC_NAMES = {"talk_share": "{role} talk time", "turn_count": "Turns by {role_lower}",
                      "question_count": "Questions asked by {role_lower}"}  # fmt: skip
-OTHER_ROLE_WORDS = {"students": "Student", "caller": "Caller", "customer": "Customer", "visitor": "Visitor"}
+# A support call's staff member is an "Agent", not the tenant's person word: a company's is "Sales rep" (2026-11-04).
+OTHER_ROLE_WORDS = {"students": "Student", "caller": "Caller", "customer": "Customer", "visitor": "Visitor",
+                    "support_agent": "Agent"}  # fmt: skip
 
 
 def metric_name(key: str, person_label: str) -> str:
@@ -579,6 +581,7 @@ def report_payload(
         "ticket": shown_ticket(report.get("ticket")),
         "deal_card": report.get("deal_card"),  # sales meetings: verified items only (sabha_analytics.sales)
         "meeting_notes": report.get("meeting_notes"),  # meetings: verified items only (sabha_analytics.meetings)
+        "case_card": report.get("case_card"),  # support calls: verified items only (sabha_analytics.support)
     }
 
 

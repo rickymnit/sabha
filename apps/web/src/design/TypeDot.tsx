@@ -10,6 +10,7 @@ const swatches: Record<ConversationType, string> = {
   counselling: "bg-type-counselling",
   meeting: "bg-type-meeting",
   sales: "bg-type-sales",
+  support: "bg-type-support",
 };
 
 export interface TypeDotProps {

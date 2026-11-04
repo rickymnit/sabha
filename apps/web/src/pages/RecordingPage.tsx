@@ -147,7 +147,9 @@ export function RecordingPage() {
       }
     : undefined;
   // A meeting has an organiser, not a person analysed (ADR 0008).
-  const labels = isMeeting ? { ...me.tenant.labels, person: "Organiser" } : me.tenant.labels;
+  // A support call's staff member is an agent; a company's person word ("Sales rep") does not fit it.
+  const person = isMeeting ? "Organiser" : recording.data.type === "support" ? "Agent" : null;
+  const labels = person ? { ...me.tenant.labels, person } : me.tenant.labels;
   const canReview = recording.data.status === "NEEDS_REVIEW" && RESOLVERS.includes(me.user.role);
   const versions = history.data ?? [];
   const shownVersion = version ? versions.find((v) => v.id === version) : undefined;
@@ -266,7 +268,7 @@ export function RecordingPage() {
         analysis={analysis.data}
         transcript={view?.transcript ?? data?.transcript ?? null}
         labels={labels}
-        roles={view?.roles ?? roleLabels(data?.roles ?? {}, me.tenant.labels.person)}
+        roles={view?.roles ?? roleLabels(data?.roles ?? {}, labels.person)}
         viewerRole={viewerRole(me.user.role)}
         getPlaybackUrl={getPlaybackUrl}
         audioNote={
