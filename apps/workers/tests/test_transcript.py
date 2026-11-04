@@ -293,6 +293,46 @@ def test_the_tie_breaker_is_told_which_company_the_agent_works_for() -> None:
     assert "The support_agent works for SchoolLog (it may be said or written as SchoolLog, school log)" in user
 
 
+def support_call() -> TieBreakRequest:
+    from sabha_asr.roles import RoleAssignment, SpeakerRole
+
+    low = "heuristic_low_confidence"
+    speakers = {"S0": SpeakerRole("support_agent", 0.5, low), "S1": SpeakerRole("customer", 0.5, low)}
+    return TieBreakRequest("support", ("support_agent", "customer"), RoleAssignment(speakers, "unclear_roles"),
+                           (("S0", "एनीडेस्क नंबर लीजिए सर 193197"), ("S1", "जी, रिपोर्ट मॉड्यूल में जाइए")),
+                           organisation=("SchoolLog",), guidance="Support for {organisation}: AnyDesk.")  # fmt: skip
+
+
+def evidence_answer(**change: Any) -> dict[str, Any]:
+    return {"staff_speaker": "S1", "confidence": 0.95, "needs_review": False,
+            "staff_evidence": [{"speaker": "S1", "quote": "रिपोर्ट मॉड्यूल में जाइए"}],
+            "other_evidence": [{"speaker": "S0", "quote": "एनीडेस्क नंबर लीजिए सर [PHONE_1]"}], **change}  # fmt: skip
+
+
+def test_on_a_support_call_the_tie_breaker_must_quote_both_sides() -> None:
+    gateway = FakeGateway(evidence_answer())
+    answer = LlmRoleTieBreaker(gateway, "t1", "r1")(support_call())  # type: ignore[arg-type]  # a fake gateway
+    assert answer is not None and answer.role_by_speaker() == {"S0": "customer", "S1": "support_agent"}
+    assert [q["side"] for q in answer.ai_evidence] == ["staff", "other"]  # the placeholder hid the number
+    user = gateway.calls[0]["messages"][1].content
+    assert user.startswith("Support for SchoolLog: AnyDesk.") and "staff_evidence" in user
+    assert set(gateway.calls[0]["json_schema"]["required"]) >= {"staff_evidence", "other_evidence", "needs_review"}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"needs_review": True},
+        {"staff_evidence": [{"speaker": "S1", "quote": "मैं स्कूल लोग से बोल रहा हूँ"}]},  # never said
+        {"other_evidence": [{"speaker": "S1", "quote": "रिपोर्ट मॉड्यूल में जाइए"}]},  # the agent's own words
+    ],
+    ids=["asks for review", "invented quote", "quote from the wrong side"],
+)
+def test_a_support_tie_break_without_real_evidence_on_both_sides_is_not_used(change: dict[str, Any]) -> None:
+    gateway = FakeGateway(evidence_answer(**change))
+    assert LlmRoleTieBreaker(gateway, "t1", "r1")(support_call()) is None  # type: ignore[arg-type]  # a fake gateway
+
+
 @pytest.mark.parametrize(
     "gateway",
     [

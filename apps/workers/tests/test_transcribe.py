@@ -193,6 +193,7 @@ def test_the_stage_writes_compact_words_and_cost_inputs(stage: Stage) -> None:
     assert meta["sent_audio_s"] == 50.5  # the 0.5 s overlap at the split is sent twice
     # P3.6/P3.7: roles and the transcript on the original timeline, then ANALYZING.
     assert stage.artefacts.exists(f"t1/{rid}/transcribe@v1/transcript@v1.json")
+    assert stage.artefacts.exists(f"t1/{rid}/transcribe@v1/roles_auto@v1.json")  # kept for reviewer corrections
     (doc,) = stage.saved
     assert doc.roles == {"S0": "teacher"} and doc.storage_key.endswith("transcript@v1.json")
     assert meta["speakers"] == 1

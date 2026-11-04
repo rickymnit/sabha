@@ -58,6 +58,13 @@ Support (a phone call about the company's products, one agent and one customer, 
 reception call rule above, unchanged. The agent answers or calls with the company's name ("thank you for calling
 <company> support", "main Priya, <company> se"), as a receptionist does.
 
+Evidence profiles (sabha_asr.role_evidence, owner's decision 2026-11-04; support calls first): a type with a profile
+and exactly two speakers is decided by behaviour over the whole conversation instead of the rules above. Strong or
+corroborated evidence decides (method "evidence"). Conflicting evidence goes straight to a reviewer (`unclear_roles`,
+with the conflict in the evidence). Weak evidence goes to the tie-breaker, which is then told what the type's
+conversations look like and must quote its evidence; its answer is used only at the profile's `ai_min_confidence`
+(0.9 for support) and only when it does not contradict the evidence's lean (confidence >= role_evidence.LEAN).
+
 A stereo channel hint (`receptionist_channel_speaker`, the speaker label heard on the receptionist's channel) is
   configuration, not inference: when given it wins, with confidence 1.0 and method "channel".
 
@@ -77,10 +84,11 @@ import json
 import operator
 import unicodedata
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Protocol, TypedDict
 
+from sabha_asr.role_evidence import LEAN, PROFILES, RoleEvidence, judge, speaker_stretches
 from sabha_asr.words import Turn, Word, assign_words_to_turns
 from sabha_core.state import RecordingStatus
 
@@ -95,7 +103,10 @@ VISITOR = "visitor"
 METHOD_HEURISTIC = "heuristic"
 METHOD_CHANNEL = "channel"
 METHOD_LOW_CONFIDENCE = "heuristic_low_confidence"
+METHOD_EVIDENCE = "evidence"
 REASON_UNCLEAR_ROLES = "unclear_roles"
+EVIDENCE_TIE_BREAK_WINDOW_MS = 300_000
+"""With an evidence profile, the tie-breaker reads the first five minutes (its own limit on length still applies)."""
 
 DEFAULT_LONG_TURN_MS = 15_000
 DEFAULT_TURN_JOIN_GAP_MS = 1_000
@@ -246,6 +257,8 @@ class RoleAssignment:
 
     speakers: Mapping[str, SpeakerRole]
     needs_review_reason: str | None = None
+    evidence: RoleEvidence | None = None  # what the evidence profile found, when the type has one
+    ai_evidence: tuple[dict[str, str], ...] = ()  # the tie-breaker's verified quotes: {speaker, side, quote}
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "speakers", MappingProxyType(dict(self.speakers)))
@@ -275,6 +288,8 @@ class TieBreakRequest:
     # The tenant's name and the ways it is said: the staff member works there and the others do not. A school or
     # company name, not a person's (golden rule 8 is about people's details).
     organisation: tuple[str, ...] = field(default=())
+    # What conversations of this type look like (the evidence profile's guidance); empty: the plain question.
+    guidance: str = ""
 
 
 class RoleTieBreaker(Protocol):
@@ -506,6 +521,37 @@ def assign_roles(
     if not labels:
         return RoleAssignment({}, REASON_UNCLEAR_ROLES)
 
+    organisation = tuple(dict.fromkeys(name for name in tenant_name_variants if name.strip()))
+    profile = PROFILES.get(recording_type)
+    evidence = judge(turns, words, profile, organisation) if profile is not None else None
+    if profile is not None and evidence is not None:
+        found = RoleAssignment(_build(labels, evidence.staff, role_pair, evidence.confidence, METHOD_EVIDENCE),
+                               evidence=evidence)  # fmt: skip
+        if evidence.decision in ("auto", "corroborated"):
+            return found
+        low = RoleAssignment(_build(labels, evidence.staff, role_pair, evidence.confidence, METHOD_LOW_CONFIDENCE),
+                             REASON_UNCLEAR_ROLES, evidence=evidence)  # fmt: skip
+        if evidence.decision == "conflict":
+            return low  # straight to a reviewer: no tie-breaker for conflicting evidence
+        if tie_breaker is None:
+            return low
+        request = TieBreakRequest(
+            recording_type, role_pair, low,
+            tuple((label, text) for label, start, text in speaker_stretches(turns, words)
+                  if start < EVIDENCE_TIE_BREAK_WINDOW_MS),
+            organisation=organisation, guidance=profile.guidance,
+        )  # fmt: skip
+        answer = tie_breaker(request)
+        if answer is None or answer.needs_review_reason is not None:
+            return low
+        _check_tie_break(answer, low, role_pair)
+        ai_staff = next(label for label, s in answer.speakers.items() if s.role == role_pair[0])
+        if any(s.confidence < profile.ai_min_confidence for s in answer.speakers.values()):
+            return low
+        if evidence.confidence >= LEAN and ai_staff != evidence.staff:
+            return low  # the AI contradicts the evidence's lean: a reviewer decides
+        return replace(answer, evidence=evidence)
+
     if recording_type == TEACHING:
         staff, confidence, agree = _teaching_guess(turns, params)
     elif recording_type == SALES:
@@ -524,9 +570,12 @@ def assign_roles(
     if tie_breaker is None:
         return heuristic
     request = TieBreakRequest(
-        recording_type, role_pair, heuristic, tuple(_speaker_runs(turns, words, params.tie_break_window_ms)),
-        organisation=tuple(dict.fromkeys(name for name in tenant_name_variants if name.strip())),
-    )  # fmt: skip
+        recording_type,
+        role_pair,
+        heuristic,
+        tuple(_speaker_runs(turns, words, params.tie_break_window_ms)),
+        organisation=organisation,
+    )
     answer = tie_breaker(request)
     if answer is None or answer.needs_review_reason is not None:
         return heuristic

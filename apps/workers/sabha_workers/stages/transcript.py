@@ -8,7 +8,11 @@
 3. Assigns roles with sabha_asr.roles (heuristics; the tenant's name and its `name_variants` are what a receptionist
    greets with and a sales rep introduces). When
    the heuristics are unsure it asks the LLM tie-breaker if one is configured (sabha_workers.stages.roles_llm).
-   Writes `roles@v1.json`.
+   Types with an evidence profile (support calls) are judged by behaviour (sabha_asr.role_evidence). Roles are
+   judged on the same turns the words are given to speakers by (`AsrOutput.word_turns`). Writes `roles@v1.json`,
+   and the automatic decision twice more, never overwritten by a reviewer's: `roles_auto@v1.json` (the roles) and,
+   when there is any, `role_evidence@v1.json` (what the evidence and the tie-breaker found). Reviewer corrections are
+   measured against them (eval/role_corrections.py).
 4. Assembles `transcript@v1.json` with sabha_asr.assembly: utterances with role, speaker label, text and times on
    the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it, with the
    list rows' "who spoke when" strip (`speaker_strip`).
@@ -165,9 +169,20 @@ def finish_transcript(
     else:
         names = [tenant.name, *tenant.name_variants]
         assignment = assign_roles(
-            turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=names,
+            asr.word_turns or turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=names,
             tie_breaker=deps.tie_breaker(ctx.tenant_id, recording.id),
         )  # fmt: skip
+        ctx.artefacts.put(ctx.prefix + "roles_auto@v1.json", assignment.to_json().encode(), "application/json")
+        if assignment.evidence is not None or assignment.ai_evidence:
+            found = {
+                "version": "role_evidence@v1",
+                "timeline": "compact",
+                "evidence": None if assignment.evidence is None else assignment.evidence.to_record(),
+                "ai_evidence": list(assignment.ai_evidence),
+                "needs_review_reason": assignment.needs_review_reason,
+            }
+            ctx.artefacts.put(ctx.prefix + "role_evidence@v1.json", json.dumps(found, ensure_ascii=False).encode(),
+                              "application/json")  # fmt: skip
     ctx.artefacts.put(ctx.prefix + "roles@v1.json", assignment.to_json().encode(), "application/json")
 
     roles = assignment.role_by_speaker()
