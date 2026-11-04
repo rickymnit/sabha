@@ -370,7 +370,8 @@ export interface ProcessingInfo {
   stages: {
     stage: string;
     attempt: number;
-    status: "running" | "succeeded" | "failed";
+    /** "retrying": this attempt failed and the stage tries again by itself (a busy service). */
+    status: "running" | "succeeded" | "failed" | "retrying";
     started_at: string;
     finished_at: string | null;
     duration_ms: number | null;

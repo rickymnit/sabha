@@ -3,6 +3,9 @@
 GET /v1/recordings/{id}/processing: every stage run (attempt, outcome, timing, the error in plain words), the latest
 failure with whether it can still be retried (sabha_api.services.retry), and the LLM calls' recorded cost. Costs are
 the ones the gateway stored (golden rule 6): calls without a price are counted, never estimated.
+
+A failed run that is the latest of its stage while the recording is still in that stage is "retrying": the runner
+tries again by itself (a busy or unreachable provider), so it is not shown as a failure.
 """
 
 from __future__ import annotations
@@ -21,11 +24,14 @@ from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
 from sabha_core.state import RecordingStatus
 
+_WORKING = {"preprocess": RecordingStatus.PREPROCESSING, "diarize": RecordingStatus.DIARIZING,
+            "transcribe": RecordingStatus.TRANSCRIBING, "analyze": RecordingStatus.ANALYZING}  # fmt: skip
+
 
 class StageOut(BaseModel):
     stage: str
     attempt: int
-    status: str  # running, succeeded, failed
+    status: str  # running, succeeded, failed, retrying (failed, and the stage will try again by itself)
     started_at: datetime
     finished_at: datetime | None
     duration_ms: int | None
@@ -74,12 +80,18 @@ async def processing(
         failure = FailureOut(stage=letter.stage, error=explain(letter.error_code), error_code=letter.error_code,
                              attempts=letter.attempts, at=letter.created_at, state=state)  # fmt: skip
     priced = [c.cost_usd for c in calls if c.cost_usd is not None]
+    latest = {r.stage: r.attempt for r in stages}  # sorted by start, so the last run of each stage wins
+
+    def shown(r: StageRun) -> str:
+        retrying = r.status == "failed" and latest[r.stage] == r.attempt and recording.status is _WORKING.get(r.stage)
+        return "retrying" if retrying else r.status
+
     return ProcessingOut(
         stages=[
             StageOut(
                 stage=r.stage,
                 attempt=r.attempt,
-                status=r.status,
+                status=shown(r),
                 started_at=r.started_at,
                 finished_at=r.finished_at,
                 duration_ms=r.duration_ms,

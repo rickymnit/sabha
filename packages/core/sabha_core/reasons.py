@@ -22,6 +22,8 @@ REASONS: dict[str, dict[str, str]] = {
         "ticket_failed": "The call ticket could not be written.",
         "unverified_dimensions": "Some parts could not be checked against the transcript and are left out.",
         "closed_by_reviewer": "A reviewer closed this recording as not usable.",
+        "asr_unavailable": "The speech service was busy or could not be reached; Sabha tries again by itself.",
+        "llm_unavailable": "The AI service was busy or could not be reached; Sabha tries again by itself.",
     },
     "hi": {
         "unclear_roles": "बोलने वालों को ठीक से अलग नहीं पहचाना जा सका।",
@@ -38,6 +40,8 @@ REASONS: dict[str, dict[str, str]] = {
         "analysis_failed": "फ़ीडबैक नहीं बन सका; व्यवस्थापक इसे दोबारा चला सकते हैं।",
         "ticket_failed": "कॉल का टिकट नहीं लिखा जा सका।",
         "closed_by_reviewer": "एक समीक्षक ने इस रिकॉर्डिंग को उपयोग योग्य नहीं मानकर बंद कर दिया।",
+        "asr_unavailable": "स्पीच सेवा व्यस्त थी या उस तक पहुँचा नहीं जा सका; Sabha अपने आप फिर से कोशिश करता है।",
+        "llm_unavailable": "AI सेवा व्यस्त थी या उस तक पहुँचा नहीं जा सका; Sabha अपने आप फिर से कोशिश करता है।",
         "unverified_dimensions": "कुछ हिस्से ट्रांसक्रिप्ट से जाँचे नहीं जा सके, इसलिए वे शामिल नहीं हैं।",
     },
 }

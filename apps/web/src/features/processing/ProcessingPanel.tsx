@@ -26,16 +26,33 @@ export function ProcessingPanel({ info }: { info: ProcessingInfo }) {
                 aria-hidden="true"
                 className={cx(
                   "h-2 w-2 shrink-0 rounded-full",
-                  run.status === "succeeded" ? "bg-success" : run.status === "failed" ? "bg-danger" : "bg-primary",
+                  run.status === "succeeded"
+                    ? "bg-success"
+                    : run.status === "failed"
+                      ? "bg-danger"
+                      : run.status === "retrying"
+                        ? "bg-warning"
+                        : "bg-primary",
                 )}
               />
               <span className="font-semibold">{STAGE_NAMES[run.stage] ?? run.stage}</span>
               <span className="text-muted">
                 {run.attempt > 1 ? `attempt ${run.attempt}, ` : ""}
-                {run.status === "running" ? "running" : run.status === "succeeded" ? "done" : "failed"}
+                {
+                  {
+                    running: "running",
+                    succeeded: "done",
+                    failed: "failed",
+                    retrying: "did not finish; waiting to try again",
+                  }[run.status]
+                }
                 {run.duration_ms !== null ? ` in ${seconds(run.duration_ms)}` : ""}, {formatDateTime(run.started_at)}
               </span>
-              {run.error && <span className="basis-full pl-5 text-danger">{run.error}</span>}
+              {run.error && (
+                <span className={cx("basis-full pl-5", run.status === "retrying" ? "text-ink-2" : "text-danger")}>
+                  {run.error}
+                </span>
+              )}
             </li>
           ))}
         </ol>

@@ -17,7 +17,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
 
 import httpx
 import pytest
@@ -27,7 +28,18 @@ from pymongo.database import Database
 
 from sabha_api.resources import open_resources
 from sabha_core.indexes import ensure_indexes
-from sabha_core.models import DeadLetter, IdentityLink, OutboxEvent, Person, Recording, Role, Tenant, Unit, User
+from sabha_core.models import (
+    DeadLetter,
+    IdentityLink,
+    OutboxEvent,
+    Person,
+    Recording,
+    Role,
+    StageRun,
+    Tenant,
+    Unit,
+    User,
+)
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.repo import COLLECTIONS
@@ -241,3 +253,20 @@ def test_processing_shows_the_failure_and_whether_it_can_be_retried(api: Api) ->
     api.post("owner", rid, "retry")
     after = get()
     assert after["can_retry"] is False and after["failure"]["state"] == "retried"
+
+
+def test_a_busy_provider_shows_as_retrying_not_failed(api: Api) -> None:
+    rid = failed(api, dead_letter=False, status=RecordingStatus.TRANSCRIBING)
+    now = datetime.now(UTC)
+    runs: tuple[tuple[str, int, Literal["succeeded", "failed"], str | None], ...] = (
+        ("diarize", 1, "failed", "diarize_timeout"), ("diarize", 2, "succeeded", None),
+        ("transcribe", 1, "failed", "asr_unavailable"),
+    )  # fmt: skip
+    for minute, (stage, attempt, status, code) in enumerate(runs):
+        insert(api.db, "stage_runs", StageRun(tenant_id=T, recording_id=rid, stage=stage, version="v1", attempt=attempt,
+                                              status=status, worker="w", started_at=now + timedelta(minutes=minute),
+                                              error_code=code))  # fmt: skip
+    out = api.client.get(f"/v1/recordings/{rid}/processing",
+                         headers={"Authorization": f"Bearer {api.idp.token('admin')}"}).json()  # fmt: skip
+    assert [r["status"] for r in out["stages"]] == ["failed", "succeeded", "retrying"]
+    assert "tries again by itself" in out["stages"][2]["error"]

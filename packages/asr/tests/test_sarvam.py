@@ -17,6 +17,7 @@ Handler = Callable[[httpx.Request], httpx.Response]
 
 
 def provider(handler: Handler, **kwargs: Any) -> SarvamProvider:
+    kwargs.setdefault("sleep", lambda seconds: None)  # rate-limit waits take no time in tests
     return SarvamProvider("secret-key-123", client=httpx.Client(transport=httpx.MockTransport(handler)), **kwargs)
 
 
@@ -184,6 +185,29 @@ def test_http_errors_map_to_retryable_or_not(status: int, code: str, retryable: 
     assert raised.value.retryable is retryable
     assert raised.value.reason == f"HTTP {status} {code}"
     assert raised.value.provider == "sarvam"
+
+
+def test_a_rate_limited_chunk_is_sent_again_after_a_wait() -> None:
+    answers = [
+        httpx.Response(429, json={"error": {"code": "rate_limit_exceeded_error"}}, headers={"retry-after": "3"}),
+        httpx.Response(429, json={"error": {"code": "rate_limit_exceeded_error"}}),
+        httpx.Response(200, json={"transcript": "ठीक है", "language_code": "hi-IN"}),
+    ]
+    waits: list[float] = []
+    result = provider(lambda request: answers.pop(0), sleep=waits.append).transcribe([CHUNK])
+    assert result[0].text == "ठीक है" and waits == [3.0, 4.0]  # Sarvam's Retry-After, then 2 ** 2
+
+
+def test_rate_limit_waits_end_and_a_quota_error_is_never_waited_for() -> None:
+    waits: list[float] = []
+    busy = {"error": {"code": "rate_limit_exceeded_error"}}
+    with pytest.raises(ProviderError) as raised:
+        provider(respond(busy, 429), sleep=waits.append).transcribe([CHUNK])
+    assert raised.value.retryable is True and waits == [2.0, 4.0, 8.0, 16.0]
+    waits.clear()
+    with pytest.raises(ProviderError):
+        provider(respond({"error": {"code": "insufficient_quota_error"}}, 429), sleep=waits.append).transcribe([CHUNK])
+    assert waits == []
 
 
 def test_error_without_a_json_body() -> None:

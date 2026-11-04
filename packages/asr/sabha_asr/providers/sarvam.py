@@ -13,11 +13,19 @@ clamped to the chunk. Without timestamps, the whole transcript is spread across 
 Errors, from Sarvam's error guide: 429 (rate limit, except `insufficient_quota_error`), 500 and 503 are retryable;
 400, 403, 413, 422 and running out of credits are not. Network errors and timeouts are retryable. Reasons name the
 status and Sarvam's error code only: never the key, audio or transcript text.
+
+Rate limits: a chunk answered with 429 `rate_limit_exceeded_error` is sent again after a wait, up to
+RATE_LIMIT_RETRIES times: Sarvam's Retry-After when it gives one (at most MAX_WAIT_S), else 2, 4, 8, 16 s. Calls are
+cut at every change of speaker, so a long call sends dozens of short requests back to back; without this one busy
+minute failed the whole stage. Each wait is logged. After the last try the 429 is raised as before (retryable, so
+the stage tries again later, resuming after the batches already saved).
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+import time
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
@@ -32,6 +40,10 @@ MAX_CHUNK_MS = 29_500  # the REST limit is 30 s; keep a margin for WAV header ro
 DEFAULT_TIMEOUT_S = 60.0
 _RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 _NOT_RETRYABLE_CODES = frozenset({"insufficient_quota_error", "invalid_api_key_error"})
+RATE_LIMIT_RETRIES = 4
+MAX_WAIT_S = 30.0
+
+log = logging.getLogger("sabha.asr.sarvam")
 
 
 class SarvamProvider:
@@ -44,6 +56,7 @@ class SarvamProvider:
         base_url: str = "https://api.sarvam.ai",
         timeout_s: float = DEFAULT_TIMEOUT_S,
         client: httpx.Client | None = None,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if not api_key:
             raise ValueError("a Sarvam API key is required")
@@ -52,6 +65,7 @@ class SarvamProvider:
         self._language = language
         self._url = f"{base_url.rstrip('/')}/speech-to-text"
         self._client = client or httpx.Client(timeout=timeout_s, follow_redirects=False)
+        self._sleep = sleep
 
     @property
     def name(self) -> str:
@@ -81,8 +95,26 @@ class SarvamProvider:
         data = {"model": self._model, "language_code": chunk.language or self._language, "with_timestamps": "true"}
         if self._model == "saaras:v3":
             data["mode"] = "transcribe"
+        response = self._post(data, chunk)
+        for retry in range(1, RATE_LIMIT_RETRIES + 1):
+            if response.status_code != 429 or not _http_error(response).retryable:
+                break
+            wait = _retry_after(response) or float(2**retry)
+            log.warning("Sarvam rate limit; waiting before sending the chunk again",
+                        extra={"chunk_id": chunk.chunk_id, "wait_s": wait, "retry": retry})  # fmt: skip
+            self._sleep(wait)
+            response = self._post(data, chunk)
+        if response.status_code != 200:
+            raise _http_error(response)
         try:
-            response = self._client.post(
+            body = response.json()
+        except ValueError as exc:
+            raise ProviderError(NAME, "response is not JSON", retryable=False) from exc
+        return _parse(chunk, body)
+
+    def _post(self, data: dict[str, str], chunk: AudioChunk) -> httpx.Response:
+        try:
+            return self._client.post(
                 self._url,
                 headers={"api-subscription-key": self._api_key},
                 data=data,
@@ -92,13 +124,15 @@ class SarvamProvider:
             raise ProviderError(NAME, f"timed out ({type(exc).__name__})", retryable=True) from exc
         except httpx.TransportError as exc:
             raise ProviderError(NAME, f"network error ({type(exc).__name__})", retryable=True) from exc
-        if response.status_code != 200:
-            raise _http_error(response)
-        try:
-            body = response.json()
-        except ValueError as exc:
-            raise ProviderError(NAME, "response is not JSON", retryable=False) from exc
-        return _parse(chunk, body)
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    """Sarvam's Retry-After in seconds, capped at MAX_WAIT_S; None when absent or not a number."""
+    try:
+        seconds = float(response.headers.get("retry-after", ""))
+    except ValueError:
+        return None
+    return min(max(seconds, 0.0), MAX_WAIT_S)
 
 
 def _http_error(response: httpx.Response) -> ProviderError:
