@@ -119,7 +119,7 @@ def test_company_defaults() -> None:
         T.RECEPTION: "reception.company.v0.1",
         T.SALES: "sales.company.v0.3",
         T.MEETING: "meeting.company.v0.1",
-        T.SUPPORT: "support.company.v0.2",
+        T.SUPPORT: "support.company.v0.3",
     }
     assert company.consent == ConsentDefaults(
         consent_ref_required=True,
