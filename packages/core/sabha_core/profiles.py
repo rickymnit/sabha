@@ -212,7 +212,7 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
             _T.RECEPTION: "reception.company.v0.1",
             _T.MEETING: "meeting.company.v0.1",  # draft for review (2026-10-26): the meeting is scored, never a person
             # Draft for review (2026-11-04): phone calls about the company's products, one agent and one customer.
-            _T.SUPPORT: "support.company.v0.1",
+            _T.SUPPORT: "support.company.v0.2",
         },
         consent=ConsentDefaults(
             parental_consent_types=frozenset(),
