@@ -1,7 +1,7 @@
 // The words around "who spoke when" strips in lists (UI v2, docs/design/v2/01-overview.png, 02-recordings.png): the
 // caption under each row ("Teacher 62%", "Staff 45%") and the legend above the table ("Staff speaking", "Students
-// or callers"). The staff word comes from the tenant's labels; a reception call's staff are front-desk staff, and a
-// support call's are agents (a company's person word is "Sales rep", which does not fit a support call).
+// or callers"). The staff word comes from the tenant's labels; a reception call's staff are front-desk staff, a
+// support call's are agents and a sales call's are sales reps (a company's person word, "Team member", is general).
 
 import type { Me, RecordingItem } from "../api/types";
 import type { ConversationType } from "../design";
@@ -12,6 +12,7 @@ type Labels = Me["tenant"]["labels"];
 /** Who the blue side is in one recording. */
 export function staffWord(type: RecordingItem["type"], labels: Labels): string {
   if (type === "reception") return "Staff";
+  if (type === "sales") return "Sales rep";
   return type === "support" ? "Agent" : capitalise(labels.person);
 }
 

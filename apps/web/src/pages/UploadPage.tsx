@@ -57,6 +57,27 @@ function remember(consentRef: string) {
   }
 }
 
+const TYPE_KEY = "sabha.upload.type";
+
+/** The conversation type last chosen on this device, if it is still switched on; else the first one on. */
+function rememberedType(enabled: readonly ConversationType[]): ConversationType {
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem(TYPE_KEY);
+  } catch {
+    // Storage blocked: start from the first type.
+  }
+  return enabled.find((t) => t === last) ?? enabled[0] ?? "teaching";
+}
+
+function rememberType(type: ConversationType) {
+  try {
+    localStorage.setItem(TYPE_KEY, type);
+  } catch {
+    // Storage blocked: nothing to remember, nothing lost.
+  }
+}
+
 function FileRow({
   item,
   type,
@@ -170,10 +191,14 @@ export function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const durations = useRef(new Map<string, number | null>()); // file key -> length the browser read (cost estimate)
   const [running, setRunning] = useState(false);
-  const [type, setType] = useState<ConversationType>(me.tenant.enabled_types[0] ?? "teaching");
-  // A support call is analysed for its agent; a company's person word ("Sales rep") does not fit it.
+  const [type, setType] = useState<ConversationType>(() => rememberedType(me.tenant.enabled_types));
+  // Sales and support calls are analysed for a job, not by a company's person word ("Team member").
   const labels =
-    type === "support" ? { ...me.tenant.labels, person: "Agent", person_plural: "Agents" } : me.tenant.labels;
+    type === "support"
+      ? { ...me.tenant.labels, person: "Agent", person_plural: "Agents" }
+      : type === "sales"
+        ? { ...me.tenant.labels, person: "Sales rep", person_plural: "Sales reps" }
+        : me.tenant.labels;
   const [personId, setPersonId] = useState("");
   const [consentOnFile, setConsentOnFile] = useState(() => rememberedConsent() !== "");
   const [consentRef, setConsentRef] = useState(rememberedConsent);
@@ -350,7 +375,10 @@ export function UploadPage() {
             <ChoiceCards
               legend="Conversation type"
               value={type}
-              onChange={setType}
+              onChange={(next) => {
+                setType(next);
+                rememberType(next);
+              }}
               disabled={running}
               options={me.tenant.enabled_types.map((t) => ({ value: t, label: capitalise(t) }))}
             />

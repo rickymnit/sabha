@@ -191,14 +191,16 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
         # Support calls added by the owner (2026-11-04), on for every company.
         enabled_types=(_T.RECEPTION, _T.MEETING, _T.SALES, _T.SUPPORT),  # Setup.dc.html:163
         labels=Labels(  # Setup.dc.html:164
-            person="Sales rep",
-            person_plural="Team",
+            # "Team member", not the design's "Sales rep": a company's people also take support and front-desk calls
+            # (owner, 2026-11-05). Sales calls still name the person "Sales rep", as support calls name an "Agent".
+            person="Team member",
+            person_plural="Team members",
             # "Conversation", not the design's "Call" (Setup.dc.html:164): in-person sales meetings and team meetings
             # are not calls (owner's decision on sales, 2026-10-24). A tenant can rename it.
             recording="Conversation",
             recording_plural="Conversations",
             unit="Team or branch",
-            manager="Sales manager",
+            manager="Manager",
             unit_group="Branch",
             unit_group_plural="Branches",
             unit_sub="Team",

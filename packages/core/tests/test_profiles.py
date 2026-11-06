@@ -103,12 +103,12 @@ def test_company_defaults() -> None:
     assert company.name is ProfileName.COMPANY
     assert company.enabled_types == (T.RECEPTION, T.MEETING, T.SALES, T.SUPPORT)
     assert company.labels.model_dump() == {
-        "person": "Sales rep",
-        "person_plural": "Team",
+        "person": "Team member",
+        "person_plural": "Team members",
         "recording": "Conversation",
         "recording_plural": "Conversations",
         "unit": "Team or branch",
-        "manager": "Sales manager",
+        "manager": "Manager",
         "unit_group": "Branch",
         "unit_group_plural": "Branches",
         "unit_sub": "Team",
@@ -136,7 +136,7 @@ def test_company_uses_sales_words() -> None:
     # ("Conversation" rather than the plan's "Call" since 2026-10-26: in-person sales meetings are not calls).
     labels = get_profile(ProfileName.COMPANY).labels
 
-    assert (labels.person, labels.recording, labels.person_plural) == ("Sales rep", "Conversation", "Team")
+    assert (labels.person, labels.recording, labels.person_plural) == ("Team member", "Conversation", "Team members")
 
 
 @pytest.mark.parametrize("name", ALL_PROFILES)

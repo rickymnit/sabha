@@ -449,7 +449,7 @@ PROCESSING_STAGES = {
 }  # fmt: skip
 LANGUAGE_NAMES = {"hi": "Hindi", "en": "English", "mr": "Marathi", "ta": "Tamil", "te": "Telugu", "bn": "Bengali",
                   "gu": "Gujarati", "kn": "Kannada", "ml": "Malayalam", "pa": "Punjabi", "or": "Odia"}  # fmt: skip
-STAFF_ROLE_WORDS = frozenset({"teacher", "receptionist", "sales_rep"})
+STAFF_ROLE_WORDS = frozenset({"teacher", "receptionist"})
 
 
 def _reasons(codes: list[str]) -> list[dict[str, str]]:
@@ -457,7 +457,7 @@ def _reasons(codes: list[str]) -> list[dict[str, str]]:
 
 
 # Display names for the computed metrics (sabha_analytics.metrics). "{person}" is the tenant's word for the staff
-# member ("Teacher", "Receptionist" in a school; "Sales rep" in a company); other roles are named as below.
+# member ("Teacher", "Receptionist" in a school; "Team member" in a company); other roles are named as below.
 METRIC_NAMES = {
     "duration_s": "Length",
     "call_duration_s": "Call length",
@@ -475,9 +475,9 @@ METRIC_NAMES = {
 }
 ROLE_METRIC_NAMES = {"talk_share": "{role} talk time", "turn_count": "Turns by {role_lower}",
                      "question_count": "Questions asked by {role_lower}"}  # fmt: skip
-# A support call's staff member is an "Agent", not the tenant's person word: a company's is "Sales rep" (2026-11-04).
+# Sales and support calls name their staff member by the job, not by the tenant's person word ("Team member").
 OTHER_ROLE_WORDS = {"students": "Student", "caller": "Caller", "customer": "Customer", "visitor": "Visitor",
-                    "support_agent": "Agent"}  # fmt: skip
+                    "support_agent": "Agent", "sales_rep": "Sales rep"}  # fmt: skip
 
 
 def metric_name(key: str, person_label: str) -> str:
