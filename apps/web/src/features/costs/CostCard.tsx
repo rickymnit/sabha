@@ -2,16 +2,15 @@
 // upload page showed, kept on the recording; actual is the speech-to-text audio sent at the published price and the
 // LLM calls' recorded cost. Only Sabha's AI services are counted. A part without a price is shown as such.
 
-import { useRecordingCost } from "../../api/hooks";
-import { Panel, cx } from "../../design";
+import type { CostResponse } from "./types";
+import { cx } from "../../design";
 import { formatDifference, formatInr } from "./money";
 
 const money = (value: number | null | undefined, missing = "—") => (value == null ? missing : formatInr(value));
 
-export function CostCard({ recordingId }: { recordingId: string }) {
-  const cost = useRecordingCost(recordingId);
-  if (!cost.data) return null;
-  const { estimate, actual, sources, duration_ms } = cost.data;
+/** The cost table and where its prices come from, as a part of TechnicalDetails. */
+export function CostCard({ cost }: { cost: CostResponse }) {
+  const { estimate, actual, sources, duration_ms } = cost;
   const minutes = duration_ms ? duration_ms / 60_000 : null;
   const rows: [string, number | null | undefined, number | null | undefined][] = [
     ["Speech-to-text", estimate?.asr_inr, actual.asr_inr],
@@ -21,10 +20,13 @@ export function CostCard({ recordingId }: { recordingId: string }) {
   const expectedPerMin =
     estimate?.total_inr != null && estimate.duration_ms ? estimate.total_inr / (estimate.duration_ms / 60_000) : null;
   return (
-    <Panel
-      title="Cost of this recording"
-      description="Sabha's AI services only (speech-to-text and the LLM); our own servers are not included."
-    >
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h3 className="m-0 text-base font-semibold">Cost of this recording</h3>
+        <p className="m-0 text-sm text-muted">
+          Sabha&apos;s AI services only (speech-to-text and the LLM); our own servers are not included.
+        </p>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] text-table">
           <thead>
@@ -105,6 +107,6 @@ export function CostCard({ recordingId }: { recordingId: string }) {
             : "No dollar-to-rupee rate is set (USD_INR_RATE), so the LLM cost is not shown in rupees."}
         </li>
       </ul>
-    </Panel>
+    </section>
   );
 }

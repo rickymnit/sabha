@@ -3,7 +3,7 @@
 
 import type { ProcessingInfo } from "../../api/types";
 import { formatDateTime } from "../../app/format";
-import { Panel, cx } from "../../design";
+import { cx } from "../../design";
 import { STAGE_NAMES } from "./stages";
 
 function seconds(ms: number | null): string {
@@ -12,10 +12,15 @@ function seconds(ms: number | null): string {
   return s < 90 ? `${s} s` : `${Math.round(s / 60)} min`;
 }
 
+/** The pipeline runs, as a part of TechnicalDetails. */
 export function ProcessingPanel({ info }: { info: ProcessingInfo }) {
   const cost = info.ai.cost_usd;
   return (
-    <Panel title="Processing details" description="Visible to owners and administrators only.">
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h3 className="m-0 text-base font-semibold">Processing details</h3>
+        <p className="m-0 text-sm text-muted">Visible to owners and administrators only.</p>
+      </div>
       {info.stages.length === 0 ? (
         <p className="m-0 text-muted">Nothing has run yet.</p>
       ) : (
@@ -63,6 +68,6 @@ export function ProcessingPanel({ info }: { info: ProcessingInfo }) {
           ? "No AI calls yet."
           : `AI: ${info.ai.calls} ${info.ai.calls === 1 ? "call" : "calls"}${cost !== null ? `, US$${cost.toFixed(4)} recorded` : ""}${info.ai.unpriced_calls ? ` (${info.ai.unpriced_calls} without a published price)` : ""}.`}
       </p>
-    </Panel>
+    </section>
   );
 }

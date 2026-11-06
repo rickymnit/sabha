@@ -360,12 +360,8 @@ function ReportBody({
               }}
               speakers={speakers}
               onSeek={seek}
-              provenance={
-                // The model id means nothing to most readers; administrators see it for support questions.
-                viewerRole === "admin"
-                  ? `Scored against the ${rubricLabel} rubric by ${analysis.model.ids.join(", ")}`
-                  : `Scored against the ${rubricLabel} rubric`
-              }
+              // The model id means nothing to most readers; administrators find it under Technical details.
+              provenance={`Scored against the ${rubricLabel} rubric`}
               levels={levels}
               disputeLabel={disputeLabel}
               recordingWord={recordingWord}

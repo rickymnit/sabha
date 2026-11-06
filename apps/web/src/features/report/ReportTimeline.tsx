@@ -3,7 +3,7 @@
 // playhead. "Zoom to 10 min" shows ten minutes around the playhead (or the first pin); the arrows move the window.
 // Times are on the original timeline (golden rule 4).
 
-import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
 import { cx } from "../../design";
 import { formatClock, type RoleLabels, type Utterance } from "../transcript";
@@ -184,17 +184,15 @@ export function ReportTimeline({
               {phases
                 .filter((phase) => phase.end_ms > view.start_ms && phase.start_ms < view.end_ms)
                 .map((phase) => (
-                  <li
+                  <PhaseBlock
                     key={`${phase.name}-${phase.start_ms}`}
+                    name={sentenceCase(phase.name)}
                     title={`${sentenceCase(phase.name)}, ${formatClock(phase.start_ms)} to ${formatClock(phase.end_ms)}`}
-                    className="absolute inset-y-0 overflow-hidden whitespace-nowrap rounded-md border-r-2 border-surface bg-fill px-2 py-[5px]"
                     style={{
                       left: `${at(Math.max(phase.start_ms, view.start_ms))}%`,
                       width: `${at(Math.min(phase.end_ms, view.end_ms)) - at(Math.max(phase.start_ms, view.start_ms))}%`,
                     }}
-                  >
-                    {sentenceCase(phase.name)}
-                  </li>
+                  />
                 ))}
             </ol>
           </div>
@@ -279,5 +277,35 @@ export function ReportTimeline({
         Times refer to the original recording.
       </p>
     </div>
+  );
+}
+
+/** One phase on the strip. A name that does not fit is hidden rather than cut ("Proble"); it stays in the tooltip
+ * and the label. Hidden with `invisible`, which keeps its width, so the check still measures the whole name. */
+function PhaseBlock({ name, title, style }: { name: string; title: string; style: CSSProperties }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const [fits, setFits] = useState(true);
+  useLayoutEffect(() => {
+    const block = ref.current;
+    if (!block) return;
+    const check = () => setFits(block.scrollWidth <= block.clientWidth);
+    check();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(check);
+    observer.observe(block);
+    return () => observer.disconnect();
+  }, [name]);
+  return (
+    <li
+      ref={ref}
+      title={title}
+      aria-label={name}
+      className="absolute inset-y-0 overflow-hidden whitespace-nowrap rounded-md border-r-2 border-surface bg-fill px-2 py-[5px]"
+      style={style}
+    >
+      <span aria-hidden="true" className={fits ? undefined : "invisible"}>
+        {name}
+      </span>
+    </li>
   );
 }

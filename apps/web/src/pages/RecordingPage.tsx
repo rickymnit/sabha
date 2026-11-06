@@ -25,8 +25,7 @@ import type { Me, TranscriptResponse } from "../api/types";
 import { Button, EmptyState, Icon, Menu, Skeleton, SkeletonGroup, useToast, type MenuItem } from "../design";
 import type { DisputeDraft } from "../features/disputes/types";
 import { EraseDialog } from "../features/erasure/EraseDialog";
-import { CostCard } from "../features/costs/CostCard";
-import { ProcessingPanel, ReasonDialog, STAGE_NAMES } from "../features/processing";
+import { ReasonDialog, STAGE_NAMES, TechnicalDetails } from "../features/processing";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
 import { CoachingSteps, RecordingReport, SharedNote } from "../features/report";
 import { ShareDialog } from "../features/share/ShareDialog";
@@ -147,8 +146,14 @@ export function RecordingPage() {
       }
     : undefined;
   // A meeting has an organiser, not a person analysed (ADR 0008).
-  // A support call's staff member is an agent; a company's person word ("Sales rep") does not fit it.
-  const person = isMeeting ? "Organiser" : recording.data.type === "support" ? "Agent" : null;
+  // Sales and support calls name the staff member by the job, not by a company's person word ("Team member").
+  const person = isMeeting
+    ? "Organiser"
+    : recording.data.type === "support"
+      ? "Agent"
+      : recording.data.type === "sales"
+        ? "Sales rep"
+        : null;
   const labels = person ? { ...me.tenant.labels, person } : me.tenant.labels;
   const canReview = recording.data.status === "NEEDS_REVIEW" && RESOLVERS.includes(me.user.role);
   const versions = history.data ?? [];
@@ -302,8 +307,11 @@ export function RecordingPage() {
           onClose={() => setSharing(false)}
         />
       )}
-      <CostCard recordingId={id} />
-      {isAdmin && processing.data && <ProcessingPanel info={processing.data} />}
+      <TechnicalDetails
+        recordingId={id}
+        processing={isAdmin ? processing.data : undefined}
+        models={isAdmin && analysis.data && "model" in analysis.data ? analysis.data.model.ids : undefined}
+      />
       {erasing && (
         <EraseDialog
           what={`this ${recordingWord}`}
