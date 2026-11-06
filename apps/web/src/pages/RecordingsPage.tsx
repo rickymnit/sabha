@@ -606,28 +606,31 @@ export function RecordingsPage() {
                 Showing {rows.length}
                 {onlyTab && shownOf !== undefined && shownOf !== null ? ` of ${count(shownOf)}` : ""}
               </span>
-              <span className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  disabled={cursors.length === 1}
-                  onClick={() => {
-                    setCursors((c) => c.slice(0, -1));
-                    setSelected(new Set());
-                  }}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={!page.data?.next_cursor || page.isPlaceholderData}
-                  onClick={() => {
-                    setCursors((c) => [...c, page.data?.next_cursor ?? null]);
-                    setSelected(new Set());
-                  }}
-                >
-                  Next
-                </Button>
-              </span>
+              {/* Only when there is another page to go to. */}
+              {(cursors.length > 1 || Boolean(page.data?.next_cursor)) && (
+                <span className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={cursors.length === 1}
+                    onClick={() => {
+                      setCursors((c) => c.slice(0, -1));
+                      setSelected(new Set());
+                    }}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={!page.data?.next_cursor || page.isPlaceholderData}
+                    onClick={() => {
+                      setCursors((c) => [...c, page.data?.next_cursor ?? null]);
+                      setSelected(new Set());
+                    }}
+                  >
+                    Next
+                  </Button>
+                </span>
+              )}
             </>
           )
         }

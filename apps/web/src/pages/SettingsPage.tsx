@@ -141,6 +141,9 @@ function SettingsForm({ settings }: { settings: TenantSettings }) {
   const available = new Set(settings.types.filter((t) => t.available).map((t) => t.type));
   const [saved, setSaved] = useState(() => draftOf(settings));
   const [draft, setDraft] = useState(() => draftOf(settings));
+  // Types not set up for this organisation are left out: a company has no use for "Teaching" greyed out. One that
+  // is somehow on stays listed so it can be switched off.
+  const shownTypes = order.filter((t) => available.has(t) || draft.types.includes(t));
   const [typesError, setTypesError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -236,34 +239,25 @@ function SettingsForm({ settings }: { settings: TenantSettings }) {
 
         <Panel
           title="Conversation types"
-          description={`Your plan covers ${settings.max_types === order.length ? `all ${order.length}` : `any ${settings.max_types}`} at a time. Switching one off stops new uploads of it; finished reports stay available.`}
+          description={`${settings.max_types < shownTypes.length ? `Your plan covers up to ${settings.max_types} at a time. ` : ""}Switching one off stops new uploads of it; finished reports stay available.`}
         >
           <fieldset aria-labelledby={typesHeading} className="m-0 flex flex-col gap-2 border-0 p-0">
             <legend id={typesHeading} className="sr-only">
               Conversation types
             </legend>
-            {order.map((type) => {
-              const on = draft.types.includes(type);
-              const ready = available.has(type);
-              return (
-                <Checkbox
-                  key={type}
-                  checked={on}
-                  disabled={!ready && !on}
-                  onChange={(e) => toggle(type, e.target.checked)}
-                  className="rounded border border-line px-3.5"
-                  label={TYPE_INFO[type].name}
-                  description={
-                    ready
-                      ? TYPE_INFO[type].description
-                      : "Not set up for your organisation yet. Ask your Sabha contact."
-                  }
-                />
-              );
-            })}
+            {shownTypes.map((type) => (
+              <Checkbox
+                key={type}
+                checked={draft.types.includes(type)}
+                onChange={(e) => toggle(type, e.target.checked)}
+                className="rounded border border-line px-3.5"
+                label={TYPE_INFO[type].name}
+                description={TYPE_INFO[type].description}
+              />
+            ))}
           </fieldset>
           <p className="mb-0 mt-3 text-small text-muted" aria-live="polite">
-            {draft.types.length} of {order.length} conversation types on.
+            {draft.types.length} of {shownTypes.length} conversation types on.
           </p>
           {(typesError || (submitted && (overLimit || noTypes))) && (
             <p role="alert" className="mb-0 mt-1 text-small font-semibold text-danger">

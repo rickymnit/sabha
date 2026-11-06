@@ -30,6 +30,7 @@ import { ALL_UNITS } from "../features/overview/metrics";
 import { OverviewPage } from "../features/overview/OverviewPage";
 import { presetRange, toQuery, type DayRange, type RangePreset } from "../features/overview/range";
 import type { OverviewStats, ProcessingItem } from "../features/overview/types";
+import { formatClock } from "../features/transcript/text";
 
 const DECISIONS_SHOWN = 4;
 
@@ -52,14 +53,8 @@ const COMPARE: Record<RangePreset, string> = {
   custom: "prev. period",
 };
 
-const clock = (ms: number | null) => {
-  if (ms === null) return "";
-  const s = Math.round(ms / 1000);
-  const h = Math.floor(s / 3600);
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-};
+// The same "1:19" as the recordings list, so one call has one length everywhere.
+const clock = (ms: number | null) => (ms === null ? "" : formatClock(ms));
 
 const clockIst = new Intl.DateTimeFormat("en-IN", {
   hour: "2-digit",
@@ -122,16 +117,17 @@ function Decisions({ me }: { me: Me }) {
 function Processing({ stats, typeNames }: { stats: OverviewStats; typeNames: Record<ConversationType, string> }) {
   const items = stats.processing ?? [];
   const running = (stats.in_progress ?? []).filter((s) => s.stage !== "needs_review").reduce((n, s) => n + s.n, 0);
-  const typical = [...(stats.turnaround ?? [])].sort((a, b) => b.n - a.n)[0];
+  // The usual wait for each type uploaded, most uploaded first: "Typical support 4 min · sales 5 min".
+  const typical = [...(stats.turnaround ?? [])].sort((a, b) => b.n - a.n).slice(0, 3);
   const minutesFor = (type: ConversationType) => stats.turnaround?.find((t) => t.type === type)?.minutes;
   const now = new Date();
   return (
     <Panel
       title="Processing now"
       actions={
-        typical && (
+        typical.length > 0 && (
           <span className="text-small text-muted">
-            Typical {typeNames[typical.type].toLowerCase()}: {Math.round(typical.minutes)} min
+            Typical {typical.map((t) => `${typeNames[t.type].toLowerCase()} ${Math.round(t.minutes)} min`).join(" · ")}
           </span>
         )
       }

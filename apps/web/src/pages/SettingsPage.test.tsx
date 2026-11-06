@@ -129,12 +129,11 @@ describe("the settings page", () => {
     expect(patches(fetchMock)).toEqual([]);
   });
 
-  it("explains types the organisation cannot switch on and keeps one on", async () => {
+  it("leaves out types the organisation cannot switch on and keeps one on", async () => {
     const fetchMock = stubApi("owner");
     renderAt("/settings");
-    const meetings = await screen.findByRole("checkbox", { name: "Meetings" });
-    expect(meetings).toBeDisabled();
-    expect(screen.getAllByText(/Not set up for your organisation yet/)).toHaveLength(3);
+    await screen.findByRole("checkbox", { name: "Teaching" });
+    expect(screen.queryByRole("checkbox", { name: "Meetings" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("checkbox", { name: "Teaching" }));
     await userEvent.click(screen.getByRole("checkbox", { name: "Reception" }));

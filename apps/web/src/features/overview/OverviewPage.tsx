@@ -195,7 +195,10 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
   const rows = coachingRows(stats);
   const weeks = Math.max(1, ...rows.map((r) => r.weekly?.length ?? 0));
   const main = mainType(stats);
-  const byUnit = !stats.unit_id && (stats.units?.length ?? 0) > 1 ? (stats.units ?? []) : [];
+  // Units with no verified score of this type would be whole columns of "—"; they are left out.
+  const byUnit = (!stats.unit_id && (stats.units?.length ?? 0) > 1 ? (stats.units ?? []) : []).filter((u) =>
+    rows.some((item) => item.by_unit?.some((v) => v.unit_id === u.id && v.n > 0)),
+  );
   const legend = (
     <ul className="m-0 flex list-none flex-wrap gap-3 p-0 text-small text-muted" aria-label="Colours">
       {[

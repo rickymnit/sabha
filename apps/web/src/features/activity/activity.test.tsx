@@ -11,6 +11,7 @@ import { ToastProvider } from "../../design";
 import { StaticSessionProvider } from "../../session/providers";
 import type { Session } from "../../session/session";
 import { describe } from "./describe";
+import { groupViewing, viewingWords } from "./group";
 
 const LABELS = { person: "Teacher", person_plural: "Teachers", recording: "Lesson", recording_plural: "Lessons",
                  unit: "Class", manager: "Coordinator" }; // prettier-ignore
@@ -39,6 +40,25 @@ const sentence = (e: AuditEntryItem) => {
   const d = describe(e, LABELS);
   return `${[d.text, d.target].filter(Boolean).join(" ")}${d.after ?? ""}`;
 };
+
+group("grouping listening", () => {
+  it("folds back-to-back opens and plays of one recording by one person into a row, and no more", () => {
+    const rows = groupViewing([
+      entry({ at: "2026-10-27T05:20:00Z" }),
+      entry({ at: "2026-10-27T05:19:00Z" }),
+      entry({ at: "2026-10-27T05:18:00Z", action: "analysis.view" }),
+      entry({ at: "2026-10-27T05:17:00Z", target: { type: "recording", id: "r-2", label: "Another" } }),
+      entry({ at: "2026-10-27T03:00:00Z", target: { type: "recording", id: "r-2", label: "Another" } }), // 2 h apart
+    ]);
+    expect(rows.map((r) => [r.plays, r.views])).toEqual([
+      [2, 1],
+      [1, 0],
+      [1, 0],
+    ]);
+    expect(viewingWords(rows[0]!)).toEqual({ text: "opened the report for", after: " and played the audio twice" });
+    expect(viewingWords(rows[1]!)).toBeNull();
+  });
+});
 
 group("entries in plain words", () => {
   it("names what was done to which recording, in the tenant's words", () => {

@@ -7,10 +7,11 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import { useAudit } from "../api/hooks";
-import type { AuditEntryItem, Me } from "../api/types";
+import type { Me } from "../api/types";
 import { capitalise, formatDateTime, formatWhen } from "../app/format";
 import { Button, EmptyState, Icon, PageHeader, Panel, Select, Skeleton, SkeletonGroup, Table } from "../design";
 import { actionChoices, describe, roleWord } from "../features/activity/describe";
+import { groupViewing, viewingWords, type ActivityRow } from "../features/activity/group";
 
 const PERIODS = [
   { value: "1", label: "Today and yesterday" },
@@ -35,6 +36,7 @@ export function ActivityPage() {
   if (!from.has(period)) from.set(period, since(period));
   const audit = useAudit({ action: action || null, actorUserId: actor?.id ?? null, from: from.get(period) ?? null });
   const rows = audit.data?.pages.flatMap((page) => page.items) ?? [];
+  const shown = groupViewing(rows);
   const filtered = Boolean(action || actor || period !== "30");
 
   const open = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -122,10 +124,10 @@ export function ActivityPage() {
             ))}
           </SkeletonGroup>
         ) : (
-          <Table<AuditEntryItem>
+          <Table<ActivityRow>
             aria-label="Activity"
-            rows={rows}
-            rowKey={(entry) => entry.id}
+            rows={shown}
+            rowKey={(row) => row.entry.id}
             minWidth={0}
             empty={
               <EmptyState
@@ -152,7 +154,7 @@ export function ActivityPage() {
                 key: "when",
                 header: "When",
                 className: "whitespace-nowrap text-muted",
-                render: (entry) => (
+                render: ({ entry }) => (
                   <time dateTime={entry.at} title={formatDateTime(entry.at)}>
                     {formatWhen(entry.at)}
                   </time>
@@ -161,7 +163,8 @@ export function ActivityPage() {
               {
                 key: "who",
                 header: "Who",
-                render: (entry) =>
+                className: "whitespace-nowrap",
+                render: ({ entry }) =>
                   entry.actor.name ? (
                     <button
                       type="button"
@@ -179,8 +182,8 @@ export function ActivityPage() {
               {
                 key: "what",
                 header: "What",
-                render: (entry) => {
-                  const d = describe(entry, labels);
+                render: (row) => {
+                  const d = { ...describe(row.entry, labels), ...viewingWords(row) };
                   return (
                     <span>
                       {capitalise(d.text)}
