@@ -122,6 +122,7 @@ export function TranscriptList({
     [tabLine],
   );
 
+  const scrollingRef = useRef(false);
   // useVirtualizer returns a mutable instance; nothing here memoises values derived from it.
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
@@ -131,6 +132,19 @@ export function TranscriptList({
     overscan: 6,
     rangeExtractor,
     measureElement: measureRow,
+    // During a smooth scroll (following playback, jumping to a match) the virtualiser skips measuring rows far from
+    // the target, and a skipped row keeps the one-line estimate, so wrapped lines overlap the next. Measure the rows
+    // on screen again once scrolling stops.
+    onChange: (instance, scrolling) => {
+      if (scrollingRef.current && !scrolling) {
+        requestAnimationFrame(() =>
+          scrollRef.current
+            ?.querySelectorAll<HTMLElement>("[data-index]")
+            .forEach((row) => instance.measureElement(row)),
+        );
+      }
+      scrollingRef.current = scrolling;
+    },
   });
 
   const scrollToLine = useCallback(
