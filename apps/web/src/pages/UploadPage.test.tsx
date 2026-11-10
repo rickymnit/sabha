@@ -80,7 +80,7 @@ describe("the upload page", () => {
     await user.type(screen.getByRole("textbox", { name: "Consent form or notice" }), "Front desk notice 2026");
     await user.click(start);
 
-    expect(await screen.findByText(/All uploaded/)).toBeInTheDocument();
+    expect(await screen.findByText(/2 lessons uploaded/)).toBeInTheDocument();
     expect(uploadRecording).toHaveBeenCalledTimes(2);
     expect(vi.mocked(uploadRecording).mock.calls[0]?.[0]).toMatchObject({
       type: "reception", personId: "p-ravi", consentRef: "Front desk notice 2026",

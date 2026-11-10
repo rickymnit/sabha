@@ -4,12 +4,12 @@
 // unprocessed, until consent is recorded; the page says so before and after.
 // Not in this version: resuming after the page is closed, so the page asks people to keep it open.
 
-import { useReducer, useRef, useState, type DragEvent } from "react";
+import { useReducer, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client";
-import { usePeople } from "../api/hooks";
+import { usePeople, useUsage } from "../api/hooks";
 import type { Me } from "../api/types";
 import {
   Button,
@@ -20,10 +20,14 @@ import {
   Panel,
   ProgressBar,
   Select,
+  TypeDot,
   cx,
   type ConversationType,
 } from "../design";
 import { CostPreview } from "../features/costs/CostPreview";
+import { TYPE_INFO } from "../app/conversationTypes";
+import { ADMINS } from "../app/nav";
+import { PlanUsage } from "../app/PlanUsage";
 import { unitLabel, unitWords } from "../app/units";
 import { useSession } from "../session/session";
 import { capitalise } from "../app/format";
@@ -78,6 +82,24 @@ function rememberType(type: ConversationType) {
   }
 }
 
+const STATUS = {
+  muted: ["text-muted", "bg-muted-2"],
+  success: ["text-success", "bg-success"],
+  danger: ["text-danger", "bg-danger"],
+  warning: ["text-warning-ink", "bg-warning"],
+} as const;
+
+/** A file's state as a coloured dot and words, like the status column on the recordings list (UI v2). */
+function Status({ tone, children }: { tone: keyof typeof STATUS; children: ReactNode }) {
+  const [text, dot] = STATUS[tone];
+  return (
+    <span className={cx("flex flex-wrap items-center gap-x-1.5 gap-y-1 text-small", text)}>
+      <span aria-hidden="true" className={cx("size-1.5 shrink-0 rounded-full", dot)} />
+      {children}
+    </span>
+  );
+}
+
 function FileRow({
   item,
   type,
@@ -126,7 +148,7 @@ function FileRow({
           ) : (
             <CostPreview file={file} type={type} onDuration={onDuration} />
           ))}
-        {state.kind === "ready" && <span className="text-small text-muted">Ready to upload</span>}
+        {state.kind === "ready" && <Status tone="muted">Ready to upload</Status>}
         {state.kind === "uploading" && (
           <ProgressBar
             value={state.sent}
@@ -137,7 +159,7 @@ function FileRow({
           />
         )}
         {state.kind === "done" && (
-          <span className="text-small text-success">
+          <Status tone="success">
             {state.awaitingConsent
               ? "Uploaded. Waiting for consent before it is processed."
               : "Uploaded. Sabha is processing it now."}{" "}
@@ -148,19 +170,19 @@ function FileRow({
             >
               Open
             </button>
-          </span>
+          </Status>
         )}
-        {state.kind === "invalid" && <span className="text-small text-danger">{state.reason}</span>}
+        {state.kind === "invalid" && <Status tone="danger">{state.reason}</Status>}
         {state.kind === "failed" && (
-          <span className="text-small text-danger">
+          <Status tone="danger">
             {state.message}{" "}
             <button type="button" onClick={onRetry} className="font-semibold text-primary underline">
               Try again
             </button>
-          </span>
+          </Status>
         )}
         {state.kind === "duplicate" && (
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-warning-ink">
+          <Status tone="warning">
             This file has been uploaded before.
             <button type="button" onClick={onForce} className="font-semibold text-primary underline">
               Upload it again
@@ -168,7 +190,7 @@ function FileRow({
             <button type="button" onClick={onSkip} className="font-semibold text-primary underline">
               Skip it
             </button>
-          </span>
+          </Status>
         )}
       </div>
       {state.kind !== "uploading" && state.kind !== "done" && (
@@ -186,6 +208,7 @@ export function UploadPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const people = usePeople();
+  const usage = useUsage(ADMINS.includes(me.user.role)); // this month's audio hours: owners and admins
   const input = useRef<HTMLInputElement>(null);
   const [items, dispatch] = useReducer(queueReducer, []);
   const [dragging, setDragging] = useState(false);
@@ -279,8 +302,7 @@ export function UploadPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        breadcrumbs={[{ label: capitalise(labels.recording_plural), href: "/recordings" }, { label: "Upload" }]}
-        title="Upload recordings"
+        title={`Upload ${labels.recording_plural.toLowerCase()}`}
         description="Files go straight to secure storage in India. Keep this page open until every file says uploaded."
       />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -337,11 +359,20 @@ export function UploadPage() {
                 allDone && (
                   <>
                     <span>
-                      All uploaded. Each one appears in {labels.recording_plural.toLowerCase()} and updates on its own.
+                      {items.length} {(items.length === 1 ? labels.recording : labels.recording_plural).toLowerCase()}{" "}
+                      uploaded.{" "}
+                      {items.some((i) => i.state.kind === "done" && i.state.awaitingConsent)
+                        ? "Those without consent wait; the rest are being processed and update on their own."
+                        : "Sabha is processing them now; each one updates on its own."}
                     </span>
-                    <Button onClick={() => navigate("/recordings")}>
-                      Go to {labels.recording_plural.toLowerCase()}
-                    </Button>
+                    <span className="flex flex-wrap gap-2">
+                      <Button variant="secondary" onClick={() => dispatch({ type: "clearFinished" })}>
+                        Upload more
+                      </Button>
+                      <Button onClick={() => navigate("/recordings")}>
+                        Go to {labels.recording_plural.toLowerCase()}
+                      </Button>
+                    </span>
                   </>
                 )
               }
@@ -380,7 +411,11 @@ export function UploadPage() {
                 rememberType(next);
               }}
               disabled={running}
-              options={me.tenant.enabled_types.map((t) => ({ value: t, label: capitalise(t) }))}
+              options={me.tenant.enabled_types.map((t) => ({
+                value: t,
+                label: <TypeDot type={t} label={TYPE_INFO[t].name} />,
+              }))}
+              hint={TYPE_INFO[type].description}
             />
           )}
           {staffSelf && onlyPerson ? (
@@ -451,6 +486,7 @@ export function UploadPage() {
           </div>
 
           <div className="flex flex-col gap-2 border-t border-line-subtle pt-4">
+            {usage.data && <PlanUsage usage={usage.data} />}
             <Button fullWidth disabled={!canStart} onClick={() => void start()}>
               {running ? "Uploading…" : summary.ready > 0 ? `Upload ${summary.ready} ${things}` : "Upload"}
             </Button>
