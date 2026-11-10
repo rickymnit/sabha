@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api/client";
 import { ToastProvider } from "../design";
+import { emptyOverview } from "../features/overview/mock";
 import { StaticSessionProvider } from "../session/providers";
 import type { Session } from "../session/session";
 import { ApiErrors } from "./App";
@@ -69,7 +70,7 @@ const MENUS: [string, string[]][] = [
   ["admin", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload", "Activity", "Settings"]],
   ["manager", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload"]],
   ["reviewer", ["Overview", "Lessons", "Reviews", "Teachers", "Rubrics", "Upload"]],
-  ["staff", ["Lessons", "Rubrics", "Upload"]],
+  ["staff", ["My progress", "Lessons", "Rubrics", "Upload"]],
 ];
 
 describe("each role's menu", () => {
@@ -141,12 +142,12 @@ describe("a session that ends on its own", () => {
 
 describe("pages for some roles only", () => {
   it.each(["/overview", "/people", "/reviews", "/reviews/r9"])(
-    "send a teacher who types %s to their lessons",
+    "send a teacher who types %s to their own progress page",
     async (path) => {
-      stubApi({ "/v1/me": me("staff"), "/v1/recordings": EMPTY });
+      stubApi({ "/v1/me": me("staff"), "/v1/recordings": EMPTY, "/v1/overview": { ...emptyOverview(), units: [] } });
       const router = renderAt(path);
-      expect(await screen.findByRole("heading", { level: 1, name: "Lessons" })).toBeInTheDocument();
-      expect(router.state.location.pathname).toBe("/recordings");
+      expect(await screen.findByRole("heading", { level: 1, name: /, Priya$/ })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/progress");
     },
   );
 

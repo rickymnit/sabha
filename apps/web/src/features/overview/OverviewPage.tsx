@@ -18,8 +18,8 @@ import {
 } from "../../design";
 import type { Labels } from "../report/types";
 import { DateRangePicker } from "./DateRangePicker";
-import { ALL_UNITS, coachingRows, mainType, overviewTiles, type Tile, type TypeNames } from "./metrics";
-import { describeRange, type DayRange, type RangePreset } from "./range";
+import { ALL_UNITS, coachingRows, greeting, mainType, overviewTiles, type Tile, type TypeNames } from "./metrics";
+import { PRESET_WORDS, describeRange, type DayRange, type RangePreset } from "./range";
 import type { CoachingItem, OverviewStats } from "./types";
 
 export interface OverviewPageProps {
@@ -47,19 +47,6 @@ export interface OverviewPageProps {
   processing?: ReactNode;
   /** Recent recordings. */
   recent?: ReactNode;
-}
-
-/** "in the last 7 days" for the fixed periods; a custom period names its dates instead. */
-const PRESET_WORDS: Partial<Record<RangePreset, string>> = {
-  "7d": " in the last 7 days",
-  "30d": " in the last 30 days",
-  month: " this month",
-};
-
-function greeting(now: Date): string {
-  const hour = Number(new Intl.DateTimeFormat("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" })
-    .format(now)); // prettier-ignore
-  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
 export function OverviewPage(props: OverviewPageProps) {
@@ -131,10 +118,20 @@ function Tiles({ stats, typeNames, labels, compare, enabledTypes }: OverviewPage
       </Panel>
     );
   }
+  return <TileRow tiles={tiles} />;
+}
+
+const XL_COLUMNS = ["xl:grid-cols-1", "xl:grid-cols-1", "xl:grid-cols-2", "xl:grid-cols-3", "xl:grid-cols-4"];
+
+/** The period's tiles in one bordered row, each with its trend bars. */
+export function TileRow({ tiles }: { tiles: Tile[] }) {
   return (
     <section
       aria-label="In this period"
-      className="grid overflow-hidden rounded-panel border border-line bg-surface sm:grid-cols-2 xl:grid-cols-4"
+      className={cx(
+        "grid overflow-hidden rounded-panel border border-line bg-surface sm:grid-cols-2",
+        XL_COLUMNS[Math.min(tiles.length, 4)],
+      )}
     >
       {tiles.map((tile, i) => (
         <div

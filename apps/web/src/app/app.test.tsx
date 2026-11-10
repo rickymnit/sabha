@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ToastProvider } from "../design";
+import { emptyOverview } from "../features/overview/mock";
 import { reportRecording, roleLabels } from "../pages/recordingView";
 import { DevSessionProvider, StaticSessionProvider } from "../session/providers";
 import { authMode, DEV_TOKEN_KEY, type Session } from "../session/session";
@@ -142,7 +143,7 @@ describe("the menu", () => {
     const links = within(menu)
       .getAllByRole("link")
       .map((a) => a.textContent);
-    expect(links).toEqual(["Lessons", "Rubrics", "Upload", "Teaching", "Reception"]);
+    expect(links).toEqual(["My progress", "Lessons", "Rubrics", "Upload", "Teaching", "Reception"]);
     expect(within(menu).getByText("Teacher, Class 6")).toBeInTheDocument();
     expect(within(menu).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
@@ -207,10 +208,10 @@ describe("the overview", () => {
     expect(await screen.findByRole("link", { name: "Fractions" })).toBeInTheDocument();
   });
 
-  it("is not a teacher's home", async () => {
-    stubApi({ "/v1/me": ME, "/v1/recordings": PAGE });
+  it("is not a teacher's home: their own progress page is", async () => {
+    stubApi({ "/v1/me": ME, "/v1/recordings": PAGE, "/v1/overview": { ...emptyOverview(), units: [] } });
     renderAt("/", signedIn);
-    expect(await screen.findByRole("heading", { name: "Lessons" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /, Asha$/ })).toBeInTheDocument();
   });
 });
 

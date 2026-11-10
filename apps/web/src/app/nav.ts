@@ -30,6 +30,13 @@ export function navItems(me: Me): NavEntry[] {
       match: (path) => path === "/overview",
     },
     {
+      to: "/progress",
+      label: "My progress",
+      icon: "overview",
+      roles: ["staff"], // the Overview's counterpart for the person analysed
+      match: (path) => path === "/progress",
+    },
+    {
       to: "/recordings",
       label: capitalise(labels.recording_plural),
       icon: "recordings",

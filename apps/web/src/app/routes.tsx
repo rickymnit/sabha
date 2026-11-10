@@ -51,6 +51,16 @@ export const routes: RouteObject[] = [
             ],
           },
           {
+            // A staff member's own page: how their recordings went and what to work on next.
+            element: <RoleGate roles={["staff"]} />,
+            children: [
+              {
+                path: "/progress",
+                ...page(() => import("../pages/MyProgressPage").then((m) => ({ Component: m.MyProgressPage }))),
+              },
+            ],
+          },
+          {
             path: "/recordings",
             ...page(() => import("../pages/RecordingsPage").then((m) => ({ Component: m.RecordingsPage }))),
           },

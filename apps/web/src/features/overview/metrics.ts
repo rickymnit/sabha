@@ -148,3 +148,10 @@ export function coachingRows(stats: OverviewStats): CoachingItem[] {
     .sort((a, b) => a.median - b.median || b.n - a.n)
     .slice(0, MAX_COACHING_ROWS);
 }
+
+/** "Good morning" by the hour in India. */
+export function greeting(now: Date): string {
+  const hour = Number(new Intl.DateTimeFormat("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" })
+    .format(now)); // prettier-ignore
+  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
