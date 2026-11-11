@@ -1,8 +1,8 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { ReviewsPage } from "../reviews/ReviewsPage";
+import { DisputeDecision } from "../reviews/DisputeDecision";
 import { mockReviewItems } from "../reviews/mock";
 import { DisputeDialog } from "./DisputeDialog";
 
@@ -75,54 +75,66 @@ describe("DisputeDialog", () => {
   });
 });
 
-describe("ReviewsPage", () => {
-  function setup() {
+describe("DisputeDecision", () => {
+  const dispute = () => {
+    const item = mockReviewItems()[0];
+    if (item?.kind !== "dispute") throw new Error("the first mock item is a dispute");
+    return item;
+  };
+  function setup(change: Partial<ReturnType<typeof dispute>> = {}) {
     const onResolve = vi.fn(async () => {});
-    render(<ReviewsPage items={mockReviewItems()} onResolve={onResolve} recordingHref={(id) => `/recordings/${id}`} />);
-    return { onResolve, user: userEvent.setup() };
+    const player = { play: vi.fn(async () => {}), playing: null };
+    render(
+      <DisputeDecision
+        item={{ ...dispute(), ...change }}
+        player={player}
+        recordingHref="/recordings/rec_101"
+        onResolve={onResolve}
+      />,
+    );
+    return { onResolve, player, user: userEvent.setup() };
   }
-  const queue = () => within(screen.getByRole("list", { name: /Queue/ })).getAllByRole("button");
 
-  it("shows open items by default and can show everything", async () => {
-    const { user } = setup();
-    expect(queue()).toHaveLength(2); // the rejected dispute is hidden
-    await user.click(within(screen.getByRole("group", { name: "Status" })).getByRole("button", { name: "All" }));
-    expect(queue()).toHaveLength(3);
-  });
-
-  it("filters to disputes only", async () => {
-    const { user } = setup();
-    await user.click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "Disputes" }));
-    expect(queue()).toHaveLength(1);
-  });
-
-  it("accepting needs a note and sends the final score", async () => {
+  it("accepts the proposed score without a note", async () => {
     const { onResolve, user } = setup();
-    await user.click(screen.getByRole("button", { name: "Accept and set score" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Add a note");
-    expect(onResolve).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Accept 3" }));
+    expect(onResolve).toHaveBeenCalledWith({ decision: "accepted", final_score: 3 });
+  });
 
-    await user.type(screen.getByRole("textbox", { name: "Note to the person" }), "Agreed: two real checks at 12 min.");
-    await user.click(screen.getByRole("button", { name: "Accept and set score" }));
-    expect(onResolve).toHaveBeenCalledWith("dsp_001", {
+  it("keeping the AI score needs a note, which is sent", async () => {
+    const { onResolve, user } = setup();
+    const keep = screen.getByRole("button", { name: "Keep AI score 2" });
+    expect(keep).toBeDisabled();
+    await user.type(screen.getByRole("textbox", { name: "Note to Anjali" }), "The checks were yes or no only.");
+    await user.click(keep);
+    expect(onResolve).toHaveBeenCalledWith({ decision: "rejected", note: "The checks were yes or no only." });
+  });
+
+  it("sets a score nobody proposed, with a note", async () => {
+    const { onResolve, user } = setup();
+    await user.type(screen.getByRole("textbox", { name: "Note to Anjali" }), "One real check, at 12 minutes.");
+    await user.click(screen.getByRole("button", { name: "Set a different score" }));
+    const scores = within(screen.getByRole("group", { name: "Final score" }));
+    expect(scores.queryByRole("radio", { name: "2" })).toBeNull(); // the score shown now
+    expect(scores.queryByRole("radio", { name: "3" })).toBeNull(); // that is "Accept 3"
+    await user.click(scores.getByRole("radio", { name: "4" }));
+    await user.click(screen.getByRole("button", { name: "Set score 4" }));
+    expect(onResolve).toHaveBeenCalledWith({
       decision: "accepted",
-      final_score: 3,
-      note: "Agreed: two real checks at 12 min.",
+      final_score: 4,
+      note: "One real check, at 12 minutes.",
     });
   });
 
-  it("rejecting sends no score", async () => {
-    const { onResolve, user } = setup();
-    await user.type(screen.getByRole("textbox", { name: "Note to the person" }), "The checks were yes/no only.");
-    await user.click(screen.getByRole("button", { name: "Reject" }));
-    expect(onResolve).toHaveBeenCalledWith("dsp_001", { decision: "rejected", note: "The checks were yes/no only." });
+  it("plays the moment the reason names", async () => {
+    const { player, user } = setup({ comment: "I did a thumbs-up check at 22:30 that the transcript missed." });
+    await user.click(screen.getByRole("button", { name: "Play the moment named at 22:30" }));
+    expect(player.play).toHaveBeenCalledWith(1_350_000, 1_365_000);
   });
 
-  it("links a needs-review item to its recording", async () => {
-    const { user } = setup();
-    await user.click(queue()[1]!);
-    await act(async () => {});
-    expect(screen.getByRole("link", { name: "Open the recording" })).toHaveAttribute("href", "/recordings/rec_102");
-    expect(screen.queryByRole("button", { name: "Accept and set score" })).toBeNull();
+  it("says someone else decides a dispute you raised", () => {
+    setup({ raised_by_me: true });
+    expect(screen.getByText(/You raised this dispute, so another reviewer/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept 3" })).toBeNull();
   });
 });

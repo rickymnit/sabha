@@ -14,10 +14,16 @@ export function mockReviewItems(): ReviewItem[] {
       dimension_key: "checks_for_understanding",
       dimension_name: "Checks for understanding",
       ai_score: 2,
+      current_score: 2,
       proposed_score: 3,
-      comment: "I asked three students to explain the idea back, around 12 and 31 minutes.",
-      evidence: [{ quote: "Sab samajh aa gaya na? Good.", start_ms: 731_000 }],
+      comment: "I did a thumbs-up check at 22:30 that the transcript may have missed because it was non-verbal.",
+      evidence: [
+        { quote: "Sab samajh aaya? Okay, good, let us move to the worksheet.", start_ms: 1_265_000 },
+        { quote: "[Student], what comes out of the light reaction? Oxygen, right. Good.", start_ms: 1_428_000 },
+      ],
       status: "open",
+      raised_by_name: "Anjali Sharma",
+      recorded_at: "2026-10-27T05:50:00Z",
       created_at: "2026-10-15T05:12:00Z",
     },
     {

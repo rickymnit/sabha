@@ -7,10 +7,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SegmentedControl } from "../design";
 import { RecordingReport, type AnalysisPayload, type ViewerRole } from "../features/report";
 import { mockFailed, mockLesson, mockNeedsReview, mockProcessing, mockReport } from "../features/report/mock";
+import { mockSalesCall, mockSalesReport } from "../features/report/salesMock";
 import type { PlaybackUrl } from "../features/transcript";
 import { synthesizeWav } from "./synthAudio";
 
-type DemoState = "completed" | "no-comparison" | "partial" | "processing" | "needs-review" | "failed";
+type DemoState = "completed" | "no-comparison" | "partial" | "processing" | "needs-review" | "failed" | "sales";
 
 const STATES: { value: DemoState; label: string }[] = [
   { value: "completed", label: "Completed" },
@@ -19,6 +20,7 @@ const STATES: { value: DemoState; label: string }[] = [
   { value: "processing", label: "Processing" },
   { value: "needs-review", label: "Needs review" },
   { value: "failed", label: "Failed" },
+  { value: "sales", label: "Sales call" },
 ];
 
 const ROLES: { value: ViewerRole; label: string }[] = [
@@ -35,8 +37,11 @@ export interface ReportDemoProps {
 }
 
 export default function ReportDemo({ initialState = "completed", initialViewerRole = "admin" }: ReportDemoProps) {
-  const lesson = useMemo(() => mockLesson(), []);
-  const [state, setState] = useState<DemoState>(initialState);
+  const [state, setState] = useState<DemoState>(
+    () => (new URLSearchParams(location.search).get("state") as DemoState | null) ?? initialState,
+  );
+  const isSales = state === "sales";
+  const lesson = useMemo(() => (isSales ? mockSalesCall() : mockLesson()), [isSales]);
   const [viewerRole, setViewerRole] = useState<ViewerRole>(initialViewerRole);
 
   const analysis: AnalysisPayload = useMemo(() => {
@@ -47,6 +52,8 @@ export default function ReportDemo({ initialState = "completed", initialViewerRo
         return mockNeedsReview(lesson);
       case "failed":
         return mockFailed(lesson);
+      case "sales":
+        return mockSalesReport();
       default:
         return mockReport(lesson, state);
     }

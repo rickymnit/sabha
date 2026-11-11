@@ -31,6 +31,7 @@ import { SmallPauseIcon } from "./icons";
 import { TicketPanel } from "./TicketPanel";
 import { VoicesPanel } from "./VoicesPanel";
 import { RubricAccordion } from "./RubricPanels";
+import { NextStepCard, SalesOverall, TalkListenCard } from "./SalesPanels";
 import { evidenceLines } from "./timeline";
 import { notApplicableDimensions, visibleDimensions } from "./visibility";
 import { DisputeDialog } from "../disputes/DisputeDialog";
@@ -223,6 +224,10 @@ function ReportBody({
   );
 
   const recordingWord = labels.recording.toLowerCase();
+  // Sales conversations get the UI v2 sales layout (PDF pages 5 and 9): points lost, the deal at a glance, the next
+  // step and talk and listen beside the transcript.
+  const sales = analysis.rubric.id.startsWith("sales.") || Boolean(analysis.deal_card);
+  const repName = recording.person.name.split(" ")[0] ?? recording.person.name;
   const timelineHeadingId = useId();
   const transcriptHeadingId = useId();
   const rubricLabel = `${analysis.rubric.name} v${analysis.rubric.version}`;
@@ -300,11 +305,15 @@ function ReportBody({
 
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
           <div className="flex min-w-0 flex-col gap-5">
-            <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+            {sales ? (
+              <SalesOverall analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+            ) : (
+              <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+            )}
 
             {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={seek} />}
 
-            {analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
+            {analysis.deal_card && !sales && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
 
             {analysis.case_card && <CaseCardPanel card={analysis.case_card} onSeek={seek} />}
 
@@ -366,6 +375,8 @@ function ReportBody({
               disputeLabel={disputeLabel}
               recordingWord={recordingWord}
               onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
+              pointsLost={sales}
+              overall={analysis.overall}
             />
             {onSubmitDispute && (
               <DisputeDialog
@@ -379,9 +390,21 @@ function ReportBody({
               />
             )}
 
-            {analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
+            {sales && analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
+
+            {!sales && analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
           </div>
-          {transcriptPanel}
+          {sales ? (
+            <div className="flex min-w-0 flex-col gap-5">
+              {analysis.deal_card && (
+                <NextStepCard step={analysis.deal_card.next_step} repName={repName} onSeek={seek} />
+              )}
+              <TalkListenCard metrics={analysis.metrics} labels={labels} repName={repName} onSeek={seek} />
+              {transcriptPanel}
+            </div>
+          ) : (
+            transcriptPanel
+          )}
         </div>
       </PlayingFromContext.Provider>
     </SeekModeContext.Provider>

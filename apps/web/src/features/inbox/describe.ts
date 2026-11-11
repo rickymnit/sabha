@@ -25,7 +25,7 @@ export function describeInboxItem(item: InboxItem, labels: Me["tenant"]["labels"
         title: `${item.person_name ?? "Someone"} disputes a score`,
         detail: `${item.dimension_name ?? "A score"}, ${item.recording_title}: AI gave ${item.ai_score}, proposed ${item.proposed_score}`,
         action: "Decide",
-        to: "/reviews?tab=disputes",
+        to: item.dispute_id ? `/reviews?item=d:${item.dispute_id}` : "/reviews?tab=disputes",
       };
     case "review":
       return item.reason === "unclear_roles"

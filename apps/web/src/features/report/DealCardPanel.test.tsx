@@ -24,16 +24,18 @@ const CARD: DealCard = {
 }; // prettier-ignore
 
 describe("DealCardPanel", () => {
-  it("shows the next step, needs, objections and interest, each with a quote that plays its moment", async () => {
+  it("sums up the deal in four tiles and shows every quote behind Show evidence", async () => {
     const onSeek = vi.fn();
     render(<DealCardPanel card={CARD} labels={labels} onSeek={onSeek} />);
-    const card = screen.getByRole("region", { name: "Deal card" });
+    const card = screen.getByRole("region", { name: "The deal at a glance" });
     expect(within(card).getByText("Some interest")).toBeInTheDocument();
     expect(within(card).getByText("Send the quotation and hold a call.")).toBeInTheDocument();
     expect(within(card).getByText("Both sides, Thursday 4 pm")).toBeInTheDocument();
-    expect(within(card).getByText("Cut the two days spent on reconciliation.")).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Play from 2:34" })).toBeNull(); // quotes wait behind the button
+    await userEvent.click(within(card).getByRole("button", { name: "Show evidence" }));
     expect(within(card).getByText("Uses another ERP at Rs 12 per student a month.")).toBeInTheDocument();
-    expect(within(card).getByText("Settled")).toBeInTheDocument();
+    expect(within(card).getAllByText("Cut the two days spent on reconciliation.").length).toBeGreaterThan(0);
+    expect(within(card).getByText("Handled")).toBeInTheDocument();
     expect(within(card).getByText("Unclear")).toBeInTheDocument();
     expect(within(card).getByText(/1 item was left out because its words could not be found/)).toBeInTheDocument();
     await userEvent.click(within(card).getByRole("button", { name: "Play from 2:34" }));
@@ -46,18 +48,21 @@ describe("DealCardPanel", () => {
         card={{ ...CARD, next_step: null, objections: [], current_setup: [], left_out: 0 }}
         labels={labels}
         onSeek={vi.fn()}
+        defaultOpen
       />,
     );
+    expect(screen.getByText("No next step agreed")).toBeInTheDocument();
+    expect(screen.getByText("No objections raised")).toBeInTheDocument();
     expect(screen.getByText("No next step was agreed in this meeting.")).toBeInTheDocument();
     expect(screen.getByText("The customer raised no objections.")).toBeInTheDocument();
     expect(screen.queryByText(/left out/)).toBeNull();
     expect(screen.queryByText("What they use today")).toBeNull(); // nothing said about it: no empty section
   });
 
-  it("shows a report made before the deal card had a current setup", () => {
-    const older = { ...CARD, current_setup: undefined };
-    render(<DealCardPanel card={older} labels={labels} onSeek={vi.fn()} />);
-    expect(screen.getByRole("region", { name: "Deal card" })).toBeInTheDocument();
-    expect(screen.queryByText("What they use today")).toBeNull();
+  it("names an objection left open as the open issue", () => {
+    const open = { ...CARD.objections[0]!, objection: "Price per student", settled: "no" as const };
+    render(<DealCardPanel card={{ ...CARD, objections: [open] }} labels={labels} onSeek={vi.fn()} />);
+    expect(screen.getByText("Price per student")).toBeInTheDocument();
+    expect(screen.getByText("Not answered on the call")).toBeInTheDocument();
   });
 });

@@ -46,7 +46,17 @@ export const routes: RouteObject[] = [
               },
               {
                 path: "/reviews/:id",
-                ...page(() => import("../pages/ReviewPage").then((m) => ({ Component: m.ReviewPage }))),
+                ...page(() => import("../pages/ReviewQueuePage").then((m) => ({ Component: m.ReviewQueuePage }))),
+              },
+            ],
+          },
+          {
+            // A staff member's own page: how their recordings went and what to work on next.
+            element: <RoleGate roles={["staff"]} />,
+            children: [
+              {
+                path: "/progress",
+                ...page(() => import("../pages/MyProgressPage").then((m) => ({ Component: m.MyProgressPage }))),
               },
             ],
           },

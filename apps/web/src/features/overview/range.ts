@@ -98,3 +98,18 @@ export function describeRange({ start, end }: DayRange): string {
   if (sm !== em) return `${sd} ${MONTHS[sm - 1]} to ${endText}`;
   return `${sd} to ${endText}`;
 }
+
+/** What the previous period is called in "Up 32 vs prev. 7 days". */
+export const COMPARE: Record<RangePreset, string> = {
+  "7d": "prev. 7 days",
+  "30d": "prev. 30 days",
+  month: "prev. month",
+  custom: "prev. period",
+};
+
+/** "in the last 7 days" for the fixed periods; a custom period names its dates instead. */
+export const PRESET_WORDS: Partial<Record<RangePreset, string>> = {
+  "7d": " in the last 7 days",
+  "30d": " in the last 30 days",
+  month: " this month",
+};

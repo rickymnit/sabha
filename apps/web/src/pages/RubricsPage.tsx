@@ -3,29 +3,20 @@
 // 2026-10-27). Editing and publishing wait for the calibration sample test (P5.9), and the design's "Agreement with
 // raters" column waits for real rater scores (golden rule 6), so neither is shown.
 
-import { useState, type MouseEvent } from "react";
-import { Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Navigate, useOutletContext, useParams } from "react-router-dom";
 
 import { useRubric, useRubrics } from "../api/hooks";
 import type { Me, RubricDetail, RubricListItem } from "../api/types";
 import { TYPE_INFO } from "../app/conversationTypes";
 import { capitalise } from "../app/format";
+import { useOpen } from "../app/useOpen";
 import { Button, EmptyState, Icon, PageHeader, Panel, Skeleton, SkeletonGroup, Table, TypeDot, cx } from "../design";
 
 type Dimension = RubricDetail["dimensions"][number];
 type Change = RubricDetail["changes"][number];
 
 const percent = (weight: number) => `${Math.round(weight * 100)}%`;
-
-/** A link that changes page without reloading (keeps cmd/ctrl-click for a new tab). */
-function useOpen() {
-  const navigate = useNavigate();
-  return (event: MouseEvent<HTMLAnchorElement>, to: string) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-    event.preventDefault();
-    navigate(to);
-  };
-}
 
 export function RubricsPage() {
   const { id } = useParams();

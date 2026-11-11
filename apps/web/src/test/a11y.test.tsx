@@ -108,7 +108,7 @@ const PAGES: [string, string, string | RegExp][] = [
   ["/rubrics/teaching.school.v0.1", "staff", "Teaching rubric"],
   ["/settings", "owner", "Settings"],
   ["/activity", "admin", "Activity"],
-  ["/upload", "staff", "Upload recordings"],
+  ["/upload", "staff", "Upload lessons"],
   ["/no-such-page", "staff", "We couldn't find that page"],
 ];
 

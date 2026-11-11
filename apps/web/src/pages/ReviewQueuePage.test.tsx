@@ -23,6 +23,13 @@ const ITEM = {
   unit_id: "unit-6", file_name: "Waves.mp3", duration_ms: 180_000, created_at: "2026-10-23T05:00:00Z",
   status_changed_at: "2026-10-23T05:10:00Z", completed_at: null, overall_score: null,
 }; // prettier-ignore
+const DISPUTE = {
+  kind: "dispute", id: "d1", recording_id: "r8", recording_title: "Light", person_name: "Asha Rao", unit: "Class 6",
+  dimension_key: "concept_clarity", dimension_name: "Concept clarity", ai_score: 4, current_score: 4,
+  proposed_score: 5, comment: "Both terms were defined and checked.", status: "open", raised_by_me: false,
+  raised_by_name: "Asha Rao", recorded_at: "2026-10-22T05:00:00Z",
+  evidence: [{ quote: "Chlorophyll leaf ka green pigment hai", start_ms: 34_000 }], created_at: "2026-10-24T05:00:00Z",
+}; // prettier-ignore
 const DETAIL = { ...ITEM, type_label: "Teaching", unit_name: "Class 6", recorded_at: ITEM.created_at, speech_ms: 1,
                  languages: [], removed_silence: [] }; // prettier-ignore
 const SPEAKERS = {
@@ -39,15 +46,33 @@ function stubApi(role: string, status = "NEEDS_REVIEW") {
       ? me(role)
       : path.startsWith("/v1/reviews")
         ? { items: status === "NEEDS_REVIEW" ? [ITEM] : [], next_cursor: null }
-        : path.endsWith("/speakers")
-          ? SPEAKERS
-          : path.endsWith("/transcript")
-            ? { playback_url: "https://storage.example/p.opus", playback_expires_in_s: 900 }
-            : path.endsWith("/review") && init?.method === "POST"
-              ? { recording_id: "r9", status: "TRANSCRIBING" }
-              : path.startsWith("/v1/recordings/r9")
-                ? { ...DETAIL, status }
-                : { items: [], next_cursor: null };
+        : path.startsWith("/v1/disputes?")
+          ? { items: [DISPUTE], next_cursor: null }
+          : path.endsWith("/resolve") && init?.method === "POST"
+            ? { ...DISPUTE, status: "accepted" }
+            : path.endsWith("/r8/analysis")
+              ? {
+                  dimensions: [
+                    {
+                      key: "concept_clarity",
+                      name: "Concept clarity",
+                      weight: 1,
+                      verified: true,
+                      score: 4,
+                      rationale: "Defined chlorophyll but never checked it.",
+                      evidence: [],
+                    },
+                  ],
+                }
+              : path.endsWith("/speakers")
+                ? SPEAKERS
+                : path.endsWith("/transcript")
+                  ? { playback_url: "https://storage.example/p.opus", playback_expires_in_s: 900 }
+                  : path.endsWith("/review") && init?.method === "POST"
+                    ? { recording_id: "r9", status: "TRANSCRIBING" }
+                    : path.startsWith("/v1/recordings/r9")
+                      ? { ...DETAIL, status }
+                      : { items: [], next_cursor: null };
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -75,21 +100,45 @@ const posted = (fetchMock: ReturnType<typeof stubApi>) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("reviews", () => {
-  it("lists what waits for review, with a count in the menu, and opens a review", async () => {
+  it("lists disputes and paused recordings together, with a count in the menu", async () => {
     stubApi("manager");
-    const router = renderAt("/reviews");
-    expect(await screen.findByText("We could not tell the speakers apart reliably.")).toBeInTheDocument();
+    renderAt("/reviews");
+    const queue = await screen.findByRole("list", { name: "Waiting" });
+    const rows = within(queue).getAllByRole("button");
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining("Score dispute"), // newest first
+      expect.stringContaining("Who is the teacher?"),
+    ]);
+    expect(screen.getByText("0 of 2 decided")).toBeInTheDocument();
     const menu = screen.getByRole("navigation", { name: "Main" });
-    expect(await within(menu).findByText("1 waiting", { exact: false })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("link", { name: "Waves" }));
-    // Pages load when first opened (app/routes.tsx), so the address changes once the review page is ready.
-    await waitFor(() => expect(router.state.location.pathname).toBe("/reviews/r9"));
+    expect(await within(menu).findByText("2 waiting", { exact: false })).toBeInTheDocument();
+    const detail = await screen.findByRole("region", { name: "Concept clarity: Light" });
+    expect(within(detail).getByText("Chlorophyll leaf ka green pigment hai")).toBeInTheDocument();
+    expect(await within(detail).findByText("Defined chlorophyll but never checked it.")).toBeInTheDocument();
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: /Speakers/ }),
+    );
+    expect(within(screen.getByRole("list", { name: "Waiting" })).getAllByRole("button")).toHaveLength(1);
+    expect(await screen.findByRole("heading", { name: "Who is the teacher?", level: 2 })).toBeInTheDocument();
+  });
+
+  it("accepts the proposed score without a note and counts the decision", async () => {
+    const fetchMock = stubApi("manager");
+    renderAt("/reviews?item=d:d1");
+    const detail = await screen.findByRole("region", { name: "Concept clarity: Light" });
+    await userEvent.click(within(detail).getByRole("button", { name: "Accept 5" }));
+    const resolved = () =>
+      fetchMock.mock.calls.filter(([path, init]) => path.endsWith("/resolve") && init?.method === "POST");
+    await waitFor(() => expect(resolved()).toHaveLength(1));
+    expect(resolved()[0]?.[0]).toBe("/v1/disputes/d1/resolve");
+    expect(JSON.parse(String(resolved()[0]?.[1]?.body))).toEqual({ decision: "accepted", final_score: 5 });
+    expect(await screen.findByText(/1 of \d decided/)).toBeInTheDocument();
   });
 
   it("asks who the teacher is and sends the chosen voice", async () => {
     const fetchMock = stubApi("manager");
     renderAt("/reviews/r9");
-    expect(await screen.findByRole("heading", { name: "Who is the teacher?" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Who is the teacher?", level: 2 })).toBeInTheDocument();
     const confirm = await screen.findByRole("button", { name: "Confirm and score" });
     expect(confirm).toBeDisabled();
     const voices = await screen.findAllByRole("radio");
@@ -106,6 +155,7 @@ describe("reviews", () => {
   it("closes a recording only with a note", async () => {
     const fetchMock = stubApi("admin");
     renderAt("/reviews/r9");
+    await userEvent.click(await screen.findByText("Not usable? Close it instead"));
     const close = await screen.findByRole("button", { name: "Close as not usable" });
     expect(close).toBeDisabled();
     await userEvent.type(screen.getByRole("textbox", { name: "Why is it not usable?" }), "Recorder in a bag");
