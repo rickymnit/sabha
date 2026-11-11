@@ -73,10 +73,12 @@ export function SalesOverall({
       : historyText(overall, analysis.person_history, firstName, labels.recording_plural.toLowerCase());
   const [headline, ...rest] = analysis.summary.split(/(?<=\.)\s+/);
 
+  // Laid out by the card's own width, not the screen's: the score sits beside the headline when there is room and
+  // above it when not, and the two lists share a row only when each gets at least 260px.
   return (
     <section aria-labelledby={headingId} className="overflow-hidden rounded-panel border border-line bg-surface">
-      <div className="flex flex-wrap">
-        <div className="flex flex-[1_1_270px] flex-col gap-2 border-b border-line-subtle px-6 py-5 sm:border-b-0 sm:border-r">
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-5 px-6 py-5">
+        <div className="flex w-full max-w-[260px] shrink-0 flex-col gap-2.5">
           <span className="text-sm text-muted">Overall</span>
           {overall === null ? (
             <>
@@ -99,7 +101,7 @@ export function SalesOverall({
                   {LEVELS[level - 1]}
                 </span>
               </span>
-              <ol aria-label="Where this sits" className="m-0 grid list-none grid-cols-5 gap-1.5 p-0">
+              <ol aria-label="Where this sits" className="m-0 grid list-none grid-cols-5 gap-1 p-0">
                 {LEVELS.map((name, i) => (
                   <li key={name} className="flex flex-col gap-1" aria-current={i + 1 === level ? "true" : undefined}>
                     <span
@@ -111,7 +113,7 @@ export function SalesOverall({
                     />
                     <span
                       className={cx(
-                        "text-2xs leading-tight [overflow-wrap:anywhere]",
+                        "text-2xs leading-tight",
                         i + 1 === level ? cx("font-semibold", CHIP[band].split(" ")[1]) : "text-muted",
                       )}
                     >
@@ -123,59 +125,64 @@ export function SalesOverall({
             </>
           )}
           {past && (
-            <span data-testid="overall-history" className="text-small text-ink-2">
+            <span data-testid="overall-history" className="text-small text-muted">
               {past}
             </span>
           )}
         </div>
-        <div className="flex min-w-0 flex-[999_1_380px] flex-col gap-4 px-6 py-5">
-          <h2 id={headingId} className="m-0 text-lg font-semibold leading-snug">
+        <div className="flex min-w-0 flex-[1_1_280px] flex-col gap-2 sm:pt-6">
+          <h2 id={headingId} className="m-0 text-lg font-semibold leading-snug text-ink">
             {headline}
           </h2>
-          {rest.length > 0 && <p className="m-0 -mt-2 text-ink-2">{rest.join(" ")}</p>}
-          <div className="grid gap-5 md:grid-cols-2">
-            {analysis.strengths.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-success">
-                  <span className="grid h-4.5 w-4.5 place-items-center rounded-full bg-success-tint">
-                    <CheckIcon />
-                  </span>
-                  Went well
-                </span>
-                <ul className="m-0 flex list-none flex-col gap-2 p-0 text-ink-2">
-                  {analysis.strengths.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {analysis.suggestions.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-danger">
-                  <span
-                    aria-hidden="true"
-                    className="grid h-4.5 w-4.5 place-items-center rounded-full bg-danger-tint text-2xs font-bold"
-                  >
-                    !
-                  </span>
-                  Fix first
-                </span>
-                <ul
-                  aria-label={`What to fix in the next ${labels.recording.toLowerCase()}`}
-                  className="m-0 flex list-none flex-col gap-2 p-0"
-                >
-                  {analysis.suggestions.map((s, i) => (
-                    <li key={`${s.utterance_id}-${i}`} className="flex items-start gap-2.5 text-ink-2">
-                      <TimeChip ms={s.start_ms} onSeek={onSeek} />
-                      <span className="pt-0.5">{s.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          {rest.length > 0 && <p className="m-0 text-sm text-ink-2">{rest.join(" ")}</p>}
         </div>
       </div>
+      {(analysis.strengths.length > 0 || analysis.suggestions.length > 0) && (
+        <div className="grid gap-x-8 gap-y-5 border-t border-line-subtle px-6 py-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))]">
+          {analysis.strengths.length > 0 && (
+            <div className="flex min-w-0 flex-col gap-2.5">
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-success">
+                <span className="grid h-4.5 w-4.5 place-items-center rounded-full bg-success-tint">
+                  <CheckIcon />
+                </span>
+                Went well
+              </span>
+              <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm text-ink-2">
+                {analysis.strengths.map((s) => (
+                  <li key={s} className="flex gap-2">
+                    <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-success-bar" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {analysis.suggestions.length > 0 && (
+            <div className="flex min-w-0 flex-col gap-2.5">
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-danger">
+                <span
+                  aria-hidden="true"
+                  className="grid h-4.5 w-4.5 place-items-center rounded-full bg-danger-tint text-2xs font-bold"
+                >
+                  !
+                </span>
+                Fix first
+              </span>
+              <ul
+                aria-label={`What to fix in the next ${labels.recording.toLowerCase()}`}
+                className="m-0 flex list-none flex-col gap-2.5 p-0"
+              >
+                {analysis.suggestions.map((s, i) => (
+                  <li key={`${s.utterance_id}-${i}`} className="flex items-start gap-2.5 text-sm text-ink-2">
+                    <TimeChip ms={s.start_ms} onSeek={onSeek} />
+                    <span className="pt-1">{s.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       <p className="m-0 flex items-center gap-2 border-t border-line-subtle bg-surface-faint px-6 py-2.5 text-small text-ink-2">
         <span aria-hidden="true" className="text-success">
           <CheckIcon />
