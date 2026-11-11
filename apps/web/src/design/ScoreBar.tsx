@@ -15,11 +15,13 @@ export interface ScoreBarProps {
   valueText?: string;
   /** Hides the value text; the segments then carry it as their accessible name. */
   hideValue?: boolean;
+  /** "dot": five 8px dots (UI v2 sales call report, "Where the points were lost"). */
+  shape?: "dash" | "dot";
   className?: string;
 }
 
 /** Five segments, filled up to the (rounded) score in the score's band colour. */
-export function ScoreBar({ score, max = 5, valueText, hideValue = false, className }: ScoreBarProps) {
+export function ScoreBar({ score, max = 5, valueText, hideValue = false, shape = "dash", className }: ScoreBarProps) {
   const filled = Math.max(0, Math.min(max, Math.round(score)));
   const text = valueText ?? `${score} of ${max}`;
   const fill = fills[scoreBand(score)];
@@ -29,7 +31,7 @@ export function ScoreBar({ score, max = 5, valueText, hideValue = false, classNa
         <span
           key={i}
           data-filled={i < filled}
-          className={cx("h-[5px] w-4 rounded-full", i < filled ? fill : "bg-line")}
+          className={cx(shape === "dot" ? "h-2 w-2" : "h-[5px] w-4", "rounded-full", i < filled ? fill : "bg-line")}
         />
       ))}
     </span>

@@ -3,7 +3,7 @@
 
 import { useId } from "react";
 
-import { Button, ScoreBar, ScoreChip, cx } from "../../design";
+import { Button, ScoreBar, ScoreChip, cx, scoreBand } from "../../design";
 import { formatClock } from "../transcript";
 import { formatPercent } from "./format";
 import { CheckIcon, SmallGoIcon, SmallPauseIcon, SmallPlayIcon } from "./icons";
@@ -189,6 +189,31 @@ export interface RubricAccordionProps {
   /** The tenant's word for the recording, for "where this lesson is". */
   recordingWord: string;
   onDispute?: () => void;
+  /**
+   * UI v2 sales call report ("Where the points were lost"): rows sorted by how much each pulled the overall score
+   * down, (5 - score) x its share of the verified weight, with the two biggest marked "Fix first".
+   */
+  pointsLost?: boolean;
+  /** The overall score shown above, so "2.9 of 5 points lost" matches it (reviewers' scores included). */
+  overall?: number | null;
+}
+
+/** "1.0", "0.75", "0.5", "0": as the design writes points lost. */
+function formatLost(lost: number): string {
+  return lost >= 1 ? lost.toFixed(1) : String(Math.round(lost * 100) / 100);
+}
+
+const LOST_INK = { low: "text-danger", mid: "text-warning-ink", good: "text-success" } as const;
+
+/** Points each dimension took off the overall score: (5 - score) x its share of the verified weight. */
+function pointsLostBy(dimensions: readonly VerifiedDimension[]): Map<string, { lost: number; share: number }> {
+  const total = dimensions.reduce((sum, d) => sum + d.weight, 0);
+  return new Map(
+    dimensions.map((d) => {
+      const share = total > 0 ? d.weight / total : 0;
+      return [d.key, { lost: (5 - displayedScore(d)) * share, share }];
+    }),
+  );
 }
 
 /**
@@ -208,28 +233,70 @@ export function RubricAccordion({
   disputedBy,
   recordingWord,
   onDispute,
+  pointsLost = false,
+  overall,
 }: RubricAccordionProps) {
   const headingId = useId();
   const mode = useSeekMode();
   const playingFrom = usePlayingFrom();
+  const lost = pointsLostBy(dimensions);
+  const lostOf = (key: string) => lost.get(key)?.lost ?? 0;
+  const rows = pointsLost ? [...dimensions].sort((a, b) => lostOf(b.key) - lostOf(a.key)) : dimensions;
+  const mostLost = Math.max(0.0001, ...rows.map((d) => lostOf(d.key)));
+  const fixFirst = new Set(
+    rows
+      .filter((d) => lostOf(d.key) > 0)
+      .slice(0, 2)
+      .map((d) => d.key),
+  );
+  const totalLost = overall != null ? 5 - overall : rows.reduce((sum, d) => sum + lostOf(d.key), 0);
   return (
     <section
       aria-labelledby={headingId}
       className="min-w-0 overflow-hidden rounded-panel border border-line bg-surface"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line-subtle px-5 py-3.5">
-        <h2 id={headingId} className="m-0 text-lg font-semibold">
-          Rubric scores
-        </h2>
-        <span className="text-small text-muted">
-          Every score quotes the {recordingWord}; quotes are checked against the transcript
-        </span>
+        {pointsLost ? (
+          <>
+            <div className="flex flex-col gap-0.5">
+              <h2 id={headingId} className="m-0 text-lg font-semibold">
+                Where the points were lost
+              </h2>
+              <span className="text-small text-muted">
+                Sorted by how much each rubric point pulled the overall score down
+              </span>
+            </div>
+            <span className="text-small text-ink-2" data-testid="points-lost-total">
+              {totalLost.toFixed(1)} of 5 points lost in total
+            </span>
+          </>
+        ) : (
+          <>
+            <h2 id={headingId} className="m-0 text-lg font-semibold">
+              Rubric scores
+            </h2>
+            <span className="text-small text-muted">
+              Every score quotes the {recordingWord}; quotes are checked against the transcript
+            </span>
+          </>
+        )}
       </div>
+      {pointsLost && dimensions.length > 0 && (
+        <div
+          aria-hidden="true"
+          className="hidden grid-cols-[minmax(0,1fr)_96px_minmax(180px,240px)_24px] gap-4 border-b border-line-subtle bg-surface-faint px-5 py-2 text-caption text-muted md:grid"
+        >
+          <span>Rubric point</span>
+          <span>Score</span>
+          <span>Points lost</span>
+          <span />
+        </div>
+      )}
       {dimensions.length === 0 ? (
         <p className="m-0 px-5 py-4 text-sm text-muted">No scores could be checked against the transcript.</p>
       ) : (
         <ul className="m-0 list-none p-0">
-          {dimensions.map((d) => {
+          {rows.map((d) => {
             const open = d.key === openKey;
             const score = displayedScore(d);
             const scale = levels?.(d.key) ?? [];
@@ -242,29 +309,85 @@ export function RubricAccordion({
                 data-dimension={d.key}
                 className={cx("border-b border-line-subtle last:border-b-0", open && "bg-primary-tint-subtle/40")}
               >
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  aria-controls={panelId}
-                  onClick={() => onToggle(d.key)}
-                  className="flex min-h-[56px] w-full items-center justify-between gap-3 px-5 py-2.5 text-left"
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="font-semibold text-ink">{d.name}</span>
-                    <span className="text-caption text-muted">
-                      Weight {formatPercent(d.weight)}
-                      {d.dispute_open ? `, disputed${disputedBy ? ` by ${disputedBy}` : ""}` : ""}
+                {pointsLost ? (
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={() => onToggle(d.key)}
+                    className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-3 text-left md:grid-cols-[minmax(0,1fr)_96px_minmax(180px,240px)_24px]"
+                  >
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-ink">{d.name}</span>
+                        {fixFirst.has(d.key) && (
+                          <span className="rounded bg-ink px-1.5 py-0.5 text-2xs font-semibold text-surface">
+                            Fix first
+                          </span>
+                        )}
+                        {d.override && <span className="text-caption font-semibold text-primary-hover">Reviewed</span>}
+                        {d.dispute_open && (
+                          <span className="text-caption font-semibold text-warning-ink">Disputed</span>
+                        )}
+                      </span>
+                      {!open && <span className="line-clamp-1 text-small text-muted">{d.rationale}</span>}
                     </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-3">
-                    {d.override && <span className="text-caption font-semibold text-primary-hover">Reviewed</span>}
-                    <ScoreBar score={score} hideValue className="hidden sm:inline-flex" />
-                    <ScoreChip score={score} />
-                    <span aria-hidden="true" className={cx("text-muted transition-transform", open && "rotate-180")}>
+                    <span className="flex items-center gap-2 justify-self-end md:justify-self-start">
+                      <ScoreBar score={score} hideValue shape="dot" />
+                      <span className={cx("text-sm font-semibold tabular-nums", LOST_INK[scoreBand(score)])}>
+                        {score}/5
+                      </span>
+                    </span>
+                    <span className="col-span-2 flex items-center gap-3 md:col-span-1">
+                      <span aria-hidden="true" className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-track">
+                        <span
+                          className={cx(
+                            "block h-full rounded-full",
+                            fixFirst.has(d.key) ? "bg-danger-bar" : "bg-danger-bar/45",
+                          )}
+                          style={{ width: `${(lostOf(d.key) / mostLost) * 100}%` }}
+                        />
+                      </span>
+                      <span className="shrink-0 whitespace-nowrap text-small">
+                        <span className="font-semibold tabular-nums text-ink">
+                          {lostOf(d.key) > 0 ? "−" : ""}
+                          {formatLost(lostOf(d.key))}
+                        </span>{" "}
+                        <span className="text-muted">counts {formatPercent(lost.get(d.key)?.share ?? d.weight)}</span>
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={cx("hidden text-muted transition-transform md:inline", open && "rotate-180")}
+                    >
                       ⌄
                     </span>
-                  </span>
-                </button>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={() => onToggle(d.key)}
+                    className="flex min-h-[56px] w-full items-center justify-between gap-3 px-5 py-2.5 text-left"
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="font-semibold text-ink">{d.name}</span>
+                      <span className="text-caption text-muted">
+                        Weight {formatPercent(d.weight)}
+                        {d.dispute_open ? `, disputed${disputedBy ? ` by ${disputedBy}` : ""}` : ""}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-3">
+                      {d.override && <span className="text-caption font-semibold text-primary-hover">Reviewed</span>}
+                      <ScoreBar score={score} hideValue className="hidden sm:inline-flex" />
+                      <ScoreChip score={score} />
+                      <span aria-hidden="true" className={cx("text-muted transition-transform", open && "rotate-180")}>
+                        ⌄
+                      </span>
+                    </span>
+                  </button>
+                )}
                 {open && (
                   <div id={panelId} className="flex flex-col gap-4 px-5 pb-5">
                     {d.override && (
@@ -349,7 +472,8 @@ export function RubricAccordion({
                     </ol>
                     {d.suggestion && (
                       <p className="m-0 rounded-card bg-primary-tint-subtle px-4 py-3 text-primary-hover">
-                        <span className="font-semibold">Try next time:</span> {d.suggestion}
+                        <span className="font-semibold">{pointsLost ? "Next time:" : "Try next time:"}</span>{" "}
+                        {d.suggestion}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
