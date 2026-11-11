@@ -21,6 +21,7 @@ from sabha_core.models import (
     Recording,
     Score,
     Unit,
+    User,
 )  # fmt: skip
 from sabha_core.repo import TenantRepo
 
@@ -36,6 +37,7 @@ Disputes = Annotated[TenantRepo[Dispute], Depends(tenant_repo("disputes", Disput
 Outbox = Annotated[TenantRepo[OutboxEvent], Depends(tenant_repo("outbox", OutboxEvent))]
 Entries = Annotated[TenantRepo[AuditEntry], Depends(tenant_repo("audit_log", AuditEntry))]
 Records = Annotated[TenantRepo[IdempotencyRecord], Depends(tenant_repo("idempotency_keys", IdempotencyRecord))]
+Users = Annotated[TenantRepo[User], Depends(tenant_repo("users", User))]
 Txn = Annotated[Transactions, Depends(transactions)]
 
 
@@ -60,12 +62,13 @@ async def raise_dispute(
 @router.get("/v1/disputes", response_model=service.DisputePage)
 async def dispute_queue(
     principal: Caller, disputes: Disputes, recordings: Recordings, people: People, units: Units, scores: Scores,
-    status: Literal["open", "accepted", "rejected"] = "open", cursor: str | None = None,
+    users: Users, status: Literal["open", "accepted", "rejected"] = "open", cursor: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> service.DisputePage:  # fmt: skip
     """Disputes you may decide, newest first. Reviewers, managers and administrators only."""
     return await service.dispute_queue(principal, status=status, cursor=cursor, limit=limit, disputes=disputes,
-                                       recordings=recordings, people=people, units=units, scores=scores)  # fmt: skip
+                                       recordings=recordings, people=people, units=units, scores=scores,
+                                       users=users)  # fmt: skip
 
 
 @router.post("/v1/disputes/{dispute_id}/resolve", response_model=service.DisputeOut)

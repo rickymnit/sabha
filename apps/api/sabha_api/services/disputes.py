@@ -44,6 +44,7 @@ from sabha_core.models import (
     Recording,
     Score,
     Unit,
+    User,
     utc_now,
 )  # fmt: skip
 from sabha_core.profiles import ConversationType
@@ -68,6 +69,10 @@ class FinalScoreRequiredError(BadRequestError):
     code, title = "final_score_required", "Say which score is right"
 
 
+class NoteRequiredError(BadRequestError):
+    code, title = "note_required", "Add a note for the person"
+
+
 class DisputeOpenError(ConflictError):
     code, title = "dispute_open", "A dispute about this score is already open"
 
@@ -81,7 +86,7 @@ class OwnDisputeError(ForbiddenError):
 
 
 Comment = Annotated[str, StringConstraints(strip_whitespace=True, min_length=COMMENT_MIN, max_length=COMMENT_MAX)]
-Note = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NOTE_MAX)]
+OptionalNote = Annotated[str, StringConstraints(strip_whitespace=True, max_length=NOTE_MAX)]
 
 
 class DisputeIn(BaseModel):
@@ -93,7 +98,7 @@ class DisputeIn(BaseModel):
 class ResolutionIn(BaseModel):
     decision: Literal["accepted", "rejected"]
     final_score: int | None = Field(default=None, ge=1, le=5, description="Required when accepted")
-    note: Note
+    note: OptionalNote = Field(default="", description="Required unless the proposed score is accepted as it is")
 
 
 class DisputeOut(BaseModel):
@@ -136,6 +141,8 @@ class DisputeItem(BaseModel):
     evidence: list[Quote]
     status: Literal["open", "accepted", "rejected", "closed"]
     raised_by_me: bool  # then someone else decides it
+    raised_by_name: str | None  # who raised it: the person analysed or their manager; the note is addressed to them
+    recorded_at: datetime | None
     created_at: datetime
 
 
@@ -229,7 +236,7 @@ def require_resolver(principal: Principal) -> None:
 async def dispute_queue(
     principal: Principal, *, status: Literal["open", "accepted", "rejected"], cursor: str | None, limit: int,
     disputes: TenantRepo[Dispute], recordings: TenantRepo[Recording], people: TenantRepo[Person],
-    units: TenantRepo[Unit], scores: TenantRepo[Score],
+    units: TenantRepo[Unit], scores: TenantRepo[Score], users: TenantRepo[User],
 ) -> DisputePage:  # fmt: skip
     require_resolver(principal)
     conditions = [c for c in (visible_disputes(principal), after_cursor(cursor), {"status": status}) if c]
@@ -237,7 +244,10 @@ async def dispute_queue(
     page, more = found[:limit], len(found) > limit
     names = {p.id: p.name for p in await people.find({"_id": {"$in": [d.person_id for d in page if d.person_id]}})}
     unit_names = {u.id: u.name for u in await units.find({"_id": {"$in": [d.unit_id for d in page if d.unit_id]}})}
-    files = {r.id: r.file_name for r in await recordings.find({"_id": {"$in": [d.recording_id for d in page]}})}
+    found_recordings = await recordings.find({"_id": {"$in": [d.recording_id for d in page]}})
+    files = {r.id: r.file_name for r in found_recordings}
+    recorded = {r.id: r.recorded_at or r.created_at for r in found_recordings}
+    raisers = {u.id: u.name for u in await users.find({"_id": {"$in": list({d.raised_by for d in page})}})}
     quotes: dict[tuple[str, str], list[Quote]] = {}
     for s in await scores.find({"analysis_id": {"$in": [d.analysis_id for d in page]}}):
         quotes[(s.analysis_id, s.dimension)] = [Quote(quote=e["quote"], start_ms=e["start_ms"]) for e in s.evidence]
@@ -249,7 +259,8 @@ async def dispute_queue(
             unit=unit_names.get(d.unit_id or ""), dimension_key=d.dimension, dimension_name=d.dimension_name,
             ai_score=d.ai_score, current_score=d.current_score, proposed_score=d.proposed_score, comment=d.comment,
             evidence=quotes.get((d.analysis_id, d.dimension), []), status=d.status,
-            raised_by_me=d.raised_by == principal.user_id, created_at=d.created_at,
+            raised_by_me=d.raised_by == principal.user_id, raised_by_name=raisers.get(d.raised_by),
+            recorded_at=recorded.get(d.recording_id), created_at=d.created_at,
         ))  # fmt: skip
     next_cursor = encode_cursor(page[-1].created_at, page[-1].id) if more and page else None
     return DisputePage(items=items, next_cursor=next_cursor)
@@ -273,6 +284,9 @@ async def resolve(
         raise FinalScoreRequiredError("Give the final score when accepting a dispute.")
     if accepted and body.final_score == dispute.current_score:
         raise SameScoreError("Accepting with the score already shown changes nothing: reject the dispute instead.")
+    if not body.note and not (accepted and body.final_score == dispute.proposed_score):
+        raise NoteRequiredError("Keeping the score or setting one nobody proposed needs a note the person can read.")
+    note = body.note or None
     analysis = await analyses.find_one({"_id": dispute.analysis_id})
     if analysis is None:
         raise NotFoundError("The analysis of this dispute no longer exists.")
@@ -282,11 +296,11 @@ async def resolve(
     calibration = {"source": "dispute", "rubric_id": analysis.rubric_id, "rubric_version": analysis.rubric_version,
                    "dimension": dispute.dimension, "ai_score": dispute.ai_score,
                    "human_score": final if final is not None else dispute.current_score}  # fmt: skip
-    decided = {"status": body.decision, "final_score": final, "resolution_note": body.note,
+    decided = {"status": body.decision, "final_score": final, "resolution_note": note,
                "resolved_by": principal.user_id, "resolved_by_role": principal.role.value, "resolved_at": now,
                "calibration": calibration}  # fmt: skip
     meta = {"dispute_id": dispute.id, "analysis_id": dispute.analysis_id, "dimension": dispute.dimension,
-            "decision": body.decision, "final_score": final, "note": body.note}  # fmt: skip
+            "decision": body.decision, "final_score": final, "note": note}  # fmt: skip
     async with transactions.run() as session:
         changed = await disputes.update_one({"_id": dispute.id, "status": "open"}, {"$set": decided}, session=session)
         if not changed:

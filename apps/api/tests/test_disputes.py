@@ -236,7 +236,8 @@ def test_the_queue_shows_open_disputes_of_the_callers_units(api: Api) -> None:
     assert item["kind"] == "dispute" and item["person_name"] == "Asha" and item["unit"] == "Class 1"
     assert (item["dimension_name"], item["ai_score"], item["proposed_score"]) == ("Concept clarity", 4, 5)
     assert item["evidence"] == [{"quote": "Chlorophyll leaf ka green pigment hai", "start_ms": 34_000}]
-    assert item["raised_by_me"] is False
+    assert item["raised_by_me"] is False and item["raised_by_name"] == "asha"  # who to address the note to
+    assert item["recorded_at"]
     assert body(api.get("other_manager", "/v1/disputes"))["items"] == []
     assert api.get("asha", "/v1/disputes").status_code == 403
     assert body(api.get("owner", "/v1/disputes?status=accepted"))["items"] == []
@@ -298,9 +299,26 @@ def test_an_acceptance_needs_a_new_final_score(api: Api, payload: dict[str, Any]
     assert response.status_code == 400 and code(response) == error
 
 
-def test_a_note_is_required(api: Api) -> None:
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"decision": "rejected", "note": ""},
+        {"decision": "rejected", "note": "   "},
+        {"decision": "rejected"},
+        {"decision": "accepted", "final_score": 3, "note": ""},  # a score nobody proposed needs a reason
+    ],
+)
+def test_a_note_is_required_unless_the_proposed_score_is_accepted(api: Api, payload: dict[str, Any]) -> None:
     dispute = body(api.dispute("asha", scored(api)), 201)
-    assert api.resolve("reviewer", dispute["id"], decision="rejected", note="").status_code == 422
+    response = api.resolve("reviewer", dispute["id"], **payload)
+    assert response.status_code == 400 and code(response) == "note_required"
+    assert one(api, "disputes", {"_id": dispute["id"]})["status"] == "open"
+
+
+def test_accepting_the_proposed_score_needs_no_note(api: Api) -> None:
+    dispute = body(api.dispute("asha", scored(api)), 201)
+    done = body(api.resolve("reviewer", dispute["id"], decision="accepted", final_score=5))
+    assert done["status"] == "accepted" and done["final_score"] == 5 and done["resolution_note"] is None
 
 
 def test_a_dispute_is_decided_once(api: Api) -> None:

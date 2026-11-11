@@ -31,6 +31,10 @@ export type ReviewItem =
       status: DisputeStatus;
       /** The viewer raised it, so someone else decides it. */
       raised_by_me?: boolean;
+      /** Who raised it (the person analysed or their manager): the note is addressed to them. */
+      raised_by_name?: string | null;
+      /** When the conversation was recorded, ISO 8601 UTC. */
+      recorded_at?: string | null;
       /** ISO 8601 UTC. */
       created_at: string;
     }
@@ -51,7 +55,8 @@ export interface Resolution {
   decision: "accepted" | "rejected";
   /** Required when accepted. */
   final_score?: number;
-  note: string;
+  /** Required unless the proposed score is accepted as it is. */
+  note?: string;
 }
 
 export const COMMENT_MIN = 10;

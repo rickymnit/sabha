@@ -46,7 +46,7 @@ export const routes: RouteObject[] = [
               },
               {
                 path: "/reviews/:id",
-                ...page(() => import("../pages/ReviewPage").then((m) => ({ Component: m.ReviewPage }))),
+                ...page(() => import("../pages/ReviewQueuePage").then((m) => ({ Component: m.ReviewQueuePage }))),
               },
             ],
           },
