@@ -61,7 +61,8 @@ export function QueueList({ items, filter, onFilter, selectedKey, onSelect, deci
             onClick={() => onFilter(f.value)}
             className="min-h-[36px] rounded-seg-outer px-3 text-sm text-ink-2 hover:bg-surface-subtle aria-pressed:bg-primary-tint aria-pressed:font-semibold aria-pressed:text-primary"
           >
-            {f.label} <span className="tabular-nums">{count(f.value)}</span>
+            {f.label}{" "}
+            <span className="tabular-nums text-muted-2 [[aria-pressed=true]_&]:text-primary">{count(f.value)}</span>
           </button>
         ))}
       </div>

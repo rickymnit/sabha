@@ -78,7 +78,7 @@ export function SalesOverall({
   return (
     <section aria-labelledby={headingId} className="overflow-hidden rounded-panel border border-line bg-surface">
       <div className="flex flex-wrap items-start gap-x-8 gap-y-5 px-6 py-5">
-        <div className="flex w-full max-w-[260px] shrink-0 flex-col gap-2.5">
+        <div className="flex w-full max-w-[280px] shrink-0 flex-col gap-2.5">
           <span className="text-sm text-muted">Overall</span>
           {overall === null ? (
             <>
@@ -101,7 +101,10 @@ export function SalesOverall({
                   {LEVELS[level - 1]}
                 </span>
               </span>
-              <ol aria-label="Where this sits" className="m-0 grid list-none grid-cols-5 gap-1 p-0">
+              <ol
+                aria-label="Where this sits"
+                className="m-0 grid list-none grid-cols-[1fr_1.45fr_1fr_1fr_1fr] gap-1 p-0"
+              >
                 {LEVELS.map((name, i) => (
                   <li key={name} className="flex flex-col gap-1" aria-current={i + 1 === level ? "true" : undefined}>
                     <span
@@ -113,7 +116,7 @@ export function SalesOverall({
                     />
                     <span
                       className={cx(
-                        "text-2xs leading-tight",
+                        "whitespace-nowrap text-2xs leading-tight",
                         i + 1 === level ? cx("font-semibold", CHIP[band].split(" ")[1]) : "text-muted",
                       )}
                     >

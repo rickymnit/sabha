@@ -54,7 +54,7 @@ export function buildQueue(
       icon: "message",
       tone: "bg-primary-tint text-primary",
       title: "Score dispute",
-      detail: `${d.person_name ?? d.recording_title}: ${d.dimension_name.toLowerCase()}, ${d.current_score ?? d.ai_score} to ${d.proposed_score}`,
+      detail: `${d.person_name ?? d.recording_title}: ${d.dimension_name.toLowerCase()}, ${d.current_score ?? d.ai_score}\u00a0to\u00a0${d.proposed_score}`,
       at: d.created_at,
       dispute: d,
     }));

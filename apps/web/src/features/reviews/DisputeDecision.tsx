@@ -148,9 +148,9 @@ export function DisputeDecision({
             {item.evidence.map((e, i) => (
               <li
                 key={i}
-                className="flex items-start justify-between gap-3 rounded-card border border-line-subtle px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-card border border-line-subtle px-4 py-2.5"
               >
-                <q className="pt-1.5 text-ink [quotes:none]">{e.quote}</q>
+                <q className="text-ink [quotes:none]">{e.quote}</q>
                 <TimeButton ms={e.start_ms} player={player} label="quote" />
               </li>
             ))}

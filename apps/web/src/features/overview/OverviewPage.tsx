@@ -190,7 +190,9 @@ function Cell({ value }: { value: { median: number; n: number } | undefined }) {
 
 function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: OverviewStats }) {
   const rows = coachingRows(stats);
-  const weeks = Math.max(1, ...rows.map((r) => r.weekly?.length ?? 0));
+  const weeks = Math.max(0, ...rows.map((r) => r.weekly?.length ?? 0));
+  // A trend needs at least two weeks; with one the column would be empty.
+  const trend = weeks >= 2;
   const main = mainType(stats);
   // Units with no verified score of this type would be whole columns of "—"; they are left out.
   const byUnit = (!stats.unit_id && (stats.units?.length ?? 0) > 1 ? (stats.units ?? []) : []).filter((u) =>
@@ -221,10 +223,16 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
         <p className="m-0 px-5 py-4 text-sm text-muted">Not enough verified scores in this period yet.</p>
       ) : (
         <div className="overflow-x-auto px-5 py-3">
-          <table className="w-full min-w-[560px] table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1 text-table">
+          <table
+            className={cx(
+              "w-full min-w-[560px] table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1 text-table",
+              // One median column with no trend: keep it a short scale beside the names, not a full-width band.
+              !trend && !byUnit.length && "max-w-[680px]",
+            )}
+          >
             <thead>
               <tr className="text-left text-small font-medium text-muted">
-                <th scope="col" className="w-[30%] py-1.5 font-medium">
+                <th scope="col" className={cx("py-1.5 font-medium", trend || byUnit.length ? "w-[30%]" : "w-[60%]")}>
                   Rubric point
                 </th>
                 {byUnit.length ? (
@@ -238,9 +246,11 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
                     Median
                   </th>
                 )}
-                <th scope="col" className="w-48 py-1.5 font-medium">
-                  {weeks} weeks ago → now
-                </th>
+                {trend && (
+                  <th scope="col" className="w-48 py-1.5 font-medium">
+                    {weeks} weeks ago → now
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -250,6 +260,7 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
                   item={item}
                   units={byUnit}
                   labels={labels}
+                  trend={trend}
                 />
               ))}
             </tbody>
@@ -260,7 +271,17 @@ function Coaching({ stats, typeNames, labels }: OverviewPageProps & { stats: Ove
   );
 }
 
-function CoachingRow({ item, units, labels }: { item: CoachingItem; units: { id: string }[]; labels: Labels }) {
+function CoachingRow({
+  item,
+  units,
+  labels,
+  trend,
+}: {
+  item: CoachingItem;
+  units: { id: string }[];
+  labels: Labels;
+  trend: boolean;
+}) {
   const weekly = item.weekly ?? [];
   const values = weekly.map((w) => (w.median === null ? null : w.median / 5));
   const said = weekly.map((w) => (w.median === null ? "none" : w.median.toFixed(1))).join(", ");
@@ -285,18 +306,20 @@ function CoachingRow({ item, units, labels }: { item: CoachingItem; units: { id:
           <Cell value={item} />
         </td>
       )}
-      <td className="py-1">
-        {weekly.length > 0 && (
-          <span className="flex items-center gap-2.5">
-            <BarSpark values={values} label={`Weekly median: ${said}`} height={22} />
-            {first !== undefined && last !== undefined && (
-              <span className="whitespace-nowrap text-small tabular-nums text-muted" aria-hidden="true">
-                {first.toFixed(1)} → {last.toFixed(1)}
-              </span>
-            )}
-          </span>
-        )}
-      </td>
+      {trend && (
+        <td className="py-1">
+          {weekly.length > 0 && (
+            <span className="flex items-center gap-2.5">
+              <BarSpark values={values} label={`Weekly median: ${said}`} height={22} />
+              {first !== undefined && last !== undefined && (
+                <span className="whitespace-nowrap text-small tabular-nums text-muted" aria-hidden="true">
+                  {first.toFixed(1)} → {last.toFixed(1)}
+                </span>
+              )}
+            </span>
+          )}
+        </td>
+      )}
     </tr>
   );
 }

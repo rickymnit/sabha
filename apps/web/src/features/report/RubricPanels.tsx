@@ -349,11 +349,13 @@ export function RubricAccordion({
                         />
                       </span>
                       <span className="shrink-0 whitespace-nowrap text-small">
-                        <span className="font-semibold tabular-nums text-ink">
+                        <span className="inline-block w-[2.6rem] text-right font-semibold tabular-nums text-ink">
                           {lostOf(d.key) > 0 ? "−" : ""}
                           {formatLost(lostOf(d.key))}
                         </span>{" "}
-                        <span className="text-muted">counts {formatPercent(lost.get(d.key)?.share ?? d.weight)}</span>
+                        <span className="inline-block w-[4.6rem] text-muted">
+                          counts {formatPercent(lost.get(d.key)?.share ?? d.weight)}
+                        </span>
                       </span>
                     </span>
                     <span
