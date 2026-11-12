@@ -70,6 +70,24 @@ def test_backfill_fills_what_is_missing_once_and_skips_missing_files(
         status="COMPLETED", verified_share=1.0,
     ))  # fmt: skip
 
+    card = {"interest_level": {"value": "high"}, "next_step": {"action": "Send the quote.", "owner": "sales_rep",
+                                                                "due": "Thursday"}}  # fmt: skip
+    s3.put_object(Bucket=BUCKET, Key=f"{T}/r-sale/a.json", Body=json.dumps({"deal_card": card}).encode())
+    sale = Analysis(tenant_id=T, recording_id="r-sale", version="v1", conversation_type=ConversationType.SALES,
+                    rubric_id="sales.company.v0.3", rubric_version="0.3", rubric_hash="h",
+                    report_key=f"{T}/r-sale/a.json", status="COMPLETED", verified_share=1.0)  # fmt: skip
+    old = sale.model_dump(by_alias=True)
+    for key in (
+        "interest_level",
+        "next_action",
+        "next_action_owner",
+        "next_action_due",
+        "client_said",
+        "practice_point",
+    ):  # stored before these fields existed
+        old.pop(key)
+    db.analyses.insert_one(old)
+
     dry = backfill(db, s3, artefacts_bucket=BUCKET, preprocess_version="v1", dry_run=True)
     assert one(db, "transcripts", {"recording_id": "r-lesson"})["speaker_strip"] == []  # a dry run writes nothing
     (done,) = backfill(db, s3, artefacts_bucket=BUCKET, preprocess_version="v1")
@@ -80,6 +98,13 @@ def test_backfill_fills_what_is_missing_once_and_skips_missing_files(
     assert [(s["start_ms"], s["speaker"]) for s in strip] == [(0, "staff"), (40_000, "other")]
     assert one(db, "recordings", {"_id": "r-lesson"})["speech_ms"] == 30_000
     assert one(db, "analyses", {"recording_id": "r-call"})["ticket_status"] == "resolved"
+    filled = one(db, "analyses", {"recording_id": "r-sale"})
+    assert (done.sales, filled["interest_level"], filled["next_action_due"]) == (1, "high", "Thursday")
 
     (again,) = backfill(db, s3, artefacts_bucket=BUCKET, preprocess_version="v1")
-    assert (again.strips, again.speech, again.tickets) == (0, 0, 0)  # nothing left; only the missing files remain
+    assert (again.strips, again.speech, again.tickets, again.sales) == (
+        0,
+        0,
+        0,
+        0,
+    )  # nothing left; only the missing files remain

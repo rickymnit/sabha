@@ -1,5 +1,5 @@
-"""Fill in fields added after recordings were processed (UI v2): speaker strips, speech time, reception tickets.
-Use --dry-run first.
+"""Fill in fields added after recordings were processed (UI v2): speaker strips, speech time, reception tickets and
+sales highlights. Use --dry-run first.
 
 uv run python scripts/admin/backfill.py --dry-run
 """
@@ -31,8 +31,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     verb = "would fill" if args.dry_run else "filled"
     for d in done:
         print(
-            f"{d.tenant_id}: {verb} {d.strips} speaker strips, {d.speech} speech times, {d.tickets} tickets; "
-            f"{d.missing_files} files missing"
+            f"{d.tenant_id}: {verb} {d.strips} speaker strips, {d.speech} speech times, {d.tickets} tickets, "
+            f"{d.sales} sales analyses; {d.missing_files} files missing"
         )
     if not done:
         print("nothing to fill in")

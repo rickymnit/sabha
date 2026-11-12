@@ -45,6 +45,7 @@ from sabha_api.routers import (
     search,
     usage,
     users,
+    workspace,
 )
 from sabha_api.routers import settings as workspace_settings
 from sabha_core.logging import configure_logging
@@ -111,6 +112,7 @@ def create_app(
     if password_login:  # APP_ENV=local only, never with DEV_LOGIN (settings); not in the OpenAPI document
         app.include_router(dev_idp.password_router)
     app.include_router(me.router)
+    app.include_router(workspace.router)
     app.include_router(users.router)
     app.include_router(recordings.router)
     app.include_router(results.recordings_router)

@@ -396,6 +396,16 @@ class Analysis(TenantDoc):
     ticket_status: str | None = None
     ticket_category: str | None = None
     ticket_follow_up: str | None = None
+    # Sales: the deal card's interest level, next step (action, who, the date as said) and the client's name as said,
+    # plus the coaching's practice point, copied from the report so the rep's dashboard can list them without reading
+    # every report (founder's dashboard doc, 2026-11-12). Verified items only. The practice point is private to the
+    # person analysed: only their own /v1/me routes return it.
+    interest_level: str | None = None
+    next_action: str | None = None
+    next_action_owner: str | None = None
+    next_action_due: str | None = None
+    client_said: str | None = None
+    practice_point: str | None = None
     model_ids: list[str] = Field(default_factory=list)
     prompt_hashes: dict[str, str] = Field(default_factory=dict)
     usage: dict[str, int] = Field(default_factory=dict)

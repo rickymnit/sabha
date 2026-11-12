@@ -7,7 +7,7 @@ import json
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Literal
 from urllib.parse import urlencode
 
@@ -849,3 +849,41 @@ def test_a_ticket_is_shown_only_with_its_verified_quotes() -> None:
     old = {k: v for k, v in ticket.items() if k != "evidence"}  # stored before quotes were asked for
     assert shown_ticket(old) is None
     assert shown_ticket(None) is None
+
+
+# --- The person's own workspace (founder's Sales Executive dashboard doc, 2026-11-12) ---
+
+
+def sale(api: Api, rid: str, person: str, *, recorded: datetime, interest: str | None, due: str | None,
+         client: str | None = None, said: str | None = None, superseded: bool = False) -> None:  # fmt: skip
+    insert(api.db, "recordings", Recording(
+        id=rid, tenant_id=T, type=ConversationType.SALES, status=RecordingStatus.COMPLETED, consent_ref="c",
+        person_id=person, unit_id="unit-1", file_name=f"{rid}.mp3", recorded_at=recorded, interaction="call",
+        client_name=client,
+    ))  # fmt: skip
+    insert(api.db, "analyses", Analysis(
+        tenant_id=T, recording_id=rid, version="v1", person_id=person, unit_id="unit-1",
+        conversation_type=ConversationType.SALES, rubric_id="sales.company.v0.4", rubric_version="0.4",
+        rubric_hash="h", report_key=f"{T}/{rid}/a.json", status="COMPLETED", verified_share=1.0, overall_score=3.5,
+        interest_level=interest, next_action=f"Follow up on {rid}.", next_action_owner="sales_rep",
+        next_action_due=due, client_said=said, superseded=superseded,
+    ))  # fmt: skip
+
+
+def test_my_next_actions_are_mine_with_dates_and_priorities(api: Api) -> None:
+    now = utc_now()
+    sale(api, "s-soon", "p-asha", recorded=now - timedelta(days=1), interest="high", due="tomorrow",
+         client="Sunrise School")  # fmt: skip
+    sale(api, "s-vague", "p-asha", recorded=now - timedelta(days=2), interest="high", due="next week",
+         said="Green Valley")  # fmt: skip
+    sale(api, "s-week", "p-asha", recorded=now - timedelta(days=1), interest="medium", due="in 5 days")
+    sale(api, "s-old", "p-asha", recorded=now - timedelta(days=3), interest="high", due="tomorrow", superseded=True)
+    sale(api, "s-ravi", "p-ravi", recorded=now, interest="high", due="tomorrow")  # someone else's
+
+    items = api.get("asha", "/v1/me/next-actions").json()["items"]
+    assert [(i["recording_id"], i["priority"]) for i in items] == [
+        ("s-soon", "high"), ("s-week", "medium"), ("s-vague", "low")]  # fmt: skip
+    soon, _, vague = items
+    assert soon["client"] == "Sunrise School" and soon["due_said"] == "tomorrow" and soon["due_date"] is not None
+    assert vague["client"] == "Green Valley" and vague["due_date"] is None  # "next week" names no date
+    assert api.get("manager", "/v1/me/next-actions").json()["items"] == []  # no person linked: nothing

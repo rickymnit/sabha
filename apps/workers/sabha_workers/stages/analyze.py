@@ -104,6 +104,22 @@ def ticket_fields(report: dict[str, Any]) -> dict[str, str | None]:
             "ticket_follow_up": follow_up.get("text")}  # fmt: skip
 
 
+def sales_fields(report: dict[str, Any]) -> dict[str, str | None]:
+    """A sales report's deal card highlights and practice point for the Analysis document (verified items only, as
+    the report holds them), so the rep's dashboard can list next actions and coaching without reading every report."""
+    card = report.get("deal_card") or {}
+    step = card.get("next_step") or {}
+    tip = (report.get("next_time") or {}).get("practice_point") or {}
+    return {
+        "interest_level": (card.get("interest_level") or {}).get("value"),
+        "next_action": step.get("action"),
+        "next_action_owner": step.get("owner"),
+        "next_action_due": step.get("due"),
+        "client_said": (card.get("client_name") or {}).get("name"),
+        "practice_point": tip.get("text"),
+    }
+
+
 def make_work(deps: AnalyzeDeps) -> Work:
     """The analyze `work` function for StageRunner (module docstring)."""
 
@@ -174,6 +190,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
             ticket_status=ticket.get("ticket_status"), ticket_category=ticket.get("ticket_category"),
             ticket_follow_up=ticket.get("ticket_follow_up"),
         )  # fmt: skip
+        if recording.type is ConversationType.SALES:
+            analysis = analysis.model_copy(update=sales_fields(report))
         deps.save(ctx.tenant_id, analysis, scores_from(report, analysis))
         meta = {
             "rubric": rubric.id,

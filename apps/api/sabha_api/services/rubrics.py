@@ -94,6 +94,14 @@ def _read(folder: Path, rubric_id: str) -> Rubric:
     return _load(str(path), path.stat().st_mtime_ns)
 
 
+def current_rubric(tenant: Tenant, conversation_type: ConversationType, rubrics_dir: str) -> Rubric | None:
+    """The rubric the tenant's profile uses for a type, or None when it has none or the file is not deployed."""
+    rubric_id = get_profile(tenant.profile).default_rubrics.get(conversation_type)
+    if rubric_id is None or not (Path(rubrics_dir) / f"{rubric_id}.yaml").is_file():
+        return None
+    return _read(Path(rubrics_dir), rubric_id)
+
+
 def _version_key(rubric_id: str) -> tuple[int, int]:
     match = _ID.fullmatch(rubric_id)
     assert match is not None  # noqa: S101  # only ids that matched _ID reach here

@@ -4,7 +4,9 @@ again: it only touches documents still missing the field. Run by hand with scrip
 - speaker strips: each transcript's `speaker_strip` from its transcript@v1.json (sabha_workers.stages.transcript);
 - speech: each recording's `speech_ms` from the preprocess stage's segments@v1.json (the compact length);
 - tickets: each reception analysis's `ticket_status`, `ticket_category` and `ticket_follow_up` from its report
-  (sabha_workers.stages.analyze.ticket_fields).
+  (sabha_workers.stages.analyze.ticket_fields);
+- sales: each sales analysis's interest level, next action, client name and practice point from its report
+  (sabha_workers.stages.analyze.sales_fields), for analyses stored before 2026-11-12.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from sabha_core.profiles import ConversationType
 from sabha_core.repo import SyncSystemRepo, SyncTenantRepo
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
-from sabha_workers.stages.analyze import ticket_fields
+from sabha_workers.stages.analyze import sales_fields, ticket_fields
 from sabha_workers.stages.transcript import speaker_strip
 
 log = logging.getLogger(__name__)
@@ -34,6 +36,7 @@ class Filled:
     speech: int
     tickets: int
     missing_files: int
+    sales: int = 0
 
 
 class _Files:
@@ -97,6 +100,16 @@ def backfill(
                 if not dry_run:
                     analyses.update_one({"_id": analysis.id}, {"$set": fields})
 
-        if strips or speech or tickets or files.missing:
-            done.append(Filled(tenant.id, strips, speech, tickets, files.missing))
+        sales = 0
+        for analysis in analyses.find({"conversation_type": ConversationType.SALES.value,
+                                       "interest_level": {"$exists": False}}):  # fmt: skip
+            report = files.json(analysis.report_key)
+            if report is None:
+                continue
+            sales += 1
+            if not dry_run:
+                analyses.update_one({"_id": analysis.id}, {"$set": sales_fields(report)})
+
+        if strips or speech or tickets or sales or files.missing:
+            done.append(Filled(tenant.id, strips, speech, tickets, files.missing, sales))
     return done
