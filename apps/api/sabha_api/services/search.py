@@ -1,5 +1,6 @@
 """GET /v1/search: the header search (UI v2), by name only (owner's decision, 2026-10-27): people by name and
-recordings by file name, a few of each, from what the caller may see. Not transcripts: searching "anything said"
+recordings by file name or client name (typed at upload, or as said in a sales conversation), a few of each, from
+what the caller may see. Not transcripts: searching "anything said"
 would need a text index on the transcripts and is not built.
 
 The text is matched as a case-insensitive substring; it is escaped, so it is never read as a pattern. Every query
@@ -35,8 +36,11 @@ async def search(
     found_people = await people.find({"$and": [people_filter(principal), {"name": pattern}]}, sort=[("name", 1)],
                                      limit=LIMIT)  # fmt: skip
     visible = await visible_filter(principal, people)
-    found = await recordings.find({"$and": [visible, {"file_name": pattern}]},
-                                  sort=[("created_at", -1), ("_id", -1)], limit=LIMIT)  # fmt: skip
+    said = await analyses.find({"client_said": pattern, "superseded": {"$ne": True}}, limit=50)
+    named = {"$or": [{"file_name": pattern}, {"client_name": pattern},
+                     {"_id": {"$in": sorted({a.recording_id for a in said})}}]}  # fmt: skip
+    found = await recordings.find({"$and": [visible, named]}, sort=[("created_at", -1), ("_id", -1)],
+                                  limit=LIMIT)  # fmt: skip
     return SearchOut(
         people=[PersonOut(id=p.id, name=p.name, unit_id=p.unit_id, unit_ids=p.unit_ids) for p in found_people],
         recordings=await recording_out(found, people, analyses, transcripts),

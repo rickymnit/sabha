@@ -870,6 +870,16 @@ def sale(api: Api, rid: str, person: str, *, recorded: datetime, interest: str |
     ))  # fmt: skip
 
 
+def test_search_finds_a_sale_by_its_client_typed_or_said(api: Api) -> None:
+    now = utc_now()
+    sale(api, "s-typed", "p-asha", recorded=now, interest="high", due=None, client="Sunrise School")
+    sale(api, "s-said", "p-asha", recorded=now - timedelta(days=1), interest="high", due=None, said="Sunrise Academy")
+    sale(api, "s-ravi", "p-ravi", recorded=now, interest="high", due=None, client="Sunrise Ltd")
+    ids = lambda sub: sorted(r["id"] for r in api.get(sub, "/v1/search?q=sunrise").json()["recordings"])  # noqa: E731
+    assert ids("asha") == ["s-said", "s-typed"]  # never Ravi's, though the name matches
+    assert ids("owner") == ["s-ravi", "s-said", "s-typed"]
+
+
 def test_my_next_actions_are_mine_with_dates_and_priorities(api: Api) -> None:
     now = utc_now()
     sale(api, "s-soon", "p-asha", recorded=now - timedelta(days=1), interest="high", due="tomorrow",
