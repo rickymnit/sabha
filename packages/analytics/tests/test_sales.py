@@ -13,7 +13,7 @@ from sabha_analytics.next_time import ProductFact, write_next_time
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse, load_report_schema
 from sabha_analytics.rubric import Rubric, load_rubric
-from sabha_analytics.sales import interest_values, validate_deal_card, write_deal_card
+from sabha_analytics.sales import interest_values, is_greeting, validate_deal_card, write_deal_card
 from sabha_core.state import RecordingStatus
 
 MEETING_ROWS = (
@@ -277,3 +277,9 @@ def test_coaching_in_another_script_is_sent_back_for_english(meeting: PreparedTr
     outcome = write_next_time(meeting, dimensions=(), model=model, product_info=())
     assert outcome.next_time is not None and outcome.attempts == 2
     assert "write the text in English" in str(model.calls[1]["messages"])
+
+
+@pytest.mark.parametrize(("name", "greeting"), [("खम्मा गनी", True), ("Khamma Ghani!", True), ("नमस्ते।", True),
+                                                ("Edge Retail Solutions", False), ("इंद्रधनुष 8", False)])  # fmt: skip
+def test_a_greeting_is_never_taken_for_the_client_name(name: str, greeting: bool) -> None:
+    assert is_greeting(name) is greeting

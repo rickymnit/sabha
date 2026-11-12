@@ -13,7 +13,8 @@ From the redacted transcript the model writes, every item with a quote it rests 
   when nothing was agreed;
 - client_name: the customer's organisation (or, failing that, the customer's name) as said in the conversation, at
   most 8 words, or null when it is not said (founder's dashboard doc, 2026-11-12: shown when the rep left the client
-  blank at upload). A name hidden by redaction is a placeholder, so it stays null.
+  blank at upload). A name hidden by redaction is a placeholder, so it stays null; so does a greeting the model
+  mistook for a name ("khamma ghani", "namaste"; seen on the demo calls, 2026-11-12).
 
 Golden rule 5 applies to every item: its quote must be found in the transcript (grounding.verify_quote, the same
 check as rubric evidence) and is stored in the transcript's own wording, with that utterance's times. A failing
@@ -26,6 +27,7 @@ No placeholder may appear in the model's own words (golden rule 8); quotes may c
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,6 +60,18 @@ MAX_RESPONSE_WORDS = 30
 MAX_ACTION_WORDS = 30
 MAX_DUE_WORDS = 8
 MAX_CLIENT_WORDS = 8
+# Greetings are not names (romanised and Devanagari), compared after lower-casing and dropping punctuation.
+GREETINGS = frozenset({
+    "namaste", "namaskar", "namaskaar", "khamma ghani", "khamma gani", "ram ram", "jai shri krishna",
+    "sat sri akal", "hello", "hi", "good morning", "good afternoon", "good evening", "salaam", "adaab",
+    "नमस्ते", "नमस्कार", "खम्मा घणी", "खम्मा गनी", "खम्मा घनी", "राम राम", "जय श्री कृष्ण", "हेलो", "हैलो", "सत श्री अकाल",
+})  # fmt: skip
+
+
+def is_greeting(name: str) -> bool:
+    return " ".join(re.sub(r"[^\w\s\u0900-\u0963\u0970-\u097f]", " ", name.lower()).split()) in GREETINGS
+
+
 CARD_KEYS = frozenset({"current_setup", "customer_needs", "objections", "interest_level", "next_step", "client_name"})
 
 
@@ -334,7 +348,7 @@ def validate_deal_card(
         else:
             name = check.text("client_name", raw_client.get("name"), MAX_CLIENT_WORDS)
             ev = check.evidence("client_name", raw_client)
-            if name is not None and ev is not None:
+            if name is not None and ev is not None and not is_greeting(name):
                 client = ClientName(name.strip(), ev)
 
     blocking = [p for p in check.problems if p.code != "quote_not_found"]
