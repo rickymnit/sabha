@@ -12,6 +12,14 @@ values from `docs/design/source/*.dc.html` (`File:line`) until a page's v2 resty
 
 Text on every background below meets WCAG AA (4.5:1) for normal text.
 
+**Light and dark (2026-11-12).** The values below are the light theme. Every token is a CSS variable set in
+`apps/web/src/theme.css` for light and for dark (`<html data-theme="dark">`); `tailwind.config.ts` only names them.
+Change a colour there, in both themes; `src/test/contrast.test.ts` checks the text pairs in each. Two tokens exist
+for dark mode's sake: `on-primary` (text on a primary background: white in light, deep ink in dark, where primary is
+lighter) and `scrim` (the layer behind a dialog, used as `bg-scrim/40`). Never put `text-surface` on `bg-primary`.
+The device setting picks the theme until the person uses the sun/moon button in the top bar; the pick is kept in
+this browser.
+
 ### Text and neutrals
 
 | Token | Hex | Used for |

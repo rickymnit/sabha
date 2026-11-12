@@ -1,6 +1,10 @@
 import type { Config } from "tailwindcss";
 
-// Every value here comes from docs/design/tokens.md (UI v2 since 2026-10-27). Colours, font sizes and radii replace
+/** A colour token: a CSS variable holding "R G B", set for light and dark in src/theme.css, so opacity
+ *  modifiers (bg-ink/40) still work. */
+const v = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`;
+
+// Every value here comes from docs/design/tokens.md (UI v2 since 2026-10-27); the dark set is in src/theme.css. Colours, font sizes and radii replace
 // Tailwind's defaults (not extend them) so only design tokens are available.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -9,51 +13,55 @@ export default {
       transparent: "transparent",
       current: "currentColor",
       inherit: "inherit",
-      ink: { DEFAULT: "#121521", 2: "#3D414C", raised: "#262B3E" },
-      muted: { DEFAULT: "#5F6677", 2: "#686F7F" },
-      subtle: "#686F7F",
+      ink: { DEFAULT: v("ink"), 2: v("ink-2"), raised: v("ink-raised") },
+      muted: { DEFAULT: v("muted"), 2: v("muted-2") },
+      subtle: v("subtle"),
       line: {
-        DEFAULT: "#E4E7EC",
-        strong: "#B8BDC7",
-        input: "#D7D8DC",
-        subtle: "#ECEEF2",
+        DEFAULT: v("line"),
+        strong: v("line-strong"),
+        input: v("line-input"),
+        subtle: v("line-subtle"),
       },
-      track: "#EEF0F3",
-      fill: { DEFAULT: "#F1F2F5", 2: "#E9EBEF" },
-      surface: { DEFAULT: "#FFFFFF", subtle: "#F6F7F9", faint: "#FAFBFC" },
-      page: "#F6F7F9",
+      track: v("track"),
+      fill: { DEFAULT: v("fill"), 2: v("fill-2") },
+      surface: { DEFAULT: v("surface"), subtle: v("surface-subtle"), faint: v("surface-faint") },
+      page: v("page"),
       primary: {
-        DEFAULT: "#3346D3",
-        hover: "#2536B0",
-        tint: "#EEF0FC",
-        "tint-subtle": "#F5F5FD",
-        "tint-strong": "#DDE2F8",
-        border: "#B9C1F0",
-        disabled: "#C9CEF2",
-        "disabled-ink": "#2F3A86",
+        DEFAULT: v("primary"),
+        hover: v("primary-hover"),
+        tint: v("primary-tint"),
+        "tint-subtle": v("primary-tint-subtle"),
+        "tint-strong": v("primary-tint-strong"),
+        border: v("primary-border"),
+        disabled: v("primary-disabled"),
+        "disabled-ink": v("primary-disabled-ink"),
       },
-      "brand-accent": "#F2A33A",
-      success: { DEFAULT: "#0B6343", bar: "#1F9A6B", tint: "#DDF1E6" },
+      "brand-accent": v("brand-accent"),
+      // Text and icons on a primary background: white in light, deep ink on the lighter dark-mode primary.
+      "on-primary": v("on-primary"),
+      // The dimmed layer behind a dialog (used with an opacity, bg-scrim/40).
+      scrim: v("scrim"),
+      success: { DEFAULT: v("success"), bar: v("success-bar"), tint: v("success-tint") },
       warning: {
-        DEFAULT: "#7A4A00",
-        ink: "#7A4A00",
-        bar: "#E8A23F",
-        tint: "#FCEBCF",
-        "tint-subtle": "#FEF6E9",
-        surface: "#FEFAF1",
-        border: "#ECD9B8",
+        DEFAULT: v("warning"),
+        ink: v("warning-ink"),
+        bar: v("warning-bar"),
+        tint: v("warning-tint"),
+        "tint-subtle": v("warning-tint-subtle"),
+        surface: v("warning-surface"),
+        border: v("warning-border"),
       },
-      danger: { DEFAULT: "#A12B12", bar: "#DB532E", tint: "#FBE2DB" },
+      danger: { DEFAULT: v("danger"), bar: v("danger-bar"), tint: v("danger-tint") },
       type: {
-        teaching: "#3346D3",
-        reception: "#F2A33A",
-        counselling: "#1E7A55",
-        meeting: "#7A4DB8",
-        sales: "#0F7C8C",
-        support: "#C2417A",
+        teaching: v("type-teaching"),
+        reception: v("type-reception"),
+        counselling: v("type-counselling"),
+        meeting: v("type-meeting"),
+        sales: v("type-sales"),
+        support: v("type-support"),
       },
       // Who spoke when: the analysed staff member and everyone else (SpeakerStrip, report timeline).
-      speaker: { staff: "#3346D3", other: "#F2A33A" },
+      speaker: { staff: v("speaker-staff"), other: v("speaker-other") },
     },
     fontFamily: {
       sans: ["Geist", "'Segoe UI'", "system-ui", "sans-serif"],
@@ -100,7 +108,7 @@ export default {
         touch: "44px",
       },
       boxShadow: {
-        seg: "0 0 0 1px #E4E7EC",
+        seg: "0 0 0 1px rgb(var(--c-line))",
       },
       // Motion is not in the designs; these are ours. Components apply them only under `motion-safe:`, so
       // people who ask for reduced motion get none.

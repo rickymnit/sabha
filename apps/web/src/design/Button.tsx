@@ -14,7 +14,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // Main.dc.html:97 (secondary), :101 (primary); Rubrics.dc.html:98 (disabled primary).
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-primary px-4 font-semibold text-surface hover:bg-primary-hover disabled:bg-primary-disabled disabled:text-primary-disabled-ink",
+    "bg-primary px-4 font-semibold text-on-primary hover:bg-primary-hover disabled:bg-primary-disabled disabled:text-primary-disabled-ink",
   secondary:
     "border border-line-input bg-surface px-3.5 text-ink hover:bg-surface-subtle disabled:bg-surface-subtle disabled:text-muted-2",
   ghost: "px-3 font-semibold text-primary hover:bg-primary-tint-subtle hover:text-primary-hover disabled:text-muted-2",

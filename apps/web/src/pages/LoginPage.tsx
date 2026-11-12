@@ -40,7 +40,7 @@ function BrandPanel() {
   return (
     <section
       aria-label="About Sabha"
-      className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-surface lg:flex lg:w-[44%]"
+      className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-on-primary lg:flex lg:w-[44%]"
     >
       <span className="inline-flex items-center gap-2.5">
         <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded bg-surface">

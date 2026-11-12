@@ -60,7 +60,7 @@ export function NavItem({
       </span>
       {badge !== undefined && (
         // UI v2: a solid primary pill (docs/design/v2/*.png, the Reviews count).
-        <span className="min-w-[36px] rounded-full bg-primary px-[7px] py-px text-center text-caption font-semibold tabular-nums text-surface">
+        <span className="min-w-[36px] rounded-full bg-primary px-[7px] py-px text-center text-caption font-semibold tabular-nums text-on-primary">
           <span aria-hidden="true">{badge}</span>
           <span className="sr-only">, {badgeLabel ?? badge}</span>
         </span>

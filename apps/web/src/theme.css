@@ -1,0 +1,110 @@
+/* Colour tokens as "R G B" (tailwind.config.ts reads them with rgb(var(--c-name) / alpha)). Light values are the
+   design tokens in docs/design/tokens.md; dark values are ours, chosen for contrast on the dark surfaces (text tokens
+   stay at 4.5:1 or more on surface and page). The theme is set on <html data-theme> by public/theme-init.js before
+   the first paint and by src/app/theme.ts after that. */
+
+:root {
+  color-scheme: light;
+  --c-ink: 18 21 33;
+  --c-ink-2: 61 65 76;
+  --c-ink-raised: 38 43 62;
+  --c-muted: 95 102 119;
+  --c-muted-2: 104 111 127;
+  --c-subtle: 104 111 127;
+  --c-line: 228 231 236;
+  --c-line-strong: 184 189 199;
+  --c-line-input: 215 216 220;
+  --c-line-subtle: 236 238 242;
+  --c-track: 238 240 243;
+  --c-fill: 241 242 245;
+  --c-fill-2: 233 235 239;
+  --c-surface: 255 255 255;
+  --c-surface-subtle: 246 247 249;
+  --c-surface-faint: 250 251 252;
+  --c-page: 246 247 249;
+  --c-primary: 51 70 211;
+  --c-primary-hover: 37 54 176;
+  --c-primary-tint: 238 240 252;
+  --c-primary-tint-subtle: 245 245 253;
+  --c-primary-tint-strong: 221 226 248;
+  --c-primary-border: 185 193 240;
+  --c-primary-disabled: 201 206 242;
+  --c-primary-disabled-ink: 47 58 134;
+  --c-brand-accent: 242 163 58;
+  --c-success: 11 99 67;
+  --c-success-bar: 31 154 107;
+  --c-success-tint: 221 241 230;
+  --c-warning: 122 74 0;
+  --c-warning-ink: 122 74 0;
+  --c-warning-bar: 232 162 63;
+  --c-warning-tint: 252 235 207;
+  --c-warning-tint-subtle: 254 246 233;
+  --c-warning-surface: 254 250 241;
+  --c-warning-border: 236 217 184;
+  --c-danger: 161 43 18;
+  --c-danger-bar: 219 83 46;
+  --c-danger-tint: 251 226 219;
+  --c-type-teaching: 51 70 211;
+  --c-type-reception: 242 163 58;
+  --c-type-counselling: 30 122 85;
+  --c-type-meeting: 122 77 184;
+  --c-type-sales: 15 124 140;
+  --c-type-support: 194 65 122;
+  --c-speaker-staff: 51 70 211;
+  --c-speaker-other: 242 163 58;
+  --c-on-primary: 255 255 255;
+  --c-scrim: 18 21 33;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-ink: 232 234 240;
+  --c-ink-2: 195 199 209;
+  --c-ink-raised: 212 216 226;
+  --c-muted: 158 165 181;
+  --c-muted-2: 143 150 167;
+  --c-subtle: 143 150 167;
+  --c-line: 43 48 60;
+  --c-line-strong: 75 81 98;
+  --c-line-input: 58 64 78;
+  --c-line-subtle: 36 40 51;
+  --c-track: 38 42 53;
+  --c-fill: 35 39 51;
+  --c-fill-2: 43 48 60;
+  --c-surface: 23 26 34;
+  --c-surface-subtle: 29 33 43;
+  --c-surface-faint: 26 29 38;
+  --c-page: 15 17 23;
+  --c-primary: 123 140 247;
+  --c-primary-hover: 151 164 249;
+  --c-primary-tint: 31 36 66;
+  --c-primary-tint-subtle: 26 30 53;
+  --c-primary-tint-strong: 44 52 102;
+  --c-primary-border: 63 74 140;
+  --c-primary-disabled: 46 53 99;
+  --c-primary-disabled-ink: 154 164 232;
+  --c-brand-accent: 242 163 58;
+  --c-on-primary: 14 18 34;
+  --c-scrim: 0 0 0;
+  --c-success: 90 203 149;
+  --c-success-bar: 47 166 118;
+  --c-success-tint: 20 48 31;
+  --c-warning: 240 179 87;
+  --c-warning-ink: 240 179 87;
+  --c-warning-bar: 232 162 63;
+  --c-warning-tint: 58 42 16;
+  --c-warning-tint-subtle: 42 33 18;
+  --c-warning-surface: 34 28 16;
+  --c-warning-border: 90 69 32;
+  --c-danger: 243 138 114;
+  --c-danger-bar: 224 96 60;
+  --c-danger-tint: 59 28 21;
+  --c-type-teaching: 123 140 247;
+  --c-type-reception: 242 163 58;
+  --c-type-counselling: 63 174 128;
+  --c-type-meeting: 160 122 216;
+  --c-type-sales: 43 168 184;
+  --c-type-support: 224 106 158;
+  --c-speaker-staff: 123 140 247;
+  --c-speaker-other: 242 163 58;
+}

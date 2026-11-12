@@ -469,7 +469,10 @@ const Line = memo(function Line({
             node = (
               <mark
                 data-active-match={isActive ? "" : undefined}
-                className={cx("rounded-xs", isActive ? "bg-primary text-surface" : "bg-primary-tint-strong text-ink")}
+                className={cx(
+                  "rounded-xs",
+                  isActive ? "bg-primary text-on-primary" : "bg-primary-tint-strong text-ink",
+                )}
               >
                 {node}
               </mark>

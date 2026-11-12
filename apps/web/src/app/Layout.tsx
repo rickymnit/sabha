@@ -13,6 +13,7 @@ import { useSession } from "../session/session";
 import { capitalise, roleTitle } from "./format";
 import { unitLabel, unitTree, unitWords } from "./units";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
+import { useTheme } from "./theme";
 import { isSalesRep } from "./workspace";
 import { AppLoading } from "./AppLoading";
 import { InboxBell } from "../features/inbox/InboxBell";
@@ -138,6 +139,23 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
   );
 }
 
+/** Light or dark colours (src/app/theme.ts): the button shows what a click switches to. */
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={toggle}
+      className="flex size-11 items-center justify-center rounded border border-line bg-surface text-ink-2 hover:bg-surface-subtle"
+    >
+      <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
+    </button>
+  );
+}
+
 /** The bar above every page (UI v2): search, and Upload for everyone (staff upload for themselves). */
 function Header({ me }: { me: Me }) {
   const navigate = useNavigate();
@@ -146,6 +164,7 @@ function Header({ me }: { me: Me }) {
       <div className="mx-auto flex max-w-[1360px] items-center gap-2.5">
         <HeaderSearch me={me} />
         <div className="ml-auto flex items-center gap-2.5">
+          <ThemeToggle />
           <InboxBell me={me} />
           <Button icon={<Icon name="upload" size={16} />} onClick={() => navigate("/upload")}>
             {isSalesRep(me) ? (

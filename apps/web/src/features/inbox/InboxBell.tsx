@@ -46,7 +46,7 @@ export function InboxBell({ me }: { me: Me }) {
         {n > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-primary px-1 text-center text-2xs font-semibold leading-[18px] text-surface"
+            className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-primary px-1 text-center text-2xs font-semibold leading-[18px] text-on-primary"
           >
             {n > 99 ? "99+" : n}
           </span>

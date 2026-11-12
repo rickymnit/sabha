@@ -1,35 +1,41 @@
 // Colour contrast (P6.8), which jsdom cannot measure for the axe check (test/a11y.test.tsx): the WCAG 2.1 ratio of
-// every text colour on the backgrounds the app sets it on, from the design tokens themselves (tailwind.config.ts).
+// every text colour on the backgrounds the app sets it on, from the design tokens themselves (src/theme.css), in both
+// the light and the dark theme.
 // Body text needs 4.5:1 (AA); the pairs are the ones the components use.
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import config from "../../tailwind.config";
+type Theme = "light" | "dark";
 
-type Palette = Record<string, string | Record<string, string>>;
-const colors = config.theme.colors as unknown as Palette;
-
-/** A token's hex value: "ink" -> ink.DEFAULT, "muted-2" -> muted["2"], "warning-ink" -> warning.ink. */
-function hex(token: string): string {
-  const direct = colors[token];
-  if (typeof direct === "string") return direct;
-  if (direct) return direct.DEFAULT as string;
-  for (let cut = token.lastIndexOf("-"); cut > 0; cut = token.lastIndexOf("-", cut - 1)) {
-    const group = colors[token.slice(0, cut)];
-    const value = typeof group === "object" ? group[token.slice(cut + 1)] : undefined;
-    if (value) return value;
-  }
-  throw new Error(`no colour token ${token}`);
+/** The colour tokens of one theme, from src/theme.css: "ink" -> [18, 21, 33]. */
+function palette(theme: Theme): Map<string, number[]> {
+  const css = readFileSync(join(__dirname, "..", "theme.css"), "utf8");
+  const selector = theme === "light" ? ":root {" : ':root[data-theme="dark"] {';
+  const block = css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));
+  return new Map(
+    [...block.matchAll(/--c-([\w-]+):\s*(\d+) (\d+) (\d+);/g)].map((m) => [m[1]!, [+m[2]!, +m[3]!, +m[4]!]]),
+  );
 }
 
-function luminance(color: string): number {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255);
+const PALETTES = { light: palette("light"), dark: palette("dark") };
+
+function rgb(theme: Theme, token: string): number[] {
+  const value = PALETTES[theme].get(token);
+  if (!value) throw new Error(`no colour token ${token} in the ${theme} theme`);
+  return value;
+}
+
+function luminance(color: number[]): number {
+  const [r, g, b] = color.map((c) => c / 255);
   const linear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * linear(r!) + 0.7152 * linear(g!) + 0.0722 * linear(b!);
 }
 
-function contrast(foreground: string, background: string): number {
-  const [light, dark] = [luminance(hex(foreground)), luminance(hex(background))].sort((a, b) => b - a);
+function contrast(theme: Theme, foreground: string, background: string): number {
+  const [light, dark] = [luminance(rgb(theme, foreground)), luminance(rgb(theme, background))].sort((a, b) => b - a);
   return (light! + 0.05) / (dark! + 0.05);
 }
 
@@ -40,7 +46,7 @@ const PAIRS: [string, string][] = [
   ),
   ["primary-hover", "primary-tint"], // the current menu item
   ["primary", "primary-tint-subtle"],
-  ["surface", "primary"], // buttons, the sign-in brand panel
+  ["on-primary", "primary"], // buttons, the sign-in brand panel
   ["primary-tint", "primary"], // the sign-in panel's points
   ["danger", "danger-tint"], // errors, low score chips
   ["success", "success-tint"],
@@ -50,13 +56,17 @@ const PAIRS: [string, string][] = [
   ["surface", "ink"], // toasts
 ];
 
-describe("colour contrast", () => {
+describe.each(["light", "dark"] as const)("colour contrast, %s theme", (theme) => {
   it.each(PAIRS)("%s text on %s meets WCAG AA (4.5:1)", (text, background) => {
-    expect(contrast(text, background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(theme, text, background)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("computes the WCAG ratio", () => {
-    expect(contrast("ink", "ink")).toBeCloseTo(1);
-    expect(contrast("surface", "ink")).toBeGreaterThan(15); // near-black on white
+  it("has every token the other theme has", () => {
+    expect([...PALETTES[theme].keys()].sort()).toEqual([...PALETTES.light.keys()].sort());
   });
+});
+
+it("computes the WCAG ratio", () => {
+  expect(contrast("light", "ink", "ink")).toBeCloseTo(1);
+  expect(contrast("light", "surface", "ink")).toBeGreaterThan(15); // near-black on white
 });
