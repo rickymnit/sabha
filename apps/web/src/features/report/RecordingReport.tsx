@@ -3,6 +3,7 @@
 // them. Golden rule 5 is enforced here: only verified dimensions with quotes are ever rendered, whatever the
 // payload contains.
 
+import { PrivateCoachingNote } from "./PrivateCoachingNote";
 import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Card, cx, scoreBand } from "../../design";
@@ -71,7 +72,7 @@ export interface RecordingReportProps {
   canDispute?: boolean;
   /** Sends a dispute; required for the dispute button to open the dialog. */
   onSubmitDispute?: (draft: DisputeDraft) => Promise<void>;
-  /** Buttons under the header (the "…" menu, Share with the person). */
+  /** Buttons under the header (the "…" menu). */
   actions?: ReactNode;
   /** Above the report: the coaching steps (managers) or the manager's note (the person analysed). */
   banner?: ReactNode;
@@ -495,6 +496,7 @@ function OverallPanel({
           What happened in this {labels.recording.toLowerCase()}
         </h2>
         <p className="m-0 max-w-[72ch] text-ink-2">{analysis.summary}</p>
+        {analysis.coaching_private && <PrivateCoachingNote firstName={firstName} />}
         {analysis.suggestions.length > 0 && (
           <ul
             aria-label={`Suggestions for the next ${labels.recording.toLowerCase()}`}

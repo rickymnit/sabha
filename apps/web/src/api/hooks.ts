@@ -29,7 +29,6 @@ import {
   type RecordingDetail,
   type RecordingCounts,
   type RecordingQuery,
-  type ShareResult,
   type RecordingPage,
   type RubricDetail,
   type RubricListItem,
@@ -148,24 +147,6 @@ export function useExportRecordings() {
       link.download = `recordings-${new Date().toISOString().slice(0, 10)}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-    },
-  });
-}
-
-/** POST /v1/recordings/share: email the people analysed a link, with a note shown on their report. */
-export function useShareRecordings() {
-  const { token } = useSession();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (request: { recording_ids: string[]; note: string | null }) =>
-      apiFetch<ShareResult>("/v1/recordings/share", {
-        method: "POST",
-        token,
-        body: request,
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-      }),
-    onSuccess: async () => {
-      await Promise.all(["recording", "recordings"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
     },
   });
 }

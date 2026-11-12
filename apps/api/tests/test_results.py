@@ -663,12 +663,28 @@ def test_the_report_payload_for_a_completed_lesson(api: Api) -> None:
     assert (metrics["longest_monologue_s"]["unit"], metrics["longest_monologue_s"]["value"]) == ("ms", 95_500)
     assert metrics["words_per_minute"]["unit"] == "wpm"
     assert body["dimensions"][0]["evidence"][0] == DIMENSIONS[0]["evidence"][0]
-    assert body["suggestions"] == [{"text": "Ask a student to explain.", "utterance_id": "u0001", "start_ms": 9_000}]
+    assert body["summary"] == "A clear lesson."  # the analysis stays visible to the manager; the coaching does not
+    assert (body["strengths"], body["gaps"], body["suggestions"], body["coaching_private"]) == ([], [], [], True)
     assert body["phases"] == [{"name": "introduction", "start_ms": 0, "end_ms": 8_000}]
     (entry,) = api.db.audit_log.find({"action": "analysis.view"})
     assert entry["meta"]["analysis_id"] == newest
     history = api.get("manager", "/v1/recordings/r-asha/analyses").json()
     assert [h["version"] for h in history] == ["v2", "v1"]
+
+
+def test_coaching_is_private_to_the_person_analysed(api: Api) -> None:
+    # Founder's rule (2026-11-12): only the person analysed sees their coaching (what went well, what to improve,
+    # suggestions); managers and owners see the scores, evidence and summary but never the coaching.
+    recording(api, "r-asha", "p-asha", "unit-1", 30)
+    analysis(api, "r-asha", "v1", 3.6, 10)
+    own = api.get("asha", "/v1/recordings/r-asha/analysis").json()
+    assert own["coaching_private"] is False and own["strengths"] == ["Plain words."] and own["gaps"] == ["Few checks."]
+    assert own["suggestions"] == [{"text": "Ask a student to explain.", "utterance_id": "u0001", "start_ms": 9_000}]
+    for viewer in ("owner", "manager"):
+        body = api.get(viewer, "/v1/recordings/r-asha/analysis").json()
+        assert body["coaching_private"] is True and body["overall"] == 3.6 and body["summary"] == "A clear lesson."
+        text = json.dumps(body)
+        assert "Plain words." not in text and "Few checks." not in text and "Ask a student" not in text
 
 
 def test_unverified_dimensions_show_nothing_but_their_name(api: Api) -> None:

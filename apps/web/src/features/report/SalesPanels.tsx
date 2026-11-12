@@ -2,6 +2,7 @@
 // went well and what to fix first; the agreed next step in a dark card; and "Talk and listen", the talk shares and
 // counts computed in code from the transcript (golden rule 5: numbers come from code, never the AI).
 
+import { PrivateCoachingNote } from "./PrivateCoachingNote";
 import { useId } from "react";
 
 import { cx, scoreBand } from "../../design";
@@ -140,6 +141,11 @@ export function SalesOverall({
           {rest.length > 0 && <p className="m-0 text-sm text-ink-2">{rest.join(" ")}</p>}
         </div>
       </div>
+      {analysis.coaching_private && (
+        <div className="border-t border-line-subtle px-6 py-4">
+          <PrivateCoachingNote firstName={firstName} />
+        </div>
+      )}
       {(analysis.strengths.length > 0 || analysis.suggestions.length > 0) && (
         <div className="grid gap-x-8 gap-y-5 border-t border-line-subtle px-6 py-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))]">
           {analysis.strengths.length > 0 && (

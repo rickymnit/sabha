@@ -313,11 +313,6 @@ export interface RecordingQuery {
   tab?: "decision" | null;
 }
 
-export interface ShareResult {
-  shared: string[];
-  skipped: string[];
-}
-
 /** GET /v1/rubrics and /v1/rubrics/{id} (services/rubrics.py): read-only, for everyone signed in. */
 export interface RubricVersion {
   id: string;

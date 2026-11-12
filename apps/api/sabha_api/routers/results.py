@@ -189,13 +189,16 @@ async def get_analysis(
 ) -> dict[str, Any]:  # fmt: skip
     """Everything the report page shows, in one payload for the recording's state: processing (with the stage),
     failed or needs_review (with plain-language reasons), or completed/partial (verified dimensions with their
-    quotes, metrics computed in code, synthesis, phases, model info). Viewing a report is audited (analysis.view).
+    quotes, metrics computed in code, synthesis, phases, model info). The coaching (strengths, gaps, suggestions) is
+    private to the person analysed: anyone else gets them empty with `coaching_private` true. Viewing a report is
+    audited (analysis.view).
     The shape is apps/web/src/features/report/types.ts AnalysisPayload, field for field."""
     recording = await service.visible_recording(principal, recording_id, recordings, people)
     tenant = await found.tenant(principal.tenant_id)
     person_label = tenant.labels.person if tenant is not None else "Staff"
+    coaching = await service.coaching_visible(principal, recording, people)
     payload, analysis = await service.analysis_payload(recording, analyses, reader, person_label=person_label,
-                                                       analysis_id=analysis_id)  # fmt: skip
+                                                       coaching=coaching, analysis_id=analysis_id)  # fmt: skip
     payload = await disputes.annotate_report(payload, principal, recording, analysis, scores=scores,
                                              disputes=dispute_repo)  # fmt: skip
     if analysis is not None and payload["status"] in ("completed", "partial"):

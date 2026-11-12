@@ -244,8 +244,11 @@ export interface AnalysisReport {
   summary: string;
   strengths: string[];
   gaps: string[];
-  /** Exactly three. */
+  /** Exactly three (empty when the coaching is private to someone else). */
   suggestions: Suggestion[];
+  /** Coaching (strengths, gaps, suggestions) is private to the person analysed; true: this viewer is someone else
+   * and those lists are empty. */
+  coaching_private?: boolean;
   phases?: Phase[] | null;
   /** False for an earlier version of a re-analysed recording (shown as history). */
   is_latest?: boolean;

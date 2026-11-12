@@ -594,6 +594,31 @@ def report_payload(
     }
 
 
+PRIVATE_COACHING = ("strengths", "gaps", "suggestions")
+"""Report fields that are the person's own coaching (founder's rule, 2026-11-12)."""
+
+
+async def coaching_visible(principal: Principal, recording: Recording, people: TenantRepo[Person]) -> bool:
+    """Coaching is private to the person analysed: only the user linked to the recording's person sees it, whatever
+    their role. A recording with no person analysed (a meeting) has no one's private coaching."""
+    if recording.person_id is None:
+        return True
+    own = await _own_person(principal, people)
+    return own is not None and own.id == recording.person_id
+
+
+def hide_coaching(payload: dict[str, Any], visible: bool) -> dict[str, Any]:
+    """Empties the private coaching fields of a report payload unless the viewer may see them, and says so in
+    `coaching_private` so the page can explain why they are empty."""
+    if "analysis_id" not in payload:
+        return payload
+    payload["coaching_private"] = not visible
+    if not visible:
+        for key in PRIVATE_COACHING:
+            payload[key] = []
+    return payload
+
+
 def shown_ticket(ticket: dict[str, Any] | None) -> dict[str, Any] | None:
     """Reception: the ticket with its verified quotes. Tickets stored before quotes were asked for (2026-10-26) have
     none, so they are not shown (golden rule 5)."""
@@ -608,10 +633,12 @@ async def analysis_payload(
     reader: ArtefactReader,
     *,
     person_label: str,
+    coaching: bool,
     analysis_id: str | None = None,
 ) -> tuple[dict[str, Any], Analysis | None]:
     """The report payload of the recording's latest analysis, or of an earlier version (`analysis_id`, which must
-    be one of this recording's; 404 otherwise). `is_latest` says which it is."""
+    be one of this recording's; 404 otherwise). `is_latest` says which it is. `coaching`: whether the viewer may see
+    the private coaching (coaching_visible)."""
     found = await analyses.find({"recording_id": recording.id}, sort=[("created_at", -1)], limit=1)
     newest = found[0] if found else None
     analysis = newest
@@ -626,6 +653,7 @@ async def analysis_payload(
         earlier = await analyses.find(others, sort=[("created_at", -1)], limit=20)
         history = [a.overall_score for a in earlier if a.overall_score is not None]
     payload = report_payload(recording, analysis, report, person_label=person_label, history=history)
+    payload = hide_coaching(payload, coaching)
     if analysis is not None and "analysis_id" in payload:
         payload["is_latest"] = newest is not None and analysis.id == newest.id
     return payload, analysis

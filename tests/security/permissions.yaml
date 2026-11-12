@@ -135,6 +135,8 @@ routes:
 
   GET /v1/recordings/{recording_id}/analysis:
     # Same rule; audited (analysis.view). Evidence is redacted for everyone (2026-10-19).
+    # Coaching (strengths, gaps, suggestions) is private to the person analysed (founder, 2026-11-12): everyone
+    # else gets 200 with them empty and coaching_private true (apps/api/tests/test_results.py).
     anonymous: 401
     owner: 200
     admin: 200

@@ -17,7 +17,6 @@ import {
   useReanalyse,
   useRecording,
   useRubric,
-  useShareRecordings,
   useTranscript,
 } from "../api/hooks";
 import { useSession } from "../session/session";
@@ -27,8 +26,7 @@ import type { DisputeDraft } from "../features/disputes/types";
 import { EraseDialog } from "../features/erasure/EraseDialog";
 import { ReasonDialog, STAGE_NAMES, TechnicalDetails } from "../features/processing";
 import { ReanalyseDialog, VersionPicker, versionLabel } from "../features/reanalysis";
-import { CoachingSteps, RecordingReport, SharedNote } from "../features/report";
-import { ShareDialog } from "../features/share/ShareDialog";
+import { RecordingReport, SharedNote } from "../features/report";
 import type { PlaybackUrl } from "../features/transcript";
 import { formatDateTime, viewerRole } from "../app/format";
 import { RESOLVERS } from "../app/nav";
@@ -57,8 +55,6 @@ export function RecordingPage() {
   const [deciding, setDeciding] = useState<"retry" | "abandon" | null>(null);
   const erasure = useErasure();
   const [erasing, setErasing] = useState(false);
-  const share = useShareRecordings();
-  const [sharing, setSharing] = useState(false);
   const rubric = useRubric(analysis.data && "rubric" in analysis.data ? analysis.data.rubric.id : undefined);
   const analysisId = analysis.data && "analysis_id" in analysis.data ? analysis.data.analysis_id : undefined;
   const submitDispute = useCallback(
@@ -163,30 +159,20 @@ export function RecordingPage() {
   const canReanalyse = isAdmin && recording.data.status === "COMPLETED" && !version;
   const recordingWord = me.tenant.labels.recording.toLowerCase();
   const detail = recording.data;
-  const firstName = detail.person?.name.split(" ")[0] ?? "";
   const staffViewer = me.user.role === "staff";
-  const canShare = !staffViewer && !isMeeting && detail.status === "COMPLETED" && Boolean(detail.person) && !version;
   const menu: MenuItem[] = [
     ...(canReanalyse ? [{ label: `Re-analyse this ${recordingWord}`, onSelect: () => setReanalysing(true) }] : []),
     ...(me.user.role === "owner"
       ? [{ label: `Erase this ${recordingWord}`, danger: true, onSelect: () => setErasing(true) }]
       : []),
   ];
-  const actions =
-    menu.length > 0 || canShare ? (
-      <>
-        <Menu label="More actions" items={menu} />
-        {canShare && <Button onClick={() => setSharing(true)}>Share with {firstName}</Button>}
-      </>
-    ) : undefined;
-  const readyAt = analysis.data && "created_at" in analysis.data ? analysis.data.created_at : undefined;
-  const banner = staffViewer ? (
-    detail.share_note && detail.shared_by_name ? (
+  // Coaching is private to the person analysed (founder, 2026-11-12), so there is no "Share with" step any more;
+  // a note a manager sent earlier still shows to the person.
+  const actions = menu.length > 0 ? <Menu label="More actions" items={menu} /> : undefined;
+  const banner =
+    staffViewer && detail.share_note && detail.shared_by_name ? (
       <SharedNote from={detail.shared_by_name} note={detail.share_note} />
-    ) : undefined
-  ) : canShare && readyAt ? (
-    <CoachingSteps readyAt={readyAt} sharedAt={detail.shared_at} firstName={firstName} />
-  ) : undefined;
+    ) : undefined;
   const levels = (key: string) => rubric.data?.dimensions.find((d) => d.key === key)?.scale;
   return (
     <div className="flex flex-col gap-4">
@@ -291,22 +277,6 @@ export function RecordingPage() {
         levels={levels}
         disputeLabel={staffViewer ? "Dispute this score" : "Ask for a score review"}
       />
-      {sharing && detail.person && (
-        <ShareDialog
-          who={firstName}
-          recordingWord={recordingWord}
-          count={1}
-          onSubmit={async (note) => {
-            await share.mutateAsync({ recording_ids: [id], note });
-            toast.show({
-              tone: "success",
-              title: `Shared with ${firstName}`,
-              message: "They get an email with a link.",
-            });
-          }}
-          onClose={() => setSharing(false)}
-        />
-      )}
       <TechnicalDetails
         recordingId={id}
         processing={isAdmin ? processing.data : undefined}

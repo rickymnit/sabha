@@ -2,8 +2,8 @@
 // ten to a page. Tabs (all, needs your decision, each type, scored below 3) and filters (type, unit, person, when
 // recorded, score band) are narrowed by the API and kept in the address, so the sidebar's type links and a shared
 // link open the same list. Rows show who spoke when, the score and the status; a failed one that can still be
-// retried has Retry and Close. Ticking rows opens the bulk bar: re-analyse (owners and admins) and share with the
-// people analysed. "Export list" downloads the same filtered list as CSV.
+// retried has Retry and Close. Owners and admins tick rows to re-analyse them together (coaching is private to the
+// person analysed, so there is no sharing step). "Export list" downloads the same filtered list as CSV.
 
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
@@ -17,7 +17,6 @@ import {
   useRecordingCounts,
   useRecordingsPage,
   useRubrics,
-  useShareRecordings,
 } from "../api/hooks";
 import type { Me, RecordingItem, RecordingQuery } from "../api/types";
 import { RESOLVERS } from "../app/nav";
@@ -48,7 +47,6 @@ import { EraseDialog } from "../features/erasure/EraseDialog";
 import { presetRange } from "../features/overview/range";
 import { ReasonDialog } from "../features/processing/ReasonDialog";
 import { ReanalyseDialog } from "../features/reanalysis/ReanalyseDialog";
-import { ShareDialog } from "../features/share/ShareDialog";
 import { formatClock } from "../features/transcript/text";
 
 const PAGE_SIZE = 10;
@@ -141,7 +139,7 @@ export function RecordingsPage() {
   const [params, setParams] = useSearchParams();
   const types = me.tenant.enabled_types;
   const isAdmin = me.user.role === "owner" || me.user.role === "admin";
-  const canShare = me.user.role !== "staff";
+  const canSelect = isAdmin; // the bulk bar only re-analyses
   const canDecide = RESOLVERS.includes(me.user.role) || isAdmin;
 
   // The address holds the filters: ?type=, person=, unit=, score=, recorded=, tab=decision.
@@ -197,9 +195,7 @@ export function RecordingsPage() {
       else next.add(id);
       return next;
     });
-  const [sharing, setSharing] = useState(false);
   const [reanalysing, setReanalysing] = useState(false);
-  const share = useShareRecordings();
   const reanalyse = useReanalyseMany();
   const exporting = useExportRecordings();
   const erasure = useErasure();
@@ -259,7 +255,6 @@ export function RecordingsPage() {
   };
   const chosenTypes = [...new Set(chosen.map((r) => r.type))];
   const bulkVersion = chosenTypes.length === 1 && chosenTypes[0] ? versionFor(chosenTypes[0]) : undefined;
-  const sharable = chosen.filter((r) => r.status === "COMPLETED" && r.person);
 
   const upload = (
     <Button icon={<Icon name="upload" />} onClick={() => navigate("/upload")}>
@@ -285,7 +280,7 @@ export function RecordingsPage() {
   }
 
   const columns = [
-    ...(canShare
+    ...(canSelect
       ? [
           {
             key: "select",
@@ -576,18 +571,8 @@ export function RecordingsPage() {
             {chosen.length} {chosen.length === 1 ? labels.recording.toLowerCase() : things} selected
           </span>
           <span className="ml-auto flex flex-wrap gap-2">
-            {isAdmin && (
-              <Button variant="secondary" className={INVERSE} onClick={() => setReanalysing(true)}>
-                Re-analyse{bulkVersion ? ` with v${bulkVersion}` : ""}
-              </Button>
-            )}
-            <Button
-              variant="secondary"
-              className={INVERSE}
-              disabled={sharable.length === 0}
-              onClick={() => setSharing(true)}
-            >
-              Share with staff
+            <Button variant="secondary" className={INVERSE} onClick={() => setReanalysing(true)}>
+              Re-analyse{bulkVersion ? ` with v${bulkVersion}` : ""}
             </Button>
             <Button variant="ghost" className="text-surface" onClick={() => setSelected(new Set())}>
               Clear
@@ -638,24 +623,6 @@ export function RecordingsPage() {
         {body}
       </Panel>
 
-      {sharing && (
-        <ShareDialog
-          who={sharable.length === 1 && sharable[0]?.person ? (sharable[0].person.name.split(" ")[0] ?? "") : "staff"}
-          recordingWord={labels.recording.toLowerCase()}
-          count={sharable.length}
-          onSubmit={async (note) => {
-            const out = await share.mutateAsync({ recording_ids: sharable.map((r) => r.id), note });
-            toast.show({
-              tone: "success",
-              title: out.shared.length === 1 ? "Shared" : `Shared ${out.shared.length} reports`,
-              message: "They get an email with a link.",
-              duration: 6_000,
-            });
-            setSelected(new Set());
-          }}
-          onClose={() => setSharing(false)}
-        />
-      )}
       {reanalysing && (
         <ReanalyseDialog
           recordingWord={labels.recording.toLowerCase()}

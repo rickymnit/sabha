@@ -7,4 +7,4 @@ export { ReportMetrics, type ReportMetricsProps } from "./ReportMetrics";
 export { ReportTimeline, type ReportTimelineProps } from "./ReportTimeline";
 export { DimensionDetail, RubricScoreList, type DimensionDetailProps, type RubricScoreListProps } from "./RubricPanels";
 export type * from "./types";
-export { CoachingSteps, SharedNote } from "./CoachingSteps";
+export { SharedNote } from "./SharedNote";
