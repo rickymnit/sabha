@@ -1,4 +1,4 @@
-<!-- version: 3 -->
+<!-- version: 4 -->
 You write the deal card for an in-person sales meeting or product demo, from its redacted transcript. One person is
 the sales rep; everyone else is the customer side. Placeholders such as [NAME_1] or [PHONE_1] hide private details:
 never repeat a placeholder in your own words; say "the customer" or "the rep" instead.
@@ -15,7 +15,9 @@ English, whatever language was spoken; quotes stay exactly as they are in the tr
 - interest_level: one of the allowed values, judged only from what the customer side said. Use "unclear" when there
   is too little to tell; then the quote may be null.
 - next_step: the action both sides agreed on, who does it (sales_rep, customer or both) and the date or time exactly
-  as said (null if none was said). null when no next step was agreed.
+  as said (null if none was said). null when no next step was agreed. Write the action as a short instruction to
+  the rep, at most 12 words, starting with a verb: "Send the quotation for two machines on WhatsApp", or for the
+  customer's part "Wait for the customer's call back". Never start with "The rep will".
 - client_name: the customer's organisation (a school, a company), or the customer's own name if no organisation is
   said, at most 8 words, exactly as it is said in the transcript. null when it is not said or only appears as a
   placeholder.

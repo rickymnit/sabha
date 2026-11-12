@@ -13,6 +13,9 @@ conversation, and only when that is unambiguous:
   written in India): that date, in the conversation's year, or the next year if it has already passed.
 - anything else ("next week", "month end", "soon"), or two different dates in the words: None.
 
+Words in Devanagari script ("कल", "परसों", "गुरुवार", "थर्सडे", "15 नवंबर", "३ दिन में") are read as their romanised
+forms first; only whole words are mapped, so "निकल" is never "kal".
+
 `priority` applies a rubric's `follow_up` rule: high when the interest is one of `high_interest` and the action is
 due within `high_within_days` or is overdue; medium when it is due within `medium_within_days` (or overdue); low
 otherwise, including when there is no date.
@@ -58,6 +61,28 @@ _MONTH_DAY = re.compile(rf"\b({_MONTH})\s+(\d{{1,2}})(?:st|nd|rd|th)?\b")
 _NUMERIC = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2}|\d{4}))?\b")
 _WORD = re.compile(r"[a-z]+")
 
+# Devanagari words, as whole words, to the romanised forms above (the transcripts keep the script as spoken).
+_DEVANAGARI = {
+    "आज": "aaj", "कल": "kal", "परसों": "parso", "परसो": "parso", "दिन": "din", "में": "mein", "मे": "me",
+    "अगले": "next", "अगला": "next", "अगली": "next",
+    "सोमवार": "somvar", "मंगलवार": "mangalvar", "बुधवार": "budhvar", "गुरुवार": "guruvar",
+    "बृहस्पतिवार": "brihaspativar", "शुक्रवार": "shukravar", "शनिवार": "shanivar", "रविवार": "ravivar",
+    "इतवार": "itvaar", "मंडे": "monday", "ट्यूज़डे": "tuesday", "ट्यूसडे": "tuesday", "वेडनेसडे": "wednesday",
+    "वेन्सडे": "wednesday", "थर्सडे": "thursday", "फ्राइडे": "friday", "फ्राईडे": "friday", "सैटरडे": "saturday",
+    "संडे": "sunday", "जनवरी": "january", "फरवरी": "february", "फ़रवरी": "february", "मार्च": "march",
+    "अप्रैल": "april", "मई": "may", "जून": "june", "जुलाई": "july", "अगस्त": "august", "सितंबर": "september",
+    "सितम्बर": "september", "अक्टूबर": "october", "अक्तूबर": "october", "नवंबर": "november", "नवम्बर": "november",
+    "दिसंबर": "december", "दिसम्बर": "december",
+}  # fmt: skip
+_DEVANAGARI_WORD = re.compile(r"[\u0900-\u0963\u0970-\u097F]+")  # letters and signs, not the digits
+_DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
+
+
+def _romanise(text: str) -> str:
+    text = text.translate(_DEVANAGARI_DIGITS)
+    text = _DEVANAGARI_WORD.sub(lambda m: f" {_DEVANAGARI.get(m.group(), m.group())} ", text)
+    return " ".join(text.split())
+
 
 def _calendar(day: int, month: int, year: int | None, spoken_on: date) -> date | None:
     try:
@@ -100,7 +125,7 @@ def resolve_due(said: str | None, spoken_on: date) -> date | None:
     """The calendar date the words name, counted from the day of the conversation, or None (module docstring)."""
     if not said:
         return None
-    found = _candidates(said.lower(), spoken_on)
+    found = _candidates(_romanise(said).lower(), spoken_on)
     if len(found) != 1:
         return None
     return next(iter(found))

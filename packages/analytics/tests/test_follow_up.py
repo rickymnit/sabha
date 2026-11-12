@@ -31,6 +31,12 @@ MONDAY = date(2026, 11, 9)
         ("December 2", date(2026, 12, 2)),
         ("2/1", date(2027, 1, 2)),  # day/month, already passed this year
         ("20-11-2026", date(2026, 11, 20)),
+        ("कल, 12 बजे के बाद", date(2026, 11, 10)),  # Devanagari, as the transcripts keep it
+        ("परसों तक", date(2026, 11, 11)),
+        ("गुरुवार को", date(2026, 11, 12)),
+        ("थर्सडे 4 बजे", date(2026, 11, 12)),
+        ("15 नवंबर", date(2026, 11, 15)),
+        ("३ दिन में", date(2026, 11, 12)),
     ],
 )
 def test_clear_words_give_a_date(said: str, expected: date) -> None:
@@ -39,7 +45,21 @@ def test_clear_words_give_a_date(said: str, expected: date) -> None:
 
 @pytest.mark.parametrize(
     "said",
-    [None, "", "next week", "month end", "soon", "next Thursday", "Thursday or Friday", "31/2", "kal ya parso"],
+    [
+        None,
+        "",
+        "next week",
+        "month end",
+        "soon",
+        "next Thursday",
+        "Thursday or Friday",
+        "31/2",
+        "kal ya parso",
+        "अभी",
+        "निकल गया",
+        "कल तक; थर्सडे 4 बजे",
+        "अगले सोमवार",
+    ],
 )
 def test_unclear_words_give_no_date(said: str | None) -> None:
     assert resolve_due(said, MONDAY) is None
