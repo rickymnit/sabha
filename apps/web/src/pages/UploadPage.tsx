@@ -223,6 +223,8 @@ export function UploadPage() {
         ? { ...me.tenant.labels, person: "Sales rep", person_plural: "Sales reps" }
         : me.tenant.labels;
   const [personId, setPersonId] = useState("");
+  const [interaction, setInteraction] = useState<"call" | "meeting">("meeting");
+  const [clientName, setClientName] = useState("");
   const [consentOnFile, setConsentOnFile] = useState(() => rememberedConsent() !== "");
   const [consentRef, setConsentRef] = useState(rememberedConsent);
 
@@ -259,6 +261,8 @@ export function UploadPage() {
         consentRef: consent || null,
         token,
         expectedDurationMs: durations.current.get(item.key) ?? null,
+        interaction: type === "sales" ? interaction : null,
+        clientName: type === "sales" ? clientName : null,
         onProgress: (sent, total) =>
           dispatch({ type: "set", key: item.key, state: { kind: "uploading", sent, total } }),
       });
@@ -417,6 +421,29 @@ export function UploadPage() {
               }))}
               hint={TYPE_INFO[type].description}
             />
+          )}
+          {type === "sales" && (
+            <>
+              <ChoiceCards
+                legend="Call or meeting"
+                value={interaction}
+                onChange={setInteraction}
+                disabled={running}
+                options={[
+                  { value: "call", label: "Phone call" },
+                  { value: "meeting", label: "Meeting" },
+                ]}
+              />
+              <Input
+                label="Client (optional)"
+                placeholder="For example: Sunrise Public School"
+                value={clientName}
+                maxLength={120}
+                disabled={running}
+                onChange={(e) => setClientName(e.target.value)}
+                hint="Left blank, Sabha picks up the client's name from the conversation when it is said."
+              />
+            </>
           )}
           {staffSelf && onlyPerson ? (
             <div className="flex flex-col gap-1">

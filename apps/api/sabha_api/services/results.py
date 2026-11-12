@@ -234,6 +234,8 @@ class RecordingOut(BaseModel):
     recorded_at: datetime | None = None  # when it was recorded, if known; else see created_at
     shared_at: datetime | None = None  # a manager shared the report with the person (UI v2)
     retryable: bool = False  # failed with an open dead letter: owners and admins may retry or close it
+    interaction: Literal["call", "meeting"] | None = None  # sales: a call or a meeting (older ones: meeting)
+    client_name: str | None = None  # sales: the client as typed at upload
 
 
 class RecordingPage(BaseModel):
@@ -288,6 +290,13 @@ def summary(analysis: Analysis) -> AnalysisSummary:
     )  # fmt: skip
 
 
+def interaction_of(recording: Recording) -> Literal["call", "meeting"] | None:
+    """A sales recording is a call or a meeting; one uploaded before the choice existed counts as a meeting."""
+    if recording.type is not ConversationType.SALES:
+        return None
+    return recording.interaction or "meeting"
+
+
 def status_note(recording: Recording) -> str | None:
     if recording.status.value not in ("FAILED", "NEEDS_REVIEW"):
         return None
@@ -335,7 +344,7 @@ async def recording_out(
             overall_score=latest[r.id].overall_score if r.id in latest else None, audio_deleted_at=r.audio_deleted_at,
             source=r.source,
             speaker_strip=strips.get(r.id), recorded_at=r.recorded_at, shared_at=r.shared_at,
-            retryable=r.id in open_letters,
+            retryable=r.id in open_letters, interaction=interaction_of(r), client_name=r.client_name,
         )
         for r in recordings
     ]  # fmt: skip

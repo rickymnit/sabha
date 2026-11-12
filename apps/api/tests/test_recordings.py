@@ -276,6 +276,19 @@ def test_a_type_the_tenant_has_not_enabled_is_refused(api: Api) -> None:
     problem(api.create("owner-a", {**LESSON, "type": "sales"}), 422, "type_not_enabled")
 
 
+def test_a_sales_recording_is_a_call_or_a_meeting_with_an_optional_client(api: Api) -> None:
+    api.db.tenants.update_one({"_id": "tenant-b"}, {"$addToSet": {"enabled_types": "sales"}})
+    sale = {**LESSON, "type": "sales"}
+    call = api.create("owner-b", {**sale, "interaction": "call", "client_name": "  Sunrise Public School "})
+    plain = api.create("owner-b", {**sale, "client_name": "  "})
+    assert call.status_code == plain.status_code == 201, (call.text, plain.text)
+    doc = api.db.recordings.find_one({"_id": call.json()["recording_id"]})
+    assert doc is not None and (doc["interaction"], doc["client_name"]) == ("call", "Sunrise Public School")
+    doc = api.db.recordings.find_one({"_id": plain.json()["recording_id"]})
+    assert doc is not None and (doc["interaction"], doc["client_name"]) == ("meeting", None)  # the default
+    problem(api.create("owner-a", {**LESSON, "interaction": "call"}), 422, "interaction_not_allowed")
+
+
 @pytest.mark.parametrize(
     ("file_name", "content_type"),
     [("lesson.exe", "application/octet-stream"), ("lesson.mp3", "video/mp4"), ("lesson", "audio/mpeg")],

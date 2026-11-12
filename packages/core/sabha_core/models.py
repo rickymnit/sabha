@@ -256,6 +256,10 @@ class CostEstimate(BaseModel):
     made_at: UtcDatetime = Field(default_factory=utc_now)
 
 
+Interaction = Literal["call", "meeting"]
+CLIENT_NAME_MAX = 120
+
+
 class Recording(TenantDoc):
     """A recorded conversation. Status changes only through sabha_core.state.transition (CLAUDE.md).
 
@@ -314,6 +318,11 @@ class Recording(TenantDoc):
     shared_at: UtcDatetime | None = None
     shared_by: str | None = None  # user id
     share_note: str | None = Field(default=None, max_length=500)
+    # Sales (founder's dashboard doc, 2026-11-12): a phone call or a meeting, counted apart on the rep's dashboard
+    # (None on other types; an older sales recording without it counts as a meeting), and the client as typed at
+    # upload. When the client is left blank, the analysis may name it from the conversation (quote-backed).
+    interaction: Interaction | None = None
+    client_name: str | None = Field(default=None, max_length=CLIENT_NAME_MAX)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

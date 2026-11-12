@@ -47,7 +47,19 @@ from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import ApiError, ConflictError, ForbiddenError, NotFoundError
-from sabha_core.models import AuditEntry, CostEstimate, OutboxEvent, Person, Recording, Tenant, Unit, new_id, utc_now
+from sabha_core.models import (
+    CLIENT_NAME_MAX,
+    AuditEntry,
+    CostEstimate,
+    Interaction,
+    OutboxEvent,
+    Person,
+    Recording,
+    Tenant,
+    Unit,
+    new_id,
+    utc_now,
+)
 from sabha_core.outbox import READY, record_event_async, record_transition_async
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
@@ -84,13 +96,16 @@ class RecordingIn(BaseModel):
     recorded_at: datetime | None = None
     # The length the browser measured before uploading; with it the expected cost is worked out and kept (costs.py).
     expected_duration_ms: int | None = Field(default=None, ge=1, le=24 * 3_600_000)
+    # Sales only: a phone call or a meeting (default meeting), and the client's name if the uploader knows it.
+    interaction: Interaction | None = None
+    client_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=CLIENT_NAME_MAX)] | None = None
 
     @field_validator("content_type")
     @classmethod
     def _media_type(cls, value: str) -> str:
         return value.split(";", 1)[0].strip().lower()  # "audio/webm;codecs=opus" -> "audio/webm"
 
-    @field_validator("consent_ref")
+    @field_validator("consent_ref", "client_name")
     @classmethod
     def _blank_is_none(cls, value: str | None) -> str | None:
         return value or None
@@ -124,6 +139,10 @@ class PartsOut(BaseModel):
 
 class TypeNotEnabledError(ApiError):
     status, code, title = 422, "type_not_enabled", "Type not enabled"
+
+
+class InteractionNotAllowedError(ApiError):
+    status, code, title = 422, "interaction_not_allowed", "Only sales recordings are calls or meetings"
 
 
 class UnsupportedFormatError(ApiError):
@@ -284,6 +303,9 @@ async def create(
 ) -> UploadOut:
     if body.type not in tenant.enabled_types:
         raise TypeNotEnabledError(f"{body.type} recordings are not enabled for your organisation.")
+    sales = body.type is ConversationType.SALES
+    if body.interaction is not None and not sales:
+        raise InteractionNotAllowedError("Only sales recordings are marked as a call or a meeting.")
     transcript = _check_format(body.file_name, body.content_type) in TRANSCRIPT_FORMATS
     if body.size_bytes > settings.upload_max_bytes:
         raise FileTooLargeError(f"Files may be at most {settings.upload_max_bytes} bytes.")
@@ -322,6 +344,8 @@ async def create(
         part_count=part_count,
         created_by=principal.user_id,
         cost_estimate=cost_estimate,
+        interaction=(body.interaction or "meeting") if sales else None,
+        client_name=body.client_name,
     )
     try:
         async with transactions.run() as session:

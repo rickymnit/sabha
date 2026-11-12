@@ -37,16 +37,17 @@ class ListFilter(BaseModel):
     recorded_from: date | None = None
     recorded_to: date | None = None
     tab: Literal["decision"] | None = None
+    interaction: Literal["call", "meeting"] | None = None  # sales calls or meetings (older sales ones are meetings)
 
 
 def list_filter(
     type: ConversationType | None = None, person_id: str | None = None, unit_id: str | None = None,
     score: ScoreBand | None = None, recorded_from: date | None = None, recorded_to: date | None = None,
-    tab: Literal["decision"] | None = None,
+    tab: Literal["decision"] | None = None, interaction: Literal["call", "meeting"] | None = None,
 ) -> ListFilter:  # fmt: skip
     """The filters as query parameters (a FastAPI dependency)."""
     return ListFilter(type=type, person_id=person_id, unit_id=unit_id, score=score, recorded_from=recorded_from,
-                      recorded_to=recorded_to, tab=tab)  # fmt: skip
+                      recorded_to=recorded_to, tab=tab, interaction=interaction)  # fmt: skip
 
 
 def band(score: float) -> ScoreBand:
@@ -89,6 +90,10 @@ async def filter_conditions(
         conditions.append({"person_id": f.person_id})
     if f.type is not None:
         conditions.append({"type": f.type.value})
+    if f.interaction == "call":
+        conditions.append({"type": "sales", "interaction": "call"})
+    elif f.interaction == "meeting":
+        conditions.append({"type": "sales", "interaction": {"$ne": "call"}})
     if f.unit_id is not None:
         conditions.append({"unit_id": {"$in": sorted(subtree(await units.find({}), [f.unit_id]))}})
     if f.score is not None:

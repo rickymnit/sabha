@@ -33,6 +33,9 @@ export interface UploadInput {
   unitId?: string | null;
   /** The length the browser measured; the server keeps the expected cost worked out from it. */
   expectedDurationMs?: number | null;
+  /** Sales only: a phone call or a meeting, and the client's name if known. */
+  interaction?: "call" | "meeting" | null;
+  clientName?: string | null;
   /** Bytes uploaded so far, after each part. */
   onProgress?: (sent: number, total: number) => void;
   /** For tests: fetch for the part PUTs, and a pause between retries. */
@@ -105,6 +108,8 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       consent_ref: input.consentRef,
       ...(input.expectedDurationMs ? { expected_duration_ms: input.expectedDurationMs } : {}),
       ...(input.unitId ? { unit_id: input.unitId } : {}),
+      ...(input.interaction ? { interaction: input.interaction } : {}),
+      ...(input.clientName?.trim() ? { client_name: input.clientName.trim() } : {}),
     },
   });
   const etags = new Map<number, string>();

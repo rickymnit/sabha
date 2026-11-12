@@ -65,6 +65,10 @@ export interface RecordingItem {
   shared_at?: string | null;
   /** Failed and not yet closed: owners and admins may retry or close it. */
   retryable?: boolean;
+  /** Sales: a phone call or a meeting (older ones count as meetings); other types null. */
+  interaction?: "call" | "meeting" | null;
+  /** Sales: the client as typed at upload. */
+  client_name?: string | null;
 }
 
 export interface RecordingPage {
