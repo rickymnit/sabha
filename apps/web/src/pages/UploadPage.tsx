@@ -4,6 +4,7 @@
 // unprocessed, until consent is recorded; the page says so before and after.
 // Not in this version: resuming after the page is closed, so the page asks people to keep it open.
 
+import { MeetingRecorder } from "../features/workspace/MeetingRecorder";
 import { useReducer, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -311,6 +312,15 @@ export function UploadPage() {
       />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-5">
+          {type === "sales" && (
+            <MeetingRecorder
+              disabled={running}
+              onRecorded={(file) => {
+                setInteraction("meeting");
+                dispatch({ type: "add", files: [file] });
+              }}
+            />
+          )}
           <div
             onDragOver={(e) => {
               e.preventDefault();
