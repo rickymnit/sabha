@@ -4,7 +4,7 @@
 // payload contains.
 
 import { PrivateCoachingNote } from "./PrivateCoachingNote";
-import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Card, cx, scoreBand } from "../../design";
 
@@ -83,6 +83,8 @@ export interface RecordingReportProps {
   disputeLabel?: string;
   /** Sales: the rubric's words for the interest levels. */
   interestLabels?: Record<string, string>;
+  /** Open at this moment (ms, original timeline): the transcript goes to that line; nothing plays by itself. */
+  startAtMs?: number;
   /** Meetings: the voices in order of first speech, their names, and saving new names. */
   meeting?: {
     voices: string[];
@@ -110,6 +112,7 @@ export function RecordingReport({
   levels,
   disputeLabel,
   interestLabels,
+  startAtMs,
 }: RecordingReportProps) {
   const isReport = analysis.status === "completed" || analysis.status === "partial";
   const disputed = isReport
@@ -143,6 +146,7 @@ export function RecordingReport({
           meeting={meeting}
           levels={levels}
           interestLabels={interestLabels}
+          startAtMs={startAtMs}
           disputeLabel={disputeLabel}
         />
       )}
@@ -171,6 +175,7 @@ function ReportBody({
   levels,
   disputeLabel,
   interestLabels,
+  startAtMs,
 }: ReportBodyProps) {
   const [disputeOpen, setDisputeOpen] = useState(false);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
@@ -216,6 +221,15 @@ function ReportBody({
     },
     [noAudio, lastSeek, playing],
   );
+
+  // A link to a moment (?at= from the rep's interaction page): show that line once, without playing.
+  const startedAt = useRef(false);
+  useEffect(() => {
+    if (startAtMs === undefined || startedAt.current) return;
+    startedAt.current = true;
+    setCurrentMs(startAtMs);
+    transcriptRef.current?.scrollIntoView({ block: "start" });
+  }, [startAtMs]);
 
   const highlights = useMemo(
     () => (selected ? evidenceLines(utterances, selected.evidence) : new Map<number, number[]>()),

@@ -58,6 +58,35 @@ export const routes: RouteObject[] = [
                 path: "/progress",
                 ...page(() => import("../pages/MyProgressPage").then((m) => ({ Component: m.MyProgressPage }))),
               },
+              // A sales rep's own workspace (founder's Sales Executive dashboard doc, 2026-11-12).
+              {
+                path: "/my",
+                ...page(() =>
+                  import("../pages/workspace/MyOverviewPage").then((m) => ({ Component: m.MyOverviewPage })),
+                ),
+              },
+              {
+                path: "/my/interactions",
+                ...page(() =>
+                  import("../pages/workspace/MyInteractionsPage").then((m) => ({ Component: m.MyInteractionsPage })),
+                ),
+              },
+              {
+                path: "/my/interactions/:id",
+                ...page(() =>
+                  import("../pages/workspace/InteractionPage").then((m) => ({ Component: m.InteractionPage })),
+                ),
+              },
+              {
+                path: "/my/actions",
+                ...page(() => import("../pages/workspace/MyActionsPage").then((m) => ({ Component: m.MyActionsPage }))),
+              },
+              {
+                path: "/my/coaching",
+                ...page(() =>
+                  import("../pages/workspace/MyCoachingPage").then((m) => ({ Component: m.MyCoachingPage })),
+                ),
+              },
             ],
           },
           {

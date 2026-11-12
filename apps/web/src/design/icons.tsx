@@ -25,7 +25,10 @@ export type IconName =
   | "bell"
   | "message"
   | "phone"
-  | "download";
+  | "download"
+  | "checkList"
+  | "spark"
+  | "mic";
 
 const paths: Record<IconName, ReactNode> = {
   bell: <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2 2 0 0 0 4 0" />,
@@ -44,6 +47,16 @@ const paths: Record<IconName, ReactNode> = {
   ),
   recordings: <path d="M3 12h1M7 8v8M11 5v14M15 9v6M19 11v2" />,
   upload: <path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />,
+  checkList: <path d="M4 6.5l1.8 1.8L9 5M4 12.5l1.8 1.8L9 11M4 18.5l1.8 1.8L9 17M12 7h8M12 13h8M12 19h8" />,
+  spark: (
+    <path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4L12 3zM18.5 16l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+  ),
+  mic: (
+    <>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+    </>
+  ),
   people: (
     <>
       <circle cx="9" cy="8" r="3.5" />

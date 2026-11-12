@@ -938,3 +938,10 @@ def test_my_coaching_groups_my_scores_into_themes_with_my_practice_points(api: A
     assert themes["communication"]["score"] is None and body["focus"] == "discovery"
     assert [p["text"] for p in body["practice_points"]] == ["Ask who decides."]
     assert api.get("manager", "/v1/me/coaching").json() == {"themes": [], "focus": None, "practice_points": []}
+
+
+def test_me_names_my_person_and_the_kinds_of_conversation_i_have(api: Api) -> None:
+    api.db.tenants.update_one({"_id": T}, {"$set": {"enabled_types": ["teaching", "sales"]}})
+    sale(api, "s-1", "p-asha", recorded=utc_now(), interest="high", due=None)
+    assert api.get("asha", "/v1/me").json()["person"] == {"id": "p-asha", "name": "Asha", "types": ["sales"]}
+    assert api.get("manager", "/v1/me").json()["person"] is None  # no person linked

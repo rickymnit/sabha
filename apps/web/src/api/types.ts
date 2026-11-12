@@ -7,6 +7,8 @@ import type { Labels, TimeRange } from "../features/report/types";
 export type Role = "owner" | "admin" | "manager" | "reviewer" | "staff";
 
 export interface Me {
+  /** The person linked to this user, with the conversation types they have recordings of (null when none). */
+  person?: { id: string; name: string; types: ConversationType[] } | null;
   /** `title` is the job title shown under the name ("Coordinator, Class 6"); display only. */
   user: { id: string; email: string; name: string; role: Role; title: string | null; unit_ids: string[] };
   tenant: {
@@ -69,6 +71,10 @@ export interface RecordingItem {
   interaction?: "call" | "meeting" | null;
   /** Sales: the client as typed at upload. */
   client_name?: string | null;
+  /** Sales: the client's name as said in the conversation (when it was left blank at upload). */
+  client_said?: string | null;
+  /** Sales: the AI-suggested interest (a rubric value such as "high"). */
+  interest_level?: string | null;
 }
 
 export interface RecordingPage {
@@ -405,4 +411,54 @@ export interface ProductInfoList {
   items: ProductInfoItem[];
   /** Owners and admins may add, change and retire entries. */
   can_edit: boolean;
+}
+
+/** GET /v1/me/next-actions: the signed-in person's own next actions, highest priority first. */
+export interface NextActionItem {
+  recording_id: string;
+  title: string;
+  interaction: "call" | "meeting" | null;
+  client: string | null;
+  recorded_at: string;
+  action: string;
+  owner: "sales_rep" | "customer" | "both" | null;
+  /** Exactly as said ("Thursday 4 pm"). */
+  due_said: string | null;
+  /** The date it means (YYYY-MM-DD), when that is clear. */
+  due_date: string | null;
+  overdue: boolean;
+  priority: "high" | "medium" | "low";
+  interest: string | null;
+  interest_label: string | null;
+}
+
+/** GET /v1/me/summary: the person's calls and meetings this week or month and the one before. */
+export interface PeriodCounts {
+  start: string;
+  end: string;
+  calls: number;
+  meetings: number;
+  total: number;
+  score: number | null;
+  scored: number;
+}
+
+export interface MySummary {
+  period: "week" | "month";
+  current: PeriodCounts;
+  previous: PeriodCounts;
+}
+
+/** GET /v1/me/coaching: private coaching themes and the learning history. */
+export interface MyCoaching {
+  themes: { key: string; name: string; score: number | null; previous: number | null; count: number }[];
+  focus: string | null;
+  practice_points: {
+    recording_id: string;
+    title: string;
+    interaction: "call" | "meeting" | null;
+    client: string | null;
+    recorded_at: string;
+    text: string;
+  }[];
 }

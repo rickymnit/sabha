@@ -39,6 +39,9 @@ import {
   type TenantSettings,
   type TranscriptResponse,
   type UsageSummary,
+  type MyCoaching,
+  type MySummary,
+  type NextActionItem,
   type ProductInfoItem,
   type ProductInfoList,
 } from "./types";
@@ -80,18 +83,21 @@ export function useMe(): UseQueryResult<Me, ApiError> {
 export interface RecordingFilters {
   type?: string | null;
   personId?: string | null;
+  /** Sales calls or meetings only. */
+  interaction?: "call" | "meeting" | null;
 }
 
 export function useRecordings(filters: RecordingFilters = {}, pageSize = 20) {
   const { token } = useSession();
-  const { type = null, personId = null } = filters;
+  const { type = null, personId = null, interaction = null } = filters;
   return useInfiniteQuery({
-    queryKey: ["recordings", pageSize, type, personId, token],
+    queryKey: ["recordings", pageSize, type, personId, interaction, token],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ limit: String(pageSize) });
       if (pageParam) params.set("cursor", pageParam);
       if (type) params.set("type", type);
       if (personId) params.set("person_id", personId);
+      if (interaction) params.set("interaction", interaction);
       return apiFetch<RecordingPage>(`/v1/recordings?${params}`, { token });
     },
     initialPageParam: null as string | null,
@@ -670,4 +676,35 @@ export function useProductInfoChanges() {
       onSuccess: refresh,
     }),
   };
+}
+
+/** GET /v1/me/next-actions: your own next actions from your sales calls and meetings. */
+export function useMyNextActions(): UseQueryResult<{ items: NextActionItem[] }, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["my-next-actions", token],
+    queryFn: () => apiFetch<{ items: NextActionItem[] }>("/v1/me/next-actions", { token }),
+    enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/me/summary: your calls and meetings this week or month, and the one before. */
+export function useMySummary(period: "week" | "month"): UseQueryResult<MySummary, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["my-summary", period, token],
+    queryFn: () => apiFetch<MySummary>(`/v1/me/summary?period=${period}`, { token }),
+    placeholderData: (previous) => previous,
+    enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/me/coaching: your private coaching themes and practice points. */
+export function useMyCoaching(): UseQueryResult<MyCoaching, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["my-coaching", token],
+    queryFn: () => apiFetch<MyCoaching>("/v1/me/coaching", { token }),
+    enabled: Boolean(token),
+  });
 }

@@ -4,6 +4,7 @@
 import type { Me, Role } from "../api/types";
 import type { IconName } from "../design";
 import { capitalise } from "./format";
+import { isSalesRep } from "./workspace";
 
 export interface NavEntry {
   to: string;
@@ -19,7 +20,31 @@ export const ADMINS: Role[] = ["owner", "admin"];
 /** Who resolves reviews (ADR 0007): never staff, not even for their own recordings. */
 export const RESOLVERS: Role[] = ["owner", "admin", "manager", "reviewer"];
 
+/** A sales rep's own workspace (founder's Sales Executive dashboard doc, 2026-11-12): four simple pages. */
+function salesRepItems(): NavEntry[] {
+  const exact = (to: string) => (path: string) => path === to;
+  return [
+    { to: "/my", label: "Overview", icon: "overview", match: exact("/my") },
+    {
+      to: "/my/interactions",
+      label: "My interactions",
+      icon: "recordings",
+      match: (path) => path.startsWith("/my/interactions") || path.startsWith("/recordings/"),
+    },
+    { to: "/my/actions", label: "My next actions", icon: "checkList", match: exact("/my/actions") },
+    { to: "/my/coaching", label: "Private coaching", icon: "spark", match: exact("/my/coaching") },
+    { to: "/upload", label: "Add a recording", icon: "upload", match: exact("/upload") },
+    {
+      to: "/rubrics",
+      label: "Rubrics",
+      icon: "rubrics",
+      match: (path) => path === "/rubrics" || path.startsWith("/rubrics/"),
+    },
+  ];
+}
+
 export function navItems(me: Me): NavEntry[] {
+  if (isSalesRep(me)) return salesRepItems();
   const labels = me.tenant.labels;
   const entries: (NavEntry & { roles: Role[] })[] = [
     {

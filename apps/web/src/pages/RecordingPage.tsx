@@ -3,7 +3,7 @@
 // playback URL. While the recording is processing, the page refreshes itself (api/hooks.ts).
 
 import { useCallback, useState } from "react";
-import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
 import {
@@ -35,6 +35,8 @@ import { meetingView, reportRecording, roleLabels, voiceLabel } from "./recordin
 export function RecordingPage() {
   const me = useOutletContext<Me>();
   const { id = "" } = useParams();
+  const [params] = useSearchParams();
+  const startAt = params.get("at");
   const navigate = useNavigate();
   const api = useApi();
   const { token } = useSession();
@@ -276,6 +278,7 @@ export function RecordingPage() {
         banner={banner}
         levels={levels}
         interestLabels={rubric.data?.output_labels?.interest_level}
+        {...(startAt !== null && Number.isFinite(Number(startAt)) ? { startAtMs: Number(startAt) } : {})}
         disputeLabel={staffViewer ? "Dispute this score" : "Ask for a score review"}
       />
       <TechnicalDetails

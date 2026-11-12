@@ -236,6 +236,8 @@ class RecordingOut(BaseModel):
     retryable: bool = False  # failed with an open dead letter: owners and admins may retry or close it
     interaction: Literal["call", "meeting"] | None = None  # sales: a call or a meeting (older ones: meeting)
     client_name: str | None = None  # sales: the client as typed at upload
+    client_said: str | None = None  # sales: the client's name as said in the conversation (latest analysis)
+    interest_level: str | None = None  # sales: the AI-suggested interest (latest analysis), a rubric value
 
 
 class RecordingPage(BaseModel):
@@ -345,6 +347,8 @@ async def recording_out(
             source=r.source,
             speaker_strip=strips.get(r.id), recorded_at=r.recorded_at, shared_at=r.shared_at,
             retryable=r.id in open_letters, interaction=interaction_of(r), client_name=r.client_name,
+            client_said=latest[r.id].client_said if r.id in latest else None,
+            interest_level=latest[r.id].interest_level if r.id in latest else None,
         )
         for r in recordings
     ]  # fmt: skip
