@@ -130,12 +130,17 @@ SYNTHESIS = {"summary": "A clear lesson.", "strengths": ["Plain words."], "gaps"
                               "end_ms": 30_000}]}  # fmt: skip
 
 
+NEXT_TIME = {"question_to_ask": None, "explain_better": None, "left_out": 0,
+             "practice_point": {"text": "Pause after each question.", "evidence": {
+                 "quote": "Tell me", "utterance_id": "u0001", "start_ms": 9_000, "end_ms": 30_000}}}  # fmt: skip
+
+
 def analysis(api: Api, rid: str, version: str, score: float, minutes_ago: int, person: str = "p-asha",
              dimensions: list[dict[str, Any]] | None = None,
              status: Literal["COMPLETED", "NEEDS_REVIEW"] = "COMPLETED") -> str:  # fmt: skip
     key = f"{T}/{rid}/analyze@{version}/analysis@v1.json"
     report = {"version": "analysis@v1", "overall": {"score": score}, "dimensions": dimensions or DIMENSIONS,
-              "metrics": METRICS, "synthesis": SYNTHESIS,
+              "metrics": METRICS, "synthesis": SYNTHESIS, "next_time": NEXT_TIME,
               "phases": [{"phase": "introduction", "start_utterance_id": "u0000", "end_utterance_id": "u0000",
                           "start_ms": 0, "end_ms": 8_000}]}  # fmt: skip
     api.s3.put_object(Bucket="sabha-artefacts", Key=key, Body=json.dumps(report).encode())
@@ -680,11 +685,14 @@ def test_coaching_is_private_to_the_person_analysed(api: Api) -> None:
     own = api.get("asha", "/v1/recordings/r-asha/analysis").json()
     assert own["coaching_private"] is False and own["strengths"] == ["Plain words."] and own["gaps"] == ["Few checks."]
     assert own["suggestions"] == [{"text": "Ask a student to explain.", "utterance_id": "u0001", "start_ms": 9_000}]
+    assert own["next_time"]["practice_point"]["text"] == "Pause after each question."
     for viewer in ("owner", "manager"):
         body = api.get(viewer, "/v1/recordings/r-asha/analysis").json()
         assert body["coaching_private"] is True and body["overall"] == 3.6 and body["summary"] == "A clear lesson."
+        assert body["next_time"] is None
         text = json.dumps(body)
         assert "Plain words." not in text and "Few checks." not in text and "Ask a student" not in text
+        assert "Pause after" not in text
 
 
 def test_unverified_dimensions_show_nothing_but_their_name(api: Api) -> None:

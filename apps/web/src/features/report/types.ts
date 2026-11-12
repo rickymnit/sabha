@@ -172,7 +172,23 @@ export interface DealCard {
     due: string | null;
     evidence: CardEvidence;
   } | null;
+  /** The client's name as said in the conversation (cards from 2026-11-12 on). */
+  client_name?: { name: string; evidence: CardEvidence } | null;
   /** Items left out because their quote was not found in the transcript. */
+  left_out: number;
+}
+
+/** One coaching tip for the next conversation, with the moment it rests on. */
+export interface Tip {
+  text: string;
+  evidence: CardEvidence;
+}
+
+/** Sales v0.4 on: coaching for the next conversation, private to the person analysed (verified items only). */
+export interface NextTime {
+  question_to_ask: Tip | null;
+  explain_better: Tip | null;
+  practice_point: Tip | null;
   left_out: number;
 }
 
@@ -262,6 +278,8 @@ export interface AnalysisReport {
   meeting_notes?: MeetingNotes | null;
   /** Support calls only. */
   case_card?: CaseCard | null;
+  /** Sales v0.4 on, and only for the person analysed (null for everyone else). */
+  next_time?: NextTime | null;
 }
 
 export interface AnalysisProcessing {

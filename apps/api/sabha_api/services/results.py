@@ -591,11 +591,14 @@ def report_payload(
         "deal_card": report.get("deal_card"),  # sales meetings: verified items only (sabha_analytics.sales)
         "meeting_notes": report.get("meeting_notes"),  # meetings: verified items only (sabha_analytics.meetings)
         "case_card": report.get("case_card"),  # support calls: verified items only (sabha_analytics.support)
+        "next_time": report.get(
+            "next_time"
+        ),  # sales v0.4: private coaching, verified items (sabha_analytics.next_time)
     }
 
 
 PRIVATE_COACHING = ("strengths", "gaps", "suggestions")
-"""Report fields that are the person's own coaching (founder's rule, 2026-11-12)."""
+"""Report lists that are the person's own coaching (founder's rule, 2026-11-12); `next_time` is private too."""
 
 
 async def coaching_visible(principal: Principal, recording: Recording, people: TenantRepo[Person]) -> bool:
@@ -616,6 +619,7 @@ def hide_coaching(payload: dict[str, Any], visible: bool) -> dict[str, Any]:
     if not visible:
         for key in PRIVATE_COACHING:
             payload[key] = []
+        payload["next_time"] = None
     return payload
 
 

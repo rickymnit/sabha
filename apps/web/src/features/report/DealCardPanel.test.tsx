@@ -28,7 +28,7 @@ describe("DealCardPanel", () => {
     const onSeek = vi.fn();
     render(<DealCardPanel card={CARD} labels={labels} onSeek={onSeek} />);
     const card = screen.getByRole("region", { name: "The deal at a glance" });
-    expect(within(card).getByText("Some interest")).toBeInTheDocument();
+    expect(within(card).getByText("Considering")).toBeInTheDocument();
     expect(within(card).getByText("Send the quotation and hold a call.")).toBeInTheDocument();
     expect(within(card).getByText("Both sides, Thursday 4 pm")).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Play from 2:34" })).toBeNull(); // quotes wait behind the button

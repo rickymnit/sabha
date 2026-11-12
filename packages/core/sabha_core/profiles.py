@@ -209,7 +209,7 @@ _PROFILES: dict[ProfileName, OrgProfile] = {
         default_rubrics={
             **dict.fromkeys(ConversationType),
             # Draft built on the client's sales training (2026-10-26), weights by the owner (2026-11-02), for review.
-            _T.SALES: "sales.company.v0.3",
+            _T.SALES: "sales.company.v0.4",
             # Draft for review (2026-10-26): walk-in visitors at the front desk, one visitor per recording.
             _T.RECEPTION: "reception.company.v0.1",
             _T.MEETING: "meeting.company.v0.1",  # draft for review (2026-10-26): the meeting is scored, never a person

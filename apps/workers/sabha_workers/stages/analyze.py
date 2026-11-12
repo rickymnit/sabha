@@ -39,6 +39,7 @@ from pymongo.database import Database
 
 from sabha_analytics.grounding import prepare_transcript
 from sabha_analytics.metrics import SILENCE_METRIC_KEYS, compute_metrics, select_metrics
+from sabha_analytics.next_time import OUTPUT_SECTION as NEXT_TIME_SECTION
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse
 from sabha_analytics.rubric import Rubric
@@ -141,6 +142,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 sales=recording.type is ConversationType.SALES,
                 support=recording.type is ConversationType.SUPPORT,
                 meeting=meeting,
+                next_time=NEXT_TIME_SECTION in rubric.output,
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:
             retryable = isinstance(exc, BudgetUnavailableError) or exc.retryable

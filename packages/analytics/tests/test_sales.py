@@ -9,6 +9,7 @@ import jsonschema
 import pytest
 
 from sabha_analytics.grounding import PreparedTranscript, prepare_transcript
+from sabha_analytics.next_time import write_next_time
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse, load_report_schema
 from sabha_analytics.rubric import Rubric, load_rubric
@@ -17,7 +18,12 @@ from sabha_core.state import RecordingStatus
 
 MEETING_ROWS = (
     ("sales_rep", 0, 7_000, "Namaste sir, main Rohit, Brightpath se. Pehle aapka process samajhna hai."),
-    ("customer", 7_500, 18_000, "Abhi fees ka reconciliation Excel mein hota hai, har mahine do din lag jaate hain."),
+    (
+        "customer",
+        7_500,
+        18_000,
+        "Sunrise School mein fees ka reconciliation Excel mein hota hai, har mahine do din lag jaate hain.",
+    ),
     (
         "sales_rep",
         18_500,
@@ -80,6 +86,8 @@ CARD: dict[str, Any] = {
     "next_step": {"action": "Send the quotation and hold a call on Thursday.", "owner": "both",
                   "due": "Thursday 4 pm", "quote": "Main kal tak quotation bhejta hoon", "start_ms": 63_500,
                   "utterance_id": "u0006"},
+    "client_name": {"name": "Sunrise School", "quote": "Sunrise School mein fees", "start_ms": 7_500,
+                    "utterance_id": "u0001"},
 }  # fmt: skip
 SCORES: dict[str, Any] = {
     "dimensions": [
@@ -128,6 +136,8 @@ def test_a_sales_meeting_report_has_a_verified_deal_card(
     assert (card["objections"][0]["settled"], card["interest_level"]["value"]) == ("yes", "high")
     assert card["next_step"]["due"] == "Thursday 4 pm" and card["left_out"] == 0
     assert card["current_setup"][0]["fact"] == "Fee reconciliation is done in Excel."
+    assert card["client_name"] == {"name": "Sunrise School", "evidence": {
+        "quote": "Sunrise School mein fees", "utterance_id": "u0001", "start_ms": 7_500, "end_ms": 18_000}}  # fmt: skip
     assert "deal_card.system" in report["prompts"]
     assert "Allowed interest levels: high, medium, low, unclear" in model.calls[-1]["messages"][0]["content"]
 
@@ -191,3 +201,53 @@ def test_the_interest_levels_come_from_the_rubric() -> None:
         interest_values({"category": ["x"]})
     with pytest.raises(ValueError, match="must include 'unclear'"):
         interest_values({"interest_level": ["high", "low"]})
+
+
+# --- Coaching for the next conversation (sabha_analytics.next_time, founder's dashboard doc 2026-11-12) ---
+
+COACHING: dict[str, Any] = {
+    "question_to_ask": {"text": "Who else signs off on a new fee system?", "quote": "Pehle aapka process samajhna hai",
+                        "start_ms": 0, "utterance_id": "u0000"},
+    "explain_better": {"text": "Explain how quarterly billing works before the client asks about price.",
+                       "quote": "Price thoda zyada lag raha hai", "start_ms": 40_500, "utterance_id": "u0003"},
+    "practice_point": {"text": "Repeat the agreed next step and its time back to the client.",
+                       "quote": "Thursday chaar baje call fix karte hain", "start_ms": 63_500, "utterance_id": "u0006"},
+}  # fmt: skip
+
+
+def test_a_sales_report_carries_verified_coaching_for_the_next_call(
+    sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
+) -> None:
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD, COACHING])
+    result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
+                     analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True,
+                     next_time=True)  # fmt: skip
+    report = result.report
+    jsonschema.validate(report, load_report_schema())
+    coaching = report["next_time"]
+    assert coaching["practice_point"]["text"] == "Repeat the agreed next step and its time back to the client."
+    assert coaching["practice_point"]["evidence"] == {
+        "quote": "Thursday chaar baje call fix karte hain", "utterance_id": "u0006", "start_ms": 63_500,
+        "end_ms": 72_000,
+    }  # fmt: skip
+    assert coaching["question_to_ask"]["text"].endswith("?") and coaching["left_out"] == 0
+    assert "next_time.system" in report["prompts"]
+    assert ": 4\n" in model.calls[-1]["messages"][0]["content"]  # the verified scores steer the practice point
+
+
+def test_a_tip_whose_quote_is_not_in_the_transcript_is_left_out(meeting: PreparedTranscript, fake_judge: Any) -> None:
+    invented = {**COACHING, "explain_better": {**COACHING["explain_better"], "quote": "ERP integration kab tak hoga"}}
+    model = fake_judge([invented, invented])
+    outcome = write_next_time(meeting, dimensions=(), model=model)
+    assert outcome.attempts == 2 and outcome.failure_reasons == ("quote_not_found",)
+    assert outcome.next_time is not None and outcome.next_time.explain_better is None  # never shown
+    assert outcome.next_time.practice_point is not None and outcome.next_time.left_out == 1
+
+
+def test_without_the_flag_there_is_no_coaching_call(
+    sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
+) -> None:
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD])
+    result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
+                     analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True)  # fmt: skip
+    assert result.report["next_time"] is None and len(model.calls) == 4

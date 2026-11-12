@@ -275,6 +275,7 @@ export function RecordingPage() {
         actions={actions}
         banner={banner}
         levels={levels}
+        interestLabels={rubric.data?.output_labels?.interest_level}
         disputeLabel={staffViewer ? "Dispute this score" : "Ask for a score review"}
       />
       <TechnicalDetails

@@ -10,7 +10,10 @@ From the redacted transcript the model writes, every item with a quote it rests 
 - interest_level: one of the rubric's `output_values.interest_level`, with the quote it rests on ("unclear" needs
   none);
 - next_step: the agreed action, who does it (sales_rep, customer or both) and the date or time as said, or null
-  when nothing was agreed.
+  when nothing was agreed;
+- client_name: the customer's organisation (or, failing that, the customer's name) as said in the conversation, at
+  most 8 words, or null when it is not said (founder's dashboard doc, 2026-11-12: shown when the rep left the client
+  blank at upload). A name hidden by redaction is a placeholder, so it stays null.
 
 Golden rule 5 applies to every item: its quote must be found in the transcript (grounding.verify_quote, the same
 check as rubric evidence) and is stored in the transcript's own wording, with that utterance's times. A failing
@@ -54,6 +57,8 @@ MAX_OBJECTION_WORDS = 20
 MAX_RESPONSE_WORDS = 30
 MAX_ACTION_WORDS = 30
 MAX_DUE_WORDS = 8
+MAX_CLIENT_WORDS = 8
+CARD_KEYS = frozenset({"current_setup", "customer_needs", "objections", "interest_level", "next_step", "client_name"})
 
 
 def interest_values(output_values: Mapping[str, Sequence[str]] | None) -> tuple[str, ...]:
@@ -109,6 +114,12 @@ class NextStep:
 
 
 @dataclass(frozen=True, slots=True)
+class ClientName:
+    name: str
+    evidence: Evidence
+
+
+@dataclass(frozen=True, slots=True)
 class DealCard:
     current_setup: tuple[SetupFact, ...]
     customer_needs: tuple[Need, ...]
@@ -116,6 +127,7 @@ class DealCard:
     interest: Interest | None  # None when its quote could not be verified
     next_step: NextStep | None
     left_out: int = 0  # items dropped because their quote was not found in the transcript
+    client: ClientName | None = None  # the client's name as said; None when not said or not verified
 
     def to_record(self) -> dict[str, Any]:
         def ev(e: Evidence | None) -> dict[str, Any] | None:
@@ -141,6 +153,9 @@ class DealCard:
                 "due": self.next_step.due,
                 "evidence": ev(self.next_step.evidence),
             },
+            "client_name": None
+            if self.client is None
+            else {"name": self.client.name, "evidence": ev(self.client.evidence)},
             "left_out": self.left_out,
         }
 
@@ -176,7 +191,7 @@ def deal_card_schema(interest: Sequence[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["current_setup", "customer_needs", "objections", "interest_level", "next_step"],
+        "required": sorted(CARD_KEYS),
         "properties": {
             "current_setup": {"type": "array", "maxItems": MAX_SETUP_ITEMS, "items": quoted_item({"fact": text})},
             "customer_needs": {"type": "array", "maxItems": MAX_ITEMS, "items": quoted_item({"need": text})},
@@ -197,6 +212,7 @@ def deal_card_schema(interest: Sequence[str]) -> dict[str, Any]:
                     quoted_item({"action": text, "owner": {"enum": list(OWNERS)}, "due": {"type": ["string", "null"]}}),
                 ]
             },
+            "client_name": {"anyOf": [{"type": "null"}, quoted_item({"name": text})]},
         },
     }
 
@@ -252,9 +268,8 @@ def validate_deal_card(
 ) -> tuple[DealCard | None, list[Problem]]:
     """The card (verified items only) and every problem found. The card is None when the answer's shape or texts
     are invalid; quote problems alone still give a card, without those items."""
-    keys = {"current_setup", "customer_needs", "objections", "interest_level", "next_step"}
-    if not isinstance(data, dict) or set(data) != keys:
-        return None, [Problem("invalid_output", f"Answer with exactly {', '.join(sorted(keys))}.")]
+    if not isinstance(data, dict) or set(data) != CARD_KEYS:
+        return None, [Problem("invalid_output", f"Answer with exactly {', '.join(sorted(CARD_KEYS))}.")]
     check = QuoteCheck(transcript, interest)
     setup, needs, objections = data["current_setup"], data["customer_needs"], data["objections"]
     if not isinstance(needs, list) or not isinstance(objections, list) or max(len(needs), len(objections)) > MAX_ITEMS:
@@ -311,11 +326,22 @@ def validate_deal_card(
             if action is not None and ev is not None:
                 next_step = NextStep(action, step["owner"], due, ev)
 
+    client: ClientName | None = None
+    raw_client = data["client_name"]
+    if raw_client is not None:
+        if not isinstance(raw_client, dict):
+            check.problems.append(Problem("invalid_shape", "client_name must be null or {name, quote...}."))
+        else:
+            name = check.text("client_name", raw_client.get("name"), MAX_CLIENT_WORDS)
+            ev = check.evidence("client_name", raw_client)
+            if name is not None and ev is not None:
+                client = ClientName(name.strip(), ev)
+
     blocking = [p for p in check.problems if p.code != "quote_not_found"]
     if blocking:
         return None, check.problems
     card = DealCard(tuple(kept_setup), tuple(kept_needs), tuple(kept_objections), level, next_step,
-                    left_out=check.unverified)  # fmt: skip
+                    left_out=check.unverified, client=client)  # fmt: skip
     return card, check.problems
 
 

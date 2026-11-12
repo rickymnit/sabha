@@ -32,6 +32,7 @@ import { SmallPauseIcon } from "./icons";
 import { TicketPanel } from "./TicketPanel";
 import { VoicesPanel } from "./VoicesPanel";
 import { RubricAccordion } from "./RubricPanels";
+import { NextTimePanel } from "./NextTimePanel";
 import { NextStepCard, SalesOverall, TalkListenCard } from "./SalesPanels";
 import { evidenceLines } from "./timeline";
 import { notApplicableDimensions, visibleDimensions } from "./visibility";
@@ -80,6 +81,8 @@ export interface RecordingReportProps {
   levels?: (key: string) => readonly { level: number; description: string }[] | undefined;
   /** The dispute button's words: "Dispute this score" for the person analysed. */
   disputeLabel?: string;
+  /** Sales: the rubric's words for the interest levels. */
+  interestLabels?: Record<string, string>;
   /** Meetings: the voices in order of first speech, their names, and saving new names. */
   meeting?: {
     voices: string[];
@@ -106,6 +109,7 @@ export function RecordingReport({
   banner,
   levels,
   disputeLabel,
+  interestLabels,
 }: RecordingReportProps) {
   const isReport = analysis.status === "completed" || analysis.status === "partial";
   const disputed = isReport
@@ -138,6 +142,7 @@ export function RecordingReport({
           onSubmitDispute={canDispute ? onSubmitDispute : undefined}
           meeting={meeting}
           levels={levels}
+          interestLabels={interestLabels}
           disputeLabel={disputeLabel}
         />
       )}
@@ -165,6 +170,7 @@ function ReportBody({
   meeting,
   levels,
   disputeLabel,
+  interestLabels,
 }: ReportBodyProps) {
   const [disputeOpen, setDisputeOpen] = useState(false);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
@@ -307,7 +313,10 @@ function ReportBody({
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
           <div className="flex min-w-0 flex-col gap-5">
             {sales ? (
-              <SalesOverall analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+              <>
+                <SalesOverall analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
+                {analysis.next_time && <NextTimePanel coaching={analysis.next_time} onSeek={seek} />}
+              </>
             ) : (
               <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
             )}
@@ -391,7 +400,9 @@ function ReportBody({
               />
             )}
 
-            {sales && analysis.deal_card && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
+            {sales && analysis.deal_card && (
+              <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} interestLabels={interestLabels} />
+            )}
 
             {!sales && analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
           </div>

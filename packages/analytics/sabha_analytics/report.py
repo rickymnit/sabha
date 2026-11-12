@@ -30,6 +30,7 @@ from typing import Any
 from sabha_analytics.classify import UNCERTAIN_TYPE, Classification
 from sabha_analytics.grounding import PreparedTranscript
 from sabha_analytics.meetings import MeetingNotesOutcome, write_meeting_notes
+from sabha_analytics.next_time import NextTimeOutcome, write_next_time
 from sabha_analytics.phases import PhaseOutcome, segment_phases
 from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, ticket_values, write_ticket
 from sabha_analytics.sales import DealCardOutcome, interest_values, write_deal_card
@@ -132,6 +133,7 @@ def build_report(
     deal_card: DealCardOutcome | None = None,
     meeting_notes: MeetingNotesOutcome | None = None,
     case_card: CaseCardOutcome | None = None,
+    next_time: NextTimeOutcome | None = None,
 ) -> AnalysisResult:
     """Assemble and check an analysis@v1 report (module docstring)."""
     reasons: list[str] = []
@@ -204,6 +206,9 @@ def build_report(
         else meeting_notes.notes.to_record(),
         # Support calls: verified items only (sabha_analytics.support). No card is not a reason for review.
         "case_card": None if case_card is None or case_card.card is None else case_card.card.to_record(),
+        # Sales v0.4 on: coaching for the next conversation, verified items only (sabha_analytics.next_time). Private
+        # to the person analysed; none is not a reason for review.
+        "next_time": None if next_time is None or next_time.next_time is None else next_time.next_time.to_record(),
     }
     check_report(report, transcript)
     return AnalysisResult(report, status)
@@ -247,7 +252,11 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
         *(item["evidence"] for item in card.get("objections", [])),
         *([card["next_step"]["evidence"]] if card.get("next_step") else []),
         *([card["interest_level"]["evidence"]] if (card.get("interest_level") or {}).get("evidence") else []),
+        *([card["client_name"]["evidence"]] if card.get("client_name") else []),
     ]
+    coaching = report.get("next_time") or {}
+    evidence += [coaching[key]["evidence"] for key in ("question_to_ask", "explain_better", "practice_point")
+                 if coaching.get(key)]  # fmt: skip
     ticket = report.get("ticket") or {}
     evidence += list((ticket.get("evidence") or {}).values())
     notes = report.get("meeting_notes") or {}
@@ -291,6 +300,7 @@ def analyse(
     sales: bool = False,
     meeting: bool = False,
     support: bool = False,
+    next_time: bool = False,
 ) -> AnalysisResult:
     """Score, compute the overall score, synthesise when there is one, and assemble the report.
 
@@ -301,6 +311,7 @@ def analyse(
     `meeting`: also write the meeting's notes (decisions, action items, open questions).
     `support`: also write the call's case card, with the outcomes of the rubric's `output_values.outcome` (ValueError
     before any model call if it has none).
+    `next_time`: also write the coaching for the next conversation (when there are verified scores).
     `reception`: also write the call's ticket, with the categories
     and statuses of the rubric's `output_values` (ValueError before any model call if the rubric has none).
     """
@@ -343,7 +354,12 @@ def analyse(
     card = write_deal_card(transcript, interest=interest, model=model) if interest is not None else None
     notes = write_meeting_notes(transcript, model=model) if meeting else None
     case = write_case_card(transcript, outcomes=outcomes, model=model) if outcomes is not None else None
-    steps = [step for step in (classification, synthesis, phases, ticket, card, notes, case) if step is not None]
+    coach = (
+        write_next_time(transcript, dimensions=scoring.dimensions, model=model)
+        if next_time and overall.score is not None
+        else None
+    )
+    steps = [s for s in (classification, synthesis, phases, ticket, card, notes, case, coach) if s is not None]
     prompts = (*scoring.prompts, *(p for step in steps for p in step.prompts))
     return build_report(
         rubric=rubric,
@@ -364,4 +380,5 @@ def analyse(
         deal_card=card,
         meeting_notes=notes,
         case_card=case,
+        next_time=coach,
     )

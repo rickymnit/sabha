@@ -109,7 +109,7 @@ def test_each_profile_sees_its_own_rubrics(api: Api) -> None:
     assert {i["type"]: i["current_id"] for i in items} == {
         "reception": "reception.company.v0.1",
         "meeting": "meeting.company.v0.1",
-        "sales": "sales.company.v0.3",
+        "sales": "sales.company.v0.4",
         "support": "support.company.v0.3",
     }
 
@@ -153,7 +153,7 @@ def test_a_newer_version_says_what_changed(api: Api) -> None:
 @pytest.mark.parametrize(
     "rubric_id",
     [
-        "sales.company.v0.3",  # another profile's
+        "sales.company.v0.4",  # another profile's
         "teaching.company.v0.1",  # no such file
         "nope",
         "teaching.school.v0.1.yaml",

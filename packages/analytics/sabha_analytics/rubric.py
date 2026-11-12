@@ -23,6 +23,12 @@ Schema (matches rubrics/teaching.school.v0.1.yaml and rubrics/reception.school.v
 - `output` sections are snake_case and unique; every `output_values` key must be one of them, with a non-empty list
   of unique snake_case values.
 - `visibility_gate` is {metric: cohens_kappa, min: m} with 0 < m <= 1.
+- Optional `output_labels`: the words users see for an output section's values ({interest_level: {high: Interested}}).
+  Each section must be in `output_values` and label exactly its values, each with a non-blank label.
+- Optional `follow_up` (sales): how the rep's next actions get a priority (founder's dashboard doc; defaults agreed
+  2026-11-12): `high_interest` (values of output_values.interest_level), `high_within_days` and
+  `medium_within_days` (whole days, 0-60, high <= medium). High = the interest is one of high_interest and the action
+  is due within high_within_days or overdue; medium = due within medium_within_days; low = the rest.
 - YAML is read with a loader that rejects duplicate keys (PyYAML otherwise keeps the last one silently).
 
 Content hash: SHA-256 (hex) of a canonical JSON serialisation of the VALIDATED model: `model_dump(mode="json",
@@ -102,6 +108,13 @@ OutputValues = Annotated[
 ]
 
 
+OutputLabels = Annotated[
+    Mapping[SnakeName, Annotated[Mapping[SnakeName, Text], AfterValidator(_freeze)]],
+    AfterValidator(_freeze),
+    PlainSerializer(lambda v: {k: dict(m) for k, m in v.items()}, return_type=dict[str, dict[str, str]]),
+]
+
+
 def _duplicates(items: Iterable[Hashable]) -> list[Hashable]:
     seen: set[Hashable] = set()
     repeated: list[Hashable] = []
@@ -161,6 +174,14 @@ class VisibilityGate(_Frozen):
     min: Annotated[float, Field(strict=True, gt=0, le=1)]
 
 
+class FollowUpRules(_Frozen):
+    """How a sales rep's next actions get a priority (module docstring, `follow_up`)."""
+
+    high_interest: Annotated[tuple[SnakeName, ...], Field(min_length=1)]
+    high_within_days: Annotated[int, Strict(), Field(ge=0, le=60)]
+    medium_within_days: Annotated[int, Strict(), Field(ge=0, le=60)]
+
+
 class Rubric(_Frozen):
     """A validated rubric file. See the module docstring for every rule."""
 
@@ -172,6 +193,8 @@ class Rubric(_Frozen):
     computed_metrics: tuple[SnakeName, ...]
     output: Annotated[tuple[SnakeName, ...], Field(min_length=1)]
     output_values: OutputValues | None = None
+    output_labels: OutputLabels | None = None
+    follow_up: FollowUpRules | None = None
     visibility_gate: VisibilityGate
 
     @model_validator(mode="after")
@@ -198,9 +221,27 @@ class Rubric(_Frozen):
             if section not in self.output:
                 problems.append(f"output_values has {section!r}, which is not listed in output")
             problems += [f"output_values.{section}: duplicate value {value!r}" for value in _duplicates(allowed)]
+        problems += self._label_problems()
         if problems:
             raise ValueError("; ".join(problems))
         return self
+
+    def _label_problems(self) -> list[str]:
+        values = self.output_values or {}
+        problems = []
+        for section, labels in (self.output_labels or {}).items():
+            if section not in values:
+                problems.append(f"output_labels has {section!r}, which has no output_values")
+            elif set(labels) != set(values[section]):
+                problems.append(f"output_labels.{section} must label exactly {', '.join(values[section])}")
+        if self.follow_up is not None:
+            interest = values.get("interest_level", ())
+            unknown = [v for v in self.follow_up.high_interest if v not in interest]
+            if unknown:
+                problems.append(f"follow_up.high_interest has {unknown}, not in output_values.interest_level")
+            if self.follow_up.high_within_days > self.follow_up.medium_within_days:
+                problems.append("follow_up.high_within_days must not be more than medium_within_days")
+        return problems
 
     def _id_problems(self) -> list[str]:
         match = RUBRIC_ID.fullmatch(self.id)

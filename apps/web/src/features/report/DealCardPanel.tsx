@@ -9,15 +9,9 @@ import { Button, cx } from "../../design";
 import { formatClock } from "../transcript";
 import { SmallGoIcon, SmallPauseIcon, SmallPlayIcon } from "./icons";
 import { usePlayingFrom, useSeekMode } from "./seekMode";
+import { interestView, type Tone } from "./interest";
 import type { CardEvidence, DealCard, Labels } from "./types";
 
-type Tone = "neutral" | "good" | "warn" | "bad";
-const INTEREST: Record<string, { text: string; tone: Tone }> = {
-  high: { text: "High interest", tone: "good" },
-  medium: { text: "Some interest", tone: "warn" },
-  low: { text: "Low interest", tone: "bad" },
-  unclear: { text: "Interest unclear", tone: "neutral" },
-};
 const SETTLED: Record<string, { text: string; tone: string }> = {
   yes: { text: "Handled", tone: "bg-success-tint text-success" },
   no: { text: "Open", tone: "bg-danger-tint text-danger" },
@@ -88,15 +82,17 @@ export interface DealCardPanelProps {
   onSeek: (ms: number) => void;
   /** Start with the evidence open (the person's own view, tests). */
   defaultOpen?: boolean;
+  /** The rubric's words for the interest levels (output_labels.interest_level). */
+  interestLabels?: Record<string, string>;
 }
 
-export function DealCardPanel({ card, labels, onSeek, defaultOpen = false }: DealCardPanelProps) {
+export function DealCardPanel({ card, labels, onSeek, defaultOpen = false, interestLabels }: DealCardPanelProps) {
   const headingId = useId();
   const evidenceId = useId();
   const [open, setOpen] = useState(defaultOpen);
   const rep = labels.person.toLowerCase();
   const owner = { sales_rep: `The ${rep}`, customer: "The customer", both: "Both sides" } as const;
-  const interest = card.interest_level ? (INTEREST[card.interest_level.value] ?? INTEREST.unclear) : null;
+  const interest = card.interest_level ? interestView(card.interest_level.value, interestLabels) : null;
   const [need, ...moreNeeds] = card.customer_needs;
   const openIssue = card.objections.find((o) => o.settled !== "yes");
   const next = card.next_step;
@@ -111,7 +107,9 @@ export function DealCardPanel({ card, labels, onSeek, defaultOpen = false }: Dea
           <h2 id={headingId} className="m-0 text-lg font-semibold">
             The deal at a glance
           </h2>
-          <span className="text-small text-muted">Every line is backed by something the customer said</span>
+          <span className="text-small text-muted">
+            {card.client_name ? `${card.client_name.name} · ` : ""}Every line is backed by something the customer said
+          </span>
         </div>
         <Button variant="secondary" aria-expanded={open} aria-controls={evidenceId} onClick={() => setOpen((o) => !o)}>
           {open ? "Hide evidence" : "Show evidence"}
@@ -122,7 +120,7 @@ export function DealCardPanel({ card, labels, onSeek, defaultOpen = false }: Dea
         <Tile
           label="Interest"
           tone={interest?.tone ?? "neutral"}
-          title={interest?.text ?? "Interest unclear"}
+          title={interest?.text ?? "Unclear"}
           detail={card.interest_level?.evidence ? `“${card.interest_level.evidence.quote}”` : undefined}
         />
         <Tile

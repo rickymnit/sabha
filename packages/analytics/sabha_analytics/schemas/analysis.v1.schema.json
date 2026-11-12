@@ -91,6 +91,8 @@
           "next_step": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["action", "owner", "due", "evidence"],
             "properties": {"action": {"type": "string", "minLength": 1}, "owner": {"enum": ["sales_rep", "customer", "both"]},
                            "due": {"type": ["string", "null"]}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
+          "client_name": {"description": "The client's name as said (cards from 2026-11-12 on).", "oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false,
+            "required": ["name", "evidence"], "properties": {"name": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
           "left_out": {"type": "integer", "minimum": 0, "description": "Items left out because their quote was not found in the transcript."}
         }
       }]
@@ -109,6 +111,19 @@
                            "evidence": {"$ref": "#/$defs/card_evidence"}}}},
           "open_questions": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false,
             "required": ["question", "evidence"], "properties": {"question": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}},
+          "left_out": {"type": "integer", "minimum": 0, "description": "Items left out because their quote was not found in the transcript."}
+        }
+      }]
+    },
+    "next_time": {
+      "description": "Sales v0.4 on: coaching for the next conversation, private to the person analysed, verified items only (sabha_analytics.next_time).",
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false,
+        "required": ["question_to_ask", "explain_better", "practice_point", "left_out"],
+        "properties": {
+          "question_to_ask": {"$ref": "#/$defs/tip"},
+          "explain_better": {"$ref": "#/$defs/tip"},
+          "practice_point": {"$ref": "#/$defs/tip"},
           "left_out": {"type": "integer", "minimum": 0, "description": "Items left out because their quote was not found in the transcript."}
         }
       }]
@@ -148,6 +163,8 @@
     "usage": {"type": "object", "required": ["total", "calls"]}
   },
   "$defs": {
+    "tip": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["text", "evidence"],
+      "properties": {"text": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
     "card_evidence": {
       "type": "object", "additionalProperties": false, "required": ["quote", "utterance_id", "start_ms", "end_ms"],
       "properties": {"quote": {"type": "string", "minLength": 1}, "utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},

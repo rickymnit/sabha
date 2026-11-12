@@ -343,6 +343,8 @@ export interface RubricDetail {
   }[];
   versions: RubricVersion[];
   previous_id: string | null;
+  /** The words users see for an output's values, e.g. { interest_level: { high: "Interested" } }. */
+  output_labels?: Record<string, Record<string, string>>;
   /** From the version before: `item` is "weight", "definition", "anchors[2]", "examples[1]", "dimension added", ... */
   changes: { dimension: string | null; item: string; old: string | null; new: string | null }[];
 }

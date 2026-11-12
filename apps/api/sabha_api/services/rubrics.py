@@ -76,6 +76,8 @@ class RubricOut(BaseModel):
     versions: list[VersionOut]
     previous_id: str | None
     changes: list[ChangeOut]
+    # The words users see for an output section's values ({"interest_level": {"high": "Interested"}}), if any.
+    output_labels: dict[str, dict[str, str]] = {}
 
 
 def _not_found() -> NotFoundError:
@@ -167,4 +169,5 @@ def read_rubric(tenant: Tenant, rubric_id: str, rubrics_dir: str) -> RubricOut:
         versions=_versions(family, current_id),
         previous_id=previous_id,
         changes=[ChangeOut(dimension=c.dimension, item=c.item, old=c.old, new=c.new) for c in changes],
+        output_labels={k: dict(v) for k, v in (rubric.output_labels or {}).items()},
     )

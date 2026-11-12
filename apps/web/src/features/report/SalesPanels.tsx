@@ -21,7 +21,7 @@ const CHIP = {
   good: "bg-success-tint text-success",
 } as const;
 
-function TimeChip({ ms, onSeek }: { ms: number; onSeek: (ms: number) => void }) {
+export function TimeChip({ ms, onSeek }: { ms: number; onSeek: (ms: number) => void }) {
   const go = useSeekMode() === "go";
   const pausable = usePlayingFrom() === ms;
   const time = formatClock(ms);
