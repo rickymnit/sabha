@@ -7,17 +7,17 @@
 
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useAnalysis, useRecording } from "../../api/hooks";
+import { useAnalysis, useMyNextActions, useRecording } from "../../api/hooks";
 import { formatDateTime, formatDuration } from "../../app/format";
-import { Button, EmptyState, Icon, Panel, ScoreChip, Skeleton } from "../../design";
+import { Button, EmptyState, Icon, Panel, Skeleton, cx } from "../../design";
 import { NextTimePanel } from "../../features/report/NextTimePanel";
 import { TimeChip } from "../../features/report/SalesPanels";
 import type { AnalysisReport } from "../../features/report/types";
-import { InteractionChip, InterestPill } from "../../features/workspace/parts";
-import { pendingWords } from "../../features/workspace/words";
+import { InterestPill, KindLabel, PriorityPill, ScoreVerdict } from "../../features/workspace/parts";
+import { conversationName, dueText, pendingWords, plainAction } from "../../features/workspace/words";
 import { useInterestLabels } from "../../features/workspace/useInterestLabels";
 
-const OWNER = { sales_rep: "You", customer: "The client", both: "You and the client" } as const;
+const OWNER = { sales_rep: "Your step", customer: "Waiting on the client", both: "You and the client" } as const;
 
 const isReport = (payload: { status: string } | undefined): payload is AnalysisReport =>
   payload?.status === "completed" || payload?.status === "partial";
@@ -28,6 +28,7 @@ export function InteractionPage() {
   const recording = useRecording(id);
   const analysis = useAnalysis(id);
   const labels = useInterestLabels();
+  const actions = useMyNextActions();
   const full = (ms?: number) => navigate(`/recordings/${id}${ms === undefined ? "" : `?at=${ms}`}`);
 
   if (recording.isError) {
@@ -54,6 +55,8 @@ export function InteractionPage() {
   const card = report?.deal_card ?? null;
   const client = detail.client_name || card?.client_name?.name || null;
   const step = card?.next_step ?? null;
+  const planned = actions.data?.items.find((a) => a.recording_id === id); // the date worked out in code
+  const due = planned ? dueText(planned) : step?.due ? `When: “${step.due}”` : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -70,21 +73,23 @@ export function InteractionPage() {
         </a>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="flex flex-wrap items-center gap-2">
-              <InteractionChip kind={detail.interaction} />
-              <span className="text-small text-muted">
+            <h1 className="m-0 text-[26px] font-bold leading-tight">
+              {conversationName(client, detail.interaction, detail.recorded_at)}
+            </h1>
+            <span className="flex flex-wrap items-center gap-x-1.5 text-small text-muted">
+              {client && <KindLabel kind={detail.interaction} />}
+              <span>
+                {client ? "· " : ""}
                 {formatDateTime(detail.recorded_at)}
-                {detail.duration_ms ? ` · ${formatDuration(detail.duration_ms)}` : ""}
               </span>
+              {detail.duration_ms ? <span>· {formatDuration(detail.duration_ms)}</span> : null}
             </span>
-            <h1 className="m-0 text-[26px] font-bold leading-tight">{client ?? detail.title}</h1>
-            {client && <span className="text-muted">{detail.title}</span>}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4">
             {report && (
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="text-small font-semibold text-muted">Quality score</span>
-                <ScoreChip score={report.overall} decimals={1} />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-small font-semibold text-muted">Quality</span>
+                <ScoreVerdict score={report.overall} size="lg" />
               </div>
             )}
             <Button variant="secondary" onClick={() => full()}>
@@ -147,11 +152,16 @@ export function InteractionPage() {
             <Panel title="Next action">
               {step ? (
                 <div className="flex flex-col gap-2">
-                  <span className="font-semibold text-ink">{step.action}</span>
-                  <span className="text-small text-muted">
-                    {OWNER[step.owner]}
-                    {step.due ? ` · “${step.due}”` : " · no date agreed"}
-                  </span>
+                  {(planned || due) && (
+                    <span className="flex flex-wrap items-center gap-2">
+                      {planned && <PriorityPill priority={planned.priority} />}
+                      <span className={cx("text-small", planned?.overdue ? "font-semibold text-danger" : "text-ink-2")}>
+                        {due ?? "No date agreed"}
+                      </span>
+                    </span>
+                  )}
+                  <span className="font-semibold text-ink">{plainAction(step.action)}</span>
+                  <span className="text-small text-muted">{OWNER[step.owner]}</span>
                   <span className="flex items-center gap-2 text-small text-muted">
                     <TimeChip ms={step.evidence.start_ms} onSeek={(ms) => full(ms)} />
                     <span>“{step.evidence.quote}”</span>

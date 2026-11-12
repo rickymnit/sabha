@@ -5,19 +5,14 @@
 import { useNavigate } from "react-router-dom";
 
 import { useMyNextActions } from "../../api/hooks";
-import type { NextActionItem } from "../../api/types";
-import { formatWhen } from "../../app/format";
-import { EmptyState, Panel, PageHeader, Skeleton, cx } from "../../design";
-import { InteractionChip, InterestPill } from "../../features/workspace/parts";
-import { dueText } from "../../features/workspace/words";
+import { EmptyState, Panel, PageHeader, Skeleton } from "../../design";
+import { ActionRow } from "../../features/workspace/ActionRow";
 
 const GROUPS = [
-  { key: "high", title: "High priority", note: "Interested clients, due within two days or overdue" },
-  { key: "medium", title: "Medium priority", note: "Due this week" },
-  { key: "low", title: "Low priority", note: "Later, or no date agreed" },
+  { key: "high", title: "Do first", note: "Interested clients, due in the next two days or overdue" },
+  { key: "medium", title: "This week", note: "Due in the next seven days" },
+  { key: "low", title: "Later", note: "Due later, or no date agreed" },
 ] as const;
-
-const OWNER = { sales_rep: "You", customer: "The client", both: "You and the client" } as const;
 
 export function MyActionsPage() {
   const navigate = useNavigate();
@@ -27,7 +22,7 @@ export function MyActionsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="My next actions"
-        description="What you agreed with each client, and when. Suggested by Sabha from your calls and meetings."
+        description="What you agreed with each client, and when. Sabha picks these up from your calls and meetings."
       />
       {actions.isPending ? (
         <Panel>
@@ -45,12 +40,13 @@ export function MyActionsPage() {
           const rows = items.filter((i) => i.priority === group.key);
           if (rows.length === 0) return null;
           return (
-            <Panel key={group.key} flush title={`${group.title} (${rows.length})`} description={group.note}>
+            <Panel key={group.key} flush title={`${group.title} · ${rows.length}`} description={group.note}>
               <ul className="m-0 flex list-none flex-col p-0">
                 {rows.map((a) => (
                   <ActionRow
                     key={a.recording_id}
                     item={a}
+                    showPriority={false}
                     onOpen={() => navigate(`/my/interactions/${a.recording_id}`)}
                   />
                 ))}
@@ -60,37 +56,5 @@ export function MyActionsPage() {
         })
       )}
     </div>
-  );
-}
-
-function ActionRow({ item, onOpen }: { item: NextActionItem; onOpen: () => void }) {
-  const due = dueText(item);
-  return (
-    <li className="border-b border-line-subtle last:border-b-0">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full flex-wrap items-start gap-x-4 gap-y-2 bg-transparent px-5 py-3.5 text-left hover:bg-surface-faint"
-      >
-        <span className="flex min-w-0 flex-[1_1_280px] flex-col gap-1">
-          <span className="font-semibold text-ink">{item.action}</span>
-          <span className="flex flex-wrap items-center gap-2 text-small text-muted">
-            <InteractionChip kind={item.interaction} />
-            <span>{item.client ?? item.title}</span>
-            <span>· {formatWhen(item.recorded_at)}</span>
-            {item.owner && <span>· {OWNER[item.owner]}</span>}
-          </span>
-        </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          {due && (
-            <span className={cx("text-sm", item.overdue ? "font-semibold text-danger" : "text-ink-2")}>{due}</span>
-          )}
-          <InterestPill
-            value={item.interest}
-            labels={item.interest && item.interest_label ? { [item.interest]: item.interest_label } : undefined}
-          />
-        </span>
-      </button>
-    </li>
   );
 }

@@ -16,7 +16,7 @@ export { MetricStrip, type Metric, type MetricFootTone, type MetricStripProps } 
 export { NavItem, type NavItemProps } from "./NavItem";
 export { PageHeader, type Breadcrumb, type PageHeaderProps } from "./PageHeader";
 export { ProgressBar, type ProgressBarProps, type ProgressTone } from "./ProgressBar";
-export { scoreBand, type ScoreBand } from "./score";
+export { scoreBand, scoreWord, type ScoreBand } from "./score";
 export { ScoreBar, type ScoreBarProps } from "./ScoreBar";
 export { ScoreChip, type ScoreChipProps } from "./ScoreChip";
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from "./SegmentedControl";

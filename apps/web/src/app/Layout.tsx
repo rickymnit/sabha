@@ -13,6 +13,7 @@ import { useSession } from "../session/session";
 import { capitalise, roleTitle } from "./format";
 import { unitLabel, unitTree, unitWords } from "./units";
 import { ADMINS, RESOLVERS, navItems } from "./nav";
+import { isSalesRep } from "./workspace";
 import { AppLoading } from "./AppLoading";
 import { InboxBell } from "../features/inbox/InboxBell";
 import { HeaderSearch } from "./HeaderSearch";
@@ -104,7 +105,7 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
           </Link>
         ))}
       </div>
-      {me.tenant.enabled_types.length > 1 && (
+      {me.tenant.enabled_types.length > 1 && !isSalesRep(me) && (
         <div className="flex flex-col gap-0.5">
           <p className="m-0 px-2.5 pb-1.5 text-caption font-semibold text-muted-2">Conversation types</p>
           {me.tenant.enabled_types.map((t) => (
@@ -147,7 +148,14 @@ function Header({ me }: { me: Me }) {
         <div className="ml-auto flex items-center gap-2.5">
           <InboxBell me={me} />
           <Button icon={<Icon name="upload" size={16} />} onClick={() => navigate("/upload")}>
-            Upload
+            {isSalesRep(me) ? (
+              <>
+                <span className="sm:hidden">Add</span>
+                <span className="hidden sm:inline">Add a recording</span>
+              </>
+            ) : (
+              "Upload"
+            )}
           </Button>
         </div>
       </div>

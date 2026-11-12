@@ -11,3 +11,8 @@ export function scoreBand(score: number): ScoreBand {
   if (shown < 3.8) return "mid";
   return "good";
 }
+
+/** The word for a score's band, so a score reads without knowing the scale: "Needs work", "Fair" or "Strong". */
+export function scoreWord(score: number): string {
+  return { low: "Needs work", mid: "Fair", good: "Strong" }[scoreBand(score)];
+}

@@ -7,10 +7,9 @@ import { useNavigate } from "react-router-dom";
 
 import { useMyCoaching } from "../../api/hooks";
 import { formatWhen } from "../../app/format";
-import { EmptyState, Panel, PageHeader, ScoreChip, Skeleton, cx, scoreBand } from "../../design";
-import { InteractionChip } from "../../features/workspace/parts";
-
-const BAR = { low: "bg-danger-bar", mid: "bg-warning-bar", good: "bg-success-bar" } as const;
+import { Button, EmptyState, Panel, PageHeader, Skeleton, cx } from "../../design";
+import { ScoreVerdict } from "../../features/workspace/parts";
+import { conversationName } from "../../features/workspace/words";
 
 export function MyCoachingPage() {
   const navigate = useNavigate();
@@ -21,6 +20,11 @@ export function MyCoachingPage() {
       <PageHeader
         title="Private coaching"
         description="Only you can see this page. Your manager sees your scores, not your coaching."
+        actions={
+          <Button variant="secondary" onClick={() => navigate("/rubrics")}>
+            How you're scored
+          </Button>
+        }
       />
       {coaching.isPending ? (
         <Panel>
@@ -48,21 +52,21 @@ export function MyCoachingPage() {
                       focus ? "border-primary-border bg-primary-tint-subtle" : "border-line-subtle",
                     )}
                   >
-                    <span className="flex items-center justify-between gap-3">
+                    <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <span className="font-semibold text-ink">{t.name}</span>
-                      <ScoreChip score={t.score} decimals={1} emptyLabel="No score yet" />
+                      <ScoreVerdict score={t.score} />
                     </span>
                     <span className="h-1.5 overflow-hidden rounded-full bg-fill" aria-hidden="true">
                       {t.score != null && (
                         <span
-                          className={cx("block h-full rounded-full", BAR[scoreBand(t.score)])}
+                          className={cx("block h-full rounded-full", focus ? "bg-danger-bar" : "bg-primary")}
                           style={{ width: `${(t.score / 5) * 100}%` }}
                         />
                       )}
                     </span>
                     <span className="text-small text-muted">
                       {focus
-                        ? "Your focus: the area with the most room to grow"
+                        ? "Work on this first: your lowest area"
                         : t.score == null
                           ? "Not scored in the last 30 days"
                           : diff == null
@@ -83,7 +87,9 @@ export function MyCoachingPage() {
             description="One thing to practise from each call and meeting, newest first."
           >
             {data.practice_points.length === 0 ? (
-              <p className="m-0 px-5 py-4 text-muted">No practice points yet.</p>
+              <p className="m-0 px-5 py-4 text-muted">
+                Your next analysed call or meeting gives you one thing to practise. It shows here.
+              </p>
             ) : (
               <ul className="m-0 flex list-none flex-col p-0">
                 {data.practice_points.map((p) => (
@@ -94,10 +100,9 @@ export function MyCoachingPage() {
                       className="flex w-full flex-col gap-1 bg-transparent px-5 py-3.5 text-left hover:bg-surface-faint"
                     >
                       <span className="text-ink">{p.text}</span>
-                      <span className="flex flex-wrap items-center gap-2 text-small text-muted">
-                        <InteractionChip kind={p.interaction} />
-                        <span>{p.client ?? p.title}</span>
-                        <span>· {formatWhen(p.recorded_at)}</span>
+                      <span className="text-small text-muted">
+                        {conversationName(p.client, p.interaction, p.recorded_at)}
+                        {p.client ? ` · ${formatWhen(p.recorded_at)}` : ""}
                       </span>
                     </button>
                   </li>

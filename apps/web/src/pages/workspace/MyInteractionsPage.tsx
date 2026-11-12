@@ -1,15 +1,12 @@
 // /my/interactions: a sales rep's own calls and meetings (founder's Sales Executive dashboard doc, 2026-11-12),
-// newest first, with whether each was a call or a meeting, the client, the AI-suggested interest and the quality
-// score. Tabs: all, calls, meetings. A row opens the interaction's summary page.
+// newest first, by client name (ConversationRow), with the AI-suggested interest and the score in words. Tabs: all, calls, meetings. A row opens the interaction's summary page.
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useRecordings } from "../../api/hooks";
-import { formatDuration, formatWhen } from "../../app/format";
-import { Button, EmptyState, Panel, PageHeader, ScoreChip, SegmentedControl, Skeleton } from "../../design";
-import { InteractionChip, InterestPill } from "../../features/workspace/parts";
-import { clientOf, pendingWords } from "../../features/workspace/words";
+import { Button, EmptyState, Panel, PageHeader, SegmentedControl, Skeleton } from "../../design";
+import { ConversationRow } from "../../features/workspace/ConversationRow";
 import { useInterestLabels } from "../../features/workspace/useInterestLabels";
 
 type Tab = "all" | "call" | "meeting";
@@ -25,8 +22,7 @@ export function MyInteractionsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="My interactions"
-        description="Your calls and meetings, with what the client wants and how each one went."
-        actions={<Button onClick={() => navigate("/upload")}>Add a recording</Button>}
+        description="Every call and meeting, newest first. Open one to see what the client wants and what to do next."
       />
       <Panel
         flush
@@ -63,36 +59,9 @@ export function MyInteractionsPage() {
           />
         ) : (
           <ul className="m-0 flex list-none flex-col p-0">
-            {rows.map((r) => {
-              const done = r.status === "COMPLETED";
-              return (
-                <li key={r.id} className="border-b border-line-subtle last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/my/interactions/${r.id}`)}
-                    className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 bg-transparent px-5 py-3.5 text-left hover:bg-surface-faint"
-                  >
-                    <InteractionChip kind={r.interaction} />
-                    <span className="flex min-w-0 flex-[1_1_220px] flex-col">
-                      <span className="truncate font-semibold text-ink">{clientOf(r) ?? r.title}</span>
-                      <span className="text-small text-muted">
-                        {formatWhen(r.recorded_at ?? r.created_at)}
-                        {r.duration_ms ? ` · ${formatDuration(r.duration_ms)}` : ""}
-                        {clientOf(r) ? ` · ${r.title}` : ""}
-                      </span>
-                    </span>
-                    {done ? (
-                      <span className="flex items-center gap-3">
-                        <InterestPill value={r.interest_level} labels={labels} />
-                        <ScoreChip score={r.overall_score} decimals={1} />
-                      </span>
-                    ) : (
-                      <span className="text-small text-muted">{pendingWords(r.status)}</span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+            {rows.map((r) => (
+              <ConversationRow key={r.id} row={r} labels={labels} onOpen={() => navigate(`/my/interactions/${r.id}`)} />
+            ))}
           </ul>
         )}
         {list.hasNextPage && (

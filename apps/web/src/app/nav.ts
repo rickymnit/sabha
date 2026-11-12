@@ -20,7 +20,9 @@ export const ADMINS: Role[] = ["owner", "admin"];
 /** Who resolves reviews (ADR 0007): never staff, not even for their own recordings. */
 export const RESOLVERS: Role[] = ["owner", "admin", "manager", "reviewer"];
 
-/** A sales rep's own workspace (founder's Sales Executive dashboard doc, 2026-11-12): four simple pages. */
+/** A sales rep's own workspace (founder's Sales Executive dashboard doc, 2026-11-12): four simple pages, nothing
+ * else (manager's feedback, 2026-11-12). Adding a recording is the button in the top bar; how scoring works is linked
+ * from Private coaching. */
 function salesRepItems(): NavEntry[] {
   const exact = (to: string) => (path: string) => path === to;
   return [
@@ -33,13 +35,6 @@ function salesRepItems(): NavEntry[] {
     },
     { to: "/my/actions", label: "My next actions", icon: "checkList", match: exact("/my/actions") },
     { to: "/my/coaching", label: "Private coaching", icon: "spark", match: exact("/my/coaching") },
-    { to: "/upload", label: "Add a recording", icon: "upload", match: exact("/upload") },
-    {
-      to: "/rubrics",
-      label: "Rubrics",
-      icon: "rubrics",
-      match: (path) => path === "/rubrics" || path.startsWith("/rubrics/"),
-    },
   ];
 }
 

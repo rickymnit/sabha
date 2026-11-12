@@ -10,6 +10,8 @@ import { useSearch } from "../api/hooks";
 import type { Me } from "../api/types";
 import { Avatar, Icon, cx } from "../design";
 import { capitalise } from "./format";
+import { isSalesRep } from "./workspace";
+import { clientOf, conversationName } from "../features/workspace/words";
 
 interface Option {
   key: string;
@@ -37,6 +39,11 @@ export function HeaderSearch({ me }: { me: Me }) {
   const [active, setActive] = useState(0);
   const search = useSearch(query);
   const units = new Map(me.tenant.units.map((u) => [u.id, u.name]));
+  // A sales rep searches only their own calls and meetings, by client, and opens their own summary page.
+  const rep = isSalesRep(me);
+  const what = rep
+    ? "your calls and meetings"
+    : `${labels.person_plural.toLowerCase()} and ${labels.recording_plural.toLowerCase()}`;
 
   // Wait for a short pause in typing before asking the API.
   useEffect(() => {
@@ -56,18 +63,27 @@ export function HeaderSearch({ me }: { me: Me }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const people: Option[] = (search.data?.people ?? []).map((p) => ({
+  const people: Option[] = (rep ? [] : (search.data?.people ?? [])).map((p) => ({
     key: `p-${p.id}`,
     to: `/recordings?person=${encodeURIComponent(p.id)}`,
     title: p.name,
     detail: (p.unit_id && units.get(p.unit_id)) || capitalise(labels.person),
   }));
-  const recordings: Option[] = (search.data?.recordings ?? []).map((r) => ({
-    key: `r-${r.id}`,
-    to: `/recordings/${r.id}`,
-    title: r.title,
-    detail: [r.person?.name, r.unit_id ? units.get(r.unit_id) : undefined].filter(Boolean).join(", "),
-  }));
+  const recordings: Option[] = (search.data?.recordings ?? []).map((r) =>
+    rep
+      ? {
+          key: `r-${r.id}`,
+          to: `/my/interactions/${r.id}`,
+          title: conversationName(clientOf(r), r.interaction, r.recorded_at ?? r.created_at),
+          detail: r.title,
+        }
+      : {
+          key: `r-${r.id}`,
+          to: `/recordings/${r.id}`,
+          title: r.title,
+          detail: [r.person?.name, r.unit_id ? units.get(r.unit_id) : undefined].filter(Boolean).join(", "),
+        },
+  );
   const options = [...people, ...recordings];
   const ready = query.trim().length >= 2 && search.isSuccess;
   const showList = open && text.trim().length >= 2 && ready;
@@ -131,9 +147,7 @@ export function HeaderSearch({ me }: { me: Me }) {
     <div className="relative w-full max-w-[420px]">
       <label className="flex min-h-touch items-center gap-2 rounded border border-line bg-surface-subtle px-3 focus-within:border-primary focus-within:bg-surface">
         <Icon name="search" size={16} className="shrink-0 text-muted-2" />
-        <span className="sr-only">
-          Search {labels.person_plural} and {labels.recording_plural}
-        </span>
+        <span className="sr-only">Search {what}</span>
         <input
           ref={input}
           type="search"
@@ -151,7 +165,7 @@ export function HeaderSearch({ me }: { me: Me }) {
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
-          placeholder={`Search ${labels.person_plural.toLowerCase()} and ${labels.recording_plural.toLowerCase()}`}
+          placeholder={`Search ${what}`}
           className="min-w-0 flex-1 border-0 bg-transparent text-sm text-ink placeholder:text-muted-2 focus-visible:outline-none"
         />
         <kbd
@@ -169,10 +183,10 @@ export function HeaderSearch({ me }: { me: Me }) {
         className="absolute inset-x-0 top-full z-30 m-0 mt-1 max-h-[420px] list-none overflow-auto rounded-card border border-line bg-surface p-0 pb-1.5 shadow-lg"
       >
         {group(capitalise(labels.person_plural), people, 0)}
-        {group(capitalise(labels.recording_plural), recordings, people.length)}
+        {group(rep ? "Calls and meetings" : capitalise(labels.recording_plural), recordings, people.length)}
         {options.length === 0 && (
           <li role="presentation" className="px-3 py-3 text-sm text-muted">
-            No {labels.person_plural.toLowerCase()} or {labels.recording_plural.toLowerCase()} match “{query.trim()}”
+            Nothing in {what} matches “{query.trim()}”
           </li>
         )}
       </ul>
