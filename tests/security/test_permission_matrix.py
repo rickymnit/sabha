@@ -412,6 +412,8 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "POST /v1/people": create_person,
     "PATCH /v1/people/{person_id}": change_person,
     "GET /v1/me/next-actions": lambda a, who: a.client.get("/v1/me/next-actions", headers=a.headers(who)),
+    "GET /v1/me/summary": lambda a, who: a.client.get("/v1/me/summary", headers=a.headers(who)),
+    "GET /v1/me/coaching": lambda a, who: a.client.get("/v1/me/coaching", headers=a.headers(who)),
     "GET /v1/product-info": lambda a, who: a.client.get("/v1/product-info", headers=a.headers(who)),
     "POST /v1/product-info": create_product_info,
     "PATCH /v1/product-info/{entry_id}": change_product_info,

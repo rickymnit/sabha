@@ -438,6 +438,16 @@ routes:
     anonymous: 401
     others: 200
 
+  GET /v1/me/summary:
+    # The caller's OWN call and meeting counts and average score (zeros without a linked person).
+    anonymous: 401
+    others: 200
+
+  GET /v1/me/coaching:
+    # The caller's OWN private coaching: theme scores and practice points (empty without a linked person).
+    anonymous: 401
+    others: 200
+
   GET /v1/audit:
     # The audit log (P1.8): owners and admins only (owner's decision, 2026-10-27). other_tenant reads its own.
     anonymous: 401

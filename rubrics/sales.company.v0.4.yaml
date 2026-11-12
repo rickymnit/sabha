@@ -7,6 +7,7 @@
 # - Coaching for the next conversation, private to the rep and each item quote-backed: a question the rep could
 #   have asked, what to explain better next time, and one practice point for the next call.
 # - The client's name as said in the conversation, quote-backed (used when the rep left it blank at upload).
+# - Coaching themes (communication, product knowledge, discovery questions, follow-up) for the rep's dashboard.
 # - The words users see for the interest levels, and how next actions get a priority (defaults agreed by the
 #   product owner 2026-11-12; the founder's doc leaves both open for validation, so they live here, not in code).
 #
@@ -25,6 +26,7 @@ roles: [sales_rep, customer]  # sales_rep is the person analysed; customer (one 
 
 dimensions:
   - key: opening_and_positioning
+    theme: communication
     name: Opening and positioning
     weight: 0.05
     definition: "The rep introduces themselves and [company], says in one or two sentences what [product] is and how it differs, and connects it to what the customer uses today."
@@ -40,6 +42,7 @@ dimensions:
       5: "Good afternoon sir, main Karan, [company] se. [product] ek AI wala school software hai jo sirf data store nahi karta, khud batata hai kya dhyan dena hai. Aap abhi koi ERP use kar rahe hain na? Main 15 minute mein dikhata hoon kaise yeh alag hai, theek hai?"
 
   - key: discovery
+    theme: discovery
     name: Discovering the customer's situation
     weight: 0.25
     definition: "The rep asks the customer about their own situation (current tools, problems, size, who decides) and uses the answers, instead of only assuming their problems."
@@ -55,6 +58,7 @@ dimensions:
       5: "Abhi monthly fee report kaun banata hai aur usmein kitna time lagta hai? ... Toh do din accounts wale lagate hain aur phir aapko samjhana padta hai. Final decision aap lenge ya trustees bhi?"
 
   - key: pains_to_value
+    theme: product_knowledge
     name: Turning problems into value
     weight: 0.25
     definition: "For each problem raised, the rep shows how [product] solves it with something concrete: a specific feature, an everyday example or comparison, or a number in the customer's terms."
@@ -70,6 +74,7 @@ dimensions:
       5: "Abhi discount ka pata saal ke end mein chalta hai. Isme usi din alert aayega ki kisi ko normal se zyada discount diya gaya. Aapke 1,200 bachchon mein ek bhi galat discount pakda toh woh yahin bach gaya. Aapke yahan aisa kabhi hua hai?"
 
   - key: differentiation
+    theme: product_knowledge
     name: Showing the difference
     weight: 0.25
     definition: "The rep explains specifically how [product] differs from what the customer uses now or from competitors, with an example rather than only a claim."
@@ -86,6 +91,7 @@ dimensions:
       5: "Abhi ke ERP mein report ka naya column chahiye toh ticket banta hai aur hafte lagte hain. Isme aap bolke maang lijiye, 'is report mein pending fees bhi daal do', aur turant ban jayegi. Aapne bataya tha ki yahi wait aapko pareshan karta hai."
 
   - key: price_and_objections
+    theme: communication
     name: Price and objections
     weight: 0.05
     definition: "The rep states the price clearly, answers concerns (price, switching, risk) specifically, ideally comparing with what the customer spends now and what [product] saves them, and checks the concern is settled."
@@ -102,6 +108,7 @@ dimensions:
       5: "Rs 30 per student per month hai. Abhi aap Rs 12 dete hain, toh 1,000 bachchon pe saal ke lagbhag Rs 2 lakh zyada. Agar do staff ka typing aur reports ka kaam hat gaya, toh woh unki salary se pehle hi nikal jaata hai. Kya is hisaab se price ki chinta door hoti hai?"
 
   - key: next_step_commitment
+    theme: follow_up
     name: Booked next step
     weight: 0.15
     definition: "The meeting ends with a specific next step, such as a demo or a trial, with a date or time that the customer agrees to."
@@ -156,6 +163,13 @@ output_labels:
     medium: Considering
     low: Not interested
     unclear: Unclear
+
+# Coaching themes on the rep's dashboard (founder's doc), in this order; each dimension above names one.
+themes:
+  communication: Communication skills
+  product_knowledge: Product knowledge
+  discovery: Discovery questions
+  follow_up: Follow-up skills
 
 # Next-action priority (the follow_up rule in sabha_analytics.rubric): high when the client is Interested and the
 # action is due within 2 days or overdue; medium when it is due within 7 days; low otherwise.

@@ -887,3 +887,54 @@ def test_my_next_actions_are_mine_with_dates_and_priorities(api: Api) -> None:
     assert soon["client"] == "Sunrise School" and soon["due_said"] == "tomorrow" and soon["due_date"] is not None
     assert vague["client"] == "Green Valley" and vague["due_date"] is None  # "next week" names no date
     assert api.get("manager", "/v1/me/next-actions").json()["items"] == []  # no person linked: nothing
+
+
+def test_my_summary_counts_calls_and_meetings_this_week_and_last(api: Api) -> None:
+    now = utc_now()
+    sale(api, "s-call", "p-asha", recorded=now, interest="high", due=None)
+    insert(api.db, "recordings", Recording(
+        id="s-meet", tenant_id=T, type=ConversationType.SALES, status=RecordingStatus.TRANSCRIBING, consent_ref="c",
+        person_id="p-asha", unit_id="unit-1", recorded_at=now, interaction="meeting",
+    ))  # fmt: skip
+    sale(api, "s-last", "p-asha", recorded=now - timedelta(days=7), interest="low", due=None)
+    sale(api, "s-ravi", "p-ravi", recorded=now, interest="high", due=None)
+    body = api.get("asha", "/v1/me/summary?period=week").json()
+    current, previous = body["current"], body["previous"]
+    assert (current["calls"], current["meetings"], current["total"]) == (1, 1, 2)  # Ravi's call is not hers
+    assert (current["score"], current["scored"]) == (3.5, 1)  # the meeting is still being processed
+    assert (previous["total"], previous["score"]) == (1, 3.5)
+
+
+def test_my_coaching_groups_my_scores_into_themes_with_my_practice_points(api: Api) -> None:
+    api.db.tenants.update_one({"_id": T}, {"$set": {"profile": "company"}})  # sales rubric v0.4 has the themes
+    now = utc_now()
+    sale(api, "s-1", "p-asha", recorded=now, interest="high", due=None)
+    api.db.analyses.update_one({"recording_id": "s-1"}, {"$set": {"practice_point": "Ask who decides."}})
+    stored = api.db.analyses.find_one({"recording_id": "s-1"})
+    assert stored is not None
+    analysis_id = stored["_id"]
+    for person, dimension, score in (("p-asha", "discovery", 2), ("p-asha", "next_step_commitment", 4),
+                                     ("p-ravi", "discovery", 5)):  # fmt: skip
+        insert(
+            api.db,
+            "scores",
+            Score(
+                tenant_id=T,
+                analysis_id=analysis_id,
+                recording_id="s-1",
+                person_id=person,
+                dimension=dimension,
+                name=dimension,
+                weight=0.2,
+                score=score,
+                verified=True,
+            ),
+        )
+    body = api.get("asha", "/v1/me/coaching").json()
+    themes = {t["key"]: t for t in body["themes"]}
+    assert [t["name"] for t in body["themes"]] == ["Communication skills", "Product knowledge",
+                                                   "Discovery questions", "Follow-up skills"]  # fmt: skip
+    assert (themes["discovery"]["score"], themes["follow_up"]["score"]) == (2.0, 4.0)  # Ravi's 5 is not hers
+    assert themes["communication"]["score"] is None and body["focus"] == "discovery"
+    assert [p["text"] for p in body["practice_points"]] == ["Ask who decides."]
+    assert api.get("manager", "/v1/me/coaching").json() == {"themes": [], "focus": None, "practice_points": []}

@@ -29,6 +29,9 @@ Schema (matches rubrics/teaching.school.v0.1.yaml and rubrics/reception.school.v
   2026-11-12): `high_interest` (values of output_values.interest_level), `high_within_days` and
   `medium_within_days` (whole days, 0-60, high <= medium). High = the interest is one of high_interest and the action
   is due within high_within_days or overdue; medium = due within medium_within_days; low = the rest.
+- Optional `themes` ({key: name}, in display order) and each dimension's `theme`: the coaching themes the person's
+  dashboard groups scores into (founder's doc: communication, product knowledge, discovery, follow-up). With
+  themes, every dimension names one of them.
 - YAML is read with a loader that rejects duplicate keys (PyYAML otherwise keeps the last one silently).
 
 Content hash: SHA-256 (hex) of a canonical JSON serialisation of the VALIDATED model: `model_dump(mode="json",
@@ -115,6 +118,11 @@ OutputLabels = Annotated[
 ]
 
 
+ThemeNames = Annotated[
+    Mapping[SnakeName, Text], AfterValidator(_freeze), PlainSerializer(_thaw, return_type=dict[str, str])
+]
+
+
 def _duplicates(items: Iterable[Hashable]) -> list[Hashable]:
     seen: set[Hashable] = set()
     repeated: list[Hashable] = []
@@ -143,6 +151,8 @@ class Dimension(_Frozen):
     # call with nothing to escalate). Such a dimension is left out of that conversation's overall score and the other
     # weights are rescaled (sabha_analytics.synthesis). The judge must still quote what the conversation was about.
     not_applicable_when: Text | None = None
+    # The coaching theme this dimension counts towards on the person's dashboard (a key of the rubric's `themes`).
+    theme: SnakeName | None = None
 
     @field_validator("anchors")
     @classmethod
@@ -195,6 +205,10 @@ class Rubric(_Frozen):
     output_values: OutputValues | None = None
     output_labels: OutputLabels | None = None
     follow_up: FollowUpRules | None = None
+    themes: (
+        Annotated[Mapping[SnakeName, Text], AfterValidator(_freeze), PlainSerializer(_thaw, return_type=dict[str, str])]
+        | None
+    ) = None
     visibility_gate: VisibilityGate
 
     @model_validator(mode="after")
@@ -234,6 +248,14 @@ class Rubric(_Frozen):
                 problems.append(f"output_labels has {section!r}, which has no output_values")
             elif set(labels) != set(values[section]):
                 problems.append(f"output_labels.{section} must label exactly {', '.join(values[section])}")
+        themes = self.themes or {}
+        problems += [
+            f"dimension {d.key!r} has theme {d.theme!r}, which is not one of themes"
+            for d in self.dimensions
+            if d.theme is not None and d.theme not in themes
+        ]
+        if themes and any(d.theme is None for d in self.dimensions):
+            problems.append("with themes, every dimension needs a theme")
         if self.follow_up is not None:
             interest = values.get("interest_level", ())
             unknown = [v for v in self.follow_up.high_interest if v not in interest]
