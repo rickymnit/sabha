@@ -20,7 +20,7 @@ English, whatever language was spoken; quotes stay exactly as they are in the tr
   customer's part "Wait for the customer's call back". Never start with "The rep will".
 - client_name: the customer's organisation (a school, a company), or the customer's own name if no organisation is
   said, at most 8 words, exactly as it is said in the transcript. null when it is not said or only appears as a
-  placeholder.
+  placeholder. Never a greeting ("namaste", "khamma ghani") or a word that is not a name.
 
 Every item needs evidence: a quote copied word for word from the transcript (at least three words, from one
 utterance), with that utterance's id and start_ms. Answer with JSON only.

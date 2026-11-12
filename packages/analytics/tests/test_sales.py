@@ -269,3 +269,11 @@ def test_coaching_points_only_at_approved_product_information(meeting: PreparedT
     model = fake_judge([invented, invented])
     outcome = write_next_time(meeting, dimensions=(), model=model, product_info=facts)
     assert outcome.next_time is None and outcome.failure_reasons == ("unknown_product_info",)  # never shown
+
+
+def test_coaching_in_another_script_is_sent_back_for_english(meeting: PreparedTranscript, fake_judge: Any) -> None:
+    hindi = {**COACHING, "practice_point": {**COACHING["practice_point"], "text": "शुरू में अपना परिचय दें"}}
+    model = fake_judge([hindi, COACHING])
+    outcome = write_next_time(meeting, dimensions=(), model=model, product_info=())
+    assert outcome.next_time is not None and outcome.attempts == 2
+    assert "write the text in English" in str(model.calls[1]["messages"])

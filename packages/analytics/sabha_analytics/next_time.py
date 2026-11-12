@@ -23,6 +23,7 @@ all there is no coaching; the scores and the rest of the report are not affected
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -119,6 +120,9 @@ def next_time_schema() -> dict[str, Any]:
     }
 
 
+_DEVANAGARI = re.compile(r"[\u0900-\u097F]")  # the rep reads coaching in English (prompt rule)
+
+
 def validate_next_time(
     data: object, *, transcript: PreparedTranscript, product_ids: frozenset[str] = frozenset()
 ) -> tuple[NextTime | None, list[Problem]]:
@@ -139,6 +143,11 @@ def validate_next_time(
             check.problems.append(Problem("invalid_shape", f"{key} must be null or {{text, quote...}}."))
             continue
         text = check.text(key, raw.get("text"), MAX_WORDS[key])
+        if text is not None and _DEVANAGARI.search(text):
+            check.problems.append(Problem(
+                "not_english", f"{key}: write the text in English; only the quote stays as it was spoken.",
+            ))  # fmt: skip
+            continue
         evidence = check.evidence(key, raw)
         product_id = raw.get("product_info_id") if key == "explain_better" else None
         if product_id is not None and product_id not in product_ids:
