@@ -13,6 +13,7 @@ from sabha_analytics.scoring import (
     PromptNotRedacted,
     check_prompt_redacted,
     group_dimensions,
+    render_metrics,
     score_dimensions,
 )
 
@@ -220,3 +221,12 @@ def test_not_applicable_still_needs_a_verified_quote(
 
     assert len(model.calls) == 2
     assert not recap.verified and not recap.not_applicable and recap.evidence == ()
+
+
+@pytest.mark.parametrize(
+    ("value", "shown"),
+    [(764.688, "765 s (12 min 45 s)"), (120.2, "120 s (2 min)"), (42.4, "42 s"), (0.82, "1 s")],
+)
+def test_seconds_reach_the_model_rounded_and_in_minutes(value: float, shown: str) -> None:
+    line = render_metrics([{"key": "longest_monologue_s", "value": value, "unit": "s", "definition": "Longest turn."}])
+    assert line == f"- longest_monologue_s = {shown}: Longest turn."

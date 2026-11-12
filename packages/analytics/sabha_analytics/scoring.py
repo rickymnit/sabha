@@ -326,10 +326,23 @@ def render_metrics(metrics: Sequence[Mapping[str, Any]]) -> str:
         return "(none)"
     lines = []
     for metric in metrics:
-        value = json.dumps(metric["value"], ensure_ascii=False)
-        unit = f" {metric['unit']}" if metric["unit"] else ""
-        lines.append(f"- {metric['key']} = {value}{unit}: {metric['definition']}")
+        value = metric["value"]
+        if metric["unit"] == "s" and isinstance(value, int | float) and not isinstance(value, bool):
+            shown = f"{round(value)} s{_in_minutes(value)}"  # people read "12 min 45 s", never "764.688 s"
+        else:
+            unit = f" {metric['unit']}" if metric["unit"] else ""
+            shown = f"{json.dumps(value, ensure_ascii=False)}{unit}"
+        lines.append(f"- {metric['key']} = {shown}: {metric['definition']}")
     return "\n".join(lines)
+
+
+def _in_minutes(seconds: float) -> str:
+    """The minutes in brackets, such as " (12 min 45 s)", for a minute or more; else nothing."""
+    whole = round(seconds)
+    if whole < 60:
+        return ""
+    minutes, rest = divmod(whole, 60)
+    return f" ({minutes} min {rest} s)" if rest else f" ({minutes} min)"
 
 
 # --- rubric ------------------------------------------------------------------------------------------------------
