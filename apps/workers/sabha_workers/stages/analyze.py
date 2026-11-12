@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -40,6 +40,7 @@ from pymongo.database import Database
 from sabha_analytics.grounding import prepare_transcript
 from sabha_analytics.metrics import SILENCE_METRIC_KEYS, compute_metrics, select_metrics
 from sabha_analytics.next_time import OUTPUT_SECTION as NEXT_TIME_SECTION
+from sabha_analytics.next_time import ProductFact
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse
 from sabha_analytics.rubric import Rubric
@@ -70,6 +71,8 @@ class AnalyzeDeps:
     save: Callable[[str, Analysis, list[Score]], None]  # (tenant_id, analysis, scores), atomically
     # (tenant_id, recording_id, since): cost of the recording's LLM calls, since a time for a re-analysis
     llm_cost: Callable[[str, str, datetime | None], float | None]
+    # (tenant_id): the tenant's active approved product information, for the coaching (founder's doc, 2026-11-12)
+    product_info: Callable[[str], Sequence[ProductFact]] = lambda _tenant_id: ()
 
 
 def _get_json(ctx: StageContext, key: str) -> Any:
@@ -133,6 +136,7 @@ def make_work(deps: AnalyzeDeps) -> Work:
         selected = select_metrics(metrics, rubric.computed_metrics)
         if imported:  # a transcript says nothing about silence, so no silence figure is shown (golden rule 5)
             selected = tuple(m for m in selected if m.key not in SILENCE_METRIC_KEYS)
+        coaching = NEXT_TIME_SECTION in rubric.output
         try:
             result = analyse(
                 rubric=rubric, transcript=transcript, metrics=[m.to_record() for m in selected],
@@ -142,7 +146,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 sales=recording.type is ConversationType.SALES,
                 support=recording.type is ConversationType.SUPPORT,
                 meeting=meeting,
-                next_time=NEXT_TIME_SECTION in rubric.output,
+                next_time=coaching,
+                product_info=deps.product_info(ctx.tenant_id) if coaching else (),
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:
             retryable = isinstance(exc, BudgetUnavailableError) or exc.retryable

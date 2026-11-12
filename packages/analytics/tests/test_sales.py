@@ -9,7 +9,7 @@ import jsonschema
 import pytest
 
 from sabha_analytics.grounding import PreparedTranscript, prepare_transcript
-from sabha_analytics.next_time import write_next_time
+from sabha_analytics.next_time import ProductFact, write_next_time
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse, load_report_schema
 from sabha_analytics.rubric import Rubric, load_rubric
@@ -251,3 +251,21 @@ def test_without_the_flag_there_is_no_coaching_call(
     result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
                      analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True)  # fmt: skip
     assert result.report["next_time"] is None and len(model.calls) == 4
+
+
+def test_coaching_points_only_at_approved_product_information(meeting: PreparedTranscript, fake_judge: Any) -> None:
+    facts = (ProductFact("pi-billing", "Quarterly billing", "Fees can be paid quarterly. Call 9876543210 for terms."),)
+    with_entry = {**COACHING, "explain_better": {**COACHING["explain_better"], "product_info_id": "pi-billing"}}
+    invented = {**COACHING, "explain_better": {**COACHING["explain_better"], "product_info_id": "pi-made-up"}}
+
+    model = fake_judge([with_entry])
+    outcome = write_next_time(meeting, dimensions=(), model=model, product_info=facts)
+    assert outcome.next_time is not None and outcome.next_time.explain_better is not None
+    assert outcome.next_time.to_record()["explain_better"]["product_info_id"] == "pi-billing"
+    prompt = model.calls[0]["messages"][0]["content"]
+    assert "[pi-billing] Quarterly billing: Fees can be paid quarterly." in prompt
+    assert "9876543210" not in prompt  # company text is masked for PII too (golden rule 8)
+
+    model = fake_judge([invented, invented])
+    outcome = write_next_time(meeting, dimensions=(), model=model, product_info=facts)
+    assert outcome.next_time is None and outcome.failure_reasons == ("unknown_product_info",)  # never shown

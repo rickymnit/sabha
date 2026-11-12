@@ -164,7 +164,8 @@
   },
   "$defs": {
     "tip": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["text", "evidence"],
-      "properties": {"text": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"}}}]},
+      "properties": {"text": {"type": "string", "minLength": 1}, "evidence": {"$ref": "#/$defs/card_evidence"},
+                     "product_info_id": {"type": "string", "minLength": 1, "description": "explain_better only: the approved product information entry to review."}}}]},
     "card_evidence": {
       "type": "object", "additionalProperties": false, "required": ["quote", "utterance_id", "start_ms", "end_ms"],
       "properties": {"quote": {"type": "string", "minLength": 1}, "utterance_id": {"type": "string", "pattern": "^u[0-9]{4,}$"},

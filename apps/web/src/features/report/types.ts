@@ -182,6 +182,9 @@ export interface DealCard {
 export interface Tip {
   text: string;
   evidence: CardEvidence;
+  /** explain_better only: the approved product information to review (null if it was removed since). */
+  product_info_id?: string;
+  product_info?: { id: string; title: string; body: string } | null;
 }
 
 /** Sales v0.4 on: coaching for the next conversation, private to the person analysed (verified items only). */

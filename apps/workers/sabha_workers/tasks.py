@@ -25,13 +25,14 @@ from pymongo.database import Database
 from redis import Redis
 
 from sabha_analytics.judge import GatewayJudge
+from sabha_analytics.next_time import MAX_PRODUCT_INFO, ProductFact
 from sabha_asr.diarization import DEFAULT_MODEL_DIR as DEFAULT_PYANNOTE_DIR
 from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_asr.registry import build_transcriber
 from sabha_asr.roles import RoleTieBreaker
 from sabha_asr.transcriber import Transcriber
 from sabha_core.backup import export_backup
-from sabha_core.models import AudioInfo, LlmCall, Person, Recording, Transcript, utc_now
+from sabha_core.models import AudioInfo, LlmCall, Person, ProductInfo, Recording, Transcript, utc_now
 from sabha_core.mongo import open_sync
 from sabha_core.repo import SyncTenantRepo, own_tenant
 from sabha_core.settings import Settings, get_settings
@@ -216,6 +217,12 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         judge=judge,
         save=lambda tenant_id, analysis, scores: analyze.store_analysis(db, tenant_id, analysis, scores),
         llm_cost=llm_cost,
+        product_info=lambda tenant_id: [
+            ProductFact(e.id, e.title, e.body)
+            for e in SyncTenantRepo(db, "product_info", tenant_id, ProductInfo).find(
+                {"status": "active"}, sort=[("title", 1)], limit=MAX_PRODUCT_INFO
+            )
+        ],
     )
 
     speed = settings.asr_speedup_factor if settings.asr_speedup else 1.0

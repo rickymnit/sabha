@@ -34,6 +34,14 @@ export function NextTimePanel({ coaching, onSeek }: { coaching: NextTime; onSeek
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="text-small font-semibold text-muted">{label}</span>
               <span className="text-ink">{tip.text}</span>
+              {tip.product_info && (
+                <details className="mt-1 rounded-card bg-surface-faint px-3 py-2">
+                  <summary className="cursor-pointer text-small font-semibold text-primary-hover">
+                    Review: {tip.product_info.title}
+                  </summary>
+                  <p className="m-0 mt-1.5 whitespace-pre-line text-small text-ink-2">{tip.product_info.body}</p>
+                </details>
+              )}
             </span>
           </li>
         ))}

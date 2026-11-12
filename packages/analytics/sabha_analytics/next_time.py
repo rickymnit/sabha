@@ -9,6 +9,12 @@ From the redacted transcript and the verified rubric scores the model writes, ev
 It runs only for a rubric whose `output` lists `practice_point`, and only when there are verified scores. The
 coaching is private to the person analysed (the API hides it from everyone else).
 
+Approved product information (founder's doc, 2026-11-12): the tenant's active entries are given to the model as the
+only source for product facts. When the client asked about a product topic, explain_better may name one entry by
+its id (`product_info_id`) for the rep to review; an id that is not one of the entries given is refused like any
+invalid answer, so coaching can never point at information that was not approved. Entry texts are company content,
+not transcript text, so they are masked for pattern PII (sabha_llm.redact.redact_again) before the prompt.
+
 Golden rule 5 applies as for the deal card (sales.QuoteCheck): every quote must be found in the transcript and is
 stored in the transcript's own wording with that utterance's times. A failing answer is re-asked once with the
 problems; then items whose quote is still not found are left out, never shown. If the second answer is not valid at
@@ -36,10 +42,23 @@ from sabha_analytics.scoring import (
     feedback_text,
     load_prompt,
 )
+from sabha_llm.redact import redact_again
 
 OUTPUT_SECTION = "practice_point"
 """A rubric asks for this coaching by listing this section in its `output`."""
 KEYS = ("question_to_ask", "explain_better", "practice_point")
+MAX_PRODUCT_INFO = 40
+
+
+@dataclass(frozen=True, slots=True)
+class ProductFact:
+    """One approved product information entry, as given to the model."""
+
+    id: str
+    title: str
+    body: str
+
+
 MAX_WORDS = {"question_to_ask": 25, "explain_better": 30, "practice_point": 25}
 
 
@@ -47,6 +66,7 @@ MAX_WORDS = {"question_to_ask": 25, "explain_better": 30, "practice_point": 25}
 class Tip:
     text: str
     evidence: Evidence
+    product_info_id: str | None = None  # explain_better only: the approved entry to review
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +82,10 @@ class NextTime:
                 return None
             e = t.evidence
             evidence = {"quote": e.quote, "utterance_id": e.utterance_id, "start_ms": e.start_ms, "end_ms": e.end_ms}
-            return {"text": t.text, "evidence": evidence}
+            record: dict[str, Any] = {"text": t.text, "evidence": evidence}
+            if t.product_info_id is not None:
+                record["product_info_id"] = t.product_info_id
+            return record
 
         return {
             "question_to_ask": tip(self.question_to_ask),
@@ -83,19 +106,22 @@ class NextTimeOutcome:
 
 def next_time_schema() -> dict[str, Any]:
     item = quoted_item({"text": {"type": "string", "minLength": 1}})
+    explain = quoted_item({"text": {"type": "string", "minLength": 1}, "product_info_id": {"type": ["string", "null"]}})
     return {
         "type": "object",
         "additionalProperties": False,
         "required": list(KEYS),
         "properties": {
             "question_to_ask": {"anyOf": [{"type": "null"}, item]},
-            "explain_better": {"anyOf": [{"type": "null"}, item]},
+            "explain_better": {"anyOf": [{"type": "null"}, explain]},
             "practice_point": item,
         },
     }
 
 
-def validate_next_time(data: object, *, transcript: PreparedTranscript) -> tuple[NextTime | None, list[Problem]]:
+def validate_next_time(
+    data: object, *, transcript: PreparedTranscript, product_ids: frozenset[str] = frozenset()
+) -> tuple[NextTime | None, list[Problem]]:
     """The coaching (verified items only) and every problem found; None when the answer's shape or texts are invalid.
     Quote problems alone still give coaching, without those items."""
     if not isinstance(data, dict) or set(data) != set(KEYS):
@@ -114,8 +140,16 @@ def validate_next_time(data: object, *, transcript: PreparedTranscript) -> tuple
             continue
         text = check.text(key, raw.get("text"), MAX_WORDS[key])
         evidence = check.evidence(key, raw)
+        product_id = raw.get("product_info_id") if key == "explain_better" else None
+        if product_id is not None and product_id not in product_ids:
+            check.problems.append(Problem(
+                "unknown_product_info",
+                f"{key}: product_info_id {product_id!r} is not one of the approved entries; use one of their ids or "
+                "null.",
+            ))  # fmt: skip
+            continue
         if text is not None and evidence is not None:
-            kept[key] = Tip(text.strip(), evidence)
+            kept[key] = Tip(text.strip(), evidence, product_id)
     if any(p.code != "quote_not_found" for p in check.problems):
         return None, check.problems
     found = NextTime(kept["question_to_ask"], kept["explain_better"], kept["practice_point"], check.unverified)
@@ -127,16 +161,28 @@ def _scores(dimensions: Sequence[DimensionResult]) -> str:
     return "\n".join(rows) or "- (none)"
 
 
+def _product_info(facts: Sequence[ProductFact]) -> str:
+    if not facts:
+        return "(none: give no product facts and leave product_info_id null)"
+    return "\n".join(
+        f"[{f.id}] {redact_again(' '.join(f.title.split()))}: {redact_again(' '.join(f.body.split()))}" for f in facts
+    )
+
+
 def write_next_time(
     transcript: PreparedTranscript,
     *,
     dimensions: Sequence[DimensionResult],
     model: JudgeModel,
+    product_info: Sequence[ProductFact] = (),
     prompts_dir: Path = PROMPTS_DIR,
 ) -> NextTimeOutcome:
     """Ask for the coaching for the next conversation (module docstring)."""
+    facts = tuple(product_info)[:MAX_PRODUCT_INFO]
     system_p, request_p = load_prompt("next_time.system", prompts_dir), load_prompt("next_time.request", prompts_dir)
-    prefix = request_p.render(scores=_scores(dimensions), transcript=transcript.render())
+    prefix = request_p.render(scores=_scores(dimensions), product_info=_product_info(facts),
+                              transcript=transcript.render())  # fmt: skip
+    ids = frozenset(f.id for f in facts)
     calls: list[CallRecord] = []
     problems: list[Problem] = []
     found: NextTime | None = None
@@ -152,7 +198,7 @@ def write_next_time(
             keys=(),
             calls=calls,
         )
-        found, problems = validate_next_time(data, transcript=transcript)
+        found, problems = validate_next_time(data, transcript=transcript, product_ids=ids)
         if found is not None and not problems:
             return NextTimeOutcome(found, attempt, (), tuple(calls), (system_p, request_p))
     reasons = tuple(dict.fromkeys(p.code for p in problems))

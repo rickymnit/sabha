@@ -28,6 +28,7 @@ from sabha_core.models import (
     IdempotencyRecord,
     OutboxEvent,
     Person,
+    ProductInfo,
     Recording,
     Score,
     Transcript,
@@ -185,6 +186,7 @@ async def get_transcript(
 async def get_analysis(
     recording_id: str, request: Request, principal: Caller, found: Found, recordings: Recordings, people: People,
     analyses: Analyses, scores: Scores, dispute_repo: Disputes, reader: Reader, entries: Entries,
+    product_info: Annotated[TenantRepo[ProductInfo], Depends(tenant_repo("product_info", ProductInfo))],
     analysis_id: str | None = None,
 ) -> dict[str, Any]:  # fmt: skip
     """Everything the report page shows, in one payload for the recording's state: processing (with the stage),
@@ -201,6 +203,7 @@ async def get_analysis(
                                                        coaching=coaching, analysis_id=analysis_id)  # fmt: skip
     payload = await disputes.annotate_report(payload, principal, recording, analysis, scores=scores,
                                              disputes=dispute_repo)  # fmt: skip
+    payload = await service.attach_product_info(payload, product_info)
     if analysis is not None and payload["status"] in ("completed", "partial"):
         await audit(entries, principal, request, action="analysis.view", target_type="recording",
                     target_id=recording.id, meta={"analysis_id": analysis.id})  # fmt: skip

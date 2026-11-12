@@ -30,7 +30,7 @@ from typing import Any
 from sabha_analytics.classify import UNCERTAIN_TYPE, Classification
 from sabha_analytics.grounding import PreparedTranscript
 from sabha_analytics.meetings import MeetingNotesOutcome, write_meeting_notes
-from sabha_analytics.next_time import NextTimeOutcome, write_next_time
+from sabha_analytics.next_time import NextTimeOutcome, ProductFact, write_next_time
 from sabha_analytics.phases import PhaseOutcome, segment_phases
 from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, ticket_values, write_ticket
 from sabha_analytics.sales import DealCardOutcome, interest_values, write_deal_card
@@ -301,6 +301,7 @@ def analyse(
     meeting: bool = False,
     support: bool = False,
     next_time: bool = False,
+    product_info: Sequence[ProductFact] = (),
 ) -> AnalysisResult:
     """Score, compute the overall score, synthesise when there is one, and assemble the report.
 
@@ -311,7 +312,8 @@ def analyse(
     `meeting`: also write the meeting's notes (decisions, action items, open questions).
     `support`: also write the call's case card, with the outcomes of the rubric's `output_values.outcome` (ValueError
     before any model call if it has none).
-    `next_time`: also write the coaching for the next conversation (when there are verified scores).
+    `next_time`: also write the coaching for the next conversation (when there are verified scores), with the
+    tenant's approved `product_info` as its only source for product facts.
     `reception`: also write the call's ticket, with the categories
     and statuses of the rubric's `output_values` (ValueError before any model call if the rubric has none).
     """
@@ -355,7 +357,7 @@ def analyse(
     notes = write_meeting_notes(transcript, model=model) if meeting else None
     case = write_case_card(transcript, outcomes=outcomes, model=model) if outcomes is not None else None
     coach = (
-        write_next_time(transcript, dimensions=scoring.dimensions, model=model)
+        write_next_time(transcript, dimensions=scoring.dimensions, model=model, product_info=product_info)
         if next_time and overall.score is not None
         else None
     )

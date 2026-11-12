@@ -391,3 +391,18 @@ export interface ProcessingInfo {
   can_retry: boolean;
   ai: { calls: number; cost_usd: number | null; unpriced_calls: number };
 }
+
+/** GET /v1/product-info: company-approved product information, the only source AI coaching uses for product facts. */
+export interface ProductInfoItem {
+  id: string;
+  title: string;
+  body: string;
+  status: "active" | "retired";
+  updated_at: string;
+}
+
+export interface ProductInfoList {
+  items: ProductInfoItem[];
+  /** Owners and admins may add, change and retire entries. */
+  can_edit: boolean;
+}

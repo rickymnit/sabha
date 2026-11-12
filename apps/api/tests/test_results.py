@@ -26,6 +26,7 @@ from sabha_core.models import (
     Dispute,
     IdentityLink,
     Person,
+    ProductInfo,
     Recording,
     Role,
     Score,
@@ -693,6 +694,23 @@ def test_coaching_is_private_to_the_person_analysed(api: Api) -> None:
         text = json.dumps(body)
         assert "Plain words." not in text and "Few checks." not in text and "Ask a student" not in text
         assert "Pause after" not in text
+
+
+def test_coaching_shows_the_approved_product_information_it_points_to(api: Api) -> None:
+    insert(api.db, "product_info", ProductInfo(id="pi-1", tenant_id=T, title="Quarterly billing",
+                                               body="Fees can be paid every quarter."))  # fmt: skip
+    tip = {"text": "Explain quarterly billing.", "product_info_id": "pi-1",
+           "evidence": {"quote": "Tell me", "utterance_id": "u0001", "start_ms": 9_000, "end_ms": 30_000}}  # fmt: skip
+    recording(api, "r-asha", "p-asha", "unit-1", 30)
+    analysis(api, "r-asha", "v1", 3.6, 10)
+    key = f"{T}/r-asha/analyze@v1/analysis@v1.json"
+    report = json.loads(api.s3.get_object(Bucket="sabha-artefacts", Key=key)["Body"].read())
+    report["next_time"] = {**NEXT_TIME, "explain_better": tip}
+    api.s3.put_object(Bucket="sabha-artefacts", Key=key, Body=json.dumps(report).encode())
+    own = api.get("asha", "/v1/recordings/r-asha/analysis").json()
+    assert own["next_time"]["explain_better"]["product_info"] == {
+        "id": "pi-1", "title": "Quarterly billing", "body": "Fees can be paid every quarter."}  # fmt: skip
+    assert api.get("manager", "/v1/recordings/r-asha/analysis").json()["next_time"] is None
 
 
 def test_unverified_dimensions_show_nothing_but_their_name(api: Api) -> None:

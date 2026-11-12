@@ -64,6 +64,7 @@ COLLECTIONS = (
     "relay_state",
     "dlq",
     "deliveries",
+    "product_info",
 )
 SYSTEM_COLLECTIONS = ("tenants", "outbox", "identities", "relay_state")
 _NOT_TENANT_SCOPED = frozenset({"tenants", "relay_state"})  # no tenant_id field

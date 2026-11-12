@@ -479,6 +479,27 @@ class StageRun(TenantDoc):
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
+PRODUCT_INFO_TITLE_MAX = 120
+PRODUCT_INFO_BODY_MAX = 3000
+
+
+class ProductInfo(TenantDoc):
+    """One piece of company-approved product information (founder's Sales Executive dashboard doc, 2026-11-12).
+
+    AI coaching may use only these for product facts, and points the rep to an entry to review. Owners and admins add
+    and change them; everyone else may only read. A retired entry is no longer given to the AI but stays readable for
+    coaching that already points at it.
+    """
+
+    title: str = Field(min_length=1, max_length=PRODUCT_INFO_TITLE_MAX)
+    body: str = Field(min_length=1, max_length=PRODUCT_INFO_BODY_MAX)
+    status: Literal["active", "retired"] = "active"
+    created_by: str | None = None  # user id
+    updated_by: str | None = None
+    updated_at: UtcDatetime = Field(default_factory=utc_now)
+    created_at: UtcDatetime = Field(default_factory=utc_now)
+
+
 class AuditEntry(TenantDoc):
     """One append-only audit record (CLAUDE.md: playback, export and score changes are audited; P1.8 completes it).
 

@@ -35,6 +35,7 @@ from sabha_api.routers import (
     me,
     organisation,
     overview,
+    product_info,
     reanalysis,
     recordings,
     results,
@@ -129,6 +130,7 @@ def create_app(
     app.include_router(inbox.router)
     app.include_router(costs.router)
     app.include_router(organisation.router)
+    app.include_router(product_info.router)
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

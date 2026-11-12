@@ -28,6 +28,7 @@ import { TYPE_INFO } from "../app/conversationTypes";
 import { capitalise } from "../app/format";
 import { unitWords } from "../app/units";
 import { ClassesPanel } from "../features/organisation/ClassesPanel";
+import { ProductInfoPanel } from "../features/product/ProductInfoPanel";
 
 const EDITORS = ["owner", "admin"];
 
@@ -106,7 +107,7 @@ export function SettingsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="Your organisation's name, the words used across the product, the conversations you analyse, and how people are grouped."
+        description="Your organisation's name, the words used across the product, the conversations you analyse, how people are grouped, and the product information coaching may use."
       />
       {settings.isError ? (
         <Panel>
@@ -129,6 +130,7 @@ export function SettingsPage() {
         <SettingsForm settings={settings.data} />
       )}
       <ClassesPanel me={me} />
+      <ProductInfoPanel />
     </div>
   );
 }

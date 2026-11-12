@@ -39,6 +39,8 @@ import {
   type TenantSettings,
   type TranscriptResponse,
   type UsageSummary,
+  type ProductInfoItem,
+  type ProductInfoList,
 } from "./types";
 
 export const REFRESH_MS = 5_000;
@@ -633,4 +635,39 @@ export function useDevUsers(enabled: boolean): UseQueryResult<DevUser[], ApiErro
     queryFn: () => apiFetch<DevUser[]>("/dev-idp/users"),
     enabled,
   });
+}
+
+/** GET /v1/product-info: the approved product information (owners and admins may include retired entries). */
+export function useProductInfo(includeRetired = false): UseQueryResult<ProductInfoList, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["product-info", includeRetired, token],
+    queryFn: () =>
+      apiFetch<ProductInfoList>(`/v1/product-info${includeRetired ? "?include_retired=true" : ""}`, { token }),
+    enabled: Boolean(token),
+  });
+}
+
+/** Add, change or retire approved product information (owners and admins). */
+export function useProductInfoChanges() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["product-info"] });
+  return {
+    add: useMutation({
+      mutationFn: (body: { title: string; body: string }) =>
+        apiFetch<ProductInfoItem>("/v1/product-info", {
+          method: "POST",
+          token,
+          headers: { "Idempotency-Key": crypto.randomUUID() },
+          body,
+        }),
+      onSuccess: refresh,
+    }),
+    change: useMutation({
+      mutationFn: ({ id, ...body }: { id: string; title?: string; body?: string; status?: "active" | "retired" }) =>
+        apiFetch<ProductInfoItem>(`/v1/product-info/${encodeURIComponent(id)}`, { method: "PATCH", token, body }),
+      onSuccess: refresh,
+    }),
+  };
 }

@@ -31,7 +31,7 @@ from pydantic import BaseModel
 
 from sabha_api.auth import Principal, Role
 from sabha_api.errors import BadRequestError, NotFoundError
-from sabha_core.models import Analysis, DeadLetter, Person, Recording, Score, SpeakerSpan, Transcript, Unit
+from sabha_core.models import Analysis, DeadLetter, Person, ProductInfo, Recording, Score, SpeakerSpan, Transcript, Unit
 from sabha_core.profiles import ConversationType
 from sabha_core.reasons import explain
 from sabha_core.repo import TenantRepo
@@ -620,6 +620,17 @@ def hide_coaching(payload: dict[str, Any], visible: bool) -> dict[str, Any]:
         for key in PRIVATE_COACHING:
             payload[key] = []
         payload["next_time"] = None
+    return payload
+
+
+async def attach_product_info(payload: dict[str, Any], entries: TenantRepo[ProductInfo]) -> dict[str, Any]:
+    """The approved product information a coaching tip points the rep to (founder's doc, 2026-11-12), as
+    next_time.explain_better.product_info {id, title, body}. A retired entry still shows; a deleted one does not."""
+    tip = (payload.get("next_time") or {}).get("explain_better") or {}
+    entry_id = tip.get("product_info_id")
+    if entry_id:
+        entry = await entries.find_one({"_id": entry_id})
+        tip["product_info"] = None if entry is None else {"id": entry.id, "title": entry.title, "body": entry.body}
     return payload
 
 

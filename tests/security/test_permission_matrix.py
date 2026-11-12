@@ -27,6 +27,7 @@ from sabha_core.models import (
     DeadLetter,
     IdentityLink,
     Person,
+    ProductInfo,
     Recording,
     Role,
     Score,
@@ -329,6 +330,16 @@ def change_person(api: Api, caller: str) -> httpx.Response:
                             headers=api.headers(caller))  # fmt: skip
 
 
+def create_product_info(api: Api, caller: str) -> httpx.Response:
+    body = {"title": f"Pricing {uuid.uuid4().hex[:6]}", "body": "Rs 30 per student per month, billed quarterly."}
+    return api.client.post("/v1/product-info", json=body, headers=api.headers(caller, create=True))
+
+
+def change_product_info(api: Api, caller: str) -> httpx.Response:
+    entry_id = fresh(api, "product_info", ProductInfo(tenant_id="tenant-a", title="Pricing", body="Rs 30 a month."))
+    return api.client.patch(f"/v1/product-info/{entry_id}", json={"status": "retired"}, headers=api.headers(caller))
+
+
 def raise_dispute(api: Api, caller: str) -> httpx.Response:
     path = f"/v1/analyses/{fresh_analysis(api)}/disputes"
     return api.client.post(path, json=DISPUTE, headers=api.headers(caller, create=True))
@@ -400,6 +411,9 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "PATCH /v1/units/{unit_id}": rename_unit,
     "POST /v1/people": create_person,
     "PATCH /v1/people/{person_id}": change_person,
+    "GET /v1/product-info": lambda a, who: a.client.get("/v1/product-info", headers=a.headers(who)),
+    "POST /v1/product-info": create_product_info,
+    "PATCH /v1/product-info/{entry_id}": change_product_info,
     "GET /v1/costs/estimate": lambda a, who: a.client.get(
         "/v1/costs/estimate?type=teaching&duration_ms=600000", headers=a.headers(who)
     ),
