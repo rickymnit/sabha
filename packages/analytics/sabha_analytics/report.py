@@ -30,7 +30,14 @@ from typing import Any
 from sabha_analytics.classify import UNCERTAIN_TYPE, Classification
 from sabha_analytics.grounding import PreparedTranscript
 from sabha_analytics.meetings import MeetingNotesOutcome, write_meeting_notes
-from sabha_analytics.next_time import NextTimeOutcome, ProductFact, write_next_time
+from sabha_analytics.moments import MomentsOutcome, write_moments
+from sabha_analytics.next_time import (
+    MAX_PRODUCT_INFO,
+    NextTimeOutcome,
+    ProductFact,
+    render_product_info,
+    write_next_time,
+)
 from sabha_analytics.phases import PhaseOutcome, segment_phases
 from sabha_analytics.reception import TICKET_FAILED, TicketOutcome, ticket_values, write_ticket
 from sabha_analytics.sales import DealCardOutcome, interest_values, write_deal_card
@@ -134,6 +141,7 @@ def build_report(
     meeting_notes: MeetingNotesOutcome | None = None,
     case_card: CaseCardOutcome | None = None,
     next_time: NextTimeOutcome | None = None,
+    moments: MomentsOutcome | None = None,
 ) -> AnalysisResult:
     """Assemble and check an analysis@v1 report (module docstring)."""
     reasons: list[str] = []
@@ -209,6 +217,9 @@ def build_report(
         # Sales v0.4 on: coaching for the next conversation, verified items only (sabha_analytics.next_time). Private
         # to the person analysed; none is not a reason for review.
         "next_time": None if next_time is None or next_time.next_time is None else next_time.next_time.to_record(),
+        # Sales and support: what was said well and badly, verified quotes only (sabha_analytics.moments). Shown to
+        # managers too; none is not a reason for review.
+        "moments": None if moments is None or moments.moments is None else moments.moments.to_record(),
     }
     check_report(report, transcript)
     return AnalysisResult(report, status)
@@ -257,6 +268,7 @@ def check_report(report: Mapping[str, Any], transcript: PreparedTranscript) -> N
     coaching = report.get("next_time") or {}
     evidence += [coaching[key]["evidence"] for key in ("question_to_ask", "explain_better", "practice_point")
                  if coaching.get(key)]  # fmt: skip
+    evidence += [item["evidence"] for item in (report.get("moments") or {}).get("items", [])]
     ticket = report.get("ticket") or {}
     evidence += list((ticket.get("evidence") or {}).values())
     notes = report.get("meeting_notes") or {}
@@ -314,6 +326,8 @@ def analyse(
     before any model call if it has none).
     `next_time`: also write the coaching for the next conversation (when there are verified scores), with the
     tenant's approved `product_info` as its only source for product facts.
+    Sales and support (owner, 2026-11-13): the scores judge product statements against `product_info`, and the
+    call's moments (said well / badly, product facts checked) are written whether or not the scores verified.
     `reception`: also write the call's ticket, with the categories
     and statuses of the rubric's `output_values` (ValueError before any model call if the rubric has none).
     """
@@ -333,7 +347,9 @@ def analyse(
     values = ticket_values(rubric.output_values) if reception else None
     interest = interest_values(rubric.output_values) if sales else None
     outcomes = outcome_values(rubric.output_values) if support else None
-    scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model)
+    checked = sales or support  # product statements judged against the approved information
+    facts = render_product_info(tuple(product_info)[:MAX_PRODUCT_INFO]) if checked and product_info else ""
+    scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model, product_info=facts)
     overall = compute_overall(scoring.dimensions)
     synthesis = None
     if overall.score is not None:
@@ -361,7 +377,11 @@ def analyse(
         if next_time and overall.score is not None
         else None
     )
-    steps = [s for s in (classification, synthesis, phases, ticket, card, notes, case, coach) if s is not None]
+    said = None
+    if checked:
+        role, kind = ("sales rep", "sales call or meeting") if sales else ("support agent", "support call")
+        said = write_moments(transcript, staff_role=role, conversation=kind, model=model, product_info=product_info)
+    steps = [s for s in (classification, synthesis, phases, ticket, card, notes, case, coach, said) if s is not None]
     prompts = (*scoring.prompts, *(p for step in steps for p in step.prompts))
     return build_report(
         rubric=rubric,
@@ -383,4 +403,5 @@ def analyse(
         meeting_notes=notes,
         case_card=case,
         next_time=coach,
+        moments=said,
     )

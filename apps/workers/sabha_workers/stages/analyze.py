@@ -120,6 +120,9 @@ def sales_fields(report: dict[str, Any]) -> dict[str, str | None]:
     }
 
 
+CHECKED_TYPES = frozenset({ConversationType.SALES, ConversationType.SUPPORT})
+
+
 def make_work(deps: AnalyzeDeps) -> Work:
     """The analyze `work` function for StageRunner (module docstring)."""
 
@@ -163,7 +166,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 support=recording.type is ConversationType.SUPPORT,
                 meeting=meeting,
                 next_time=coaching,
-                product_info=deps.product_info(ctx.tenant_id) if coaching else (),
+                # Sales and support judge product statements against it too (owner, 2026-11-13).
+                product_info=deps.product_info(ctx.tenant_id) if coaching or recording.type in CHECKED_TYPES else (),
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:
             retryable = isinstance(exc, BudgetUnavailableError) or exc.retryable

@@ -2,7 +2,7 @@
 // lowest verified rubric points. Plain functions so they can be tested.
 
 import { formatScore } from "./format";
-import { displayedScore, type AnalysisReport, type VerifiedDimension } from "./types";
+import { displayedScore, type AnalysisReport, type Moments, type VerifiedDimension } from "./types";
 
 const OWNER: Record<string, string> = {
   sales_rep: "The rep",
@@ -59,4 +59,14 @@ export function historyText(overall: number, history: AnalysisReport["person_his
   if (overall <= history.min) return `Lowest of ${name}’s last ${count} ${plural} (${range}).`;
   if (overall >= history.max) return `Highest of ${name}’s last ${count} ${plural} (${range}).`;
   return `${name}’s last ${count} ${plural}: ${range}.`;
+}
+
+/** "3 plus points, 2 drawbacks (1 wrong product fact)" for the top of the report. */
+export function momentsSummary(moments: Moments): string {
+  const plus = moments.items.filter((m) => m.kind === "plus").length;
+  const drawbacks = moments.items.length - plus;
+  const wrong = moments.items.filter((m) => m.fact === "contradicts").length;
+  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+  const facts = wrong > 0 ? ` (${n(wrong, "wrong product fact", "wrong product facts")})` : "";
+  return `${n(plus, "plus point", "plus points")}, ${n(drawbacks, "drawback", "drawbacks")}${facts}`;
 }

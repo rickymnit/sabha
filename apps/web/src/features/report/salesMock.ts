@@ -202,5 +202,20 @@ export function mockSalesReport(): AnalysisReport {
       next_step: { action: "Details by WhatsApp, then a quote", owner: "sales_rep", due: null, evidence: at(9) },
       left_out: 0,
     },
+    moments: {
+      items: [
+        { kind: "plus", text: "Asked how many locations need attendance.", fact: null, evidence: at(0) },
+        {
+          kind: "drawback",
+          text: "Offered ten percent off without explaining the value first.",
+          fact: "contradicts",
+          product_info_id: "pi-offer",
+          product_info: { id: "pi-offer", title: "Discount policy", body: "Discounts only with a manager's approval." },
+          evidence: at(6),
+        },
+        { kind: "drawback", text: "Did not agree a date for the quote.", fact: null, evidence: at(9) },
+      ],
+      left_out: 0,
+    },
   };
 }

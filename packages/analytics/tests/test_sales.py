@@ -9,6 +9,7 @@ import jsonschema
 import pytest
 
 from sabha_analytics.grounding import PreparedTranscript, prepare_transcript
+from sabha_analytics.moments import validate_moments, write_moments
 from sabha_analytics.next_time import ProductFact, write_next_time
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse, load_report_schema
@@ -117,13 +118,17 @@ PHASES: dict[str, Any] = {
         {"phase": "close", "start_utterance_id": "u0006", "end_utterance_id": "u0006"},
     ]
 }
+MOMENTS: dict[str, Any] = {"moments": [
+    {"kind": "plus", "text": "Offered quarterly billing when the client said the price was high.", "fact": None,
+     "product_info_id": None, "quote": "Quarterly billing ho sakti hai", "start_ms": 46_500, "utterance_id": "u0004"},
+]}  # fmt: skip
 METRICS = [{"key": "customer_talk_share", "value": 0.3, "unit": "ratio", "definition": "Customer share of speech."}]
 
 
 def test_a_sales_meeting_report_has_a_verified_deal_card(
     sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
 ) -> None:
-    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD])
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD, MOMENTS])
     result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
                      analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True)  # fmt: skip
     report = result.report
@@ -139,7 +144,8 @@ def test_a_sales_meeting_report_has_a_verified_deal_card(
     assert card["client_name"] == {"name": "Sunrise School", "evidence": {
         "quote": "Sunrise School mein fees", "utterance_id": "u0001", "start_ms": 7_500, "end_ms": 18_000}}  # fmt: skip
     assert "deal_card.system" in report["prompts"]
-    assert "Allowed interest levels: high, medium, low, unclear" in model.calls[-1]["messages"][0]["content"]
+    assert "Allowed interest levels: high, medium, low, unclear" in model.calls[3]["messages"][0]["content"]
+    assert report["moments"]["items"][0]["kind"] == "plus"  # what was said well and badly
 
 
 def test_an_item_whose_quote_is_not_in_the_transcript_is_reasked_then_left_out(
@@ -161,7 +167,7 @@ def test_an_invalid_answer_twice_gives_no_card_but_the_scores_stand(
     sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
 ) -> None:
     bad = {**CARD, "next_step": {**CARD["next_step"], "owner": "intern"}}
-    model = fake_judge([SCORES, SYNTHESIS, PHASES, bad, bad])
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, bad, bad, MOMENTS])
     result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
                      analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True)  # fmt: skip
     assert result.report["deal_card"] is None
@@ -218,7 +224,7 @@ COACHING: dict[str, Any] = {
 def test_a_sales_report_carries_verified_coaching_for_the_next_call(
     sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
 ) -> None:
-    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD, COACHING])
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD, COACHING, MOMENTS])
     result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
                      analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True,
                      next_time=True)  # fmt: skip
@@ -232,7 +238,7 @@ def test_a_sales_report_carries_verified_coaching_for_the_next_call(
     }  # fmt: skip
     assert coaching["question_to_ask"]["text"].endswith("?") and coaching["left_out"] == 0
     assert "next_time.system" in report["prompts"]
-    assert ": 4\n" in model.calls[-1]["messages"][0]["content"]  # the verified scores steer the practice point
+    assert ": 4\n" in model.calls[4]["messages"][0]["content"]  # the verified scores steer the practice point
 
 
 def test_a_tip_whose_quote_is_not_in_the_transcript_is_left_out(meeting: PreparedTranscript, fake_judge: Any) -> None:
@@ -247,10 +253,10 @@ def test_a_tip_whose_quote_is_not_in_the_transcript_is_left_out(meeting: Prepare
 def test_without_the_flag_there_is_no_coaching_call(
     sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
 ) -> None:
-    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD])
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD, MOMENTS])
     result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
                      analysed_roles={"sales_rep"}, phase_names=DEFAULT_PHASES["sales"], sales=True)  # fmt: skip
-    assert result.report["next_time"] is None and len(model.calls) == 4
+    assert result.report["next_time"] is None and len(model.calls) == 5  # scores, synthesis, phases, card, moments
 
 
 def test_coaching_points_only_at_approved_product_information(meeting: PreparedTranscript, fake_judge: Any) -> None:
@@ -283,3 +289,71 @@ def test_coaching_in_another_script_is_sent_back_for_english(meeting: PreparedTr
                                                 ("Edge Retail Solutions", False), ("इंद्रधनुष 8", False)])  # fmt: skip
 def test_a_greeting_is_never_taken_for_the_client_name(name: str, greeting: bool) -> None:
     assert is_greeting(name) is greeting
+
+
+# --- What was said well and badly (sabha_analytics.moments, owner 2026-11-13) ---
+
+KB_FACTS = (ProductFact("pi-billing", "Billing terms", "Software is billed yearly in advance. Helpline 9876543210."),)
+WRONG = {"kind": "drawback", "text": "Promised quarterly billing; the approved terms say yearly in advance.",
+         "fact": "contradicts", "product_info_id": "pi-billing", "quote": "Quarterly billing ho sakti hai",
+         "start_ms": 46_500, "utterance_id": "u0004"}  # fmt: skip
+PLUS = {"kind": "plus", "text": "Fixed a call for Thursday at four.", "fact": None, "product_info_id": None,
+        "quote": "Thursday chaar baje call fix karte hain", "start_ms": 63_500, "utterance_id": "u0006"}  # fmt: skip
+
+
+def test_a_contradicted_fact_is_a_drawback_naming_its_entry(meeting: PreparedTranscript, fake_judge: Any) -> None:
+    model = fake_judge([{"moments": [PLUS, WRONG]}])
+    outcome = write_moments(
+        meeting, staff_role="sales rep", conversation="sales call", model=model, product_info=KB_FACTS
+    )
+    assert outcome.moments is not None
+    items = outcome.moments.to_record()["items"]
+    assert [i["kind"] for i in items] == ["drawback", "plus"]  # in the order they were said
+    assert items[0]["fact"] == "contradicts" and items[0]["product_info_id"] == "pi-billing"
+    assert items[0]["evidence"] == {"quote": "Quarterly billing ho sakti hai", "utterance_id": "u0004",
+                                    "start_ms": 46_500, "end_ms": 58_000}  # fmt: skip
+    prompt = model.calls[0]["messages"][0]["content"]
+    assert "[pi-billing] Billing terms: Software is billed yearly" in prompt and "9876543210" not in prompt
+
+
+@pytest.mark.parametrize(("change", "code"), [
+    ({"product_info_id": "pi-made-up"}, "unknown_product_info"),
+    ({"product_info_id": None}, "fact_without_entry"),
+    ({"fact": "not_covered"}, "entry_without_fact"),
+    ({"kind": "plus"}, "contradiction_as_plus"),
+    ({"text": "बिलिंग गलत बताई"}, "not_english"),
+])  # fmt: skip
+def test_a_product_verdict_must_fit_an_approved_entry(meeting: PreparedTranscript, change: dict[str, Any],
+                                                      code: str) -> None:  # fmt: skip
+    found, problems = validate_moments({"moments": [{**WRONG, **change}]}, transcript=meeting,
+                                       product_ids=frozenset({"pi-billing"}))  # fmt: skip
+    assert found is None and [p.code for p in problems] == [code]
+
+
+def test_a_moment_whose_quote_is_not_said_is_left_out(meeting: PreparedTranscript, fake_judge: Any) -> None:
+    invented = {**PLUS, "quote": "hum free installation denge"}
+    model = fake_judge([{"moments": [PLUS, invented]}] * 2)
+    outcome = write_moments(meeting, staff_role="sales rep", conversation="sales call", model=model)
+    assert outcome.attempts == 2 and outcome.failure_reasons == ("quote_not_found",)
+    assert outcome.moments is not None and len(outcome.moments.items) == 1 and outcome.moments.left_out == 1
+
+
+def test_sales_scoring_judges_product_statements_against_the_knowledge_base(
+    sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
+) -> None:
+    model = fake_judge([SCORES, SYNTHESIS, PHASES, CARD, {"moments": [WRONG]}])
+    result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
+                     analysed_roles={"sales_rep"}, sales=True, phase_names=None, product_info=KB_FACTS)  # fmt: skip
+    scoring_prompt = model.calls[0]["messages"][0]["content"]
+    assert "# Approved product information" in scoring_prompt and "[pi-billing] Billing terms" in scoring_prompt
+    assert result.report["moments"]["items"][0]["fact"] == "contradicts"
+
+
+def test_other_types_keep_the_scoring_prompt_without_product_information(
+    sales_rubric: Rubric, meeting: PreparedTranscript, fake_judge: Any
+) -> None:
+    model = fake_judge([SCORES, SYNTHESIS])
+    result = analyse(rubric=sales_rubric, transcript=meeting, metrics=METRICS, model=model,
+                     analysed_roles={"sales_rep"}, product_info=KB_FACTS)  # fmt: skip
+    assert "Approved product information" not in model.calls[0]["messages"][0]["content"]
+    assert result.report["moments"] is None

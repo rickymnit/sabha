@@ -42,6 +42,19 @@ describe("sales report", () => {
     expect(within(panel).getByTestId("points-lost-total")).toHaveTextContent("2.9 of 5 points lost in total");
   });
 
+  it("shows a manager what was said well and badly, with product facts checked", async () => {
+    await renderSales();
+    expect(screen.getByRole("button", { name: /^What Rohit said: 1 plus point, 2 drawbacks \(1 wrong product fact\)\. See each moment/ }))
+      .toBeInTheDocument(); // prettier-ignore
+    const panel = screen.getByRole("region", { name: "What Rohit said" });
+    const drawbacks = within(panel).getByRole("region", { name: "Drawbacks (2)" });
+    expect(within(drawbacks).getByText("Contradicts")).toBeInTheDocument();
+    expect(within(drawbacks).getByText("Discount policy")).toBeInTheDocument();
+    expect(within(panel).getByRole("region", { name: "Plus points (1)" })).toHaveTextContent(
+      "Asked how many locations need attendance.",
+    );
+  });
+
   it("shows the level, the agreed next step and the counted talk shares", async () => {
     await renderSales();
     const scale = screen.getByRole("list", { name: "Where this sits" });

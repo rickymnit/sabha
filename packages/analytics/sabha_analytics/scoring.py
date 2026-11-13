@@ -740,6 +740,20 @@ class _ScoringPrompts:
         return (self.system, self.context, self.request)
 
 
+PRODUCT_INFO_SECTION = """
+# Approved product information
+
+The organisation's approved facts about its products, one entry per line with its id in square brackets. When the
+person analysed states a product fact (a price, feature, specification, warranty, delivery, payment term or policy),
+compare it with these entries. A statement that contradicts an entry is a factual error: it lowers any dimension
+about product knowledge, value, differentiation, price or troubleshooting, and that dimension's rationale says what
+was stated and what the entry says (by its title, not its id), citing the line where it was said. A statement no
+entry covers is not an error in itself.
+
+{entries}
+"""
+
+
 def load_scoring_prompts(directory: Path = PROMPTS_DIR) -> _ScoringPrompts:
     return _ScoringPrompts(
         load_prompt("scoring.system", directory),
@@ -785,9 +799,14 @@ def score_dimensions(
     metrics: Iterable[Mapping[str, object]],
     model: JudgeModel,
     prompts_dir: Path = PROMPTS_DIR,
+    product_info: str = "",
 ) -> ScoringOutcome:
     """Score every rubric dimension with grounded evidence (module docstring). Raises PromptNotRedacted, and lets
-    gateway errors propagate: a failed call fails the stage visibly rather than producing a partial report."""
+    gateway errors propagate: a failed call fails the stage visibly rather than producing a partial report.
+
+    `product_info`: the tenant's approved product information, rendered one entry per line (sales and support,
+    owner 2026-11-13). Product statements are judged against it: one that contradicts an entry lowers the dimensions
+    about product knowledge, value, price or troubleshooting. Empty: no section, the prompt is as before."""
     check_rubric(rubric)
     metric_records = normalise_metrics(metrics)
     prompts = load_scoring_prompts(prompts_dir)
@@ -797,6 +816,7 @@ def score_dimensions(
         rubric_version=rubric.version,
         dimensions="\n\n".join(render_dimension(dimension) for dimension in dimensions),
         metrics=render_metrics(metric_records),
+        product_info=PRODUCT_INFO_SECTION.format(entries=product_info) if product_info else "",
         transcript=transcript.render(),
     )
     system = prompts.system.render(**prompt_roles(rubric.id, rubric.roles))

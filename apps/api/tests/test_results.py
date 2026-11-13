@@ -736,6 +736,28 @@ def test_coaching_shows_the_approved_product_information_it_points_to(api: Api) 
     assert api.get("manager", "/v1/recordings/r-asha/analysis").json()["next_time"] is None
 
 
+def test_what_was_said_well_and_badly_is_shown_to_managers_too(api: Api) -> None:
+    insert(api.db, "product_info", ProductInfo(id="pi-1", tenant_id=T, title="Billing terms",
+                                               body="Billed yearly in advance."))  # fmt: skip
+    evidence = {"quote": "Tell me", "utterance_id": "u0001", "start_ms": 9_000, "end_ms": 30_000}
+    moments = {"left_out": 0, "items": [
+        {"kind": "drawback", "text": "Promised quarterly billing.", "fact": "contradicts", "product_info_id": "pi-1",
+         "evidence": evidence},
+        {"kind": "plus", "text": "Asked about their process.", "fact": None, "evidence": evidence},
+    ]}  # fmt: skip
+    recording(api, "r-asha", "p-asha", "unit-1", 30)
+    analysis(api, "r-asha", "v1", 3.6, 10)
+    key = f"{T}/r-asha/analyze@v1/analysis@v1.json"
+    report = json.loads(api.s3.get_object(Bucket="sabha-artefacts", Key=key)["Body"].read())
+    report["moments"] = moments
+    api.s3.put_object(Bucket="sabha-artefacts", Key=key, Body=json.dumps(report).encode())
+    seen = api.get("manager", "/v1/recordings/r-asha/analysis").json()
+    assert seen["coaching_private"] is True  # coaching stays private; the evaluation does not (owner, 2026-11-13)
+    items = seen["moments"]["items"]
+    assert [i["kind"] for i in items] == ["drawback", "plus"]
+    assert items[0]["product_info"] == {"id": "pi-1", "title": "Billing terms", "body": "Billed yearly in advance."}
+
+
 def test_unverified_dimensions_show_nothing_but_their_name(api: Api) -> None:
     tampered = {**DIMENSIONS[1], "verified": False, "score": 5, "rationale": "should never be shown"}
     not_applicable = {"key": "escalation", "name": "Escalation", "weight": 0.2, "verified": True, "score": None,

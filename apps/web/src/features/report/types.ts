@@ -195,6 +195,24 @@ export interface NextTime {
   left_out: number;
 }
 
+/** One thing the person analysed said well or badly (owner, 2026-11-13), at the moment it rests on. */
+export interface Moment {
+  kind: "plus" | "drawback";
+  text: string;
+  evidence: CardEvidence;
+  /** A product statement checked against the approved product information; null for other moments. */
+  fact: "matches" | "contradicts" | "not_covered" | null;
+  product_info_id?: string;
+  /** The entry it matched or contradicted (null if it was deleted since). */
+  product_info?: { id: string; title: string; body: string } | null;
+}
+
+/** Sales and support: what was said well and badly (verified quotes only). Shown to managers too. */
+export interface Moments {
+  items: Moment[];
+  left_out: number;
+}
+
 /** Support calls: product, problem, steps tried, outcome and the promised follow-up (verified only). */
 export interface CaseCard {
   product: { name: string; evidence: CardEvidence } | null;
@@ -283,6 +301,8 @@ export interface AnalysisReport {
   case_card?: CaseCard | null;
   /** Sales v0.4 on, and only for the person analysed (null for everyone else). */
   next_time?: NextTime | null;
+  /** Sales and support calls analysed from 2026-11-13 on; absent or null otherwise. */
+  moments?: Moments | null;
 }
 
 export interface AnalysisProcessing {

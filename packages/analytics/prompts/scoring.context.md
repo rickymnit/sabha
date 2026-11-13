@@ -1,4 +1,4 @@
-<!-- version: 1 -->
+<!-- version: 2 -->
 # Rubric $rubric_id (version $rubric_version)
 
 $dimensions
@@ -8,6 +8,7 @@ $dimensions
 Measured in code from the transcript. Context only: do not re-derive, contradict or restate them.
 
 $metrics
+$product_info
 
 # Transcript
 

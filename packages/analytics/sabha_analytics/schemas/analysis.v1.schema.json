@@ -128,6 +128,25 @@
         }
       }]
     },
+    "moments": {
+      "description": "Sales and support (owner, 2026-11-13): what the person analysed said well and badly, each with a verified quote; product statements checked against approved product information. The call's evaluation, shown to managers too (sabha_analytics.moments). Absent in older reports.",
+      "oneOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": false, "required": ["items", "left_out"],
+        "properties": {
+          "items": {"type": "array", "maxItems": 10, "items": {
+            "type": "object", "additionalProperties": false, "required": ["kind", "text", "evidence", "fact"],
+            "properties": {
+              "kind": {"enum": ["plus", "drawback"]},
+              "text": {"type": "string", "minLength": 1},
+              "evidence": {"$ref": "#/$defs/card_evidence"},
+              "fact": {"enum": [null, "matches", "contradicts", "not_covered"]},
+              "product_info_id": {"type": "string", "minLength": 1}
+            }
+          }},
+          "left_out": {"type": "integer", "minimum": 0, "description": "Moments left out because their quote was not found in the transcript."}
+        }
+      }]
+    },
     "case_card": {
       "description": "Support calls only: the case card, verified items only (sabha_analytics.support).",
       "oneOf": [{"type": "null"}, {

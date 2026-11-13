@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { Icon, cx, scoreBand, scoreWord, type IconName, type ScoreBand } from "../../design";
 import { checkedText } from "./format";
 import { TimeChip } from "./SalesPanels";
-import { bestAndWorst, historyText, nextStep } from "./answer";
+import { bestAndWorst, historyText, momentsSummary, nextStep } from "./answer";
 import { displayedScore, type AnalysisReport, type Labels, type VerifiedDimension } from "./types";
 
 const DOT: Record<ScoreBand, string> = { low: "bg-danger-bar", mid: "bg-warning-bar", good: "bg-success-bar" };
@@ -71,13 +71,23 @@ export interface ReportAnswerProps {
   labels: Labels;
   /** Opens a rubric point's detail below. */
   onWhy: (key: string) => void;
+  /** Opens the list of what was said well and badly. */
+  onMoments?: () => void;
   /** Plays (or shows) a moment. */
   onSeek: (ms: number) => void;
   /** The person analysed, for "Rohit's last 21 conversations" and the private-coaching note. */
   personName: string;
 }
 
-export function ReportAnswer({ analysis, dimensions, labels, onWhy, onSeek, personName }: ReportAnswerProps) {
+export function ReportAnswer({
+  analysis,
+  dimensions,
+  labels,
+  onWhy,
+  onMoments,
+  onSeek,
+  personName,
+}: ReportAnswerProps) {
   const firstName = personName.split(" ")[0] ?? personName;
   const history =
     analysis.overall === null
@@ -102,6 +112,19 @@ export function ReportAnswer({ analysis, dimensions, labels, onWhy, onSeek, pers
             : analysis.summary}
         </p>
       </div>
+      {analysis.moments && analysis.moments.items.length > 0 && onMoments && (
+        <button
+          type="button"
+          onClick={onMoments}
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 self-start rounded-card border border-line bg-surface-faint px-3.5 py-2 text-left text-sm hover:border-primary"
+        >
+          <span className="font-semibold text-ink">What {firstName} said:</span>{" "}
+          <span className="text-ink-2">{momentsSummary(analysis.moments)}.</span>{" "}
+          <span className="inline-flex items-center gap-1 font-semibold text-primary">
+            See each moment <Icon name="chevronRight" size={14} />
+          </span>
+        </button>
+      )}
       <div className="grid gap-4 md:grid-cols-3">
         <Card tone="good" icon="check" label="Went well">
           {best ? <Point d={best} onWhy={onWhy} /> : <p className="m-0 text-sm text-ink-2">Nothing stood out.</p>}

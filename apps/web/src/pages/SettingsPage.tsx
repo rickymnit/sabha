@@ -107,7 +107,7 @@ export function SettingsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="Your organisation's name, the words used across the product, the conversations you analyse, how people are grouped, and the product information coaching may use."
+        description="Your organisation's name, the words used across the product, the conversations you analyse, how people are grouped, and the product information that scoring and coaching check against."
       />
       {settings.isError ? (
         <Panel>

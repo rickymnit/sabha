@@ -48,7 +48,7 @@ from sabha_llm.redact import redact_again
 OUTPUT_SECTION = "practice_point"
 """A rubric asks for this coaching by listing this section in its `output`."""
 KEYS = ("question_to_ask", "explain_better", "practice_point")
-MAX_PRODUCT_INFO = 40
+MAX_PRODUCT_INFO = 80  # the API allows as many active entries (product_info.MAX_ACTIVE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +170,7 @@ def _scores(dimensions: Sequence[DimensionResult]) -> str:
     return "\n".join(rows) or "- (none)"
 
 
-def _product_info(facts: Sequence[ProductFact]) -> str:
+def render_product_info(facts: Sequence[ProductFact]) -> str:
     if not facts:
         return "(none: give no product facts and leave product_info_id null)"
     return "\n".join(
@@ -189,7 +189,7 @@ def write_next_time(
     """Ask for the coaching for the next conversation (module docstring)."""
     facts = tuple(product_info)[:MAX_PRODUCT_INFO]
     system_p, request_p = load_prompt("next_time.system", prompts_dir), load_prompt("next_time.request", prompts_dir)
-    prefix = request_p.render(scores=_scores(dimensions), product_info=_product_info(facts),
+    prefix = request_p.render(scores=_scores(dimensions), product_info=render_product_info(facts),
                               transcript=transcript.render())  # fmt: skip
     ids = frozenset(f.id for f in facts)
     calls: list[CallRecord] = []

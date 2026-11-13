@@ -34,6 +34,7 @@ import { TicketPanel } from "./TicketPanel";
 import { VoicesPanel } from "./VoicesPanel";
 import { RubricAccordion } from "./RubricPanels";
 import { NextTimePanel } from "./NextTimePanel";
+import { MomentsPanel } from "./MomentsPanel";
 import { SalesOverall, TalkListenCard } from "./SalesPanels";
 import { evidenceLines } from "./timeline";
 import { notApplicableDimensions, visibleDimensions } from "./visibility";
@@ -291,6 +292,12 @@ function ReportBody({
     if (noAudio) setTab("listen");
     seek(ms);
   };
+  const toMoments = () => {
+    setTab("why");
+    requestAnimationFrame(() =>
+      document.getElementById("what-was-said")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
   const why = (key: string) => {
     setTab("why");
     setPinKey(key);
@@ -306,6 +313,11 @@ function ReportBody({
       )}
     >
       <div className="flex min-w-0 flex-col gap-5">
+        {/* What was said well and badly: the call's evaluation, for managers and the person alike. */}
+        {analysis.moments && analysis.moments.items.length > 0 && (
+          <MomentsPanel moments={analysis.moments} name={recording.person.name.split(" ")[0] ?? ""} onSeek={listen} />
+        )}
+
         {/* The answer above has the score and summary; this panel stays only for the person's own coaching. */}
         {!analysis.coaching_private &&
           (sales ? (
@@ -464,6 +476,7 @@ function ReportBody({
           dimensions={dimensions}
           labels={labels}
           onWhy={why}
+          onMoments={toMoments}
           onSeek={listen}
           personName={recording.person.name}
         />

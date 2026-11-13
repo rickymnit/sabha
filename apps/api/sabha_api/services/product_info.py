@@ -7,7 +7,7 @@ facts to a rep. Rules:
   Owners and admins may also list retired ones (?include_retired=true).
 - Only owners and admins (the doc's Super Admin) add (POST) and change (PATCH title, body or status) entries;
   managers, reviewers and staff get 403 `not_allowed`. Every change is audited.
-- At most MAX_ACTIVE active entries per tenant (422 `product_info_limit`), so the coaching prompt stays small.
+- At most MAX_ACTIVE active entries per tenant (422 `product_info_limit`), so the prompts stay small.
 - Retiring keeps the entry (status "retired"): it is no longer given to the AI, but coaching that already points at
   it can still show it.
 """
@@ -29,7 +29,7 @@ from sabha_core.repo import TenantRepo
 
 ROUTE = "POST /v1/product-info"
 EDITORS = frozenset({Role.OWNER, Role.ADMIN})
-MAX_ACTIVE = 40
+MAX_ACTIVE = 80  # every active entry goes into the scoring and coaching prompts (sabha_analytics.next_time)
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=PRODUCT_INFO_TITLE_MAX)]
 Body = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=PRODUCT_INFO_BODY_MAX)]

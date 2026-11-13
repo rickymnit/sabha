@@ -111,7 +111,10 @@ def test_a_support_call_report_has_a_verified_case_card(
     assert outcome_values(rubric.output_values) == OUTCOMES
     by_key = {d["key"]: d for d in SCORES["dimensions"]}
     scores = [{"dimensions": [by_key[d.key] for d in group]} for group in group_dimensions(rubric.dimensions)]
-    model = fake_judge([*scores, SYNTHESIS, PHASES, CARD])
+    moments = {"moments": [{"kind": "plus", "text": "Gave the complaint number and promised a follow-up call.",
+                            "fact": None, "product_info_id": None, "quote": "kal tak ek follow up call bhi aayega",
+                            "start_ms": 36_500, "utterance_id": "u0004"}]}  # fmt: skip
+    model = fake_judge([*scores, SYNTHESIS, PHASES, CARD, moments])
     result = analyse(rubric=rubric, transcript=call, metrics=METRICS, model=model, analysed_roles={"support_agent"},
                      phase_names=DEFAULT_PHASES["support"], support=True)  # fmt: skip
     report = result.report
@@ -125,8 +128,9 @@ def test_a_support_call_report_has_a_verified_case_card(
     assert (card["outcome"]["value"], card["follow_up"]["due"], card["left_out"]) == ("solved", "tomorrow", 0)
     assert (
         "Allowed outcomes: solved, follow_up, escalated, not_solved, unclear"
-        in (model.calls[-1]["messages"][0]["content"])
+        in (model.calls[-2]["messages"][0]["content"])
     )
+    assert report["moments"]["items"][0]["evidence"]["utterance_id"] == "u0004"  # what was said well and badly
 
 
 def test_an_item_whose_quote_is_not_in_the_transcript_is_reasked_then_left_out(

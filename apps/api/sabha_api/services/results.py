@@ -642,6 +642,8 @@ def report_payload(
         "next_time": report.get(
             "next_time"
         ),  # sales v0.4: private coaching, verified items (sabha_analytics.next_time)
+        # Sales and support: what was said well and badly. The call's evaluation, so NOT private (owner, 2026-11-13).
+        "moments": report.get("moments"),
     }
 
 
@@ -675,10 +677,14 @@ async def attach_product_info(payload: dict[str, Any], entries: TenantRepo[Produ
     """The approved product information a coaching tip points the rep to (founder's doc, 2026-11-12), as
     next_time.explain_better.product_info {id, title, body}. A retired entry still shows; a deleted one does not."""
     tip = (payload.get("next_time") or {}).get("explain_better") or {}
-    entry_id = tip.get("product_info_id")
-    if entry_id:
-        entry = await entries.find_one({"_id": entry_id})
-        tip["product_info"] = None if entry is None else {"id": entry.id, "title": entry.title, "body": entry.body}
+    moments = (payload.get("moments") or {}).get("items") or []
+    pointing = [item for item in (tip, *moments) if item.get("product_info_id")]
+    if not pointing:
+        return payload
+    found = await entries.find({"_id": {"$in": sorted({item["product_info_id"] for item in pointing})}})
+    by_id = {e.id: {"id": e.id, "title": e.title, "body": e.body} for e in found}
+    for item in pointing:  # moments too (owner, 2026-11-13): the entry a product statement matched or contradicted
+        item["product_info"] = by_id.get(item["product_info_id"])
     return payload
 
 
