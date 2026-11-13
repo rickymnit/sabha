@@ -11,8 +11,14 @@ Models (https://developers.openai.com/api/docs/guides/speech-to-text):
   2027-02-26). A hint is sent as `language`.
 - `whisper-1`: asked for `verbose_json` with word timestamps, so word_timing is "word". Deprecated as above.
 
-A BCP-47 hint ("hi-IN") is sent as its language part ("hi"); "unknown" sends none, so the model detects it. The chunk's
-language comes from the answer's `languages` (first one) or `language` when given, else None.
+A BCP-47 hint ("hi-IN") is sent as its language part ("hi").
+
+Script (owner, 2026-11-13: transcripts only in English, Hindi and Hinglish, never Urdu, Bengali or other scripts):
+left to detect the language itself, the model sometimes writes Hindi speech in Urdu or Bengali script. So with
+ASR_LANGUAGE "unknown", gpt-transcribe is told to expect Hindi and English (`languages` hi, en) and the older models
+are told Hindi (`language` hi). No sample `prompt` is sent: on a real support call gpt-4o-mini-transcribe copied a
+sample sentence into 12 of 44 pieces, which would put words nobody said in the transcript. The transcribe stage
+still asks again, in Hindi, any chunk that comes back in another script (sabha_workers.stages.transcribe).
 
 Errors: see sabha_asr.providers._http. `insufficient_quota` and `invalid_api_key` are never retried.
 """
@@ -39,6 +45,8 @@ DEFAULT_TIMEOUT_S = 90.0
 WORD_TIMESTAMP_MODELS = frozenset({"whisper-1"})
 _LIST_LANGUAGE_MODELS = frozenset({"gpt-transcribe"})
 _NOT_RETRYABLE = frozenset({"insufficient_quota", "invalid_api_key"})
+EXPECTED_LANGUAGES = ("hi", "en")  # gpt-transcribe, when no hint is configured
+DEFAULT_HINT = "hi"  # the older models, which take one language, when no hint is configured
 
 log = logging.getLogger("sabha.asr.openai")
 
@@ -89,11 +97,10 @@ class OpenAIProvider:
     def _form(self, chunk: AudioChunk) -> dict[str, str | list[str]]:
         form: dict[str, str | list[str]] = {"model": self._model}
         hint = (chunk.language or self._language).split("-")[0]
-        if hint and hint != "unknown":
-            if self._model in _LIST_LANGUAGE_MODELS:
-                form["languages[]"] = [hint]
-            else:
-                form["language"] = hint
+        if self._model in _LIST_LANGUAGE_MODELS:
+            form["languages[]"] = [hint] if hint and hint != "unknown" else list(EXPECTED_LANGUAGES)
+        else:
+            form["language"] = hint if hint and hint != "unknown" else DEFAULT_HINT
         if self._model in WORD_TIMESTAMP_MODELS:
             form |= {"response_format": "verbose_json", "timestamp_granularities[]": ["word"]}
         return form

@@ -49,7 +49,12 @@ def test_openai_sends_the_model_and_spreads_the_text() -> None:
     assert seen[0].url == "https://api.openai.com/v1/audio/transcriptions"
     assert seen[0].headers["authorization"] == "Bearer k"
     assert 'name="model"\r\n\r\ngpt-transcribe' in body
-    assert "language" not in body.replace('name="file"', "")  # "unknown": no hint, the model detects it
+    # "unknown": told to expect Hindi and English, never left to guess Urdu or Bengali (owner, 2026-11-13)
+    assert body.count('name="languages[]"') == 2 and "\r\n\r\nhi\r\n" in body and "\r\n\r\nen\r\n" in body
+    assert 'name="prompt"' not in body  # a sample prompt was copied into transcripts by gpt-4o-mini-transcribe
+    mini = openai.OpenAIProvider("k", model="gpt-4o-mini-transcribe", client=mocked(handler), sleep=no_wait)
+    mini.transcribe([CHUNK])
+    assert 'name="language"\r\n\r\nhi\r\n' in seen[1].read().decode("latin-1")  # one language: Hindi
     assert [w.text for w in result.words] == ["haan", "ji", "bataiye"]
     assert result.words[0].start_ms == 0 and result.words[-1].end_ms == CHUNK.duration_ms
     assert result.languages[0].language == "hi"
@@ -179,7 +184,8 @@ def test_upload_choices_and_what_a_chosen_model_builds() -> None:
         chosen_spec("qwen:qwen3-asr-flash", s)  # listed, but no DASHSCOPE_API_KEY
     with pytest.raises(AsrConfigError, match="not one of"):
         chosen_spec("openai:gpt-9", s)
-    chosen = build_transcriber(s, "openai:gpt-4o-mini-transcribe")
-    assert chosen.primary.model_id == "openai/gpt-4o-mini-transcribe"
+    assert "openai:gpt-4o-mini-transcribe" not in offered  # writes Hindi in other scripts (registry CHOICES)
+    chosen = build_transcriber(s, "openai:gpt-transcribe")
+    assert chosen.primary.model_id == "openai/gpt-transcribe"
     assert chosen.fallbacks == ()  # the configured fallback is the chosen provider itself: never twice
     assert [f.name for f in build_transcriber(s).fallbacks] == ["openai"]

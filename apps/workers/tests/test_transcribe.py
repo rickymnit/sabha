@@ -7,6 +7,7 @@ import json
 import uuid
 import wave
 from collections.abc import Iterator, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ from pymongo import MongoClient
 from pymongo.database import Database
 
 from sabha_asr.chunking import Chunk, plan_chunks
-from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError
+from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, spread_words
 from sabha_asr.providers.fake import FakeProvider
 from sabha_asr.transcriber import Transcriber
 from sabha_core.indexes import ensure_indexes
@@ -27,7 +28,7 @@ from sabha_core.state import RecordingStatus, transition
 from sabha_core.timemap import Segment, SegmentMap
 from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
-from sabha_workers.stages.transcribe import BATCH_SIZE, make_work, off_language, plan_key
+from sabha_workers.stages.transcribe import BATCH_SIZE, foreign_script, make_work, off_language, plan_key
 from sabha_workers.stages.transcript import TranscriptDeps
 
 S = RecordingStatus
@@ -94,6 +95,24 @@ def test_a_short_chunk_heard_in_another_language_is_asked_again_in_the_main_one(
     chunks, results = zip(*pairs, strict=True)
     assert off_language(chunks, results) == ("hi-IN", [2])
     assert off_language(chunks[2:3], results[2:3]) == (None, [])  # no long chunk to judge by
+
+
+def test_only_latin_and_devanagari_count_as_english_hindi_or_hinglish() -> None:
+    assert not foreign_script("नमस्ते sir, price 25,499 plus GST है। Café?")
+    assert foreign_script("ادھر ہو گئے تھے جناب")  # Urdu script
+    assert foreign_script("ঠিক আছে স্যার")  # Bengali script
+
+
+class WrongScriptProvider(FakeProvider):
+    """Writes the first chunk in Bengali script unless told the language, as OpenAI's models did on a Hindi call."""
+
+    def transcribe(self, chunks: Sequence[AudioChunk]) -> list[ChunkResult]:
+        results = super().transcribe(chunks)
+        return [
+            replace(r, text="ঠিক আছে স্যার", words=tuple(spread_words("ঠিক আছে স্যার", 0, c.duration_ms)))
+            if c.chunk_id.endswith("0000") and c.language is None else r
+            for c, r in zip(chunks, results, strict=True)
+        ]  # fmt: skip
 
 
 # --- The stage (MongoDB, RustFS) ---
@@ -308,3 +327,14 @@ def test_missing_preprocess_output_fails_for_a_replay(stage: Stage) -> None:
     rid = stage.recording(with_inputs=False)
     assert stage.run(rid, Transcriber(FakeProvider())) == "failed"
     assert stage.doc(rid)["status_reason"] == "missing_input"
+
+
+@pytest.mark.integration
+def test_a_chunk_in_another_script_is_asked_again_in_hindi(stage: Stage) -> None:
+    rid = stage.recording()
+    provider = WrongScriptProvider(max_chunk_ms=30_000)
+    assert stage.run(rid, Transcriber(provider)) == "done"
+    assert len(provider.calls) == 2 and len(provider.calls[1]) == 1  # only the Bengali-script chunk, asked again
+    assert not any(foreign_script(w["text"]) for w in stage.output(rid)["words"])
+    (run,) = stage.db.stage_runs.find({"recording_id": rid})
+    assert (run["meta"]["script_retries"], run["meta"]["still_other_script"]) == (1, 0)

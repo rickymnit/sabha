@@ -47,6 +47,17 @@ Prices, from each provider's own published figures (checked 2026-11-13, kept in 
 6. **Self-hosted Whisper is an optional install** (`uv sync --extra whisper`, faster-whisper). It is not part of the
    API or CPU worker images.
 
+7. **Only English, Hindi and Hinglish in transcripts** (owner, 2026-11-13). Left to detect the language itself,
+   OpenAI's models wrote parts of a Hindi call in Urdu and Bengali script. So:
+   - With ASR_LANGUAGE "unknown", gpt-transcribe is told to expect Hindi and English (`languages` hi, en) and the
+     older OpenAI models are told Hindi.
+   - No sample `prompt` is sent. As a test, a Hinglish sample prompt was tried on one support call;
+     gpt-4o-mini-transcribe copied it into 12 of 44 pieces, which would put words nobody said in the transcript.
+   - The transcribe stage asks again, in Hindi, any chunk written in a script other than Latin and Devanagari, for
+     every provider. A chunk still in another script is kept and counted (`still_other_script`), never dropped.
+   - On that call: gpt-transcribe gave 0 of 44 pieces in another script. gpt-4o-mini-transcribe gave 18 of 44 in
+     Urdu or Telugu script even with `language` hi, so it is no longer offered on the upload page.
+
 ## Consequences
 
 - Providers without word times give coarser speaker attribution inside a chunk (as with Sarvam). Amazon Transcribe and

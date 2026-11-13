@@ -161,10 +161,12 @@ class Choice:
     default: bool  # the configured ASR_PROVIDER/ASR_MODEL
 
 
-CHOICES: tuple[tuple[str, str, str], ...] = (  # provider, model, name; the models offered on the upload page
+# The models offered on the upload page: provider, model, name. Not gpt-4o-mini-transcribe: on a Hindi support call it
+# wrote 18 of 44 pieces in Urdu or Telugu script even when told the language is Hindi (owner's rule, 2026-11-13:
+# transcripts only in English, Hindi and Hinglish). It stays usable in eval/asr_compare.py.
+CHOICES: tuple[tuple[str, str, str], ...] = (
     ("sarvam", "saaras:v4", "Sarvam Saaras v4"),
     ("openai", "gpt-transcribe", "OpenAI Transcribe"),
-    ("openai", "gpt-4o-mini-transcribe", "OpenAI 4o mini"),
     ("qwen", "qwen3-asr-flash", "Qwen3 ASR Flash"),
     ("aws", "transcribe", "Amazon (Mumbai)"),
     ("whisper", "large-v3-turbo", "Whisper (own server)"),

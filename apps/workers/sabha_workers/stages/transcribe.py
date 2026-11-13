@@ -43,6 +43,7 @@ import io
 import json
 import logging
 import tempfile
+import unicodedata
 import wave
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
@@ -214,6 +215,27 @@ def off_language(chunks: Sequence[Chunk], results: Sequence[ChunkResult]) -> tup
     return max(share, key=lambda language: share[language]), again
 
 
+SCRIPT_LANGUAGE = "hi-IN"
+"""The language a chunk written in another script is asked again in (owner, 2026-11-13: transcripts only in English,
+Hindi and Hinglish). Hindi in Devanagari, English in Latin letters."""
+_ALLOWED_SCRIPTS = ("LATIN", "DEVANAGARI", "COMBINING")
+
+
+def foreign_script(text: str) -> bool:
+    """True when `text` has a letter or vowel sign outside Latin and Devanagari (Urdu, Bengali, Tamil...)."""
+    for ch in text:
+        if unicodedata.category(ch)[0] in "LM" and not unicodedata.name(ch, "").startswith(_ALLOWED_SCRIPTS):
+            return True
+    return False
+
+
+def wrong_script(results: Sequence[ChunkResult]) -> list[int]:
+    """Indexes of chunks whose text is in a script other than Latin and Devanagari. Asked again with
+    SCRIPT_LANGUAGE: a provider detecting the language on its own sometimes writes Hindi speech in Urdu or Bengali
+    script (seen with OpenAI's models on a Hindi support call)."""
+    return [i for i, result in enumerate(results) if foreign_script(result.text)]
+
+
 def _speech(turns: Sequence[dict[str, Any]]) -> list[tuple[int, int]]:
     """Where anyone is talking, from the diarization turns: their union, sorted."""
     out: list[tuple[int, int]] = []
@@ -314,6 +336,8 @@ def make_work(
             timings = [part.word_timing for part in parts for _ in part.results]
             # Short chunks heard in a language the rest of the recording is not in are asked again (module docstring).
             hint, again = off_language(chunks, results)
+            if hint is not None and hint.split("-")[0].lower() not in ("hi", "en", "hindi", "english"):
+                hint = SCRIPT_LANGUAGE  # never ask again in Urdu, Bengali... (owner, 2026-11-13)
             if hint is not None and again:
                 retry_key = f"{ctx.prefix}parts/{key}-language.json"
                 try:
@@ -324,6 +348,22 @@ def make_work(
                 parts.append(retried)
                 for index, result in zip(again, retried.results, strict=True):
                     results[index], timings[index] = result, retried.word_timing
+            # Chunks written in another script (Urdu, Bengali...) are asked again in Hindi (module SCRIPT_LANGUAGE).
+            scripted = wrong_script(results)
+            if scripted:
+                script_key = f"{ctx.prefix}parts/{key}-script.json"
+                try:
+                    rescripted = Part.from_json(ctx.artefacts.get(script_key))
+                except FileNotFoundError:
+                    rescripted = ask([chunks[i] for i in scripted], SCRIPT_LANGUAGE)
+                    ctx.artefacts.put(script_key, rescripted.to_json(), "application/json")
+                parts.append(rescripted)
+                for index, result in zip(scripted, rescripted.results, strict=True):
+                    results[index], timings[index] = result, rescripted.word_timing
+            still = wrong_script(results)
+            if still:  # kept, never dropped: losing speech would be worse; counted in the stage's output
+                log.warning("chunks still in another script after asking again in Hindi",
+                            extra={"recording_id": ctx.recording.id, "chunks": len(still)})  # fmt: skip
         speech = _speech(turns)
         words = merge_chunk_words(
             (c, retime_over_speech(r.words, _within(speech, c)) if timing == "approximate" else r.words)
@@ -351,17 +391,20 @@ def make_work(
                           "application/json")  # fmt: skip
         audio_ms = segment_map.compact_length_ms
         compute_ms = sum(p.compute_ms for p in parts)
+        retried_chunks = [chunks[i] for i in (*again, *scripted)]
         meta = {
             "provider": document["provider"],
             "model": document["model"],
             "requests": len(chunks),
-            "sent_audio_s": round(sum(sent_ms(c, speed) for c in (*chunks, *(chunks[i] for i in again))) / 1000, 1),
+            "sent_audio_s": round(sum(sent_ms(c, speed) for c in (*chunks, *retried_chunks)) / 1000, 1),
             "speed": speed,
             "audio_s": round(audio_ms / 1000, 1),
             "processing_s": round(compute_ms / 1000, 1),
             "real_time_factor": round(compute_ms / audio_ms, 4) if audio_ms else None,
             "batches_resumed": resumed,
             "language_retries": len(again),
+            "script_retries": len(scripted),
+            "still_other_script": len(still),
             "fallback": bool(fallbacks),
             "words": len(words),
         }
@@ -371,6 +414,8 @@ def make_work(
         batches = [list(chunks[i : i + BATCH_SIZE]) for i in range(0, len(chunks), BATCH_SIZE)]
         if again:
             batches.append([chunks[i] for i in again])
+        if scripted:
+            batches.append([chunks[i] for i in scripted])
         for part, sent in zip(parts, batches, strict=True):
             billed[part.model_id] = billed.get(part.model_id, 0) + sum(sent_ms(c, speed) for c in sent)
         diarized_turns = [Turn(t["speaker_label"], t["start_ms"], t["end_ms"]) for t in turns]
