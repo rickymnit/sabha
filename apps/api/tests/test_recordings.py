@@ -129,6 +129,7 @@ def api(
         upload_part_size_bytes=PART,
         asr_provider="sarvam",  # priced at Sarvam's published rate (sabha_asr.pricing); never called here
         sarvam_api_key="test-key",  # pragma: allowlist secret  (a placeholder; nothing is sent to Sarvam)
+        openai_api_key="test-key",  # pragma: allowlist secret  (so OpenAI can be chosen at upload; never called)
         usd_inr_rate=90.0,
     )
     seed(db, client.app.state.settings.oidc_issuer)
@@ -220,6 +221,28 @@ def test_the_upload_keeps_its_expected_cost_and_the_actual_comes_from_usage(api:
     )
     actual = cost(f"/v1/recordings/{rid}/cost")["actual"]
     assert (actual["llm_inr"], actual["total_inr"], actual["llm_unpriced_calls"]) == (None, None, 1)
+
+
+def test_owners_and_admins_may_choose_the_speech_to_text_model(api: Api) -> None:
+    listed = api.client.get("/v1/speech-models", headers=api.headers("staff-a"))
+    assert listed.status_code == 200, listed.text
+    models = {m["id"]: m for m in listed.json()}
+    assert listed.json()[0]["id"] == "sarvam:saaras:v4" and models["sarvam:saaras:v4"]["default"]
+    assert models["sarvam:saaras:v4"]["inr_per_hour"] == 29.4  # Rs 0.49/min, published
+    assert models["openai:gpt-transcribe"]["available"] and not models["qwen:qwen3-asr-flash"]["available"]
+
+    # The estimate and the recording use the chosen model: $0.0045/min x Rs 90 x 10 min = Rs 4.05
+    created = api.create("owner-a", {**LESSON, "asr_model": "openai", "expected_duration_ms": 600_000})
+    rid = created.json()["recording_id"]
+    doc = api.db.recordings.find_one({"_id": rid})
+    assert doc is not None and doc["asr_choice"] == "openai:gpt-transcribe"
+    assert doc["cost_estimate"]["asr_inr"] == 4.05
+    entry = api.db.audit_log.find_one({"target_id": rid, "action": "recording.create"})
+    assert entry is not None and entry["meta"]["asr_model"] == "openai:gpt-transcribe"
+
+    problem(api.create("staff-a", {**LESSON, "asr_model": "openai"}), 403, "asr_model_not_allowed")
+    problem(api.create("owner-a", {**LESSON, "asr_model": "qwen"}), 422, "asr_model_unavailable")  # no key here
+    problem(api.create("owner-a", {**LESSON, "asr_model": "nobody:x"}), 422, "asr_model_unavailable")
 
 
 def test_create_returns_presigned_parts_and_records_the_recording(api: Api) -> None:

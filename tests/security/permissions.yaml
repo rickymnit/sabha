@@ -228,6 +228,12 @@ routes:
     anonymous: 401
     others: 200
 
+  GET /v1/speech-models:
+    # The speech-to-text models an upload may choose, with prices (owner, 2026-11-13). Only owners and admins may
+    # choose one (POST /v1/recordings refuses others), but the list holds nothing private.
+    anonymous: 401
+    others: 200
+
   GET /v1/recordings/{recording_id}/cost:
     # Expected and actual cost of one recording, for anyone who may see it (every role, owner 2026-10-28).
     anonymous: 401

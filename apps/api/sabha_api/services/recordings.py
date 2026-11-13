@@ -47,6 +47,7 @@ from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import ApiError, ConflictError, ForbiddenError, NotFoundError
+from sabha_asr.registry import AsrConfigError, chosen_spec
 from sabha_core.models import (
     CLIENT_NAME_MAX,
     AuditEntry,
@@ -99,6 +100,9 @@ class RecordingIn(BaseModel):
     # Sales only: a phone call or a meeting (default meeting), and the client's name if the uploader knows it.
     interaction: Interaction | None = None
     client_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=CLIENT_NAME_MAX)] | None = None
+    # Owners and admins only: the speech-to-text model for this audio, "provider:model" from GET /v1/speech-models
+    # (owner 2026-11-13). Left out, the configured model is used.
+    asr_model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
 
     @field_validator("content_type")
     @classmethod
@@ -167,6 +171,14 @@ class UnknownUnitError(ApiError):
 
 class PersonNotAllowedError(ForbiddenError):
     code, title = "person_not_allowed", "Person not allowed"
+
+
+class AsrChoiceNotAllowedError(ForbiddenError):
+    code, title = "asr_model_not_allowed", "Only owners and admins choose the speech-to-text model"
+
+
+class AsrModelUnavailableError(ApiError):
+    status, code, title = 422, "asr_model_unavailable", "Speech-to-text model not available"
 
 
 class NoLinkedPersonError(ForbiddenError):
@@ -324,6 +336,15 @@ async def create(
     if body.unit_id is not None and await units.find_one({"_id": body.unit_id}) is None:
         raise UnknownUnitError("This unit does not exist in your organisation.")
 
+    asr_choice = None
+    if body.asr_model is not None and not transcript:  # a transcript file has no audio to transcribe
+        if principal.role not in UPLOAD_ADMINS:
+            raise AsrChoiceNotAllowedError("Only owners and admins choose the speech-to-text model.")
+        try:
+            asr_choice = chosen_spec(body.asr_model, settings)
+        except AsrConfigError as exc:
+            raise AsrModelUnavailableError(str(exc)) from exc
+
     recording_id = new_id()
     key = original_key(tenant.id, recording_id, body.file_name)
     upload_id = await storage.start(key, body.content_type)
@@ -346,6 +367,7 @@ async def create(
         cost_estimate=cost_estimate,
         interaction=(body.interaction or "meeting") if sales else None,
         client_name=body.client_name,
+        asr_choice=asr_choice,
     )
     try:
         async with transactions.run() as session:
@@ -357,7 +379,12 @@ async def create(
                 action="recording.create",
                 target_type="recording",
                 target_id=recording_id,
-                meta={"type": body.type.value, "size_bytes": body.size_bytes, "source": recording.source},
+                meta={
+                    "type": body.type.value,
+                    "size_bytes": body.size_bytes,
+                    "source": recording.source,
+                    **({"asr_model": asr_choice} if asr_choice else {}),
+                },
                 session=session,
             )
     except BaseException:

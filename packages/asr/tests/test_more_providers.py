@@ -12,7 +12,15 @@ import pytest
 from sabha_asr.pricing import cost_inr
 from sabha_asr.provider import AudioChunk, ProviderError
 from sabha_asr.providers import aws, openai, qwen
-from sabha_asr.registry import AsrConfigError, build_provider, model_id_for, parse_spec
+from sabha_asr.registry import (
+    AsrConfigError,
+    build_provider,
+    build_transcriber,
+    choices,
+    chosen_spec,
+    model_id_for,
+    parse_spec,
+)
 from sabha_core.settings import Settings
 
 CHUNK = AudioChunk("rec1-c003", b"RIFF....WAVEfmt fake audio", 10_000)
@@ -156,3 +164,22 @@ def test_dollar_prices_need_the_configured_rate() -> None:
     assert cost_inr("openai/gpt-transcribe", minute, 90.0) == pytest.approx(0.405)
     assert cost_inr("aws/transcribe@us-east-1", minute, 90.0) is None  # only Mumbai's price was checked
     assert cost_inr("whisper/large-v3-turbo", minute, 90.0) is None  # self-hosted: no per-minute price
+
+
+# --- Choosing a model per upload ---
+
+
+def test_upload_choices_and_what_a_chosen_model_builds() -> None:
+    s = settings(asr_provider="sarvam", sarvam_api_key="k", openai_api_key="k", asr_fallbacks="openai")
+    offered = {c.spec: c for c in choices(s)}
+    assert next(iter(offered)) == "sarvam:saaras:v4" and offered["sarvam:saaras:v4"].default
+    assert offered["openai:gpt-transcribe"].available and not offered["qwen:qwen3-asr-flash"].available
+    assert chosen_spec("openai", s) == "openai:gpt-transcribe"  # a bare provider means its default model
+    with pytest.raises(AsrConfigError, match="not set up"):
+        chosen_spec("qwen:qwen3-asr-flash", s)  # listed, but no DASHSCOPE_API_KEY
+    with pytest.raises(AsrConfigError, match="not one of"):
+        chosen_spec("openai:gpt-9", s)
+    chosen = build_transcriber(s, "openai:gpt-4o-mini-transcribe")
+    assert chosen.primary.model_id == "openai/gpt-4o-mini-transcribe"
+    assert chosen.fallbacks == ()  # the configured fallback is the chosen provider itself: never twice
+    assert [f.name for f in build_transcriber(s).fallbacks] == ["openai"]

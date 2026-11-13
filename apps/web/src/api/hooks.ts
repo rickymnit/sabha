@@ -44,6 +44,7 @@ import {
   type NextActionItem,
   type ProductInfoItem,
   type ProductInfoList,
+  type SpeechModel,
 } from "./types";
 
 export const REFRESH_MS = 5_000;
@@ -468,11 +469,14 @@ export function useRecordingCounts(): UseQueryResult<RecordingCounts, ApiError> 
 export function useCostEstimate(
   type: ConversationType,
   durationMs: number | null,
+  asrModel: string | null = null,
 ): UseQueryResult<EstimateResponse, ApiError> {
   const { token } = useSession();
+  const model = asrModel ? `&asr_model=${encodeURIComponent(asrModel)}` : "";
   return useQuery({
-    queryKey: ["costs", "estimate", type, durationMs, token],
-    queryFn: () => apiFetch<EstimateResponse>(`/v1/costs/estimate?type=${type}&duration_ms=${durationMs}`, { token }),
+    queryKey: ["costs", "estimate", type, durationMs, asrModel, token],
+    queryFn: () =>
+      apiFetch<EstimateResponse>(`/v1/costs/estimate?type=${type}&duration_ms=${durationMs}${model}`, { token }),
     enabled: Boolean(token) && durationMs !== null && durationMs > 0,
     staleTime: 60_000,
   });
@@ -706,5 +710,16 @@ export function useMyCoaching(): UseQueryResult<MyCoaching, ApiError> {
     queryKey: ["my-coaching", token],
     queryFn: () => apiFetch<MyCoaching>("/v1/me/coaching", { token }),
     enabled: Boolean(token),
+  });
+}
+
+/** GET /v1/speech-models: the speech-to-text models an owner or admin may choose at upload, the default first. */
+export function useSpeechModels(enabled: boolean): UseQueryResult<SpeechModel[], ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["speech-models", token],
+    queryFn: () => apiFetch<SpeechModel[]>("/v1/speech-models", { token }),
+    enabled: enabled && Boolean(token),
+    staleTime: 5 * 60_000,
   });
 }

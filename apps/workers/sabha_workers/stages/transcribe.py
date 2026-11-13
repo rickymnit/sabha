@@ -244,14 +244,15 @@ def _languages(chunks: Sequence[Chunk], results: Sequence[ChunkResult]) -> list[
 
 
 def make_work(
-    transcriber: Callable[[], Transcriber],
+    transcriber: Callable[[str | None], Transcriber],
     preprocess_version: str,
     transcript: TranscriptDeps,
     *,
     speed: float = 1.0,
     run: Runner = run_tool,
 ) -> Work:
-    """The transcribe `work` function for StageRunner. `transcriber` returns the (cached) configured Transcriber.
+    """The transcribe `work` function for StageRunner. `transcriber(spec)` returns the (cached) Transcriber for the
+    model chosen at upload (Recording.asr_choice), or the configured one for None.
     `speed` above 1 sends sped-up audio (ASR_SPEEDUP, see the module docstring); `run` runs ffmpeg for it.
 
     After the words, sabha_workers.stages.transcript assigns speaker roles and writes the canonical transcript
@@ -260,7 +261,7 @@ def make_work(
     def work(ctx: StageContext) -> dict[str, Any]:
         source = artefact_prefix(ctx.tenant_id, ctx.recording.id, "preprocess", preprocess_version)
         diarized = artefact_prefix(ctx.tenant_id, ctx.recording.id, "diarize", transcript.diarize_version)
-        asr = transcriber()
+        asr = transcriber(ctx.recording.asr_choice)
         # In compact time: a chunk planned `speed` times longer is sent no longer than the provider's limit.
         max_chunk_ms = int(min(p.max_chunk_ms for p in (asr.primary, *asr.fallbacks)) * speed)
         with tempfile.TemporaryDirectory(prefix="sabha-transcribe-") as tmp:

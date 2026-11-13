@@ -121,6 +121,7 @@ class Stage:
         self.artefacts = S3Artefacts(s3_storage.client(), "sabha-artefacts")
         self.tmp = tmp
         self.saved: list[Transcript] = []
+        self.specs: list[str | None] = []  # the model each run asked for (Recording.asr_choice)
         self.transcript_deps = TranscriptDeps(
             diarize_version="v1", tenant=lambda _: TENANT, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
             tie_breaker=lambda *_: None, save=self.save_transcript,
@@ -135,8 +136,11 @@ class Stage:
         transcripts.insert_one(document)
         self.saved.append(document)
 
-    def recording(self, segment_map: SegmentMap = MAP, *, with_inputs: bool = True) -> str:
-        recording = Recording(type=ConversationType.TEACHING, status=S.TRANSCRIBING, consent_ref="c")
+    def recording(
+        self, segment_map: SegmentMap = MAP, *, with_inputs: bool = True, asr_choice: str | None = None
+    ) -> str:
+        recording = Recording(type=ConversationType.TEACHING, status=S.TRANSCRIBING, consent_ref="c",
+                              asr_choice=asr_choice)  # fmt: skip
         rid = SyncTenantRepo(self.db, "recordings", "t1", Recording).insert_one(recording).id
         if with_inputs:
             compact = self.tmp / f"{rid}.wav"
@@ -153,7 +157,11 @@ class Stage:
         return rid
 
     def run(self, rid: str, transcriber: Transcriber, attempt: int = 1, speed: float = 1.0) -> str:
-        work = make_work(lambda: transcriber, "v1", self.transcript_deps, speed=speed)
+        def chosen(spec: str | None) -> Transcriber:
+            self.specs.append(spec)
+            return transcriber
+
+        work = make_work(chosen, "v1", self.transcript_deps, speed=speed)
         return self.runner.run(TRANSCRIBE, work, "t1", rid, attempt=attempt).result
 
     def doc(self, rid: str) -> dict[str, Any]:
@@ -199,6 +207,14 @@ def test_the_stage_writes_compact_words_and_cost_inputs(stage: Stage) -> None:
     assert meta["speakers"] == 1
     stored = stage.db.transcripts.find_one({"recording_id": rid})
     assert stored is not None and stored["tenant_id"] == "t1"
+    assert stage.specs == [None]  # nothing chosen at upload: the configured model
+
+
+@pytest.mark.integration
+def test_the_model_chosen_at_upload_is_the_one_asked_for(stage: Stage) -> None:
+    rid = stage.recording(asr_choice="qwen:qwen3-asr-flash")
+    assert stage.run(rid, Transcriber(FakeProvider(max_chunk_ms=30_000))) == "done"
+    assert stage.specs == ["qwen:qwen3-asr-flash"]
 
 
 @pytest.mark.integration

@@ -27,15 +27,28 @@ async def estimate(
     analyses: Annotated[TenantRepo[Analysis], Depends(tenant_repo("analyses", Analysis))],
     type: ConversationType,
     duration_ms: Annotated[int, Query(ge=1, le=24 * 3_600_000)],
+    asr_model: Annotated[str | None, Query(max_length=100)] = None,
 ) -> service.EstimateOut:
     """What a recording of this type and length is expected to cost in rupees: speech-to-text at the published
     price, and the LLM at the median cost per minute of your organisation's recent recordings of the type. Parts
-    without a price or history are null. Our own processing is not included."""
+    without a price or history are null. Our own processing is not included. `asr_model` prices a model chosen
+    at upload (GET /v1/speech-models) instead of the configured one."""
     settings = request.app.state.settings
-    found = await service.estimate(type, duration_ms, settings, recordings=recordings, analyses=analyses)
+    found = await service.estimate(type, duration_ms, settings, recordings=recordings, analyses=analyses,
+                                   asr_spec=asr_model)  # fmt: skip
     per_minute = found.total_inr / (duration_ms / 60_000) if found.total_inr is not None else None
+    model = service.asr_model_id(settings, asr_model)
     return service.EstimateOut(estimate=found, inr_per_minute=None if per_minute is None else round(per_minute, 4),
-                               sources=service.sources(settings))  # fmt: skip
+                               sources=service.sources(settings, model))  # fmt: skip
+
+
+@router.get("/v1/speech-models", response_model=list[service.SpeechModelOut])
+async def speech_models(
+    request: Request, principal: Annotated[Principal, Depends(current_principal)]
+) -> list[service.SpeechModelOut]:
+    """The speech-to-text models an owner or admin may choose when uploading, the default first, each with its
+    published price per audio hour. Models not set up on this server are listed with `available` false."""
+    return service.speech_models(request.app.state.settings)
 
 
 @router.get("/v1/recordings/{recording_id}/cost", response_model=service.CostOut)

@@ -28,11 +28,24 @@ const people = [
   { id: "p-ravi", name: "Ravi Kumar", unit_id: "unit-6" },
 ];
 
+const speechModels = [
+  { id: "sarvam:saaras:v4", name: "Sarvam Saaras v4", available: true, default: true, inr_per_hour: 29.4 },
+  { id: "qwen:qwen3-asr-flash", name: "Qwen3 ASR Flash", available: true, default: false, inr_per_hour: 12.16 },
+  { id: "aws:transcribe", name: "Amazon (Mumbai)", available: false, default: false, inr_per_hour: 34.74 },
+];
+
 function stubApi(role: string, visible = people) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string) => {
-      const body = path.startsWith("/v1/me") ? me(role) : path.startsWith("/v1/people") ? visible : { items: [] };
+      if (path.startsWith("/v1/usage")) return new Response(null, { status: 404 }); // no plan figures in these tests
+      const body = path.startsWith("/v1/me")
+        ? me(role)
+        : path.startsWith("/v1/people")
+          ? visible
+          : path.startsWith("/v1/speech-models")
+            ? speechModels
+            : { items: [] };
       return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
     }),
   );
@@ -103,5 +116,29 @@ describe("the upload page", () => {
     expect(vi.mocked(uploadRecording).mock.calls[0]?.[0]).toMatchObject({ personId: "p-asha", consentRef: null });
     await user.click(within(files).getByRole("button", { name: "Try again" }));
     expect(within(files).getByText("Ready to upload")).toBeInTheDocument();
+  });
+
+  it("lets an owner choose the transcription model, and remembers it", async () => {
+    stubApi("owner");
+    vi.mocked(uploadRecording).mockResolvedValueOnce({ kind: "done", result: { recording_id: "r1", status: "UPLOADED", awaiting_consent: false, duplicate_of: null } }); // prettier-ignore
+    const user = userEvent.setup();
+    renderUpload();
+    const picker = await screen.findByRole("combobox", { name: "Transcription model" });
+    expect(picker).toHaveValue("sarvam:saaras:v4"); // the default
+    expect(screen.getByRole("option", { name: /Amazon.*\(not set up\)/ })).toBeDisabled();
+    await user.selectOptions(picker, "qwen:qwen3-asr-flash");
+    await user.upload(screen.getByLabelText("Choose files"), [lesson("Fractions.mp3")]);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Teacher" }), "p-asha");
+    await user.click(screen.getByRole("button", { name: "Upload 1 lesson" }));
+    await screen.findByText(/1 lesson uploaded/);
+    expect(vi.mocked(uploadRecording).mock.calls[0]?.[0]).toMatchObject({ asrModel: "qwen:qwen3-asr-flash" });
+    expect(localStorage.getItem("sabha.upload.asr_model")).toBe("qwen:qwen3-asr-flash");
+  });
+
+  it("does not offer the choice below owners and admins", async () => {
+    stubApi("manager");
+    renderUpload();
+    await screen.findByRole("combobox", { name: "Teacher" });
+    expect(screen.queryByRole("combobox", { name: "Transcription model" })).not.toBeInTheDocument();
   });
 });

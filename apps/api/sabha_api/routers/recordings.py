@@ -72,7 +72,8 @@ async def create_recording(
         estimate = None
         if body.expected_duration_ms is not None:  # what the upload page showed, kept to compare with the actual cost
             estimate = await costs.estimate(body.type, body.expected_duration_ms, request.app.state.settings,
-                                            recordings=recordings, analyses=analyses)  # fmt: skip
+                                            recordings=recordings, analyses=analyses,
+                                            asr_spec=body.asr_model)  # fmt: skip
         out = await service.create(
             principal,
             body,

@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from sabha_api.auth import Principal
 from sabha_api.services.results import visible_recording
 from sabha_asr.pricing import cost_inr, price_for
-from sabha_asr.registry import AsrConfigError, model_id_for
+from sabha_asr.registry import AsrConfigError, choices, model_id_for, parse_spec
 from sabha_core.models import Analysis, CostEstimate, LlmCall, Person, Recording, Transcript, utc_now
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
@@ -68,18 +68,41 @@ class EstimateOut(BaseModel):
     sources: Sources
 
 
-def asr_model_id(settings: Settings) -> str | None:
-    """The speech-to-text model recordings are sent to, as sabha_asr names it ("sarvam/saaras:v4")."""
-    if not settings.asr_provider:
+def asr_model_id(settings: Settings, spec: str | None = None) -> str | None:
+    """The speech-to-text model a recording is sent to, as sabha_asr names it ("sarvam/saaras:v4"): the one chosen
+    at upload (`spec`, "provider:model"), else the configured one."""
+    name, model = parse_spec(spec) if spec else (settings.asr_provider, None)
+    if not name:
         return None
     try:
-        return model_id_for(settings.asr_provider, settings)
+        return model_id_for(name, settings, model)
     except AsrConfigError:
         return None
 
 
-def sources(settings: Settings) -> Sources:
-    model = asr_model_id(settings)
+class SpeechModelOut(BaseModel):
+    id: str  # "provider:model", sent back as `asr_model` when creating a recording
+    name: str
+    available: bool  # set up on this server; the others are shown but cannot be chosen
+    default: bool
+    inr_per_hour: float | None  # None: no per-minute price (self-hosted) or no USD_INR_RATE
+
+
+def speech_models(settings: Settings) -> list[SpeechModelOut]:
+    """The speech-to-text models an upload may choose, with their published price per audio hour."""
+    out = []
+    for choice in choices(settings):
+        model = asr_model_id(settings, choice.spec)
+        price = price_for(model) if model else None
+        per_minute = price.inr_per_minute(settings.usd_inr_rate) if price else None
+        out.append(SpeechModelOut(id=choice.spec, name=choice.name, available=choice.available, default=choice.default,
+                                  inr_per_hour=None if per_minute is None else round(per_minute * 60, 2)))  # fmt: skip
+    return out
+
+
+def sources(settings: Settings, model: str | None = None) -> Sources:
+    """Where the prices come from; `model` is the speech-to-text model used (default: the configured one)."""
+    model = model or asr_model_id(settings)
     price = price_for(model) if model else None
     return Sources(asr_model=model, asr_inr_per_minute=price.inr_per_minute(settings.usd_inr_rate) if price else None,
                    asr_price_source=price.source if price else None, usd_inr_rate=settings.usd_inr_rate,
@@ -88,7 +111,7 @@ def sources(settings: Settings) -> Sources:
 
 async def estimate(
     kind: ConversationType, duration_ms: int, settings: Settings, *, recordings: TenantRepo[Recording],
-    analyses: TenantRepo[Analysis],
+    analyses: TenantRepo[Analysis], asr_spec: str | None = None,
 ) -> CostEstimate:  # fmt: skip
     since = utc_now() - timedelta(days=HISTORY_DAYS)
     done = await recordings.find({"type": kind.value, "status": RecordingStatus.COMPLETED.value,
@@ -101,7 +124,7 @@ async def estimate(
     usd_per_minute = [a.cost_usd / (lengths[a.recording_id] / 60_000) for a in found if a.cost_usd is not None]
 
     share = median(shares) if shares else 1.0
-    model = asr_model_id(settings)
+    model = asr_model_id(settings, asr_spec)
     asr = cost_inr(model, round(duration_ms * share), settings.usd_inr_rate) if model else None
     rate = settings.usd_inr_rate
     llm = median(usd_per_minute) * duration_ms / 60_000 * rate if usd_per_minute and rate else None
@@ -141,4 +164,5 @@ async def recording_cost(
         final=recording.status in (RecordingStatus.COMPLETED, RecordingStatus.FAILED),
     )  # fmt: skip
     return CostOut(recording_id=recording.id, duration_ms=recording.duration_ms, estimate=recording.cost_estimate,
-                   actual=actual, sources=sources(settings))  # fmt: skip
+                   actual=actual, sources=sources(settings, transcript.asr_model if transcript
+                                                  else asr_model_id(settings, recording.asr_choice)))  # fmt: skip

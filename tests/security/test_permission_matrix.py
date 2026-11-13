@@ -420,6 +420,7 @@ CALLS: dict[str, Callable[[Api, str], httpx.Response]] = {
     "GET /v1/costs/estimate": lambda a, who: a.client.get(
         "/v1/costs/estimate?type=teaching&duration_ms=600000", headers=a.headers(who)
     ),
+    "GET /v1/speech-models": lambda a, who: a.client.get("/v1/speech-models", headers=a.headers(who)),
     "GET /v1/recordings/{recording_id}/cost": lambda a, who: a.client.get(
         f"/v1/recordings/{DONE}/cost", headers=a.headers(who)
     ),

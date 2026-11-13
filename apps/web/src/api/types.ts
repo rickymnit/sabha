@@ -462,3 +462,12 @@ export interface MyCoaching {
     text: string;
   }[];
 }
+
+/** GET /v1/speech-models: one speech-to-text model an upload may use. */
+export interface SpeechModel {
+  id: string; // "provider:model", sent as asr_model
+  name: string;
+  available: boolean; // set up on this server
+  default: boolean;
+  inr_per_hour: number | null;
+}

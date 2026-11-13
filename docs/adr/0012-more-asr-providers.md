@@ -39,7 +39,12 @@ Prices, from each provider's own published figures (checked 2026-11-13, kept in 
    and how much each differs from Sarvam. Without human-checked transcripts (the gold set is empty) the difference is
    **not accuracy**: it says where the models disagree, and a person listens to decide who is right. Word error rate
    against a gold transcript is reported only by `eval/wer.py` (golden rule 6).
-5. **Self-hosted Whisper is an optional install** (`uv sync --extra whisper`, faster-whisper). It is not part of the
+5. **Owners and admins may choose the model per upload** (added 2026-11-13 at the owner's request). The upload page
+   lists the models in `sabha_asr.registry.CHOICES` with their price per audio hour (`GET /v1/speech-models`); ones
+   whose key is missing are shown but cannot be chosen. The recording keeps the choice (`asr_choice`, audited on
+   create), its cost estimate uses that model's price, and the speech worker builds that model for it. Other roles
+   cannot choose (403); without a choice the configured model is used.
+6. **Self-hosted Whisper is an optional install** (`uv sync --extra whisper`, faster-whisper). It is not part of the
    API or CPU worker images.
 
 ## Consequences

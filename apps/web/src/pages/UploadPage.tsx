@@ -10,8 +10,8 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client";
-import { usePeople, useUsage } from "../api/hooks";
-import type { Me } from "../api/types";
+import { usePeople, useSpeechModels, useUsage } from "../api/hooks";
+import type { Me, SpeechModel } from "../api/types";
 import {
   Button,
   ChoiceCards,
@@ -83,6 +83,34 @@ function rememberType(type: ConversationType) {
   }
 }
 
+const MODEL_KEY = "sabha.upload.asr_model";
+
+/** The speech-to-text model last chosen on this device, if it is still offered and set up; else the default. */
+function rememberedModel(models: readonly SpeechModel[]): string {
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem(MODEL_KEY);
+  } catch {
+    // Storage blocked: the default.
+  }
+  const usable = models.filter((m) => m.available);
+  return (usable.find((m) => m.id === last) ?? usable.find((m) => m.default) ?? usable[0])?.id ?? "";
+}
+
+function rememberModel(id: string) {
+  try {
+    localStorage.setItem(MODEL_KEY, id);
+  } catch {
+    // Storage blocked: nothing to remember, nothing lost.
+  }
+}
+
+/** "Sarvam Saaras v4 · ₹29.40/hour", short enough for the box; "(not set up)" on the ones that cannot be chosen. */
+function modelLabel(m: SpeechModel): string {
+  const price = m.inr_per_hour === null ? "no per-minute charge" : `₹${m.inr_per_hour.toFixed(2)}/hour`;
+  return `${m.name} · ${price}${m.available ? "" : " (not set up)"}`;
+}
+
 const STATUS = {
   muted: ["text-muted", "bg-muted-2"],
   success: ["text-success", "bg-success"],
@@ -104,6 +132,7 @@ function Status({ tone, children }: { tone: keyof typeof STATUS; children: React
 function FileRow({
   item,
   type,
+  asrModel,
   onDuration,
   onRemove,
   onRetry,
@@ -113,6 +142,7 @@ function FileRow({
 }: {
   item: QueueItem;
   type: ConversationType;
+  asrModel: string | null;
   onDuration: (ms: number | null) => void;
   onRemove: () => void;
   onRetry: () => void;
@@ -147,7 +177,7 @@ function FileRow({
           (isTranscript(file) ? (
             <span className="text-small text-muted">Meeting transcript: read as text, no audio to process</span>
           ) : (
-            <CostPreview file={file} type={type} onDuration={onDuration} />
+            <CostPreview file={file} type={type} asrModel={asrModel} onDuration={onDuration} />
           ))}
         {state.kind === "ready" && <Status tone="muted">Ready to upload</Status>}
         {state.kind === "uploading" && (
@@ -210,6 +240,11 @@ export function UploadPage() {
   const queryClient = useQueryClient();
   const people = usePeople();
   const usage = useUsage(ADMINS.includes(me.user.role)); // this month's audio hours: owners and admins
+  // Owners and admins choose the speech-to-text model (owner, 2026-11-13); everyone else gets the default.
+  const speechModels = useSpeechModels(ADMINS.includes(me.user.role));
+  const [modelChoice, setModelChoice] = useState<string | null>(null);
+  const models = speechModels.data ?? [];
+  const asrModel = models.length > 1 ? (modelChoice ?? rememberedModel(models)) || null : null;
   const input = useRef<HTMLInputElement>(null);
   const [items, dispatch] = useReducer(queueReducer, []);
   const [dragging, setDragging] = useState(false);
@@ -264,6 +299,7 @@ export function UploadPage() {
         expectedDurationMs: durations.current.get(item.key) ?? null,
         interaction: type === "sales" ? interaction : null,
         clientName: type === "sales" ? clientName : null,
+        asrModel,
         onProgress: (sent, total) =>
           dispatch({ type: "set", key: item.key, state: { kind: "uploading", sent, total } }),
       });
@@ -397,6 +433,7 @@ export function UploadPage() {
                     key={item.key}
                     item={item}
                     type={type}
+                    asrModel={asrModel}
                     onDuration={(ms) => durations.current.set(item.key, ms)}
                     onRemove={() => dispatch({ type: "remove", key: item.key })}
                     onRetry={() => dispatch({ type: "retry", key: item.key })}
@@ -488,6 +525,28 @@ export function UploadPage() {
               {personUnits.map((id) => (
                 <option key={id} value={id}>
                   {unitLabel(me.tenant.units, id)}
+                </option>
+              ))}
+            </Select>
+          )}
+
+          {asrModel !== null && (
+            <Select
+              label="Transcription model"
+              value={asrModel}
+              disabled={running}
+              onChange={(e) => {
+                setModelChoice(e.target.value);
+                rememberModel(e.target.value);
+              }}
+              hint={[
+                `Turns speech into text. Usually ${models.find((m) => m.default)?.name ?? "the default"}.`,
+                models.some((m) => !m.available) ? "Models marked “not set up” need their key added first." : "",
+              ].join(" ")}
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id} disabled={!m.available}>
+                  {modelLabel(m)}
                 </option>
               ))}
             </Select>

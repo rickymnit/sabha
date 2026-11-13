@@ -323,6 +323,9 @@ class Recording(TenantDoc):
     # upload. When the client is left blank, the analysis may name it from the conversation (quote-backed).
     interaction: Interaction | None = None
     client_name: str | None = Field(default=None, max_length=CLIENT_NAME_MAX)
+    # Speech-to-text model chosen at upload by an owner or admin ("openai:gpt-transcribe", sabha_asr.registry
+    # CHOICES; owner 2026-11-13). None: the configured ASR_PROVIDER when the recording is transcribed.
+    asr_choice: str | None = Field(default=None, max_length=100)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

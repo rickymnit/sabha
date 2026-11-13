@@ -18,14 +18,17 @@ const clock = (ms: number) => {
 export function CostPreview({
   file,
   type,
+  asrModel = null,
   onDuration,
 }: {
   file: File;
   type: ConversationType;
+  /** The speech-to-text model chosen on the page, priced instead of the default. */
+  asrModel?: string | null;
   onDuration: (ms: number | null) => void;
 }) {
   const [duration, setDuration] = useState<number | null | undefined>(undefined);
-  const estimate = useCostEstimate(type, duration ?? null);
+  const estimate = useCostEstimate(type, duration ?? null, asrModel);
 
   useEffect(() => {
     let live = true;

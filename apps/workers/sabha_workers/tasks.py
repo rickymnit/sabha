@@ -160,8 +160,8 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         )
 
     @cache
-    def transcriber() -> Transcriber:  # built on the first transcribe task; bad ASR settings fail there, loudly
-        return build_transcriber(settings)
+    def transcriber(spec: str | None) -> Transcriber:  # built on first use per model; bad settings fail loudly there
+        return build_transcriber(settings, spec)  # spec: the model chosen at upload, None for the configured one
 
     @cache
     def gateway() -> Gateway | None:  # the LLM gateway, built once; None (logged) when no LLM is configured
