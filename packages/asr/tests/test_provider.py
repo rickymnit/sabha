@@ -124,7 +124,7 @@ class _FakeWhisper:
 
 
 def whisper_ok() -> WhisperProvider:
-    return WhisperProvider(load=_FakeWhisper)
+    return WhisperProvider(load=_FakeWhisper, decode=lambda wav: wav)
 
 
 PROVIDER_FACTORIES: dict[str, Callable[[], AsrProvider]] = {

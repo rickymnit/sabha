@@ -40,3 +40,4 @@ playwright-report/
 
 # Celery beat state, written where `make beat` runs
 celerybeat-schedule*
+eval/reports/asr-compare-*/

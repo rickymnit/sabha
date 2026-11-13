@@ -16,7 +16,10 @@ from sabha_asr.registry import AsrConfigError, build_provider, model_id_for, par
 from sabha_core.settings import Settings
 
 CHUNK = AudioChunk("rec1-c003", b"RIFF....WAVEfmt fake audio", 10_000)
-NO_WAIT = {"sleep": lambda seconds: None}
+
+
+def no_wait(seconds: float) -> None:
+    """Rate-limit waits take no time in tests."""
 
 
 def mocked(handler: Any) -> httpx.Client:
@@ -33,7 +36,7 @@ def test_openai_sends_the_model_and_spreads_the_text() -> None:
         seen.append(request)
         return httpx.Response(200, json={"text": "haan ji bataiye", "languages": ["hi"]})
 
-    result = openai.OpenAIProvider("k", client=mocked(handler), **NO_WAIT).transcribe([CHUNK])[0]
+    result = openai.OpenAIProvider("k", client=mocked(handler), sleep=no_wait).transcribe([CHUNK])[0]
     body = seen[0].read().decode("latin-1")
     assert seen[0].url == "https://api.openai.com/v1/audio/transcriptions"
     assert seen[0].headers["authorization"] == "Bearer k"
@@ -53,7 +56,7 @@ def test_openai_whisper1_asks_for_word_times() -> None:
                                          "words": [{"word": "haan", "start": 0.2, "end": 0.5},
                                                    {"word": " ji", "start": 0.5, "end": 99.0}]})  # fmt: skip
 
-    p = openai.OpenAIProvider("k", model="whisper-1", client=mocked(handler), **NO_WAIT)
+    p = openai.OpenAIProvider("k", model="whisper-1", client=mocked(handler), sleep=no_wait)
     result = p.transcribe([CHUNK])[0]
     assert p.word_timing == "word"
     assert "verbose_json" in seen[0] and "timestamp_granularities[]" in seen[0]
@@ -72,7 +75,7 @@ def test_openai_errors(status: int, code: str, retryable: bool) -> None:
         return httpx.Response(status, json={"error": {"code": code, "message": "secret text never logged"}})
 
     with pytest.raises(ProviderError) as caught:
-        openai.OpenAIProvider("k", client=mocked(handler), **NO_WAIT).transcribe([CHUNK])
+        openai.OpenAIProvider("k", client=mocked(handler), sleep=no_wait).transcribe([CHUNK])
     assert caught.value.retryable is retryable
     assert "secret" not in str(caught.value)
     assert len(calls) == (5 if (status, retryable) == (429, True) else 1)  # rate limits are waited out 4 times
@@ -90,7 +93,7 @@ def test_qwen_request_and_answer() -> None:
             "content": "नमस्ते sir", "annotations": [{"type": "audio_info", "language": "hi"}]}}],
             "usage": {"seconds": 10}})  # fmt: skip
 
-    p = qwen.QwenProvider("k", language="hi-IN", client=mocked(handler), **NO_WAIT)
+    p = qwen.QwenProvider("k", language="hi-IN", client=mocked(handler), sleep=no_wait)
     result = p.transcribe([CHUNK])[0]
     sent = seen[0]
     assert sent["model"] == "qwen3-asr-flash" and sent["asr_options"] == {"enable_itn": False, "language": "hi"}
@@ -102,7 +105,7 @@ def test_qwen_request_and_answer() -> None:
 def test_qwen_unreadable_answer_is_not_retried() -> None:
     handler = lambda request: httpx.Response(200, json={"choices": []})  # noqa: E731
     with pytest.raises(ProviderError) as caught:
-        qwen.QwenProvider("k", client=mocked(handler), **NO_WAIT).transcribe([CHUNK])
+        qwen.QwenProvider("k", client=mocked(handler), sleep=no_wait).transcribe([CHUNK])
     assert not caught.value.retryable
 
 

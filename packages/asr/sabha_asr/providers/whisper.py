@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import io
 import logging
+import wave
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -42,10 +43,12 @@ class WhisperProvider:
         cpu_threads: int = 0,
         language: str = "unknown",
         load: Callable[[], Any] | None = None,
+        decode: Callable[[bytes], Any] | None = None,
     ) -> None:
         self._model_name = model
         self._language = language
         self._load = load or (lambda: _load(model, device, compute_type, cpu_threads))
+        self._decode = decode or samples
         self._model: Any = None
 
     @property
@@ -72,7 +75,7 @@ class WhisperProvider:
     def _transcribe_one(self, chunk: AudioChunk) -> ChunkResult:
         hint = (chunk.language or self._language).split("-")[0]
         segments, info = self._model.transcribe(
-            io.BytesIO(chunk.wav), language=None if hint in ("", "unknown") else hint, word_timestamps=True,
+            self._decode(chunk.wav), language=None if hint in ("", "unknown") else hint, word_timestamps=True,
             vad_filter=False, beam_size=5, condition_on_previous_text=False,
         )  # fmt: skip
         words = []
@@ -91,6 +94,18 @@ class WhisperProvider:
             words=tuple(words),
             languages=(LanguageSpan(0, chunk.duration_ms, language if isinstance(language, str) else None),),
         )
+
+
+def samples(wav: bytes) -> Any:
+    """16 kHz mono 16-bit WAV as float32 samples in [-1, 1]. Decoded here, not by faster-whisper's PyAV path, which
+    breaks with some PyAV releases; the pipeline's chunks are always this format."""
+    import numpy as np
+
+    with wave.open(io.BytesIO(wav), "rb") as reader:
+        if (reader.getframerate(), reader.getnchannels(), reader.getsampwidth()) != (16_000, 1, 2):
+            raise ValueError("Whisper chunks must be 16 kHz mono 16-bit PCM WAV")
+        pcm = reader.readframes(reader.getnframes())
+    return np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
 
 
 def _load(model: str, device: str, compute_type: str, cpu_threads: int) -> Any:
