@@ -21,5 +21,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // src/test/contrast.test.ts reads the colour tokens from theme.css (?raw); other CSS stays empty in tests.
+    css: { include: [/theme\.css/] },
   },
 });

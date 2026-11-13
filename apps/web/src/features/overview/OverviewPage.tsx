@@ -4,11 +4,12 @@
 // list, the processing panel and the recent table in. Numbers come from GET /v1/overview; any number whose n is 0
 // is hidden, never shown as 0.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   BarSpark,
   EmptyState,
+  Icon,
   Panel,
   SegmentedControl,
   Skeleton,
@@ -47,6 +48,8 @@ export interface OverviewPageProps {
   processing?: ReactNode;
   /** Recent recordings. */
   recent?: ReactNode;
+  /** The answer first (OverviewAnswer): when given, everything else moves under "See all numbers". */
+  answer?: ReactNode;
 }
 
 export function OverviewPage(props: OverviewPageProps) {
@@ -86,6 +89,24 @@ export function OverviewPage(props: OverviewPageProps) {
           <DateRangePicker preset={preset} range={range} onChange={onRangeChange} now={now} />
         </div>
       </header>
+      {props.answer ? (
+        <>
+          {props.answer}
+          <MoreDetail>
+            <Detail {...props} />
+          </MoreDetail>
+        </>
+      ) : (
+        <Detail {...props} />
+      )}
+    </div>
+  );
+}
+
+function Detail(props: OverviewPageProps) {
+  const { stats } = props;
+  return (
+    <>
       {stats === undefined ? <Skeleton className="h-[118px] rounded-panel" /> : <Tiles {...props} stats={stats} />}
       {(props.decisions || props.processing) && (
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -95,6 +116,43 @@ export function OverviewPage(props: OverviewPageProps) {
       )}
       {stats !== undefined && <Coaching {...props} stats={stats} />}
       {props.recent}
+    </>
+  );
+}
+
+const DETAIL_KEY = "sabha.overview.detail";
+
+/** Everything behind the answer: closed at first; this browser remembers it open or closed. */
+function MoreDetail({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(DETAIL_KEY) === "open";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setOpen((now) => {
+      try {
+        localStorage.setItem(DETAIL_KEY, now ? "closed" : "open");
+      } catch {
+        // storage blocked: the choice lasts until the page reloads
+      }
+      return !now;
+    });
+  };
+  return (
+    <div className="flex flex-col gap-5">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
+        className="flex min-h-touch items-center justify-center gap-2 rounded-panel border border-dashed border-line-strong bg-transparent px-4 text-sm font-semibold text-ink-2 hover:bg-surface"
+      >
+        {open ? "Hide the numbers and charts" : "See all numbers and charts"}
+        <Icon name="chevronDown" size={16} className={cx("transition-transform", open && "rotate-180")} />
+      </button>
+      {open && children}
     </div>
   );
 }

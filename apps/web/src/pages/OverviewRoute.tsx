@@ -4,15 +4,16 @@
 // see.
 
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 
-import { useInbox, useOverview } from "../api/hooks";
+import { useInbox, useOverview, usePeopleSummary } from "../api/hooks";
 import type { Me } from "../api/types";
 import { capitalise } from "../app/format";
 import { RESOLVERS } from "../app/nav";
 import { Button, EmptyState, Icon, Panel, type ConversationType } from "../design";
 import { InboxList } from "../features/inbox/InboxList";
 import { ALL_UNITS } from "../features/overview/metrics";
+import { OverviewAnswer } from "../features/overview/OverviewAnswer";
 import { OverviewPage } from "../features/overview/OverviewPage";
 import { useOpen } from "../app/useOpen";
 import { Processing, Recent } from "../features/overview/panels";
@@ -62,6 +63,8 @@ export function OverviewRoute() {
   const [unit, setUnit] = useState(ALL_UNITS);
   const overview = useOverview(toQuery(range), unit === ALL_UNITS ? null : unit);
   const inbox = useInbox();
+  const people = usePeopleSummary();
+  const navigate = useNavigate();
   const typeNames = Object.fromEntries(
     (["teaching", "reception", "counselling", "meeting", "sales", "support"] as ConversationType[]).map((t) => [
       t,
@@ -101,6 +104,18 @@ export function OverviewRoute() {
       decisions={<Decisions me={me} />}
       processing={overview.data && <Processing stats={overview.data} typeNames={typeNames} />}
       recent={<Recent me={me} />}
+      answer={
+        overview.data && (
+          <OverviewAnswer
+            stats={overview.data}
+            people={people.data}
+            labels={me.tenant.labels}
+            waiting={inbox.data?.items.length ?? 0}
+            onOpen={(to) => navigate(to)}
+            decisionsHref={RESOLVERS.includes(me.user.role) ? "/reviews" : "/recordings?tab=decision"}
+          />
+        )
+      }
     />
   );
 }

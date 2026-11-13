@@ -3,16 +3,15 @@
 // the light and the dark theme.
 // Body text needs 4.5:1 (AA); the pairs are the ones the components use.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
+
+import themeCss from "../theme.css?raw";
 
 type Theme = "light" | "dark";
 
 /** The colour tokens of one theme, from src/theme.css: "ink" -> [18, 21, 33]. */
 function palette(theme: Theme): Map<string, number[]> {
-  const css = readFileSync(join(__dirname, "..", "theme.css"), "utf8");
+  const css = themeCss;
   const selector = theme === "light" ? ":root {" : ':root[data-theme="dark"] {';
   const block = css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));
   return new Map(
