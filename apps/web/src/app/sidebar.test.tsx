@@ -59,7 +59,7 @@ function renderAt(path: string) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the menu's numbers", () => {
-  it("shows how many recordings of each type, zero included, and the plan's hours to an owner", async () => {
+  it("shows how many recordings of each type, leaves out types with none yet, and the plan's hours to an owner", async () => {
     stubApi({
       "/v1/me": me("owner"),
       "/v1/recordings/counts": { by_type: { teaching: 128, reception: 46 } },
@@ -70,7 +70,7 @@ describe("the menu's numbers", () => {
     const menu = await screen.findByRole("navigation", { name: "Main" });
     expect(await within(menu).findByRole("link", { name: "Teaching, 128" })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: "Reception, 46" })).toBeInTheDocument();
-    expect(within(menu).getByRole("link", { name: "Sales, 0" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("link", { name: /^Sales/ })).not.toBeInTheDocument(); // nothing recorded yet
     const plan = await within(menu).findByRole("region", { name: "Plan usage" });
     expect(within(plan).getByText("Audio this month")).toBeInTheDocument();
     expect(within(plan).getByText("38.4 of 100 audio hours used")).toBeInTheDocument();

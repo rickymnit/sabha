@@ -93,7 +93,7 @@ describe("the app shell", () => {
     expect(await screen.findByRole("link", { name: "Fractions" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Lesson" })).toBeInTheDocument();
     expect(screen.getAllByText("Asha, Class 6")).toHaveLength(3); // who and where, under each title
-    expect(screen.getByText("Analysed")).toBeInTheDocument();
+    expect(screen.getByText("Fair")).toBeInTheDocument(); // a finished one says how it went in a word
     expect(screen.getByText("Transcribing")).toBeInTheDocument();
     expect(screen.getByText("No speech was found in the recording.")).toBeInTheDocument(); // why it stopped
     expect(screen.queryByText(/lecture|class session/i)).not.toBeInTheDocument();
@@ -201,10 +201,17 @@ describe("the overview", () => {
     stubApi({ "/v1/me": OWNER, "/v1/overview": STATS, "/v1/recordings": PAGE });
     renderAt("/", signedIn);
     expect(await screen.findByRole("heading", { level: 1, name: /, Priya$/ })).toBeInTheDocument();
+    // The answer first: one sentence and the area that needs work; the numbers wait behind one button.
+    expect(await screen.findByText("Your teachers are doing OK.")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Needs work" })).getByText("Recap and closure"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("From 3 lessons")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "See all numbers and charts" }));
     expect(await screen.findByText("From 3 lessons")).toBeInTheDocument();
     const processing = screen.getByRole("region", { name: "Processing now" });
     expect(within(processing).getByText(/2 more in progress/)).toBeInTheDocument();
-    expect(screen.getByText("Recap and closure")).toBeInTheDocument();
+    expect(screen.getAllByText("Recap and closure")).toHaveLength(2); // the card and the coaching table
     expect(await screen.findByRole("link", { name: "Fractions" })).toBeInTheDocument();
   });
 

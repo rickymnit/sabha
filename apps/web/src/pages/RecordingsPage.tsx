@@ -18,10 +18,9 @@ import {
   useRecordingsPage,
   useRubrics,
 } from "../api/hooks";
-import type { Me, RecordingItem, RecordingQuery } from "../api/types";
+import type { Me, RecordingCounts, RecordingItem, RecordingQuery } from "../api/types";
 import { RESOLVERS } from "../app/nav";
-import { capitalise, formatWhen, statusChip } from "../app/format";
-import { othersWord, staffWord } from "../app/speakerWords";
+import { capitalise, formatDuration, formatWhen, statusChip } from "../app/format";
 import { unitTree } from "../app/units";
 import {
   Avatar,
@@ -30,16 +29,12 @@ import {
   Icon,
   PageHeader,
   Panel,
-  ScoreChip,
   Skeleton,
   SkeletonGroup,
-  SpeakerLegend,
-  SpeakerStrip,
   StatusChip,
   Table,
   TypeDot,
   cx,
-  staffShare,
   useToast,
   type ConversationType,
 } from "../design";
@@ -47,7 +42,8 @@ import { EraseDialog } from "../features/erasure/EraseDialog";
 import { presetRange } from "../features/overview/range";
 import { ReasonDialog } from "../features/processing/ReasonDialog";
 import { ReanalyseDialog } from "../features/reanalysis/ReanalyseDialog";
-import { formatClock } from "../features/transcript/text";
+import { ScoreVerdict } from "../features/workspace/parts";
+import { clientOf } from "../features/workspace/words";
 
 const PAGE_SIZE = 10;
 /** A secondary button on the dark bulk bar. */
@@ -60,6 +56,24 @@ type Recorded = keyof typeof RECORDED;
 type Tab = "all" | "decision" | "below_3" | ConversationType;
 
 const count = (n: number | null | undefined) => (typeof n === "number" ? n.toLocaleString("en-IN") : undefined);
+
+/** The list's answer first (manager's feedback, 2026-11-13), from the real counts: "17 of 21 need work (scored below
+ *  3). 2 need your decision." */
+function listAnswer(counts: RecordingCounts | undefined, labels: Me["tenant"]["labels"]): string {
+  if (counts?.total === undefined) return "Newest first";
+  const total = counts.total;
+  const things = total === 1 ? labels.recording.toLowerCase() : labels.recording_plural.toLowerCase();
+  const parts = [
+    counts.below_3 != null && total > 0
+      ? counts.below_3 > 0
+        ? `${count(counts.below_3)} of ${count(total)} ${things} need work (scored below 3).`
+        : `All ${count(total)} ${things} scored 3 or more.`
+      : `${count(total)} ${things}.`,
+  ];
+  if (counts.needs_decision)
+    parts.push(`${count(counts.needs_decision)} ${counts.needs_decision === 1 ? "needs" : "need"} your decision.`);
+  return `${parts.join(" ")} Newest first.`;
+}
 
 /** A filter that looks like the design's pill ("Type All ▾") and is a native <select> underneath. */
 function FilterPill<V extends string>(props: {
@@ -187,6 +201,8 @@ export function RecordingsPage() {
   const filtered = Boolean(type || personId || unitId || score || recorded || decision);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Filters stay tucked away unless one beyond the tabs is in use.
+  const [filtersOpen, setFiltersOpen] = useState(() => Boolean(personId || unitId || recorded || (type && score)));
   const chosen = rows.filter((r) => selected.has(r.id));
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -235,6 +251,8 @@ export function RecordingsPage() {
       to: { tab: null, type: null, score: "below_3" },
     },
   ];
+  // A tab with nothing in it is noise: only the one in use stays when empty.
+  const shownTabs = tabs.filter((t) => t.value === "all" || t.value === tab || !counts.data?.by_type || t.n !== "0");
   const tabTotal = { all: counts.data?.total, decision: counts.data?.needs_decision, below_3: counts.data?.below_3 };
   const shownOf =
     tab === "all" && filtered
@@ -309,68 +327,42 @@ export function RecordingsPage() {
     {
       key: "title",
       header: capitalise(labels.recording),
-      render: (r: RecordingItem) => (
-        <div className="flex items-center gap-3">
-          <Avatar name={r.person?.name ?? r.title} size={32} className="shrink-0" />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <a
-              href={`/recordings/${r.id}`}
-              onClick={(e) => open(e, r.id)}
-              className="font-semibold text-ink no-underline after:absolute after:inset-0 hover:text-primary-hover"
-            >
-              {r.title}
-            </a>
-            <span className="text-small text-muted">
-              {[r.person?.name, r.unit_id ? units.get(r.unit_id) : undefined].filter(Boolean).join(", ") || "—"}
-            </span>
-            <span className="text-caption text-muted-2 md:hidden">{formatWhen(r.recorded_at ?? r.created_at)}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "type",
-      hideOnPhone: true,
-      header: "Type",
-      className: "whitespace-nowrap",
-      render: (r: RecordingItem) => <TypeDot type={r.type} label={capitalise(r.type)} />,
-    },
-    {
-      key: "speakers",
-      header: "Who spoke when",
-      hideOnPhone: true,
-      className: "w-[16%] min-w-[110px]",
       render: (r: RecordingItem) => {
-        const segments = r.speaker_strip ?? [];
-        const share = staffShare(segments);
-        const word = staffWord(r.type, labels);
+        // A sales conversation goes by its client when one is known; a file name means little at a glance.
+        const name = (r.type === "sales" && clientOf(r)) || r.title;
+        const who = [r.person?.name, r.unit_id ? units.get(r.unit_id) : undefined].filter(Boolean).join(", ");
         return (
-          <SpeakerStrip
-            size="row"
-            segments={segments}
-            durationMs={r.duration_ms ?? 0}
-            label={share === null ? "No speaker data yet" : `${word} ${Math.round(share * 100)}% of speech`}
-            {...(share === null ? {} : { caption: `${word} ${Math.round(share * 100)}%` })}
-          />
+          <div className="flex items-center gap-3">
+            <Avatar name={r.person?.name ?? r.title} size={32} className="shrink-0" />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <a
+                href={`/recordings/${r.id}`}
+                onClick={(e) => open(e, r.id)}
+                className="font-semibold text-ink no-underline after:absolute after:inset-0 hover:text-primary-hover"
+              >
+                {name}
+              </a>
+              <span className="flex flex-wrap items-center gap-x-1.5 text-small text-muted">
+                {who && <span>{who}</span>}
+                {types.length > 1 && (
+                  <span className="inline-flex items-center gap-1">
+                    {who && "· "}
+                    <TypeDot type={r.type} label={capitalise(r.type)} />
+                  </span>
+                )}
+                {r.duration_ms ? <span>· {formatDuration(r.duration_ms)}</span> : null}
+              </span>
+              <span className="text-caption text-muted-2 md:hidden">{formatWhen(r.recorded_at ?? r.created_at)}</span>
+            </div>
+          </div>
         );
       },
     },
     {
-      key: "length",
-      hideOnPhone: true,
-      header: "Length",
-      className: "whitespace-nowrap tabular-nums",
-      render: (r: RecordingItem) => (r.duration_ms === null ? "—" : formatClock(r.duration_ms)),
-    },
-    {
-      key: "score",
-      header: "Score",
-      render: (r: RecordingItem) => <ScoreChip score={r.overall_score} decimals={1} />,
-    },
-    {
-      key: "status",
-      header: "Status",
+      key: "result",
+      header: "How it went",
       render: (r: RecordingItem) => {
+        if (r.status === "COMPLETED" && r.overall_score !== null) return <ScoreVerdict score={r.overall_score} />;
         const { chip, text } = statusChip(r.status);
         return (
           <div className="flex flex-col items-start gap-1">
@@ -455,11 +447,7 @@ export function RecordingsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title={capitalise(labels.recording_plural)}
-        description={
-          counts.data?.total !== undefined
-            ? `${count(counts.data.total)} ${counts.data.total === 1 ? labels.recording.toLowerCase() : things}, newest first`
-            : "Newest first"
-        }
+        description={listAnswer(counts.data, labels)}
         actions={
           <Button
             variant="secondary"
@@ -477,7 +465,7 @@ export function RecordingsPage() {
       />
 
       <nav aria-label="Views" className="-mt-1 flex gap-6 overflow-x-auto border-b border-line">
-        {tabs.map((t) => (
+        {shownTabs.map((t) => (
           <button
             key={t.value}
             type="button"
@@ -496,7 +484,26 @@ export function RecordingsPage() {
         ))}
       </nav>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="-mt-1 flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((v) => !v)}
+          icon={<Icon name="selector" size={16} />}
+        >
+          {filtersOpen ? "Hide filters" : "Filter"}
+        </Button>
+        {filtered && !filtersOpen && (
+          <Button
+            variant="ghost"
+            onClick={() => set({ type: null, person: null, unit: null, score: null, recorded: null, tab: null })}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      <div className={cx("flex flex-wrap items-center gap-2", !filtersOpen && "hidden")}>
         {types.length > 1 && (
           <FilterPill
             label="Type"
@@ -550,7 +557,6 @@ export function RecordingsPage() {
             Clear filters
           </Button>
         )}
-        <SpeakerLegend staff="Staff speaking" others={othersWord(types)} className="ml-auto" />
       </div>
 
       {isAdmin && chosenPerson && (

@@ -109,17 +109,20 @@ export function Sidebar({ me, id }: { me: Me; id?: string }) {
       {me.tenant.enabled_types.length > 1 && !isSalesRep(me) && (
         <div className="flex flex-col gap-0.5">
           <p className="m-0 px-2.5 pb-1.5 text-caption font-semibold text-muted-2">Conversation types</p>
-          {me.tenant.enabled_types.map((t) => (
-            <Link
-              key={t}
-              to={`/recordings?type=${t}`}
-              type={t}
-              current={pathname === "/recordings" && type === t}
-              {...(typeCounts ? { count: typeCounts[t] ?? 0 } : {})}
-            >
-              {capitalise(t)}
-            </Link>
-          ))}
+          {/* A type with nothing recorded yet is noise in the menu (manager's feedback, 2026-11-13). */}
+          {me.tenant.enabled_types
+            .filter((t) => !typeCounts || (typeCounts[t] ?? 0) > 0)
+            .map((t) => (
+              <Link
+                key={t}
+                to={`/recordings?type=${t}`}
+                type={t}
+                current={pathname === "/recordings" && type === t}
+                {...(typeCounts ? { count: typeCounts[t] ?? 0 } : {})}
+              >
+                {capitalise(t)}
+              </Link>
+            ))}
         </div>
       )}
       <div className="mt-auto flex flex-col gap-3">
