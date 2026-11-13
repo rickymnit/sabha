@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 
 import { Icon, cx, scoreBand, scoreWord, type IconName, type ScoreBand } from "../../design";
 import { checkedText } from "./format";
-import { PrivateCoachingNote } from "./PrivateCoachingNote";
 import { TimeChip } from "./SalesPanels";
 import { bestAndWorst, historyText, nextStep } from "./answer";
 import { displayedScore, type AnalysisReport, type Labels, type VerifiedDimension } from "./types";
@@ -132,12 +131,16 @@ export function ReportAnswer({ analysis, dimensions, labels, onWhy, onSeek, pers
           )}
         </Card>
       </div>
-      <div className="flex flex-col gap-2 border-t border-line-subtle pt-3">
-        <p className="m-0 text-small text-muted">
-          {[history, checkedText(analysis.dimensions)].filter(Boolean).join(" ")}
-        </p>
-        {analysis.coaching_private && <PrivateCoachingNote firstName={firstName} />}
-      </div>
+      {/* One quiet line: the person's range, the evidence check and, for managers, that coaching is private. */}
+      <p className="m-0 border-t border-line-subtle pt-3 text-small text-muted">
+        {[history, checkedText(analysis.dimensions)].filter(Boolean).join(" ")}
+        {analysis.coaching_private && (
+          <span data-testid="coaching-private">
+            {" "}
+            {firstName}’s coaching tips are private to {firstName}.
+          </span>
+        )}
+      </p>
     </section>
   );
 }

@@ -11,7 +11,7 @@ import { formatClock } from "../transcript";
 import { checkedText, formatMetricValue, formatScore } from "./format";
 import { CheckIcon, SmallGoIcon, SmallPauseIcon } from "./icons";
 import { usePlayingFrom, useSeekMode } from "./seekMode";
-import type { AnalysisReport, DealCard, Labels, Metric, ReportRecording } from "./types";
+import type { AnalysisReport, Labels, Metric, ReportRecording } from "./types";
 
 const LEVELS = ["Weak", "Needs work", "OK", "Good", "Strong"] as const;
 const SOLID = { low: "bg-danger-bar", mid: "bg-warning-bar", good: "bg-success-bar" } as const;
@@ -189,47 +189,6 @@ export function SalesOverall({
         </span>
         <span data-testid="overall-checked">{checkedText(analysis.dimensions)}</span>
       </p>
-    </section>
-  );
-}
-
-export function NextStepCard({
-  step,
-  repName,
-  onSeek,
-}: {
-  step: DealCard["next_step"];
-  /** The rep's first name, for "Owner: Rohit". */
-  repName: string;
-  onSeek: (ms: number) => void;
-}) {
-  const headingId = useId();
-  const owner = { sales_rep: repName, customer: "Customer", both: `${repName} and the customer` };
-  return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3 rounded-panel bg-ink px-5 py-5 text-surface">
-      <h2 id={headingId} className="m-0 text-sm font-semibold text-primary-tint-strong">
-        Next step agreed
-      </h2>
-      {step ? (
-        <>
-          <p className="m-0 text-xl font-semibold leading-snug">{step.action}</p>
-          <div className="flex flex-wrap gap-2 text-small">
-            <span className="rounded-full bg-surface/10 px-3 py-1">
-              {step.due ? `Due ${step.due}` : "No date agreed"}
-            </span>
-            <span className="rounded-full bg-surface/10 px-3 py-1">Owner: {owner[step.owner]}</span>
-            <button
-              type="button"
-              onClick={() => onSeek(step.evidence.start_ms)}
-              className="rounded-full bg-surface/10 px-3 py-1 text-surface hover:bg-surface/20"
-            >
-              Said at {formatClock(step.evidence.start_ms)}
-            </button>
-          </div>
-        </>
-      ) : (
-        <p className="m-0 text-lg font-semibold">No next step was agreed.</p>
-      )}
     </section>
   );
 }

@@ -17,7 +17,7 @@ export function VersionPicker({ versions, selected, onSelect }: VersionPickerPro
   const latest = versions[0];
   if (!latest || versions.length < 2) return null;
   return (
-    <span className="flex flex-wrap items-center gap-2 text-sm">
+    <span className="flex min-w-0 items-center gap-2 text-sm">
       <label htmlFor={id} className="font-semibold text-ink-2">
         Analysis
       </label>
@@ -25,7 +25,7 @@ export function VersionPicker({ versions, selected, onSelect }: VersionPickerPro
         id={id}
         value={selected ?? latest.id}
         onChange={(e) => onSelect(e.target.value === latest.id ? undefined : e.target.value)}
-        className="min-h-touch rounded border border-line-input bg-surface px-3"
+        className="min-h-touch min-w-0 max-w-full rounded border border-line-input bg-surface px-3"
       >
         {versions.map((v) => (
           <option key={v.id} value={v.id}>

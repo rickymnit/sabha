@@ -170,7 +170,15 @@ export function RecordingPage() {
   ];
   // Coaching is private to the person analysed (founder, 2026-11-12), so there is no "Share with" step any more;
   // a note a manager sent earlier still shows to the person.
-  const actions = menu.length > 0 ? <Menu label="More actions" items={menu} /> : undefined;
+  const picker =
+    versions.length > 1 ? <VersionPicker versions={versions} selected={version} onSelect={setVersion} /> : null;
+  const actions =
+    picker || menu.length > 0 ? (
+      <>
+        {picker}
+        {menu.length > 0 && <Menu label="More actions" items={menu} />}
+      </>
+    ) : undefined;
   const banner =
     staffViewer && detail.share_note && detail.shared_by_name ? (
       <SharedNote from={detail.shared_by_name} note={detail.share_note} />
@@ -224,11 +232,6 @@ export function RecordingPage() {
           }}
           onClose={() => setDeciding(null)}
         />
-      )}
-      {versions.length > 1 && (
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <VersionPicker versions={versions} selected={version} onSelect={setVersion} />
-        </div>
       )}
       {shownVersion && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line-subtle bg-surface-subtle px-4 py-3">

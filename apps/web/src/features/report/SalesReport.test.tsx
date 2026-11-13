@@ -46,9 +46,10 @@ describe("sales report", () => {
     await renderSales();
     const scale = screen.getByRole("list", { name: "Where this sits" });
     expect(within(scale).getByRole("listitem", { current: true })).toHaveTextContent("Needs work");
-    const next = screen.getByRole("region", { name: "Next step agreed" });
-    expect(within(next).getByText("Details by WhatsApp, then a quote")).toBeInTheDocument();
-    expect(within(next).getByText("No date agreed")).toBeInTheDocument();
+    // The agreed next step shows once, in the summary's "What happens next" card.
+    const next = screen.getByRole("region", { name: "In short" });
+    expect(within(next).getAllByText("Details by WhatsApp, then a quote")).toHaveLength(1);
+    expect(within(next).getByText(/no date said/)).toBeInTheDocument();
     const talk = screen.getByRole("region", { name: "Talk and listen" });
     expect(within(talk).getByText("Rohit 52%")).toBeInTheDocument();
     expect(within(talk).getByText("Customer 48%")).toBeInTheDocument();

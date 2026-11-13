@@ -34,7 +34,7 @@ import { TicketPanel } from "./TicketPanel";
 import { VoicesPanel } from "./VoicesPanel";
 import { RubricAccordion } from "./RubricPanels";
 import { NextTimePanel } from "./NextTimePanel";
-import { NextStepCard, SalesOverall, TalkListenCard } from "./SalesPanels";
+import { SalesOverall, TalkListenCard } from "./SalesPanels";
 import { evidenceLines } from "./timeline";
 import { notApplicableDimensions, visibleDimensions } from "./visibility";
 import { DisputeDialog } from "../disputes/DisputeDialog";
@@ -405,7 +405,6 @@ function ReportBody({
       </div>
       {sales && (
         <div className="flex min-w-0 flex-col gap-5">
-          {analysis.deal_card && <NextStepCard step={analysis.deal_card.next_step} repName={repName} onSeek={listen} />}
           <TalkListenCard metrics={analysis.metrics} labels={labels} repName={repName} onSeek={listen} />
         </div>
       )}
