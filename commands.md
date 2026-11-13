@@ -132,7 +132,7 @@ changing `apps/web/.env.local`, restart the web app.
 
 ```bash
 make dev                                              # services must be up first
-uv run python scripts/admin/dev_seed.py               # Demo School, Brightpath Software, users (safe to repeat)
+uv run python scripts/admin/dev_seed.py               # Demo School, NiaLabs, users (safe to repeat)
 pnpm -C apps/web exec playwright install chromium     # only needed for make e2e
 ```
 

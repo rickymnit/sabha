@@ -80,14 +80,14 @@ def test_local_sign_in_end_to_end(make_client: Any, mongo_uri: str, mongo_replic
     people = client.get("/dev-idp/users").json()
     listed = {f"dev-{u[0]}" for u in (*seed.USERS, *seed.COMPANY_USERS)}
     assert {p["subject"] for p in people} == listed  # E2E School is not listed
-    assert {p["tenant_name"] for p in people} == {"Demo School", "Brightpath Software"}
+    assert {p["tenant_name"] for p in people} == {"Demo School", seed.COMPANY_NAME}
     company = db.tenants.find_one({"_id": "demo-company"})
     assert (
         company is not None
         and company["profile"] == "company"
         and set(company["enabled_types"]) == {"reception", "meeting", "sales", "support"}
     )
-    assert "ब्राइट पाथ सॉफ्टवेयर" in company["name_variants"]  # how the recogniser writes it inside Hindi
+    assert "नियालैब्स" in company["name_variants"]  # how the recogniser writes it inside Hindi
     assert {(p["name"], p["title"]) for p in people if p["subject"] == "dev-asha"} == {("Asha Rao", "Teacher, Class 6")}
 
     token = client.post("/dev-idp/token", json={"subject": "dev-asha"}).json()["access_token"]

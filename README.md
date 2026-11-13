@@ -140,7 +140,7 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 | Script | What it does |
 | --- | --- |
 | `create_tenant.py` | Create a workspace from a profile (school, college or company) and invite its first owner. There is no self-sign-up |
-| `dev_seed.py` | Local only: "Demo School" and the fictional "Brightpath Software", one user per role |
+| `dev_seed.py` | Local only: "Demo School" and the demo company "NiaLabs", one user per role |
 | `set_plan.py` | Change a workspace's plan or monthly audio-hour allowance |
 | `hash_password.py` | Make the password hash for the local password sign-in |
 | `backfill.py` | Fill in fields added after recordings were processed (speaker strips, speech time, reception tickets) |
@@ -193,7 +193,7 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Speech recognition through Sarvam AI, speaker roles, transcript (P3.1, P3.5 to P3.7) | Done |
 | LLM gateway, PII redaction, scoring, grounding, synthesis, analyze stage (P5.1, P5.2, P5.4 to P5.7) | Done |
 | Reception: ticket, hold metric, not-applicable dimensions, rubric v0.2 (P5.8) | Done. Teaching rubric is v0.1 |
-| Sales meetings (rubric v0.2, deal card), team meetings scored as a whole with notes ([ADR 0008](docs/adr/0008-meetings.md)), company reception (rubric v0.1) | Done as drafts for the owner's review. Demo company "Brightpath Software" in the dev seed |
+| Sales meetings (rubric v0.2, deal card), team meetings scored as a whole with notes ([ADR 0008](docs/adr/0008-meetings.md)), company reception (rubric v0.1) | Done as drafts for the owner's review. Demo company "NiaLabs" in the dev seed |
 | Support calls for companies: rubric v0.1, case card (product, problem, steps tried, outcome, follow-up), phone-call speaker roles | Done as a draft for the owner's review (2026-11-04). On for every company; existing companies were switched on with `scripts/admin/enable_type.py` |
 | Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done |
 | UI v2 redesign (`docs/design/v2/`) | Done: tokens, sidebar, Overview, Recordings (tabs with counts, filters by type, class, person, date and score, bulk re-analyse and share, Retry or Close, CSV export) and the report (coaching steps, two-lane timeline with zoom, rubric levels, transcript alongside; pressing a time button again pauses the audio, and a third press carries on), and My progress, the home page for staff (teachers, sales reps, support agents): their own numbers, newest report with the manager's note, the three rubric points to work on, processing and recent recordings. Upload in the same style (type colours and what each is scored on, status dots per file, audio hours for owners and admins, "Upload more"). Reviews as one queue (disputes and paused recordings, filters for disputes, speakers and the rest, "2 of 5 decided") beside the decision: the AI score and its reasoning next to the proposed score, quotes and named times that play, and Accept (no note needed), Keep or Set a different score (note needed); "who is the speaker?" in the same place. The sales report: overall on a Weak to Strong scale with what went well and what to fix first, "Where the points were lost" (rubric points sorted by (5 - score) x weight, the two biggest marked Fix first), the deal at a glance with every quote behind "Show evidence", the agreed next step and talk and listen beside the transcript |
