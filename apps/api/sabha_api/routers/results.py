@@ -227,10 +227,13 @@ async def list_people(principal: Caller, people: People) -> list[service.PersonO
 
 
 @people_router.get("/summary", response_model=list[service.PersonSummary])
-async def people_summary(principal: Caller, people: People, analyses: Analyses) -> list[service.PersonSummary]:
-    """The People page: the people you may see (as GET /v1/people), each with their number of analysed recordings
-    and recent overall scores, oldest first."""
-    return await service.people_summary(principal, people, analyses)
+async def people_summary(
+    principal: Caller, people: People, analyses: Analyses, scores: Scores
+) -> list[service.PersonSummary]:
+    """The People page and the Overview: the people you may see (as GET /v1/people), each with their number of
+    analysed recordings, recent overall scores (oldest first), and their weakest and strongest rubric point over
+    those recordings."""
+    return await service.people_summary(principal, people, analyses, scores)
 
 
 @people_router.get("/{person_id}/trend", response_model=service.TrendOut)

@@ -410,6 +410,29 @@ def test_the_people_summary_counts_real_analyses_for_the_people_you_may_see(api:
     assert [p["id"] for p in api.get("asha", "/v1/people/summary").json()] == ["p-asha"]  # herself
 
 
+def test_the_people_summary_names_each_persons_weakest_and_strongest_area(api: Api) -> None:
+    recording(api, "r-1", "p-asha", "unit-1", 50)
+    recording(api, "r-2", "p-asha", "unit-1", 40)
+    first = analysis(api, "r-1", "v1", 2.4, 45)  # each adds Concept clarity = round(score)
+    old = analysis(api, "r-2", "v1", 1.0, 35)  # replaced by v2: its scores never count
+    second = analysis(api, "r-2", "v2", 3.4, 25)
+
+    def score(aid: str, rid: str, name: str, value: int | None, **extra: Any) -> None:
+        fields = {"verified": True, **extra}
+        insert(api.db, "scores", Score(tenant_id=T, analysis_id=aid, recording_id=rid, person_id="p-asha",
+                                       dimension=name.lower(), name=name, weight=0.2, score=value,
+                                       **fields))  # fmt: skip
+
+    score(first, "r-1", "Questioning", 4, human_score=5)  # a reviewer's score replaces the AI's
+    score(second, "r-2", "Questioning", 4)
+    score(old, "r-2", "Questioning", 1)
+    score(first, "r-1", "Recap", 1, verified=False)  # unverified: never counted
+    score(second, "r-2", "Recap", None, not_applicable=True)
+    asha = next(p for p in api.get("owner", "/v1/people/summary").json() if p["id"] == "p-asha")
+    assert asha["weakest"] == {"name": "Concept clarity", "median": 2.5, "n": 2}
+    assert asha["strongest"] == {"name": "Questioning", "median": 4.5, "n": 2}
+
+
 # --- Overview ---
 
 

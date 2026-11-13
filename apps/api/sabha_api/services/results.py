@@ -25,6 +25,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+from statistics import median
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -139,6 +140,18 @@ async def visible_people(principal: Principal, people: TenantRepo[Person]) -> li
 RECENT_SCORES = 10
 
 
+AREA_MIN_SCORES = 2  # an area needs at least this many verified scores to be called someone's weakest or strongest
+
+
+class Area(BaseModel):
+    """One rubric point across a person's recent recordings: the median of its verified scores (a reviewer's score
+    replaces the AI's), and how many there are."""
+
+    name: str
+    median: float
+    n: int
+
+
 class PersonSummary(PersonOut):
     """A row of the People page: real counts and scores only (golden rule 6), nothing estimated."""
 
@@ -146,13 +159,36 @@ class PersonSummary(PersonOut):
     latest_score: float | None  # the overall score of the most recently analysed recording
     recent_scores: list[float]  # overall scores of the last RECENT_SCORES analysed recordings, oldest first
     last_analysed_at: datetime | None
+    # Over the same recordings, the rubric point with the lowest and the highest median (the Overview's "one reason"
+    # per person, manager's feedback 2026-11-13); None with too few verified scores. Never the same point twice.
+    weakest: Area | None = None
+    strongest: Area | None = None
+
+
+def _areas(found: Sequence[Score]) -> tuple[Area | None, Area | None]:
+    values: dict[str, list[int]] = {}
+    for score in found:
+        value = score.human_score if score.human_score is not None else score.score
+        if score.verified and not score.not_applicable and value is not None:
+            values.setdefault(score.name, []).append(value)
+    areas = sorted(
+        (Area(name=name, median=round(float(median(v)), 1), n=len(v)) for name, v in values.items()
+         if len(v) >= AREA_MIN_SCORES),
+        key=lambda a: (a.median, -a.n, a.name),
+    )  # fmt: skip
+    if not areas:
+        return None, None
+    weakest, strongest = areas[0], areas[-1]
+    return weakest, (strongest if strongest.median > weakest.median else None)
 
 
 async def people_summary(
-    principal: Principal, people: TenantRepo[Person], analyses: TenantRepo[Analysis]
-) -> list[PersonSummary]:
-    """visible_people, each with how many of their recordings are analysed and their recent overall scores. A
-    re-analysed recording counts once, with its newest result."""
+    principal: Principal, people: TenantRepo[Person], analyses: TenantRepo[Analysis],
+    scores: TenantRepo[Score] | None = None,
+) -> list[PersonSummary]:  # fmt: skip
+    """visible_people, each with how many of their recordings are analysed, their recent overall scores and, with
+    `scores`, their weakest and strongest rubric point over those recordings. A re-analysed recording counts once,
+    with its newest result."""
     visible = await visible_people(principal, people)
     ids = [p.id for p in visible]
     found = (
@@ -161,13 +197,21 @@ async def people_summary(
     newest: dict[str, dict[str, Analysis]] = {}  # person -> recording -> its newest analysis
     for analysis in found:
         newest.setdefault(analysis.person_id or "", {})[analysis.recording_id] = analysis
+    recent = {person.id: sorted(newest.get(person.id, {}).values(), key=lambda a: a.created_at) for person in visible}
+    by_analysis: dict[str, list[Score]] = {}
+    if scores is not None:
+        ids = [a.id for mine in recent.values() for a in mine[-RECENT_SCORES:]]
+        for score in await scores.find({"analysis_id": {"$in": ids}}) if ids else []:
+            by_analysis.setdefault(score.analysis_id, []).append(score)
     out = []
     for person in visible:
-        mine = sorted(newest.get(person.id, {}).values(), key=lambda a: a.created_at)
+        mine = recent[person.id]
         scored = [a.overall_score for a in mine if a.overall_score is not None]
+        weakest, strongest = _areas([s for a in mine[-RECENT_SCORES:] for s in by_analysis.get(a.id, [])])
         out.append(PersonSummary(
             **person.model_dump(), analysed=len(mine), latest_score=scored[-1] if scored else None,
             recent_scores=scored[-RECENT_SCORES:], last_analysed_at=mine[-1].created_at if mine else None,
+            weakest=weakest, strongest=strongest,
         ))  # fmt: skip
     return out
 
