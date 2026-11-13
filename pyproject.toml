@@ -20,6 +20,8 @@ dependencies = [
 [project.optional-dependencies]
 # `uv sync --extra speech` (make setup-speech): pyannote and PyTorch for speaker diarization (P3.4).
 speech = ["sabha-asr[diarization]"]
+# `uv sync --extra whisper`: self-hosted Whisper (faster-whisper) for comparing speech-to-text models (ADR 0012).
+whisper = ["sabha-asr[whisper]"]
 
 [dependency-groups]
 dev = [
@@ -112,6 +114,11 @@ python_version = "3.12"
 # eval/ scripts import each other as top-level modules (they run as plain scripts); let mypy find them everywhere.
 mypy_path = "$MYPY_CONFIG_FILE_DIR/eval:$MYPY_CONFIG_FILE_DIR/eval/goldset:$MYPY_CONFIG_FILE_DIR/eval/raters"
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# faster-whisper is an optional install (sabha-asr[whisper]) and ships no type information.
+module = ["faster_whisper", "faster_whisper.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # boto3 ships no type information; only scripts/ and storage helpers touch it.

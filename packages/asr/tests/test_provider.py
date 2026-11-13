@@ -11,8 +11,12 @@ import httpx
 import pytest
 
 from sabha_asr.provider import AsrProvider, AudioChunk, ProviderError, spread_words
+from sabha_asr.providers.aws import AwsTranscribeProvider
 from sabha_asr.providers.fake import FakeProvider
+from sabha_asr.providers.openai import OpenAIProvider
+from sabha_asr.providers.qwen import QwenProvider
 from sabha_asr.providers.sarvam import SarvamProvider
+from sabha_asr.providers.whisper import WhisperProvider
 from sabha_asr.registry import AsrConfigError, build_transcriber
 from sabha_asr.transcriber import Transcriber
 from sabha_asr.words import Word
@@ -68,7 +72,65 @@ def sarvam_ok() -> SarvamProvider:
     return SarvamProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
 
 
-PROVIDER_FACTORIES: dict[str, Callable[[], AsrProvider]] = {"fake": FakeProvider, "sarvam": sarvam_ok}
+def openai_ok() -> OpenAIProvider:
+    handler = lambda request: httpx.Response(200, json={"text": "aaj hum", "languages": ["hi"]})  # noqa: E731
+    return OpenAIProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+def qwen_ok() -> QwenProvider:
+    answer = {"choices": [{"message": {"content": "aaj hum", "annotations": [{"language": "hi"}]}}]}
+    handler = lambda request: httpx.Response(200, json=answer)  # noqa: E731
+    return QwenProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+class _FakeAws:
+    """Amazon Transcribe and S3 clients: every job completes at once."""
+
+    def put_object(self, **_: Any) -> None: ...
+    def delete_object(self, **_: Any) -> None: ...
+    def start_transcription_job(self, **_: Any) -> None: ...
+    def delete_transcription_job(self, **_: Any) -> None: ...
+
+    def get_transcription_job(self, **_: Any) -> dict[str, Any]:
+        return {"TranscriptionJob": {"TranscriptionJobStatus": "COMPLETED", "LanguageCode": "hi-IN",
+                                     "Transcript": {"TranscriptFileUri": "https://aws.test/out.json"}}}  # fmt: skip
+
+
+def aws_ok() -> AwsTranscribeProvider:
+    items = [{"type": "pronunciation", "start_time": "0.1", "end_time": "0.4", "alternatives": [{"content": w}]}
+             for w in ("aaj", "hum")]  # fmt: skip
+    for second, item in zip((0.1, 0.5), items, strict=True):
+        item |= {"start_time": str(second), "end_time": str(second + 0.3)}
+    handler = lambda request: httpx.Response(200, json={"results": {"items": items}})  # noqa: E731
+    fake = _FakeAws()
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    return AwsTranscribeProvider(bucket="b", region="ap-south-1", transcribe_client=fake, s3_client=fake, http=http,
+                                 sleep=lambda s: None)  # fmt: skip
+
+
+class _Segment:
+    def __init__(self) -> None:
+        word = type("W", (), {})
+        self.words = []
+        for text, start in (("aaj", 0.1), ("hum", 0.5)):
+            item = word()
+            item.word, item.start, item.end, item.probability = f" {text}", start, start + 0.3, 0.9
+            self.words.append(item)
+
+
+class _FakeWhisper:
+    def transcribe(self, audio: Any, **_: Any) -> tuple[list[_Segment], Any]:
+        return [_Segment()], type("Info", (), {"language": "hi"})()
+
+
+def whisper_ok() -> WhisperProvider:
+    return WhisperProvider(load=_FakeWhisper)
+
+
+PROVIDER_FACTORIES: dict[str, Callable[[], AsrProvider]] = {
+    "fake": FakeProvider, "sarvam": sarvam_ok, "openai": openai_ok, "qwen": qwen_ok, "aws": aws_ok,
+    "whisper": whisper_ok,
+}  # fmt: skip
 
 
 @pytest.fixture(params=sorted(PROVIDER_FACTORIES))
@@ -242,7 +304,7 @@ def test_no_fallback_unless_configured() -> None:
     ("overrides", "message"),
     [
         ({}, "ASR_PROVIDER is not set"),
-        ({"asr_provider": "whisper"}, "unknown ASR provider 'whisper'"),
+        ({"asr_provider": "nobody"}, "unknown ASR provider 'nobody'"),
         ({"asr_provider": "fake", "asr_fallbacks": "nope"}, "unknown ASR provider 'nope'"),
     ],
 )

@@ -189,6 +189,7 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         rubric=lambda tenant, kind: rubric_for(tenant, kind, rubrics_dir),
         tie_breaker=tie_breaker,
         save=save_transcript,
+        usd_inr_rate=settings.usd_inr_rate,
     )
 
     def judge(tenant_id: str, recording_id: str) -> GatewayJudge:

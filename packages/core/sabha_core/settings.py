@@ -103,6 +103,16 @@ class Settings(BaseSettings):
     asr_speedup_factor: float = Field(default=1.25, gt=1.0, le=1.5)
     sarvam_api_key: SecretStr | None = None
     sarvam_base_url: str = "https://api.sarvam.ai"
+    # Other speech-to-text providers (docs/adr/0012-more-asr-providers.md). OpenAI uses OPENAI_API_KEY below.
+    dashscope_api_key: SecretStr | None = None  # Alibaba Cloud Model Studio, for Qwen-ASR
+    dashscope_base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    aws_transcribe_region: str = INDIA_REGION
+    aws_transcribe_bucket: str | None = None  # chunks are uploaded here for Amazon Transcribe batch jobs
+    aws_transcribe_access_key_id: SecretStr | None = None  # unset: boto3's own credential chain
+    aws_transcribe_secret_access_key: SecretStr | None = None
+    whisper_device: Literal["cpu", "cuda", "auto"] = "cpu"  # self-hosted faster-whisper
+    whisper_compute_type: str = "int8"  # int8 on CPU; float16 on a GPU
+    whisper_cpu_threads: int = Field(default=0, ge=0)  # 0: faster-whisper's default
 
     # LLM gateway (packages/llm, plan task P5.1). Models are "<provider>:<model>", e.g. "openai:gpt-6-luna". Fallbacks
     # are per task and only used when listed: {"score_dimension": ["openai:o4-mini"]} (golden rule 7). Token
@@ -240,6 +250,7 @@ class Settings(BaseSettings):
         "openai_base_url",
         "otel_exporter_otlp_endpoint",
         "sarvam_base_url",
+        "dashscope_base_url",
         "web_base_url",
     )
     @classmethod
@@ -314,6 +325,8 @@ class Settings(BaseSettings):
             raise ValueError("ASR_FALLBACKS lists a provider twice")
         if "sarvam" in (self.asr_provider, *self.asr_fallbacks) and self.sarvam_api_key is None:
             raise ValueError("SARVAM_API_KEY is required when Sarvam is the ASR provider or a fallback")
+        if (self.aws_transcribe_access_key_id is None) != (self.aws_transcribe_secret_access_key is None):
+            raise ValueError("set both AWS_TRANSCRIBE_ACCESS_KEY_ID and AWS_TRANSCRIBE_SECRET_ACCESS_KEY, or neither")
         return self
 
 

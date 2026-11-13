@@ -57,6 +57,7 @@ class TranscriptDeps:
     rubric: Callable[[Tenant, ConversationType], tuple[Rubric, str]]
     tie_breaker: Callable[[str, str], RoleTieBreaker | None]  # (tenant_id, recording_id) -> tie-breaker or None
     save: Callable[[str, Transcript], None]  # (tenant_id, transcript)
+    usd_inr_rate: float | None = None  # rupees for an ASR model priced in dollars (USD_INR_RATE)
 
 
 @dataclass(frozen=True)
@@ -191,7 +192,7 @@ def finish_transcript(
     key = ctx.prefix + "transcript@v1.json"
     ctx.artefacts.put(key, json.dumps(transcript, ensure_ascii=False).encode(), "application/json")
     methods = sorted({speaker.method for speaker in assignment.speakers.values()})
-    costs = [cost_inr(model, ms) for model, ms in asr.billed_ms.items()]
+    costs = [cost_inr(model, ms, deps.usd_inr_rate) for model, ms in asr.billed_ms.items()]
     asr_cost = None if not costs or any(c is None for c in costs) else round(sum(c for c in costs if c), 4)
     deps.save(
         ctx.tenant_id,

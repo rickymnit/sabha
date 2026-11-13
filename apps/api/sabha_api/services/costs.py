@@ -23,8 +23,7 @@ from pydantic import BaseModel
 from sabha_api.auth import Principal
 from sabha_api.services.results import visible_recording
 from sabha_asr.pricing import cost_inr, price_for
-from sabha_asr.providers.sarvam import DEFAULT_MODEL as SARVAM_DEFAULT_MODEL
-from sabha_asr.providers.sarvam import NAME as SARVAM
+from sabha_asr.registry import AsrConfigError, model_id_for
 from sabha_core.models import Analysis, CostEstimate, LlmCall, Person, Recording, Transcript, utc_now
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
@@ -71,15 +70,18 @@ class EstimateOut(BaseModel):
 
 def asr_model_id(settings: Settings) -> str | None:
     """The speech-to-text model recordings are sent to, as sabha_asr names it ("sarvam/saaras:v4")."""
-    if settings.asr_provider == SARVAM:
-        return f"{SARVAM}/{settings.asr_model or SARVAM_DEFAULT_MODEL}"
-    return None
+    if not settings.asr_provider:
+        return None
+    try:
+        return model_id_for(settings.asr_provider, settings)
+    except AsrConfigError:
+        return None
 
 
 def sources(settings: Settings) -> Sources:
     model = asr_model_id(settings)
     price = price_for(model) if model else None
-    return Sources(asr_model=model, asr_inr_per_minute=price.inr_per_minute if price else None,
+    return Sources(asr_model=model, asr_inr_per_minute=price.inr_per_minute(settings.usd_inr_rate) if price else None,
                    asr_price_source=price.source if price else None, usd_inr_rate=settings.usd_inr_rate,
                    usd_inr_source=settings.usd_inr_source)  # fmt: skip
 
@@ -100,7 +102,7 @@ async def estimate(
 
     share = median(shares) if shares else 1.0
     model = asr_model_id(settings)
-    asr = cost_inr(model, round(duration_ms * share)) if model else None
+    asr = cost_inr(model, round(duration_ms * share), settings.usd_inr_rate) if model else None
     rate = settings.usd_inr_rate
     llm = median(usd_per_minute) * duration_ms / 60_000 * rate if usd_per_minute and rate else None
     total = asr + llm if asr is not None and llm is not None else None

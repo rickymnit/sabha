@@ -16,6 +16,10 @@ diarization = [
     "torch>=2.8",
     "torchaudio>=2.8",
 ]
+# Self-hosted Whisper (ADR 0012): CTranslate2 inference, CPU or GPU. Only for comparing models and for a GPU worker.
+whisper = [
+    "faster-whisper>=1.2",
+]
 
 [project.scripts]
 sabha-asr-transcribe = "sabha_asr.cli:main"  # transcribe one WAV with the configured provider (P3.1)
