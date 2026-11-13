@@ -39,6 +39,11 @@ async function renderReport(analysis: AnalysisReport, viewerRole: ViewerRole = "
   return { ...view, audio };
 }
 
+/** Opens one of the report's tabs ("Why this score", "Listen and read"). */
+async function showTab(name: string) {
+  await userEvent.click(screen.getByRole("tab", { name }));
+}
+
 const pinLabels = () =>
   within(screen.getByTestId("timeline-track"))
     .queryAllByRole("button", { name: /^Play evidence/ })
@@ -99,13 +104,16 @@ describe("RecordingReport", () => {
     const report = mockReport(lesson, "completed");
     await renderReport(report);
     const user = userEvent.setup();
+    await showTab("Listen and read");
     const before = pinLabels();
+    await showTab("Why this score");
     const buttons = rowButtons();
     const other = buttons.find((b) => b.getAttribute("aria-expanded") === "false")!;
 
     await user.click(other);
 
     expect(other).toHaveAttribute("aria-expanded", "true");
+    await showTab("Listen and read");
     expect(pinLabels()).not.toEqual(before);
     expect(pinLabels().length).toBeGreaterThan(0);
   });
@@ -118,6 +126,7 @@ describe("RecordingReport", () => {
     const dimension = visibleDimensions(report.dimensions).find((d) => selectedKey.textContent?.includes(d.name))!;
     const firstQuote = dimension.evidence[0]!;
 
+    await showTab("Listen and read");
     const pin = within(screen.getByTestId("timeline-track")).getAllByRole("button", { name: /^Play evidence 1/ })[0]!;
     await user.click(pin);
     await act(async () => {});
@@ -169,12 +178,17 @@ describe("RecordingReport", () => {
     Element.prototype.scrollIntoView = scrolled;
     const buttons = screen.getAllByRole("button", { name: /^Go to evidence 1 at / });
     const detail = buttons.find((b) => /^Go to \d+:\d\d$/.test(b.textContent ?? ""));
-    expect(buttons).toHaveLength(2); // the timeline pin and the button beside the quote
+    expect(buttons).toHaveLength(1); // the button beside the quote; the timeline pin waits in "Listen and read"
     expect(detail).toBeDefined();
     expect(screen.queryByRole("button", { name: /^Play evidence/ })).toBeNull();
 
     await userEvent.click(detail!);
 
+    // With no audio the quote can only be shown in the transcript, so that tab opens at it.
+    expect(screen.getByRole("tab", { name: "Listen and read" })).toHaveAttribute("aria-selected", "true");
+    expect(
+      within(screen.getByTestId("timeline-track")).getAllByRole("button", { name: /^Go to evidence 1 at / }),
+    ).toHaveLength(1);
     expect(scrolled).toHaveBeenCalled();
     // The report now points at the quote's time (the transcript list follows it to that line).
     expect(screen.getByTestId("playhead")).toBeInTheDocument();

@@ -2,6 +2,7 @@
 // went well and what to fix first; the agreed next step in a dark card; and "Talk and listen", the talk shares and
 // counts computed in code from the transcript (golden rule 5: numbers come from code, never the AI).
 
+import { historyText } from "./answer";
 import { PrivateCoachingNote } from "./PrivateCoachingNote";
 import { useId } from "react";
 
@@ -41,16 +42,6 @@ export function TimeChip({ ms, onSeek }: { ms: number; onSeek: (ms: number) => v
 }
 
 /** "Lowest of Rohit's last 11 calls (range 2.1 to 3.9)": this score among the person's earlier ones. */
-function historyText(overall: number, history: AnalysisReport["person_history"], name: string, plural: string) {
-  if (!history || history.count === 0) return null;
-  const count = history.count + 1;
-  const min = Math.min(history.min, overall);
-  const max = Math.max(history.max, overall);
-  const range = `range ${formatScore(min)} to ${formatScore(max)}`;
-  if (overall <= history.min) return `Lowest of ${name}’s last ${count} ${plural} (${range}).`;
-  if (overall >= history.max) return `Highest of ${name}’s last ${count} ${plural} (${range}).`;
-  return `${name}’s last ${count} ${plural}: ${range}.`;
-}
 
 export function SalesOverall({
   analysis,

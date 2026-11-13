@@ -16,6 +16,8 @@ export interface TabsProps<Value extends string> {
   value?: Value;
   defaultValue?: Value;
   onChange?: (value: Value) => void;
+  /** Keep every panel rendered and only hide the others (an audio player in one keeps playing). */
+  keepMounted?: boolean;
   className?: string;
 }
 
@@ -29,6 +31,7 @@ export function Tabs<Value extends string>({
   value,
   defaultValue,
   onChange,
+  keepMounted = false,
   className,
 }: TabsProps<Value>) {
   const baseId = useId();
@@ -97,7 +100,7 @@ export function Tabs<Value extends string>({
           hidden={tab.value !== selected}
           tabIndex={0}
         >
-          {tab.value === selected && tab.panel}
+          {(keepMounted || tab.value === selected) && tab.panel}
         </div>
       ))}
     </div>

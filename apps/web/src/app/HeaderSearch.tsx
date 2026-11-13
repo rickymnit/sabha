@@ -144,7 +144,7 @@ export function HeaderSearch({ me }: { me: Me }) {
     );
 
   return (
-    <div className="relative w-full max-w-[420px]">
+    <div className="relative w-full min-w-0 max-w-[420px]">
       <label className="flex min-h-touch items-center gap-2 rounded border border-line bg-surface-subtle px-3 focus-within:border-primary focus-within:bg-surface">
         <Icon name="search" size={16} className="shrink-0 text-muted-2" />
         <span className="sr-only">Search {what}</span>

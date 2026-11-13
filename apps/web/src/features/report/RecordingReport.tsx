@@ -6,7 +6,7 @@
 import { PrivateCoachingNote } from "./PrivateCoachingNote";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Card, cx, scoreBand } from "../../design";
+import { Card, Tabs, cx, scoreBand } from "../../design";
 
 const BAND_FILL = { low: "bg-danger-bar", mid: "bg-warning-bar", good: "bg-success-bar" } as const;
 import {
@@ -23,6 +23,7 @@ import { checkedText, formatScore, joinList } from "./format";
 import { CaseCardPanel } from "./CaseCardPanel";
 import { DealCardPanel } from "./DealCardPanel";
 import { MeetingNotesPanel } from "./MeetingNotesPanel";
+import { ReportAnswer } from "./ReportAnswer";
 import { ReportHeader } from "./ReportHeader";
 import { ReportMetrics } from "./ReportMetrics";
 import { FailedState, NeedsReviewState, ProcessingState } from "./ReportStates";
@@ -178,6 +179,8 @@ function ReportBody({
   startAtMs,
 }: ReportBodyProps) {
   const [disputeOpen, setDisputeOpen] = useState(false);
+  const [tab, setTab] = useState<"why" | "listen">("why");
+  const rubricRef = useRef<HTMLDivElement>(null);
   const dimensions = useMemo(() => visibleDimensions(analysis.dimensions), [analysis.dimensions]);
   const notApplicable = notApplicableDimensions(analysis.dimensions);
   const hidden = analysis.dimensions.filter(
@@ -219,7 +222,7 @@ function ReportBody({
       setCurrentMs(ms);
       transcriptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     },
-    [noAudio, lastSeek, playing],
+    [noAudio, lastSeek, playing, setCurrentMs],
   );
 
   // A link to a moment (?at= from the rep's interaction page): show that line once, without playing.
@@ -227,8 +230,9 @@ function ReportBody({
   useEffect(() => {
     if (startAtMs === undefined || startedAt.current) return;
     startedAt.current = true;
+    setTab("listen");
     setCurrentMs(startAtMs);
-    transcriptRef.current?.scrollIntoView({ block: "start" });
+    requestAnimationFrame(() => transcriptRef.current?.scrollIntoView({ block: "start" }));
   }, [startAtMs]);
 
   const highlights = useMemo(
@@ -281,157 +285,199 @@ function ReportBody({
     </section>
   );
 
+  // Details sit in two tabs under the answer; both stay mounted so the audio keeps playing. With audio a quote's time
+  // plays right there (its own button pauses it); without, it can only be shown in the transcript, so that tab opens.
+  const listen = (ms: number) => {
+    if (noAudio) setTab("listen");
+    seek(ms);
+  };
+  const why = (key: string) => {
+    setTab("why");
+    setPinKey(key);
+    setChosenKey(key);
+    requestAnimationFrame(() => rubricRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  const whyPanel = (
+    <div
+      className={cx(
+        "grid items-start gap-5",
+        sales ? "lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]" : "max-w-[960px]",
+      )}
+    >
+      <div className="flex min-w-0 flex-col gap-5">
+        {/* The answer above has the score and summary; this panel stays only for the person's own coaching. */}
+        {!analysis.coaching_private &&
+          (sales ? (
+            <>
+              <SalesOverall analysis={analysis} recording={recording} labels={labels} onSeek={listen} />
+              {analysis.next_time && <NextTimePanel coaching={analysis.next_time} onSeek={listen} />}
+            </>
+          ) : (
+            <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={listen} />
+          ))}
+
+        {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={listen} />}
+
+        {analysis.deal_card && !sales && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={listen} />}
+
+        {analysis.case_card && <CaseCardPanel card={analysis.case_card} onSeek={listen} />}
+
+        {analysis.meeting_notes && meeting && (
+          <MeetingNotesPanel notes={analysis.meeting_notes} voiceName={meeting.voiceName} onSeek={listen} />
+        )}
+
+        {meeting && transcript && (
+          <VoicesPanel
+            key={JSON.stringify(meeting.names)}
+            transcript={transcript}
+            voices={meeting.voices}
+            names={meeting.names}
+            onSave={meeting.onSaveNames}
+          />
+        )}
+
+        {notApplicable.length > 0 && (
+          <Card as="section" aria-label="Not applicable" data-testid="not-applicable-note">
+            <p className="m-0 text-sm font-semibold text-ink">
+              Not applicable to this {labels.recording.toLowerCase()}
+            </p>
+            {notApplicable.map((d) => (
+              <p key={d.key} className="m-0 text-ink-2">
+                <span className="font-semibold">{d.name}:</span> {d.rationale} It is left out of the overall score.
+              </p>
+            ))}
+          </Card>
+        )}
+
+        {viewerRole === "admin" && hidden.length > 0 && (
+          <Card as="section" tone="warning" aria-label="Hidden dimensions" data-testid="admin-hidden-note">
+            <p className="m-0 text-sm font-semibold text-warning-ink">Visible to admins only</p>
+            <p className="m-0 text-ink-2">
+              {hidden.length === 1 ? "1 dimension is" : `${hidden.length} dimensions are`} hidden because their quotes
+              could not be verified in the transcript: {joinList(hidden.map((d) => d.name))}.{" "}
+              {hidden.length === 1 ? "It is" : "They are"} left out of the overall score.
+            </p>
+            {analysis.reasons.map((r, i) => (
+              <p key={i} className="m-0 text-caption text-muted">
+                {r.message} ({r.code})
+              </p>
+            ))}
+          </Card>
+        )}
+
+        <div ref={rubricRef} className="scroll-mt-4" />
+        <RubricAccordion
+          dimensions={dimensions}
+          openKey={openKey}
+          onToggle={(key) => {
+            setPinKey(key);
+            setChosenKey(openKey === key ? null : key);
+          }}
+          speakers={speakers}
+          onSeek={listen}
+          // The model id means nothing to most readers; administrators find it under Technical details.
+          provenance={`Scored against the ${rubricLabel} rubric`}
+          levels={levels}
+          disputeLabel={disputeLabel}
+          recordingWord={recordingWord}
+          onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
+          pointsLost={sales}
+          overall={analysis.overall}
+        />
+        {onSubmitDispute && (
+          <DisputeDialog
+            open={disputeOpen}
+            dimensions={dimensions
+              .filter((d) => !d.dispute_open)
+              .map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
+            initialKey={selected?.key}
+            onSubmit={onSubmitDispute}
+            onClose={() => setDisputeOpen(false)}
+          />
+        )}
+
+        {sales && analysis.deal_card && (
+          <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={listen} interestLabels={interestLabels} />
+        )}
+
+        {!sales && analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={listen} />}
+      </div>
+      {sales && (
+        <div className="flex min-w-0 flex-col gap-5">
+          {analysis.deal_card && <NextStepCard step={analysis.deal_card.next_step} repName={repName} onSeek={listen} />}
+          <TalkListenCard metrics={analysis.metrics} labels={labels} repName={repName} onSeek={listen} />
+        </div>
+      )}
+    </div>
+  );
+
+  const listenPanel = (
+    <div className="flex flex-col gap-5">
+      <section
+        aria-labelledby={timelineHeadingId}
+        className="flex min-w-0 flex-col rounded-panel border border-line bg-surface px-5 pb-5 pt-4.5"
+      >
+        <ReportTimeline
+          heading={
+            <h2 id={timelineHeadingId} className="m-0 text-lg font-semibold">
+              Who spoke when
+            </h2>
+          }
+          player={
+            audioNote ? (
+              <p className="m-0 rounded border border-line-subtle bg-surface-subtle px-3 py-2 text-sm text-muted">
+                {audioNote}
+              </p>
+            ) : (
+              <AudioPlayer
+                ref={playerRef}
+                label={`${labels.recording} audio`}
+                getUrl={getPlaybackUrl}
+                durationMs={recording.duration_ms}
+                onTimeUpdate={setCurrentMs}
+                onPlayingChange={setPlaying}
+                showShortcutHint={false}
+              />
+            )
+          }
+          utterances={utterances}
+          roles={roles}
+          durationMs={recording.duration_ms}
+          removedSilence={recording.removed_silence}
+          phases={analysis.phases}
+          evidence={selected?.evidence ?? []}
+          dimensionName={selected?.name}
+          currentMs={currentMs}
+          onSeek={seek}
+          recordingWord={recordingWord}
+        />
+      </section>
+      {transcriptPanel}
+    </div>
+  );
+
   return (
     <SeekModeContext.Provider value={noAudio ? "go" : "play"}>
       <PlayingFromContext.Provider value={playing && !noAudio ? lastSeek : null}>
-        <section
-          aria-labelledby={timelineHeadingId}
-          className="flex min-w-0 flex-col rounded-panel border border-line bg-surface px-5 pb-5 pt-4.5"
-        >
-          <ReportTimeline
-            heading={
-              <h2 id={timelineHeadingId} className="m-0 text-lg font-semibold">
-                Who spoke when
-              </h2>
-            }
-            player={
-              audioNote ? (
-                <p className="m-0 rounded border border-line-subtle bg-surface-subtle px-3 py-2 text-sm text-muted">
-                  {audioNote}
-                </p>
-              ) : (
-                <AudioPlayer
-                  ref={playerRef}
-                  label={`${labels.recording} audio`}
-                  getUrl={getPlaybackUrl}
-                  durationMs={recording.duration_ms}
-                  onTimeUpdate={setCurrentMs}
-                  onPlayingChange={setPlaying}
-                  showShortcutHint={false}
-                />
-              )
-            }
-            utterances={utterances}
-            roles={roles}
-            durationMs={recording.duration_ms}
-            removedSilence={recording.removed_silence}
-            phases={analysis.phases}
-            evidence={selected?.evidence ?? []}
-            dimensionName={selected?.name}
-            currentMs={currentMs}
-            onSeek={seek}
-            recordingWord={recordingWord}
-          />
-        </section>
-
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
-          <div className="flex min-w-0 flex-col gap-5">
-            {sales ? (
-              <>
-                <SalesOverall analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
-                {analysis.next_time && <NextTimePanel coaching={analysis.next_time} onSeek={seek} />}
-              </>
-            ) : (
-              <OverallPanel analysis={analysis} recording={recording} labels={labels} onSeek={seek} />
-            )}
-
-            {analysis.ticket && <TicketPanel ticket={analysis.ticket} onSeek={seek} />}
-
-            {analysis.deal_card && !sales && <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} />}
-
-            {analysis.case_card && <CaseCardPanel card={analysis.case_card} onSeek={seek} />}
-
-            {analysis.meeting_notes && meeting && (
-              <MeetingNotesPanel notes={analysis.meeting_notes} voiceName={meeting.voiceName} onSeek={seek} />
-            )}
-
-            {meeting && transcript && (
-              <VoicesPanel
-                key={JSON.stringify(meeting.names)}
-                transcript={transcript}
-                voices={meeting.voices}
-                names={meeting.names}
-                onSave={meeting.onSaveNames}
-              />
-            )}
-
-            {notApplicable.length > 0 && (
-              <Card as="section" aria-label="Not applicable" data-testid="not-applicable-note">
-                <p className="m-0 text-sm font-semibold text-ink">
-                  Not applicable to this {labels.recording.toLowerCase()}
-                </p>
-                {notApplicable.map((d) => (
-                  <p key={d.key} className="m-0 text-ink-2">
-                    <span className="font-semibold">{d.name}:</span> {d.rationale} It is left out of the overall score.
-                  </p>
-                ))}
-              </Card>
-            )}
-
-            {viewerRole === "admin" && hidden.length > 0 && (
-              <Card as="section" tone="warning" aria-label="Hidden dimensions" data-testid="admin-hidden-note">
-                <p className="m-0 text-sm font-semibold text-warning-ink">Visible to admins only</p>
-                <p className="m-0 text-ink-2">
-                  {hidden.length === 1 ? "1 dimension is" : `${hidden.length} dimensions are`} hidden because their
-                  quotes could not be verified in the transcript: {joinList(hidden.map((d) => d.name))}.{" "}
-                  {hidden.length === 1 ? "It is" : "They are"} left out of the overall score.
-                </p>
-                {analysis.reasons.map((r, i) => (
-                  <p key={i} className="m-0 text-caption text-muted">
-                    {r.message} ({r.code})
-                  </p>
-                ))}
-              </Card>
-            )}
-
-            <RubricAccordion
-              dimensions={dimensions}
-              openKey={openKey}
-              onToggle={(key) => {
-                setPinKey(key);
-                setChosenKey(openKey === key ? null : key);
-              }}
-              speakers={speakers}
-              onSeek={seek}
-              // The model id means nothing to most readers; administrators find it under Technical details.
-              provenance={`Scored against the ${rubricLabel} rubric`}
-              levels={levels}
-              disputeLabel={disputeLabel}
-              recordingWord={recordingWord}
-              onDispute={onSubmitDispute ? () => setDisputeOpen(true) : undefined}
-              pointsLost={sales}
-              overall={analysis.overall}
-            />
-            {onSubmitDispute && (
-              <DisputeDialog
-                open={disputeOpen}
-                dimensions={dimensions
-                  .filter((d) => !d.dispute_open)
-                  .map((d) => ({ key: d.key, name: d.name, score: displayedScore(d) }))}
-                initialKey={selected?.key}
-                onSubmit={onSubmitDispute}
-                onClose={() => setDisputeOpen(false)}
-              />
-            )}
-
-            {sales && analysis.deal_card && (
-              <DealCardPanel card={analysis.deal_card} labels={labels} onSeek={seek} interestLabels={interestLabels} />
-            )}
-
-            {!sales && analysis.metrics.length > 0 && <ReportMetrics metrics={analysis.metrics} onSeek={seek} />}
-          </div>
-          {sales ? (
-            <div className="flex min-w-0 flex-col gap-5">
-              {analysis.deal_card && (
-                <NextStepCard step={analysis.deal_card.next_step} repName={repName} onSeek={seek} />
-              )}
-              <TalkListenCard metrics={analysis.metrics} labels={labels} repName={repName} onSeek={seek} />
-              {transcriptPanel}
-            </div>
-          ) : (
-            transcriptPanel
-          )}
-        </div>
+        <ReportAnswer
+          analysis={analysis}
+          dimensions={dimensions}
+          labels={labels}
+          onWhy={why}
+          onSeek={listen}
+          personName={recording.person.name}
+        />
+        <Tabs
+          label="Report details"
+          value={tab}
+          onChange={setTab}
+          keepMounted
+          tabs={[
+            { value: "why", label: "Why this score", panel: whyPanel },
+            { value: "listen", label: transcript ? "Listen and read" : "Listen", panel: listenPanel },
+          ]}
+        />
       </PlayingFromContext.Provider>
     </SeekModeContext.Provider>
   );
