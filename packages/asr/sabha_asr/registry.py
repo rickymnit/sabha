@@ -36,6 +36,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "openai": "gpt-transcribe",
     "qwen": "qwen3-asr-flash",
     "groq": "whisper-large-v3",
+    "deepgram": "nova-3",
     "aws": "transcribe",
     "whisper": "large-v3-turbo",
 }
@@ -72,6 +73,15 @@ def _groq(settings: Settings, model: str) -> AsrProvider:
         raise AsrConfigError("GROQ_API_KEY is not set")
     return GroqProvider(settings.groq_api_key.get_secret_value(), model=model, language=settings.asr_language,
                         base_url=settings.groq_base_url)  # fmt: skip
+
+
+def _deepgram(settings: Settings, model: str) -> AsrProvider:
+    from sabha_asr.providers.deepgram import DeepgramProvider
+
+    if settings.deepgram_api_key is None:
+        raise AsrConfigError("DEEPGRAM_API_KEY is not set")
+    return DeepgramProvider(settings.deepgram_api_key.get_secret_value(), model=model, language=settings.asr_language,
+                            base_url=settings.deepgram_base_url)  # fmt: skip
 
 
 def _qwen(settings: Settings, model: str) -> AsrProvider:
@@ -111,6 +121,7 @@ PROVIDERS: dict[str, Callable[[Settings, str], AsrProvider]] = {
     "openai": _openai,
     "qwen": _qwen,
     "groq": _groq,
+    "deepgram": _deepgram,
     "aws": _aws,
     "whisper": _whisper,
 }
@@ -181,6 +192,7 @@ CHOICES: tuple[tuple[str, str, str], ...] = (
     ("qwen", "qwen3-asr-flash", "Qwen3 ASR Flash"),
     ("groq", "whisper-large-v3", "Whisper Large v3 (Groq)"),
     ("groq", "whisper-large-v3-turbo", "Whisper Turbo (Groq)"),
+    ("deepgram", "nova-3", "Deepgram Nova-3 (Hindi and English)"),
     ("aws", "transcribe", "Amazon (Mumbai)"),
     ("whisper", "large-v3-turbo", "Whisper (own server)"),
 )
@@ -196,6 +208,8 @@ def is_set_up(name: str, settings: Settings) -> bool:
         return settings.dashscope_api_key is not None
     if name == "groq":
         return settings.groq_api_key is not None
+    if name == "deepgram":
+        return settings.deepgram_api_key is not None
     if name == "aws":
         return bool(settings.aws_transcribe_bucket)
     if name == "whisper":

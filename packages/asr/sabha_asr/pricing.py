@@ -26,6 +26,9 @@ _AWS = ("AWS Price List API, Amazon Transcribe, Asia Pacific (Mumbai), Transcrib
 _GROQ = ("https://console.groq.com/docs/speech-to-text (whisper-large-v3 0.111 USD, whisper-large-v3-turbo 0.04 USD "
          "per audio hour; minimum 10 s billed per request, not counted here; checked 2026-11-16)")  # fmt: skip
 
+_DEEPGRAM = ("https://deepgram.com/pricing (Nova-3 pre-recorded, pay as you go: multilingual 0.0052 USD per minute, "
+             "billed per second, no minimum; checked 2026-11-16)")  # fmt: skip
+
 
 @dataclass(frozen=True, slots=True)
 class AsrPrice:
@@ -53,6 +56,7 @@ PRICES: dict[str, AsrPrice] = {
     "qwen/qwen3-asr-flash": AsrPrice(0.000035 * 60, "USD", _QWEN),
     "groq/whisper-large-v3": AsrPrice(0.111 / 60, "USD", _GROQ),
     "groq/whisper-large-v3-turbo": AsrPrice(0.04 / 60, "USD", _GROQ),
+    "deepgram/nova-3": AsrPrice(0.0052, "USD", _DEEPGRAM),  # code-switching ("multi"), the way we call it
     "aws/transcribe@ap-south-1": AsrPrice(0.0001 * 60, "USD", _AWS),  # other regions: not checked, so None
 }
 

@@ -11,7 +11,7 @@ import pytest
 
 from sabha_asr.pricing import cost_inr
 from sabha_asr.provider import AudioChunk, ProviderError
-from sabha_asr.providers import aws, groq, openai, qwen
+from sabha_asr.providers import aws, deepgram, groq, openai, qwen
 from sabha_asr.registry import (
     AsrConfigError,
     build_provider,
@@ -98,6 +98,33 @@ def test_groq_is_openai_with_groqs_address_words_and_patience() -> None:
     s = settings(asr_provider="groq", groq_api_key="k")
     assert build_transcriber(s).primary.model_id == "groq/whisper-large-v3"
     assert cost_inr("groq/whisper-large-v3-turbo", 3_600_000, 100.0) == pytest.approx(4.0)
+
+
+def test_deepgram_code_switching_words_and_languages() -> None:
+    seen: list[httpx.Request] = []
+    words = [{"word": "device", "punctuated_word": "Device", "start": 0.1, "end": 0.5, "confidence": 0.9,
+              "language": "en"},
+             {"word": "की", "start": 0.5, "end": 0.7, "confidence": 0.8, "language": "hi"},
+             {"word": "बात", "punctuated_word": "बात।", "start": 0.7, "end": 99.0, "language": "hi"}]  # fmt: skip
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if len(seen) == 1:
+            return httpx.Response(401, json={"err_code": "INVALID_AUTH", "err_msg": "bad key"})
+        return httpx.Response(200, json={"results": {"channels": [{"alternatives": [{"words": words}]}]}})
+
+    p = deepgram.DeepgramProvider("k", client=mocked(handler), sleep=no_wait)
+    with pytest.raises(ProviderError) as bad:
+        p.transcribe([CHUNK])
+    assert not bad.value.retryable and "INVALID_AUTH" in bad.value.reason
+    result = p.transcribe([CHUNK])[0]
+    query = seen[-1].url.params
+    assert seen[-1].headers["authorization"] == "Token k" and seen[-1].content == CHUNK.wav
+    assert query["language"] == "multi" and query.get_list("language_hint") == ["hi", "en"]
+    assert [(w.text, w.start_ms, w.end_ms) for w in result.words] == [("Device", 100, 500), ("की", 500, 700),
+                                                                     ("बात।", 700, 10_000)]  # fmt: skip
+    assert [(s.language, s.start_ms, s.end_ms) for s in result.languages] == [("en", 0, 500), ("hi", 500, 10_000)]
+    assert cost_inr("deepgram/nova-3", 60_000, 100.0) == pytest.approx(0.52)
 
 
 @pytest.mark.parametrize(("status", "code", "retryable"), [
