@@ -77,3 +77,18 @@ residency exception. Groq serves OpenAI's transcription API, so `providers/groq.
 Groq's address and models; both models return word times. Groq's published prices (0.111 and 0.04 USD per audio
 hour, minimum 10 s billed per request) are in `sabha_asr/pricing.py`. Its per-minute limits are low on the free
 plan, so Groq waits out a rate limit longer (8 retries) than OpenAI does.
+
+## Addendum 2026-11-16: Deepgram and Gemini, for Hindi-English code-mix
+
+The owner wants Hindi written in Devanagari and English words in Latin letters, at about Whisper's price. Whisper
+cannot do this safely: without a language it translated Hindi into English and wrote Urdu; with a mixed sample prompt
+it copied the sample into near-silent pieces. Added under the same residency exception:
+
+- `deepgram` (Nova-3, `language=multi` with hi/en hints): code-mix with word times; 0.0052 USD per minute.
+- `gemini` (`gemini-3.8-flash`, `gemini-3.5-flash-lite`): a general model told to transcribe verbatim, never
+  translate, and write each word in its own script. No word times. An answer with more than 6 words per second of
+  audio is asked again once, then fails the chunk, so invented text never reaches a transcript (golden rule 5).
+  Priced on audio input only (25 tokens per second); output tokens cost extra and are not counted.
+
+Which one to use is decided on accuracy against hand-corrected transcripts (eval/wer.py), not on the difference from
+Sarvam.

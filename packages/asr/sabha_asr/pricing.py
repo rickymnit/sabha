@@ -29,6 +29,12 @@ _GROQ = ("https://console.groq.com/docs/speech-to-text (whisper-large-v3 0.111 U
 _DEEPGRAM = ("https://deepgram.com/pricing (Nova-3 pre-recorded, pay as you go: multilingual 0.0052 USD per minute, "
              "billed per second, no minimum; checked 2026-11-16)")  # fmt: skip
 
+# Gemini bills tokens: audio is 25 tokens per second (1,500 per minute). Only the audio sent is priced here; the
+# written answer (output tokens) costs extra and is not counted, so these are lower bounds.
+_GEMINI = ("https://aistudio.google.com/docs/pricing (paid standard, checked 2026-11-16: gemini-3.8-flash input 0.75 "
+           "USD per 1M tokens until 2026-12-31, then 1.50; gemini-3.5-flash-lite audio input 0.30 USD per 1M; "
+           "25 audio tokens per second; output tokens not counted)")  # fmt: skip
+
 
 @dataclass(frozen=True, slots=True)
 class AsrPrice:
@@ -57,6 +63,8 @@ PRICES: dict[str, AsrPrice] = {
     "groq/whisper-large-v3": AsrPrice(0.111 / 60, "USD", _GROQ),
     "groq/whisper-large-v3-turbo": AsrPrice(0.04 / 60, "USD", _GROQ),
     "deepgram/nova-3": AsrPrice(0.0052, "USD", _DEEPGRAM),  # code-switching ("multi"), the way we call it
+    "gemini/gemini-3.8-flash": AsrPrice(1500 * 0.75 / 1e6, "USD", _GEMINI),  # 1.50 per 1M from 2027-01-01
+    "gemini/gemini-3.5-flash-lite": AsrPrice(1500 * 0.30 / 1e6, "USD", _GEMINI),
     "aws/transcribe@ap-south-1": AsrPrice(0.0001 * 60, "USD", _AWS),  # other regions: not checked, so None
 }
 

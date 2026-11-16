@@ -63,13 +63,14 @@ def _retry_after(response: httpx.Response) -> float | None:
 
 def error_for(provider: str, response: httpx.Response, not_retryable: frozenset[str]) -> ProviderError:
     """A failed response as a ProviderError. The code is the provider's `error.code` (or `error.type`, or a top-level
-    `code` or Deepgram's `err_code`), so "insufficient_quota" or a bad key is not retried."""
+    `code`, Deepgram's `err_code` or Google's `error.status`), so "insufficient_quota" or a bad key is not retried."""
     code = "unknown"
     try:
         body = response.json()
         error = body.get("error") if isinstance(body, dict) else None
-        if isinstance(error, dict):
-            found = error.get("code") or error.get("type")
+        if isinstance(error, dict):  # Google's `code` is the HTTP number; its `status` names the error
+            found = next((v for v in (error.get("code"), error.get("type"), error.get("status")) if isinstance(v, str)),
+                         None)  # fmt: skip
         else:
             found = (body.get("code") or body.get("err_code")) if isinstance(body, dict) else None
         if isinstance(found, str) and found:

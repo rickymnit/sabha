@@ -14,6 +14,7 @@ from sabha_asr.provider import AsrProvider, AudioChunk, ProviderError, spread_wo
 from sabha_asr.providers.aws import AwsTranscribeProvider
 from sabha_asr.providers.deepgram import DeepgramProvider
 from sabha_asr.providers.fake import FakeProvider
+from sabha_asr.providers.gemini import GeminiProvider
 from sabha_asr.providers.groq import GroqProvider
 from sabha_asr.providers.openai import OpenAIProvider
 from sabha_asr.providers.qwen import QwenProvider
@@ -86,6 +87,12 @@ def deepgram_ok() -> DeepgramProvider:
     return DeepgramProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
 
 
+def gemini_ok() -> GeminiProvider:
+    answer = {"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": '{"text": "aaj hum"}'}]}}]}
+    handler = lambda request: httpx.Response(200, json=answer)  # noqa: E731
+    return GeminiProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
 def groq_ok() -> GroqProvider:
     words = [{"word": "aaj", "start": 0.0, "end": 0.4}, {"word": "hum", "start": 0.4, "end": 0.8}]
     handler = lambda request: httpx.Response(200, json={"text": "aaj hum", "language": "Hindi", "words": words})  # noqa: E731
@@ -144,7 +151,7 @@ def whisper_ok() -> WhisperProvider:
 
 PROVIDER_FACTORIES: dict[str, Callable[[], AsrProvider]] = {
     "fake": FakeProvider, "sarvam": sarvam_ok, "openai": openai_ok, "qwen": qwen_ok, "groq": groq_ok,
-    "deepgram": deepgram_ok, "aws": aws_ok, "whisper": whisper_ok,
+    "deepgram": deepgram_ok, "gemini": gemini_ok, "aws": aws_ok, "whisper": whisper_ok,
 }  # fmt: skip
 
 

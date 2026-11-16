@@ -37,6 +37,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "qwen": "qwen3-asr-flash",
     "groq": "whisper-large-v3",
     "deepgram": "nova-3",
+    "gemini": "gemini-3.8-flash",
     "aws": "transcribe",
     "whisper": "large-v3-turbo",
 }
@@ -84,6 +85,15 @@ def _deepgram(settings: Settings, model: str) -> AsrProvider:
                             base_url=settings.deepgram_base_url)  # fmt: skip
 
 
+def _gemini(settings: Settings, model: str) -> AsrProvider:
+    from sabha_asr.providers.gemini import GeminiProvider
+
+    if settings.gemini_api_key is None:
+        raise AsrConfigError("GEMINI_API_KEY is not set")
+    return GeminiProvider(settings.gemini_api_key.get_secret_value(), model=model, language=settings.asr_language,
+                          base_url=settings.gemini_base_url)  # fmt: skip
+
+
 def _qwen(settings: Settings, model: str) -> AsrProvider:
     from sabha_asr.providers.qwen import QwenProvider
 
@@ -122,6 +132,7 @@ PROVIDERS: dict[str, Callable[[Settings, str], AsrProvider]] = {
     "qwen": _qwen,
     "groq": _groq,
     "deepgram": _deepgram,
+    "gemini": _gemini,
     "aws": _aws,
     "whisper": _whisper,
 }
@@ -193,6 +204,8 @@ CHOICES: tuple[tuple[str, str, str], ...] = (
     ("groq", "whisper-large-v3", "Whisper Large v3 (Groq)"),
     ("groq", "whisper-large-v3-turbo", "Whisper Turbo (Groq)"),
     ("deepgram", "nova-3", "Deepgram Nova-3 (Hindi and English)"),
+    ("gemini", "gemini-3.8-flash", "Gemini Flash"),
+    ("gemini", "gemini-3.5-flash-lite", "Gemini Flash-Lite"),
     ("aws", "transcribe", "Amazon (Mumbai)"),
     ("whisper", "large-v3-turbo", "Whisper (own server)"),
 )
@@ -210,6 +223,8 @@ def is_set_up(name: str, settings: Settings) -> bool:
         return settings.groq_api_key is not None
     if name == "deepgram":
         return settings.deepgram_api_key is not None
+    if name == "gemini":
+        return settings.gemini_api_key is not None
     if name == "aws":
         return bool(settings.aws_transcribe_bucket)
     if name == "whisper":

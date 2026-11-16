@@ -11,7 +11,7 @@ import pytest
 
 from sabha_asr.pricing import cost_inr
 from sabha_asr.provider import AudioChunk, ProviderError
-from sabha_asr.providers import aws, deepgram, groq, openai, qwen
+from sabha_asr.providers import aws, deepgram, gemini, groq, openai, qwen
 from sabha_asr.registry import (
     AsrConfigError,
     build_provider,
@@ -125,6 +125,46 @@ def test_deepgram_code_switching_words_and_languages() -> None:
                                                                      ("बात।", 700, 10_000)]  # fmt: skip
     assert [(s.language, s.start_ms, s.end_ms) for s in result.languages] == [("en", 0, 500), ("hi", 500, 10_000)]
     assert cost_inr("deepgram/nova-3", 60_000, 100.0) == pytest.approx(0.52)
+
+
+def gemini_answer(text: str, reason: str = "STOP") -> dict[str, Any]:
+    return {"candidates": [{"finishReason": reason, "content": {"parts": [{"text": json.dumps({"text": text})}]}}]}
+
+
+def test_gemini_request_answer_and_guard_against_invented_words() -> None:
+    seen: list[httpx.Request] = []
+    answers = [gemini_answer("एक device की   बात"), gemini_answer("word " * 61), gemini_answer("ठीक है")]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=answers[len(seen) - 1])
+
+    p = gemini.GeminiProvider("k", client=mocked(handler), sleep=no_wait)
+    first = p.transcribe([CHUNK])[0]
+    sent = json.loads(seen[0].content)
+    assert seen[0].url == ("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent")
+    assert seen[0].headers["x-goog-api-key"] == "k" and sent["generationConfig"]["temperature"] == 0
+    assert "Never translate" in sent["contents"][0]["parts"][1]["text"]
+    assert [w.text for w in first.words] == ["एक", "device", "की", "बात"] and p.word_timing == "approximate"
+    # 61 words in 10 s cannot have been spoken: asked again, and the second answer is used
+    assert [w.text for w in p.transcribe([CHUNK])[0].words] == ["ठीक", "है"] and len(seen) == 3
+
+
+def test_gemini_refuses_invented_or_blocked_answers() -> None:
+    too_long = gemini.GeminiProvider("k", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("a " * 61))),
+                                     sleep=no_wait)  # fmt: skip
+    with pytest.raises(ProviderError, match="more words than the audio"):
+        too_long.transcribe([CHUNK])
+    cut = gemini.GeminiProvider("k", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("x", "SAFETY"))),
+                                sleep=no_wait)  # fmt: skip
+    with pytest.raises(ProviderError, match="SAFETY"):
+        cut.transcribe([CHUNK])
+    bad_key = {"error": {"code": 403, "message": "no", "status": "PERMISSION_DENIED"}}
+    denied = gemini.GeminiProvider("k", client=mocked(lambda r: httpx.Response(403, json=bad_key)), sleep=no_wait)
+    with pytest.raises(ProviderError, match="PERMISSION_DENIED") as err:
+        denied.transcribe([CHUNK])
+    assert not err.value.retryable
+    assert cost_inr("gemini/gemini-3.8-flash", 3_600_000, 100.0) == pytest.approx(6.75)
 
 
 @pytest.mark.parametrize(("status", "code", "retryable"), [
