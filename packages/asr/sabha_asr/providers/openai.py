@@ -52,11 +52,18 @@ log = logging.getLogger("sabha.asr.openai")
 
 
 class OpenAIProvider:
+    # Subclasses for other services with OpenAI's transcription API (providers/groq.py) change these.
+    NAME = NAME
+    DEFAULT_MODEL = DEFAULT_MODEL
+    DEFAULT_BASE_URL = DEFAULT_BASE_URL
+    WORD_TIMESTAMP_MODELS = WORD_TIMESTAMP_MODELS
+    RATE_LIMIT_RETRIES = _http.RATE_LIMIT_RETRIES
+
     def __init__(
         self,
         api_key: str,
         *,
-        model: str = DEFAULT_MODEL,
+        model: str | None = None,
         language: str = "unknown",
         base_url: str | None = None,
         timeout_s: float = DEFAULT_TIMEOUT_S,
@@ -64,25 +71,25 @@ class OpenAIProvider:
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if not api_key:
-            raise ValueError("an OpenAI API key is required")
+            raise ValueError(f"an API key is required for {self.NAME}")
         self._api_key = api_key
-        self._model = model
+        self._model = model or self.DEFAULT_MODEL
         self._language = language
-        self._url = f"{(base_url or DEFAULT_BASE_URL).rstrip('/')}/audio/transcriptions"
+        self._url = f"{(base_url or self.DEFAULT_BASE_URL).rstrip('/')}/audio/transcriptions"
         self._client = client or httpx.Client(timeout=timeout_s, follow_redirects=False)
         self._sleep = sleep
 
     @property
     def name(self) -> str:
-        return NAME
+        return self.NAME
 
     @property
     def model_id(self) -> str:
-        return f"{NAME}/{self._model}"
+        return f"{self.NAME}/{self._model}"
 
     @property
     def word_timing(self) -> WordTiming:
-        return "word" if self._model in WORD_TIMESTAMP_MODELS else "approximate"
+        return "word" if self._model in self.WORD_TIMESTAMP_MODELS else "approximate"
 
     @property
     def max_chunk_ms(self) -> int:
@@ -101,7 +108,7 @@ class OpenAIProvider:
             form["languages[]"] = [hint] if hint and hint != "unknown" else list(EXPECTED_LANGUAGES)
         else:
             form["language"] = hint if hint and hint != "unknown" else DEFAULT_HINT
-        if self._model in WORD_TIMESTAMP_MODELS:
+        if self._model in self.WORD_TIMESTAMP_MODELS:
             form |= {"response_format": "verbose_json", "timestamp_granularities[]": ["word"]}
         return form
 
@@ -118,17 +125,17 @@ class OpenAIProvider:
                 files={"file": (f"{chunk.chunk_id}.wav", chunk.wav, "audio/wav")},
             )
 
-        response = _http.send(NAME, request, not_retryable=_NOT_RETRYABLE, sleep=self._sleep, log=log,
-                              chunk_id=chunk.chunk_id)  # fmt: skip
+        response = _http.send(self.NAME, request, not_retryable=_NOT_RETRYABLE, sleep=self._sleep, log=log,
+                              chunk_id=chunk.chunk_id, retries=self.RATE_LIMIT_RETRIES)  # fmt: skip
         if response.status_code != 200:
-            raise _http.error_for(NAME, response, _NOT_RETRYABLE)
-        return parse(chunk, _http.json_body(NAME, response))
+            raise _http.error_for(self.NAME, response, _NOT_RETRYABLE)
+        return parse(chunk, _http.json_body(self.NAME, response), name=self.NAME)
 
 
-def parse(chunk: AudioChunk, body: Any) -> ChunkResult:
+def parse(chunk: AudioChunk, body: Any, *, name: str = NAME) -> ChunkResult:
     if not isinstance(body, dict) or not isinstance(body.get("text"), str):
-        raise ProviderError(NAME, "response has no text", retryable=False)
-    words = _timed_words(chunk, body["words"]) if body.get("words") else []
+        raise ProviderError(name, "response has no text", retryable=False)
+    words = _timed_words(chunk, body["words"], name) if body.get("words") else []
     if not words:
         words = spread_words(body["text"], 0, chunk.duration_ms)
     return ChunkResult(
@@ -149,17 +156,17 @@ def _language(body: dict[str, Any]) -> str | None:
     return language if isinstance(language, str) and language else None
 
 
-def _timed_words(chunk: AudioChunk, raw: Any) -> list[Word]:
+def _timed_words(chunk: AudioChunk, raw: Any, name: str = NAME) -> list[Word]:
     """whisper-1's {word, start, end} (seconds), clamped to the chunk."""
     if not isinstance(raw, list):
-        raise ProviderError(NAME, "words is not a list", retryable=False)
+        raise ProviderError(name, "words is not a list", retryable=False)
     words = []
     for item in raw:
         if not isinstance(item, dict) or not isinstance(item.get("word"), str):
-            raise ProviderError(NAME, "a word has no text", retryable=False)
+            raise ProviderError(name, "a word has no text", retryable=False)
         start_s, end_s = item.get("start"), item.get("end")
         if not (_is_number(start_s) and _is_number(end_s)):
-            raise ProviderError(NAME, "a word has no times", retryable=False)
+            raise ProviderError(name, "a word has no times", retryable=False)
         text = item["word"].strip()
         if not text:
             continue

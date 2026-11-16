@@ -2,9 +2,9 @@
 response into a ProviderError.
 
 Retryable: network errors, timeouts, and HTTP 429/500/502/503/504, except an error code that says waiting will not
-help (no credit, bad key). A 429 is sent again after a wait, up to RATE_LIMIT_RETRIES times: the provider's
-Retry-After when given (at most MAX_WAIT_S), else 2, 4, 8, 16 s. Each wait is logged. Reasons name the status and the
-provider's error code only: never the key, audio or transcript text.
+help (no credit, bad key). A 429 is sent again after a wait, up to RATE_LIMIT_RETRIES times (a provider may ask
+for more): the provider's Retry-After when given (at most MAX_WAIT_S), else 2, 4, 8, 16 s, then MAX_WAIT_S. Each
+wait is logged. Reasons name the status and the provider's error code only: never the key, audio or transcript text.
 """
 
 from __future__ import annotations
@@ -29,13 +29,14 @@ def send(
     sleep: Callable[[float], None],
     log: logging.Logger,
     chunk_id: str,
+    retries: int = RATE_LIMIT_RETRIES,
 ) -> httpx.Response:
     """The first response that is not a retryable 429, or the last one; raises ProviderError on network errors."""
     response = _call(provider, request)
-    for retry in range(1, RATE_LIMIT_RETRIES + 1):
+    for retry in range(1, retries + 1):
         if response.status_code != 429 or not error_for(provider, response, not_retryable).retryable:
             break
-        wait = _retry_after(response) or float(2**retry)
+        wait = _retry_after(response) or min(float(2**retry), MAX_WAIT_S)
         log.warning("rate limit; waiting before sending the chunk again",
                     extra={"provider": provider, "chunk_id": chunk_id, "wait_s": wait, "retry": retry})  # fmt: skip
         sleep(wait)

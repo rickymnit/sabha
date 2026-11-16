@@ -23,6 +23,9 @@ _QWEN = ("https://www.alibabacloud.com/help/en/model-studio/qwen3-asr-flash (int
 _AWS = ("AWS Price List API, Amazon Transcribe, Asia Pacific (Mumbai), TranscribeAudio: 0.0001 USD per second "
         "(publication 2026-09-11, checked 2026-11-13)")  # fmt: skip
 
+_GROQ = ("https://console.groq.com/docs/speech-to-text (whisper-large-v3 0.111 USD, whisper-large-v3-turbo 0.04 USD "
+         "per audio hour; minimum 10 s billed per request, not counted here; checked 2026-11-16)")  # fmt: skip
+
 
 @dataclass(frozen=True, slots=True)
 class AsrPrice:
@@ -48,6 +51,8 @@ PRICES: dict[str, AsrPrice] = {
     "openai/gpt-4o-transcribe": AsrPrice(0.006, "USD", _OPENAI),
     "openai/whisper-1": AsrPrice(0.006, "USD", _OPENAI),
     "qwen/qwen3-asr-flash": AsrPrice(0.000035 * 60, "USD", _QWEN),
+    "groq/whisper-large-v3": AsrPrice(0.111 / 60, "USD", _GROQ),
+    "groq/whisper-large-v3-turbo": AsrPrice(0.04 / 60, "USD", _GROQ),
     "aws/transcribe@ap-south-1": AsrPrice(0.0001 * 60, "USD", _AWS),  # other regions: not checked, so None
 }
 

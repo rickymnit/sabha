@@ -35,6 +35,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "sarvam": "saaras:v4",
     "openai": "gpt-transcribe",
     "qwen": "qwen3-asr-flash",
+    "groq": "whisper-large-v3",
     "aws": "transcribe",
     "whisper": "large-v3-turbo",
 }
@@ -62,6 +63,15 @@ def _openai(settings: Settings, model: str) -> AsrProvider:
         raise AsrConfigError("OPENAI_API_KEY is not set")
     return OpenAIProvider(settings.openai_api_key.get_secret_value(), model=model, language=settings.asr_language,
                           base_url=settings.openai_base_url)  # fmt: skip
+
+
+def _groq(settings: Settings, model: str) -> AsrProvider:
+    from sabha_asr.providers.groq import GroqProvider
+
+    if settings.groq_api_key is None:
+        raise AsrConfigError("GROQ_API_KEY is not set")
+    return GroqProvider(settings.groq_api_key.get_secret_value(), model=model, language=settings.asr_language,
+                        base_url=settings.groq_base_url)  # fmt: skip
 
 
 def _qwen(settings: Settings, model: str) -> AsrProvider:
@@ -100,6 +110,7 @@ PROVIDERS: dict[str, Callable[[Settings, str], AsrProvider]] = {
     "sarvam": _sarvam,
     "openai": _openai,
     "qwen": _qwen,
+    "groq": _groq,
     "aws": _aws,
     "whisper": _whisper,
 }
@@ -168,6 +179,8 @@ CHOICES: tuple[tuple[str, str, str], ...] = (
     ("sarvam", "saaras:v4", "Sarvam Saaras v4"),
     ("openai", "gpt-transcribe", "OpenAI Transcribe"),
     ("qwen", "qwen3-asr-flash", "Qwen3 ASR Flash"),
+    ("groq", "whisper-large-v3", "Whisper Large v3 (Groq)"),
+    ("groq", "whisper-large-v3-turbo", "Whisper Turbo (Groq)"),
     ("aws", "transcribe", "Amazon (Mumbai)"),
     ("whisper", "large-v3-turbo", "Whisper (own server)"),
 )
@@ -181,6 +194,8 @@ def is_set_up(name: str, settings: Settings) -> bool:
         return settings.openai_api_key is not None
     if name == "qwen":
         return settings.dashscope_api_key is not None
+    if name == "groq":
+        return settings.groq_api_key is not None
     if name == "aws":
         return bool(settings.aws_transcribe_bucket)
     if name == "whisper":

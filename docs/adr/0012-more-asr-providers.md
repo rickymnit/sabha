@@ -69,3 +69,11 @@ Prices, from each provider's own published figures (checked 2026-11-13, kept in 
   not published.
 - Golden rule 12 in CLAUDE.md still says "data stays in India"; this ADR is the owner's recorded exception for speech
   recognition.
+
+## Addendum 2026-11-16: Groq
+
+The owner added Groq (Whisper Large v3 and Whisper Large v3 Turbo, hosted by Groq in the US) under the same
+residency exception. Groq serves OpenAI's transcription API, so `providers/groq.py` is the OpenAI provider with
+Groq's address and models; both models return word times. Groq's published prices (0.111 and 0.04 USD per audio
+hour, minimum 10 s billed per request) are in `sabha_asr/pricing.py`. Its per-minute limits are low on the free
+plan, so Groq waits out a rate limit longer (8 retries) than OpenAI does.

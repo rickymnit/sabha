@@ -106,6 +106,8 @@ class Settings(BaseSettings):
     # Other speech-to-text providers (docs/adr/0012-more-asr-providers.md). OpenAI uses OPENAI_API_KEY below.
     dashscope_api_key: SecretStr | None = None  # Alibaba Cloud Model Studio, for Qwen-ASR
     dashscope_base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    groq_api_key: SecretStr | None = None  # Groq, for Whisper Large v3
+    groq_base_url: str = "https://api.groq.com/openai/v1"
     aws_transcribe_region: str = INDIA_REGION
     aws_transcribe_bucket: str | None = None  # chunks are uploaded here for Amazon Transcribe batch jobs
     aws_transcribe_access_key_id: SecretStr | None = None  # unset: boto3's own credential chain
@@ -251,6 +253,7 @@ class Settings(BaseSettings):
         "otel_exporter_otlp_endpoint",
         "sarvam_base_url",
         "dashscope_base_url",
+        "groq_base_url",
         "web_base_url",
     )
     @classmethod

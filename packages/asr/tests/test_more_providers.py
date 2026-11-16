@@ -11,7 +11,7 @@ import pytest
 
 from sabha_asr.pricing import cost_inr
 from sabha_asr.provider import AudioChunk, ProviderError
-from sabha_asr.providers import aws, openai, qwen
+from sabha_asr.providers import aws, groq, openai, qwen
 from sabha_asr.registry import (
     AsrConfigError,
     build_provider,
@@ -74,6 +74,30 @@ def test_openai_whisper1_asks_for_word_times() -> None:
     assert p.word_timing == "word"
     assert "verbose_json" in seen[0] and "timestamp_granularities[]" in seen[0]
     assert [(w.text, w.start_ms, w.end_ms) for w in result.words] == [("haan", 200, 500), ("ji", 500, 10_000)]
+
+
+def test_groq_is_openai_with_groqs_address_words_and_patience() -> None:
+    seen: list[httpx.Request] = []
+    limited = 3
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if len(seen) <= limited:  # Groq's per-minute limit: outlasts OpenAI's four waits
+            return httpx.Response(429, json={"error": {"code": "rate_limit_exceeded"}})
+        return httpx.Response(200, json={"text": "haan ji", "language": "Hindi",
+                                         "words": [{"word": "haan", "start": 0.2, "end": 0.5}]})  # fmt: skip
+
+    p = groq.GroqProvider("k", client=mocked(handler), sleep=no_wait)
+    limited = 6
+    result = p.transcribe([CHUNK])[0]
+    body = seen[-1].read().decode("latin-1")
+    assert seen[-1].url == "https://api.groq.com/openai/v1/audio/transcriptions"
+    assert p.model_id == "groq/whisper-large-v3" and p.word_timing == "word"
+    assert 'name="language"\r\n\r\nhi\r\n' in body and "verbose_json" in body
+    assert [(w.text, w.start_ms) for w in result.words] == [("haan", 200)]
+    s = settings(asr_provider="groq", groq_api_key="k")
+    assert build_transcriber(s).primary.model_id == "groq/whisper-large-v3"
+    assert cost_inr("groq/whisper-large-v3-turbo", 3_600_000, 100.0) == pytest.approx(4.0)
 
 
 @pytest.mark.parametrize(("status", "code", "retryable"), [

@@ -13,6 +13,7 @@ import pytest
 from sabha_asr.provider import AsrProvider, AudioChunk, ProviderError, spread_words
 from sabha_asr.providers.aws import AwsTranscribeProvider
 from sabha_asr.providers.fake import FakeProvider
+from sabha_asr.providers.groq import GroqProvider
 from sabha_asr.providers.openai import OpenAIProvider
 from sabha_asr.providers.qwen import QwenProvider
 from sabha_asr.providers.sarvam import SarvamProvider
@@ -77,6 +78,12 @@ def openai_ok() -> OpenAIProvider:
     return OpenAIProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
 
 
+def groq_ok() -> GroqProvider:
+    words = [{"word": "aaj", "start": 0.0, "end": 0.4}, {"word": "hum", "start": 0.4, "end": 0.8}]
+    handler = lambda request: httpx.Response(200, json={"text": "aaj hum", "language": "Hindi", "words": words})  # noqa: E731
+    return GroqProvider("test-key", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
 def qwen_ok() -> QwenProvider:
     answer = {"choices": [{"message": {"content": "aaj hum", "annotations": [{"language": "hi"}]}}]}
     handler = lambda request: httpx.Response(200, json=answer)  # noqa: E731
@@ -128,7 +135,7 @@ def whisper_ok() -> WhisperProvider:
 
 
 PROVIDER_FACTORIES: dict[str, Callable[[], AsrProvider]] = {
-    "fake": FakeProvider, "sarvam": sarvam_ok, "openai": openai_ok, "qwen": qwen_ok, "aws": aws_ok,
+    "fake": FakeProvider, "sarvam": sarvam_ok, "openai": openai_ok, "qwen": qwen_ok, "groq": groq_ok, "aws": aws_ok,
     "whisper": whisper_ok,
 }  # fmt: skip
 
