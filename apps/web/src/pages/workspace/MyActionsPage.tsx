@@ -10,7 +10,7 @@ import { ActionRow } from "../../features/workspace/ActionRow";
 
 const GROUPS = [
   { key: "high", title: "Do first", note: "Interested clients, due in the next two days or overdue" },
-  { key: "medium", title: "This week", note: "Due in the next seven days" },
+  { key: "medium", title: "This week", note: "Due in the next seven days, or overdue" },
   { key: "low", title: "Later", note: "Due later, or no date agreed" },
 ] as const;
 
