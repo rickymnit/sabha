@@ -2,8 +2,9 @@
 // ten to a page. Tabs (all, needs your decision, each type, scored below 3) and filters (type, unit, person, when
 // recorded, score band) are narrowed by the API and kept in the address, so the sidebar's type links and a shared
 // link open the same list. Rows show who spoke when, the score and the status; a failed one that can still be
-// retried has Retry and Close. Owners and admins tick rows to re-analyse them together (coaching is private to the
-// person analysed, so there is no sharing step). "Export list" downloads the same filtered list as CSV.
+// retried has Retry and Close. Owners and admins also see which speech-to-text model transcribed each row, and tick
+// rows to re-analyse them together (coaching is private to the person analysed, so there is no sharing step).
+// "Export list" downloads the same filtered list as CSV.
 
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
@@ -375,6 +376,22 @@ export function RecordingsPage() {
         );
       },
     },
+    // Owners and admins choose the speech-to-text model at upload, so they see which one transcribed each row.
+    ...(isAdmin
+      ? [
+          {
+            key: "speech_model",
+            hideOnPhone: true,
+            header: "Transcribed by",
+            render: (r: RecordingItem) =>
+              r.speech_model ? (
+                <span className="text-small text-ink">{r.speech_model}</span>
+              ) : (
+                <span className="text-small text-muted-2">—</span>
+              ),
+          },
+        ]
+      : []),
     {
       key: "recorded",
       hideOnPhone: true,

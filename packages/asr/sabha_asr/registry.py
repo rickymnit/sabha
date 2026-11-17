@@ -253,3 +253,24 @@ def chosen_spec(spec: str, settings: Settings) -> str:
                 raise AsrConfigError(f"{choice.name} is not set up on this server")
             return full
     raise AsrConfigError(f"{spec!r} is not one of the speech-to-text models offered")
+
+
+_PROVIDER_NAMES = {
+    "sarvam": "Sarvam", "openai": "OpenAI", "qwen": "Qwen", "groq": "Groq", "deepgram": "Deepgram",
+    "gemini": "Gemini", "aws": "Amazon", "whisper": "Whisper", "fake": "Test model",
+}  # fmt: skip
+
+
+def model_name(model_id: str) -> str:
+    """A person-readable name for the model that made a transcript: "sarvam/saaras:v4" (as a transcript records it)
+    or "sarvam:saaras:v4" (an upload choice) gives "Sarvam Saaras v4"; a model no longer offered gets its provider's
+    name and its model id; an uploaded transcript file says so."""
+    if model_id.startswith("import:"):
+        return "Transcript file"
+    sep = "/" if "/" in model_id else ":"
+    provider, _, model = model_id.partition(sep)
+    for p, m, name in CHOICES:
+        if p == provider and m == model:
+            return name
+    known = _PROVIDER_NAMES.get(provider)
+    return f"{known} {model}" if known and model else model_id

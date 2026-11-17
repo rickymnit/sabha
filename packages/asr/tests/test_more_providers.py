@@ -280,3 +280,13 @@ def test_upload_choices_and_what_a_chosen_model_builds() -> None:
     assert chosen.primary.model_id == "openai/gpt-transcribe"
     assert chosen.fallbacks == ()  # the configured fallback is the chosen provider itself: never twice
     assert [f.name for f in build_transcriber(s).fallbacks] == ["openai"]
+
+
+def test_model_name_reads_transcript_ids_upload_choices_retired_models_and_files() -> None:
+    from sabha_asr.registry import model_name
+
+    assert model_name("sarvam/saaras:v4") == "Sarvam Saaras v4"
+    assert model_name("deepgram:nova-3") == "Deepgram Nova-3 (Hindi and English)"
+    assert model_name("openai/gpt-4o-mini-transcribe") == "OpenAI gpt-4o-mini-transcribe"
+    assert model_name("import:google-meet") == "Transcript file"
+    assert model_name("mystery") == "mystery"

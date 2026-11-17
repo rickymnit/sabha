@@ -266,9 +266,11 @@ def test_the_list_shows_who_spoke_when_but_never_a_guess_awaiting_review(api: Ap
             asr_model="sarvam/saaras:v4", word_timing="approximate", word_count=10, utterance_count=2,
             roles_need_review=guess, speaker_strip=strip, rubric_id="teaching.school.v0.1",
         ))  # fmt: skip
-    strips = {i["id"]: i["speaker_strip"] for i in api.get("owner", "/v1/recordings").json()["items"]}
-    assert strips["r-sure"] == [s.model_dump() for s in strip]
-    assert strips["r-guess"] is None
+    items = {i["id"]: i for i in api.get("owner", "/v1/recordings").json()["items"]}
+    assert items["r-sure"]["speaker_strip"] == [s.model_dump() for s in strip]
+    assert items["r-guess"]["speaker_strip"] is None
+    # The model that transcribed it, in words, even while the roles await a reviewer.
+    assert items["r-sure"]["speech_model"] == items["r-guess"]["speech_model"] == "Sarvam Saaras v4"
 
 
 def test_search_finds_names_only_among_what_the_caller_may_see(api: Api) -> None:

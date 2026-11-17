@@ -32,6 +32,7 @@ from pydantic import BaseModel
 
 from sabha_api.auth import Principal, Role
 from sabha_api.errors import BadRequestError, NotFoundError
+from sabha_asr.registry import model_name
 from sabha_core.models import Analysis, DeadLetter, Person, ProductInfo, Recording, Score, SpeakerSpan, Transcript, Unit
 from sabha_core.profiles import ConversationType
 from sabha_core.reasons import explain
@@ -282,6 +283,9 @@ class RecordingOut(BaseModel):
     client_name: str | None = None  # sales: the client as typed at upload
     client_said: str | None = None  # sales: the client's name as said in the conversation (latest analysis)
     interest_level: str | None = None  # sales: the AI-suggested interest (latest analysis), a rubric value
+    # The speech-to-text model that made the newest transcript, in words ("Sarvam Saaras v4"); None: no transcript
+    # yet, or the list did not ask for transcripts.
+    speech_model: str | None = None
 
 
 class RecordingPage(BaseModel):
@@ -356,15 +360,20 @@ async def _latest_analyses(analyses: TenantRepo[Analysis], recording_ids: list[s
     return latest
 
 
-async def _strips(transcripts: TenantRepo[Transcript], recording_ids: list[str]) -> dict[str, list[SpeakerSpan]]:
+async def _from_transcripts(
+    transcripts: TenantRepo[Transcript], recording_ids: list[str]
+) -> tuple[dict[str, list[SpeakerSpan]], dict[str, str]]:
+    """Per recording, from its newest transcript: the "who spoke when" strip and the speech-to-text model's name."""
     found = await transcripts.find({"recording_id": {"$in": recording_ids}}, sort=[("created_at", 1)])
     strips: dict[str, list[SpeakerSpan]] = {}
+    models: dict[str, str] = {}
     for doc in found:  # ascending, so the newest transcript wins
+        models[doc.recording_id] = model_name(doc.asr_model)
         if doc.roles_need_review:
             strips.pop(doc.recording_id, None)
         else:
             strips[doc.recording_id] = doc.speaker_strip
-    return strips
+    return strips, models
 
 
 async def recording_out(
@@ -379,7 +388,10 @@ async def recording_out(
     person_ids = sorted({r.person_id for r in recordings if r.person_id})
     names = {p.id: p.name for p in await people.find({"_id": {"$in": person_ids}})} if person_ids else {}
     latest = await _latest_analyses(analyses, [r.id for r in recordings]) if recordings else {}
-    strips = await _strips(transcripts, [r.id for r in recordings]) if transcripts and recordings else {}
+    strips: dict[str, list[SpeakerSpan]] = {}
+    models: dict[str, str] = {}
+    if transcripts and recordings:
+        strips, models = await _from_transcripts(transcripts, [r.id for r in recordings])
     return [
         RecordingOut(
             id=r.id, title=recording_title(r.file_name, r.id), type=r.type.value, status=r.status.value,
@@ -392,7 +404,7 @@ async def recording_out(
             speaker_strip=strips.get(r.id), recorded_at=r.recorded_at, shared_at=r.shared_at,
             retryable=r.id in open_letters, interaction=interaction_of(r), client_name=r.client_name,
             client_said=latest[r.id].client_said if r.id in latest else None,
-            interest_level=latest[r.id].interest_level if r.id in latest else None,
+            interest_level=latest[r.id].interest_level if r.id in latest else None, speech_model=models.get(r.id),
         )
         for r in recordings
     ]  # fmt: skip

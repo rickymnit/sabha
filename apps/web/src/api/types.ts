@@ -67,6 +67,8 @@ export interface RecordingItem {
   shared_at?: string | null;
   /** Failed and not yet closed: owners and admins may retry or close it. */
   retryable?: boolean;
+  /** The speech-to-text model that made the transcript, in words ("Sarvam Saaras v4"); null before transcription. */
+  speech_model?: string | null;
   /** Sales: a phone call or a meeting (older ones count as meetings); other types null. */
   interaction?: "call" | "meeting" | null;
   /** Sales: the client as typed at upload. */
