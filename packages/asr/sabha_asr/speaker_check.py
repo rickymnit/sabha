@@ -10,8 +10,8 @@ turns keep the times; the check only moves whole lines between speakers.
    speaker's words, ended at a sentence end (। ? . !) or a change of speaker.
 2. The caller sends Gemini windows of the ORIGINAL audio (WINDOW_MS) with the numbered lines heard in each, their
    text masked for PII first (golden rule 8). `GeminiSpeakerAsker` asks which lines the staff member said and which
-   it cannot tell (the rest are the customer's), with low thinking: on 3 calls (2026-11-18) that cost about Rs 9 to 11
-   per audio hour and no thinking tokens, where a long answer with default thinking cost about twice as much.
+   it cannot tell (the rest are the customer's), with no thinking. Model: Gemini 2.5 Flash-Lite (owner 2026-11-18:
+   3.8 Flash, about Rs 10.8 per audio hour for this check, is out of budget).
 3. `relabel`: a line of at least MIN_WORDS words that Gemini gives to the other side moves there: to the staff
    speaker (on a transferred call, the agent of that side of the handover) or to the customer-side voice heard
    nearest in time. Shorter lines ("ठीक", "ओके") and lines Gemini cannot tell stay as pyannote had them: on the
@@ -40,7 +40,7 @@ from sabha_asr.providers.gemini import DEFAULT_BASE_URL, usage_of
 from sabha_asr.words import Word
 
 NAME = "gemini-speakers"
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-2.5-flash-lite"
 MODEL_ID = f"gemini/{MODEL}"
 WINDOW_MS = 180_000
 """Audio per question: three minutes of the original recording (and the lines that start in it)."""
@@ -193,7 +193,7 @@ class GeminiSpeakerAsker:
                 {"text": self.prompt(window_start_s, numbered, staff_word)},
             ]}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json", "responseSchema": schema,
-                                 "thinkingConfig": {"thinkingLevel": "low"}},
+                                 "thinkingConfig": {"thinkingBudget": 0}},
         }  # fmt: skip
 
         def request() -> httpx.Response:

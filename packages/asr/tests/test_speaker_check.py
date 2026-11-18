@@ -96,7 +96,7 @@ def test_gemini_is_asked_with_little_thinking_and_answers_with_line_numbers() ->
     verdicts, usage = asker(b"RIFF", 0.0, [(1, 0.0, "हेलो।"), (2, 1.0, "मेरा नाम रोशन है।"), (3, 2.0, "ठीक")],
                             "sales rep")  # fmt: skip
     sent: dict[str, Any] = json.loads(seen[0].content)
-    assert sent["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
+    assert sent["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
     assert sent["generationConfig"]["temperature"] == 0
     assert "2. [1s] मेरा नाम रोशन है।" in sent["contents"][0]["parts"][1]["text"]
     assert verdicts == {1: "customer", 2: "staff", 3: "unsure"}

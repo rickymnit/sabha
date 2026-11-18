@@ -149,10 +149,15 @@ def test_gemini_request_answer_and_guard_against_invented_words() -> None:
     p = gemini.GeminiProvider("k", client=mocked(handler), sleep=no_wait)
     first = p.transcribe([CHUNK])[0]
     sent = json.loads(seen[0].content)
-    assert seen[0].url == ("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent")
+    assert seen[0].url == (
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+    )
     assert seen[0].headers["x-goog-api-key"] == "k" and sent["generationConfig"]["temperature"] == 0
     assert "Never translate" in sent["contents"][0]["parts"][1]["text"]
     assert [w.text for w in first.words] == ["एक", "device", "की", "बात"] and p.word_timing == "approximate"
+    assert sent["generationConfig"]["thinkingConfig"] == {
+        "thinkingBudget": 0
+    }  # 2.5 Flash-Lite, the default: no thinking
     # 61 words in 10 s cannot have been spoken: asked again, and the second answer is used
     assert [w.text for w in p.transcribe([CHUNK])[0].words] == ["ठीक", "है"] and len(seen) == 3
 
@@ -207,7 +212,9 @@ def test_gemini_2_5_flash_thinks_nothing_and_must_answer_itself() -> None:
     with pytest.raises(ProviderError, match=r"answered by gemini-3\.5-flash-lite"):
         p.transcribe([CHUNK])
     # Other Gemini models keep their own thinking settings.
-    three = gemini.GeminiProvider("k", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("x"))))
+    three = gemini.GeminiProvider(
+        "k", model="gemini-3.8-flash", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("x")))
+    )
     assert "thinkingConfig" not in three.body(CHUNK)["generationConfig"]
     assert token_cost_inr("gemini/gemini-2.5-flash", TokenUsage(1_000_000, 1_000_000), 100.0) == pytest.approx(350.0)
 

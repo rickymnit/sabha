@@ -37,7 +37,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "qwen": "qwen3-asr-flash",
     "groq": "whisper-large-v3",
     "deepgram": "nova-3",
-    "gemini": "gemini-3.8-flash",
+    "gemini": "gemini-2.5-flash-lite",  # owner 2026-11-18: 3.8 Flash is out of budget
     "aws": "transcribe",
     "whisper": "large-v3-turbo",
 }
@@ -204,7 +204,8 @@ CHOICES: tuple[tuple[str, str, str], ...] = (
     ("groq", "whisper-large-v3", "Whisper Large v3 (Groq)"),
     ("groq", "whisper-large-v3-turbo", "Whisper Turbo (Groq)"),
     ("deepgram", "nova-3", "Deepgram Nova-3 (Hindi and English)"),
-    ("gemini", "gemini-3.8-flash", "Gemini 3.8 Flash"),
+    ("gemini", "gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"),
+    # gemini-3.8-flash is not offered (owner 2026-11-18): about Rs 148 per audio hour with its default thinking.
     # gemini-2.5-flash is not offered: Google refuses it to accounts created after its retirement began ("no longer
     # available to new users", HTTP 404, 2026-11-18), and ours is one.
     ("gemini", "gemini-3.5-flash-lite", "Gemini Flash-Lite"),
