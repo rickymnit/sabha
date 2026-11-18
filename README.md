@@ -7,17 +7,22 @@ claim is backed by a timestamped quote.
 One multi-tenant product serves schools, colleges and companies. An organisation profile changes labels, default
 rubrics and rules, never code. The 8-week pilot covers **teaching and reception in schools**.
 
-> **Status (3 November 2026).** The pipeline runs end to end on a developer machine: upload in the web app,
-> preprocessing, silence detection, speaker diarisation, speech recognition (Sarvam AI), LLM scoring (OpenAI
-> `gpt-6-luna`) with verified quotes, and the report. Meeting transcripts from Google Meet can be uploaded instead
-> of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)). The web app covers recordings, people with their
-> classes and sections, overview, reviews and disputes, re-analysis, sharing a report with the person analysed,
-> live status, rubrics, settings, activity (audit log) and cost per recording. Overview, Recordings and the report
-> follow the v2 design, as does My progress, the staff home page; Upload, Reviews and the sales report too. Besides school teaching and reception, there are draft rubrics for sales meetings, team
-> meetings and company reception. It has run only on test recordings, not real school data. Not built yet: staging
-> and production on AWS, the Auth0 tenant (local sign-in is used meanwhile), monitoring, webhooks, calibration on
-> real rater scores, and consent records in the app (parked for the law team). See
-> [Project status](#project-status) and [Running costs](#running-costs).
+> **Status (18 November 2026).** The pipeline runs end to end on a developer machine: upload in the web app (or a
+> meeting recorded in the browser), preprocessing, silence detection, speaker diarisation, speech recognition, LLM
+> scoring (OpenAI `gpt-6-luna`) with verified quotes, and the report. Speech recognition can use Sarvam AI (the
+> default), Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe or a self-hosted Whisper; owners and admins pick
+> the model at upload, and `eval/asr_compare.py` compares models on calls already transcribed
+> ([ADR 0012](docs/adr/0012-more-asr-providers.md)). Transcripts are written only in English, Hindi and Hinglish.
+> Meeting transcripts from Google Meet can be uploaded instead of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)).
+> The web app covers conversations, people with their classes and sections, overview, reviews and disputes,
+> re-analysis, sharing, live status, rubrics, approved product information, settings, activity (audit log), cost per
+> recording and dark mode. Pages answer first: a sentence and three cards, scores in words, detail behind a click.
+> Sales reps get their own workspace (overview, interactions, next actions, private coaching). Besides school
+> teaching and reception, there are draft rubrics for sales calls and meetings, support calls, team meetings and
+> company reception, and the demo company is NiaLabs. It has run on test recordings and NiaLabs demo calls, not real
+> school data. Not built yet: staging and production on AWS, the Auth0 tenant (local sign-in is used meanwhile),
+> monitoring, webhooks, calibration on real rater scores, a hand-corrected gold set, and consent records in the app
+> (parked for the law team). See [Project status](#project-status) and [Running costs](#running-costs).
 
 ## How it works
 
@@ -53,7 +58,8 @@ The full list is in [`CLAUDE.md`](CLAUDE.md). In short:
 - **No ungrounded claims and no invented metrics.** Quality figures (WER, kappa, accuracy, cost) come only from
   eval scripts run on real, human-annotated data.
 - **PII is redacted before every LLM call.** No provider fallback happens silently.
-- **Data stays in India:** AWS `ap-south-1` and MongoDB Atlas Mumbai.
+- **Data stays in India:** AWS `ap-south-1` and MongoDB Atlas Mumbai. The one exception, approved by the owner,
+  is speech recognition providers outside India ([ADR 0012](docs/adr/0012-more-asr-providers.md)).
 - **Secrets come only from environment variables.** Never commit secrets or real recordings.
 
 ## Getting started
@@ -101,9 +107,20 @@ password instead of the list, set `LOGIN_USERNAME`, `LOGIN_PASSWORD_HASH` (from
 In development the web app also serves demo pages on mock data, with no sign-in: `/dev/components`,
 `/dev/transcript`, `/dev/report`, `/dev/reviews` and `/dev/overview`.
 
-Speech recognition uses Sarvam AI ([ADR 0006](docs/adr/0006-asr-sarvam.md)). To try it alone, run
-`uv run sabha-asr-transcribe <file.wav>` on a 16 kHz mono WAV file. Only send audio you have consent for, and no real
-recordings until Sarvam's and OpenAI's data terms are confirmed in writing.
+Speech recognition uses Sarvam AI by default ([ADR 0006](docs/adr/0006-asr-sarvam.md)). Other providers are
+`gemini`, `deepgram`, `openai`, `groq`, `qwen`, `aws` and `whisper` ([ADR 0012](docs/adr/0012-more-asr-providers.md)).
+Choose one with `ASR_PROVIDER` and `ASR_MODEL` in `.env` (each needs its own key, see [`.env.example`](.env.example))
+and restart the workers; owners and admins can also pick the model per upload. To try one alone, run
+`uv run sabha-asr-transcribe <file.wav>` on a 16 kHz mono WAV file. To compare models on calls already transcribed
+with Sarvam:
+
+```bash
+uv run python eval/asr_compare.py --tenant demo-company --models gemini,deepgram:nova-3 --latest 3
+```
+
+The report goes to `eval/reports/asr-compare-<date>/` (git-ignored: it holds transcripts). It shows each model's
+price, speed and how much it differs from Sarvam. That difference is not accuracy: only `eval/wer.py` on a
+hand-corrected gold set gives accuracy. Only send audio you have consent for.
 
 Local services listen on `127.0.0.1` only:
 
@@ -155,7 +172,7 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 | [`apps/workers`](apps/workers) | Celery workers: pipeline stages in `stages/`, outbox relay, notifications, cleanup and the fair GPU scheduler |
 | [`apps/web`](apps/web) | React 18 + TypeScript + Vite app. Design tokens and components are in `src/design/` |
 | [`packages/core`](packages/core) | `sabha_core`: settings, tenant-scoped repository, models, state machine, time mapping, profiles |
-| [`packages/asr`](packages/asr) | `sabha_asr`: provider layer (Sarvam AI), chunking, batching, speaker roles and transcript assembly |
+| [`packages/asr`](packages/asr) | `sabha_asr`: providers (Sarvam AI, Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe, Whisper), published prices, chunking, batching, speaker roles and transcript assembly |
 | [`packages/llm`](packages/llm) | `sabha_llm`: the gateway (routing, budgets, retries, cost accounting in `llm_calls`) and PII redaction |
 | [`packages/analytics`](packages/analytics) | `sabha_analytics`: rubric loading, metrics, scoring, grounding and synthesis |
 | [`rubrics`](rubrics) | Versioned rubric files: `<type>.<segment>.v<major>.<minor>.yaml` |
@@ -169,8 +186,8 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 
 Python 3.12 (uv workspaces, ruff, mypy), FastAPI with Pydantic v2, Celery 5 on Redis 7, MongoDB 7 (PyMongo's async
 client in the API, the sync client in workers), S3 via boto3, ffmpeg, Silero VAD, pyannote on CPU for diarisation
-(NeMo Sortformer once there is a GPU), Sarvam AI for speech recognition
-([ADR 0006](docs/adr/0006-asr-sarvam.md)), OpenAI `gpt-6-luna` for LLM judgements
+(NeMo Sortformer once there is a GPU), Sarvam AI for speech recognition by default, with seven other providers
+to choose from ([ADR 0006](docs/adr/0006-asr-sarvam.md), [ADR 0012](docs/adr/0012-more-asr-providers.md)), OpenAI `gpt-6-luna` for LLM judgements
 ([`docs/llm-providers.md`](docs/llm-providers.md)), PII redaction in `packages/llm` (regular expressions; Presidio was
 considered, see P5.2), Langfuse, React 18 with Vite, Tailwind and TanStack Query, and Auth0 over OIDC for sign-in
 ([ADR 0002](docs/adr/0002-auth.md)). Infrastructure uses Docker Compose and Terraform. Reasons for
@@ -193,8 +210,15 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Speech recognition through Sarvam AI, speaker roles, transcript (P3.1, P3.5 to P3.7) | Done |
 | LLM gateway, PII redaction, scoring, grounding, synthesis, analyze stage (P5.1, P5.2, P5.4 to P5.7) | Done |
 | Reception: ticket, hold metric, not-applicable dimensions, rubric v0.2 (P5.8) | Done. Teaching rubric is v0.1 |
-| Sales meetings (rubric v0.2, deal card), team meetings scored as a whole with notes ([ADR 0008](docs/adr/0008-meetings.md)), company reception (rubric v0.1) | Done as drafts for the owner's review. Demo company "NiaLabs" in the dev seed |
-| Support calls for companies: rubric v0.1, case card (product, problem, steps tried, outcome, follow-up), phone-call speaker roles | Done as a draft for the owner's review (2026-11-04). On for every company; existing companies were switched on with `scripts/admin/enable_type.py` |
+| Sales deal card, team meetings scored as a whole with notes ([ADR 0008](docs/adr/0008-meetings.md)), company reception (rubric v0.1) | Done as drafts for the owner's review. Demo company "NiaLabs" in the dev seed |
+| Support calls for companies: rubric v0.3 (scored on helping the customer), case card (product, problem, steps tried, outcome, follow-up), speaker roles from what each speaker does ([ADR 0011](docs/adr/0011-evidence-based-speaker-roles.md)) | Done as a draft for the owner's review. On for every company; existing companies were switched on with `scripts/admin/enable_type.py` |
+| Sales calls and meetings: rubric v0.4, call or meeting, the client's name, interest level, next actions with dates and priority, coaching for the next call | Done as a draft. Coaching is private to the person analysed for every conversation type |
+| Sales rep workspace: Overview, My interactions (one-page summary per call), My next actions (overdue ones under "This week"), private coaching; recording a meeting in the browser | Done (founder's dashboard doc, 2026-11-12) |
+| Approved product information: owners and admins add, edit and retire entries in Settings; coaching uses only these; a wrong product statement lowers the score | Done ([ADR 0013](docs/adr/0013-said-well-and-badly.md)). At most 40 active entries per workspace |
+| What the agent said well and badly: a plus and drawback list per call, visible to managers | Done ([ADR 0013](docs/adr/0013-said-well-and-badly.md)) |
+| Pages that answer first: Overview, the conversations list and the report open with one sentence and three cards, people and scores in words, names instead of file names; dark mode | Done (2026-11-12 to 11-13) |
+| Speech recognition from more providers: Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe, Whisper; model chosen at upload; "Transcribed by" column for owners and admins; transcripts only in English, Hindi and Hinglish | Done ([ADR 0012](docs/adr/0012-more-asr-providers.md)). Qwen and Amazon Transcribe not yet tried on real calls |
+| Comparing speech models on our own calls (`eval/asr_compare.py`) | Done. Run on 3 NiaLabs calls (2026-11-17): Gemini 3.8 Flash, Deepgram Nova-3 and Sarvam shortlisted. Measures difference from Sarvam, not accuracy |
 | Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done |
 | UI v2 redesign (`docs/design/v2/`) | Done: tokens, sidebar, Overview, Recordings (tabs with counts, filters by type, class, person, date and score, bulk re-analyse and share, Retry or Close, CSV export) and the report (coaching steps, two-lane timeline with zoom, rubric levels, transcript alongside; pressing a time button again pauses the audio, and a third press carries on), and My progress, the home page for staff (teachers, sales reps, support agents): their own numbers, newest report with the manager's note, the three rubric points to work on, processing and recent recordings. Upload in the same style (type colours and what each is scored on, status dots per file, audio hours for owners and admins, "Upload more"). Reviews as one queue (disputes and paused recordings, filters for disputes, speakers and the rest, "2 of 5 decided") beside the decision: the AI score and its reasoning next to the proposed score, quotes and named times that play, and Accept (no note needed), Keep or Set a different score (note needed); "who is the speaker?" in the same place. The sales report: overall on a Weak to Strong scale with what went well and what to fix first, "Where the points were lost" (rubric points sorted by (5 - score) x weight, the two biggest marked Fix first), the deal at a glance with every quote behind "Show evidence", the agreed next step and talk and listen beside the transcript |
 | Sharing a report with the person analysed | Done. Emails them a link and shows the manager's note; it does not change who may see the report (owner's decision, 2026-11-03) |
@@ -210,7 +234,7 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Audio retention, erasure on request, nightly database export and restore drill (P7.3) | Done locally. Atlas backup and bucket lifecycle come with AWS |
 | Status emails (P2.7) | Done, including "report shared" and dispute decisions. Webhooks not wired yet |
 | Evaluation tools: gold set, WER, role accuracy, AI-human agreement, grounding, rater kit (P4.1 to P4.6) | Tools done. No real gold set yet, so no quality figures |
-| Model bake-off, calibration, CI eval gate, NeMo Sortformer on GPU (P5.3, P5.9, P4.7, P3.4b) | Not started. Needs real annotated recordings (and a GPU) |
+| LLM bake-off, calibration, eval gate, speech-model accuracy (WER), NeMo Sortformer on GPU (P5.3, P5.9, P4.7, P3.4b) | Not started. Needs real hand-annotated recordings (and a GPU) |
 | Consent records in the app (P6.9) | Parked for the law team. Consent is still required at upload (golden rule 9) |
 | AWS staging and production, Terraform, monitoring, Auth0 tenant | Planned for week 8 |
 
@@ -225,7 +249,8 @@ that cost ideas can be weighed against facts. Every figure below comes from our 
 | Item | Paid per | What we know |
 | --- | --- | --- |
 | LLM: OpenAI `gpt-6-luna` | Token | $0.10 per million input tokens, $0.50 per million output, cached input $0.01, cache writes $0.125 (OpenAI model page, 2026-10-24). Every call is recorded with tokens and cost in `llm_calls` |
-| Speech recognition: Sarvam AI REST API (`saaras:v4`) | Minute of audio sent | ₹0.49 per minute pay as you go; ₹0.45, ₹0.41 and ₹0.38 on the Pro, Growth and Business plans (sarvam.ai/api-pricing, 2026-10-28; in [`sabha_asr/pricing.py`](packages/asr/sabha_asr/pricing.py)). Audio goes in chunks of at most 30 s, after silence is removed |
+| Speech recognition: Sarvam AI REST API (`saaras:v4`), the default | Minute of audio sent | ₹0.49 per minute pay as you go; ₹0.45, ₹0.41 and ₹0.38 on the Pro, Growth and Business plans (sarvam.ai/api-pricing, 2026-10-28; in [`sabha_asr/pricing.py`](packages/asr/sabha_asr/pricing.py)). Audio goes in chunks of at most 30 s, after silence is removed |
+| Speech recognition: other providers | Minute or token of audio | Per hour of audio at ₹96.5 per dollar, from published prices in `sabha_asr/pricing.py`: Gemini 3.8 Flash ₹6.51 for audio input only (output tokens not recorded yet; doubles from 2027-01-01), Deepgram Nova-3 ₹30.11, OpenAI `gpt-transcribe` ₹26.06, Groq Whisper Large v3 ₹10.71, Qwen ₹12.16, Amazon Transcribe (Mumbai) ₹34.74 |
 | Diarisation: pyannote on CPU | Compute time | Open model, no licence fee. The slowest stage by far (see below) |
 | Preprocessing and VAD: ffmpeg, Silero | Compute time | Open source, runs on CPU |
 | Hosting: AWS `ap-south-1` (S3 with 3 buckets, servers for API, workers, Redis), MongoDB Atlas Mumbai | Month | Not priced yet. Must stay in India (golden rule 12) |
@@ -285,7 +310,10 @@ quality figures come only from evaluation on real, human-rated recordings. The f
 
 - Is a GPU (for diarisation, and later NeMo Sortformer) cheaper per recording hour than CPU, at pilot volume?
 - Should diarisation run on a cheaper or spot machine, since reports are not needed in real time?
-- Would a Sarvam plan, or a self-hosted speech model in India, cost less than pay as you go at pilot volume?
+- Is Gemini 3.8 Flash as accurate as Sarvam? The 2026-11-17 comparison on 3 NiaLabs calls found it differs from
+  Sarvam on 26.4% of words, at about a fifth of the audio price, but takes about 90 s per minute of audio. A
+  hand-corrected gold set is needed before it can become the default, and its full cost per call (with output
+  tokens) is not recorded yet.
 - Would OpenAI's Batch API or a lower reasoning effort cut LLM cost without hurting agreement with raters?
 - Why does the prompt cache not hit between the two scoring calls, and is caching worth it with `gpt-6-luna`?
 - Audio is kept 90 days by default. How long should artefacts be kept, and when can they move to cheaper S3
