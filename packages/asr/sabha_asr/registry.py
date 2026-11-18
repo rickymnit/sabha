@@ -205,7 +205,8 @@ CHOICES: tuple[tuple[str, str, str], ...] = (
     ("groq", "whisper-large-v3-turbo", "Whisper Turbo (Groq)"),
     ("deepgram", "nova-3", "Deepgram Nova-3 (Hindi and English)"),
     ("gemini", "gemini-3.8-flash", "Gemini 3.8 Flash"),
-    ("gemini", "gemini-2.5-flash", "Gemini 2.5 Flash"),
+    # gemini-2.5-flash is not offered: Google refuses it to accounts created after its retirement began ("no longer
+    # available to new users", HTTP 404, 2026-11-18), and ours is one.
     ("gemini", "gemini-3.5-flash-lite", "Gemini Flash-Lite"),
     ("aws", "transcribe", "Amazon (Mumbai)"),
     ("whisper", "large-v3-turbo", "Whisper (own server)"),
