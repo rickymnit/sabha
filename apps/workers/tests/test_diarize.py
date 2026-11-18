@@ -95,8 +95,16 @@ class Stage:
         self.tmp = tmp
         self.runner = StageRunner(db=db, artefacts=self.artefacts, versions={"diarize": "v1"}, worker="test")
 
-    def recording(self, *, with_inputs: bool = True, kind: ConversationType = ConversationType.TEACHING) -> str:
-        recording = Recording(type=kind, status=S.DIARIZING, consent_ref="c")
+    def recording(
+        self,
+        *,
+        with_inputs: bool = True,
+        kind: ConversationType = ConversationType.TEACHING,
+        transfer: str | None = None,
+    ) -> str:
+        recording = Recording(
+            type=kind, status=S.DIARIZING, consent_ref="c", person_id="p1", transfer_person_id=transfer
+        )
         rid = SyncTenantRepo(self.db, "recordings", "t1", Recording).insert_one(recording).id
         if with_inputs:
             compact = self.tmp / f"{rid}.wav"
@@ -159,6 +167,18 @@ def test_a_support_call_asks_for_exactly_two_speakers_and_a_lesson_for_no_limit(
     assert stage.run(rid, flicker) == "done"
     output = json.loads(stage.artefacts.get(f"t1/{rid}/diarize@v1/diarization@v1.json"))
     assert {t["speaker_label"] for t in output["compact"]} == {"S0"}  # the 0.1 s sliver is dropped
+
+
+@pytest.mark.integration
+def test_a_transferred_support_call_asks_for_exactly_three_speakers(stage: Stage) -> None:
+    # Agent 1, the customer and agent 2, who took over (call 4: a warm transfer). Left at 2, the two agents merge.
+    turns = [("agent 1", 0, 2_000), ("customer", 2_000, 4_000), ("agent 2", 4_000, 6_000)]
+    diarizer = ScriptedDiarizer(turns)
+    rid = stage.recording(kind=ConversationType.SUPPORT, transfer="p2")
+    assert stage.run(rid, diarizer) == "done"
+    assert [(c["min_speakers"], c["max_speakers"]) for c in diarizer.calls] == [(3, 3)]
+    output = json.loads(stage.artefacts.get(f"t1/{rid}/diarize@v1/diarization@v1.json"))
+    assert output["speakers"] == ["S0", "S1", "S2"]
 
 
 @pytest.mark.integration
