@@ -13,7 +13,7 @@ import pytest
 from sabha_asr.provider import TokenUsage
 from sabha_asr.roles import TieBreakRequest
 from sabha_asr.words import Word
-from sabha_core.models import Recording, Tenant, Transcript
+from sabha_core.models import Recording, SpeakerModel, Tenant, Transcript
 from sabha_core.profiles import ConversationType
 from sabha_core.quota import Plan
 from sabha_core.timemap import Segment, SegmentMap
@@ -77,6 +77,8 @@ class Setup:
     confirmed_roles: dict[str, str] | None = None  # a reviewer's answer (ADR 0007)
     transfer: str | None = None  # agent 2 of a support call transferred during the call
     usd_inr_rate: float | None = None
+    speaker_model: SpeakerModel = "pyannote"
+    checker: Any = None  # the Gemini speaker check (fake)
     tenant: Tenant = field(default_factory=lambda: TENANT)
     saved: list[Transcript] = field(default_factory=list)
     store: Memory = field(default_factory=Memory)
@@ -87,8 +89,9 @@ class Setup:
         deps = TranscriptDeps(
             diarize_version="v1", tenant=lambda _: self.tenant, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
             tie_breaker=lambda *_: self.tie_breaker, save=lambda _, doc: self.saved.append(doc),
-            usd_inr_rate=self.usd_inr_rate,
+            usd_inr_rate=self.usd_inr_rate, speaker_checker=lambda: self.checker, run=fake_ffmpeg,
         )  # fmt: skip
+        self.store.put("t1/r1/preprocess@v1/normalised.wav", b"RIFF-original")
         recording = Recording(
             id="r1",
             tenant_id="t1",
@@ -96,6 +99,7 @@ class Setup:
             confirmed_roles=self.confirmed_roles,
             person_id="p-anil" if self.transfer else None,
             transfer_person_id=self.transfer,
+            speaker_model=self.speaker_model,
         )
         ctx = StageContext("t1", recording, "t1/r1/transcribe@v1/", self.store, 1)
         spans = [{"start_ms": 0, "end_ms": 45_000, "language": "hi-IN"},
@@ -144,6 +148,58 @@ def test_a_token_billed_transcript_costs_the_tokens_it_billed_or_is_unknown() ->
     assert setup.saved[-1].asr_cost_inr == pytest.approx(0.795)
     setup.run(LECTURE, "gemini/gemini-3.8-flash")  # an answer without its tokens: unknown, never the audio price
     assert setup.saved[-1].asr_cost_inr is None
+
+
+def fake_ffmpeg(args: Any, timeout_s: float) -> Any:
+    Path(args[-1]).write_bytes(b"RIFF-window")  # the window ffmpeg would cut
+    return None
+
+
+class FakeChecker:
+    """Gemini says lines 2, 3 and 5 were the sales rep's (numbering starts at 1); the rest the customer's."""
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[bytes, float, list[tuple[int, float, str]], str]] = []
+
+    def __call__(self, wav: bytes, start_s: float, numbered: Any, staff_word: str) -> Any:
+        self.asked.append((wav, start_s, list(numbered), staff_word))
+        return {n: "staff" if n in (2, 3, 5) else "customer" for n, _, _ in numbered}, TokenUsage(20_000, 100, 0)
+
+
+SALE_TURNS = [("S0", 0, 30_000), ("S1", 30_000, 60_000)]  # pyannote heard the whole opening as the customer (S0)
+SALE_WORDS = words((0, 4_000, "hello namaskar sir।"), (4_000, 10_000, "haan sir main NiaLabs se baat kar raha hoon।"),
+                   (10_000, 16_000, "mera naam Roshan hai aur number 9876543210 hai।"),
+                   (16_000, 30_000, "sir mujhe biometric chahiye thi।"),
+                   (30_000, 60_000, "great sir main aapko batata hoon price kya hai।"))  # fmt: skip
+
+
+def test_the_gemini_check_moves_lines_it_hears_from_the_other_side_and_costs_its_tokens() -> None:
+    company = Tenant.from_profile("company", name="NiaLabs", plan=Plan.PILOT, id="t1")
+    setup = Setup(SALE_TURNS, ConversationType.SALES, tenant=company, speaker_model="gemini", usd_inr_rate=100.0)
+    setup.confirmed_roles = {"S0": "customer", "S1": "sales_rep"}  # settled roles, as a reviewer gave them
+    setup.checker = FakeChecker()
+    setup.run(SALE_WORDS)
+    (doc,) = setup.saved
+    rep = next(label for label, role in doc.roles.items() if role == "sales_rep")
+    said = [(u["speaker_label"], u["text"]) for u in setup.transcript()["utterances"]]
+    assert (rep, "haan sir main NiaLabs se baat kar raha hoon। mera naam Roshan hai aur number 9876543210 hai।") in said
+    (_, start_s, numbered, staff_word) = setup.checker.asked[0]
+    assert start_s == 0 and staff_word == "sales rep" and numbered[0][1] == 1.0  # original time: compact 0 is 1000
+    assert "9876543210" not in json.dumps(numbered, ensure_ascii=False)  # masked before it leaves (golden rule 8)
+    assert doc.speaker_check is not None and (doc.speaker_check.changed, doc.speaker_check.lines) == (2, 5)
+    # $0.75 per 1M in, $3.75 per 1M out: 20000 and 100 tokens = $0.015375 = Rs 1.5375, added to the speech cost.
+    assert doc.speaker_check.cost_inr == pytest.approx(1.5375)
+    assert doc.asr_cost_inr == pytest.approx(0.4982 + 1.5375)
+    found = json.loads(setup.store.get("t1/r1/transcribe@v1/speaker_check@v1.json"))
+    assert [c["to"] for c in found["changed"]] == ["sales_rep", "sales_rep"]
+
+
+def test_the_gemini_check_asked_for_but_not_configured_fails_rather_than_skips() -> None:
+    company = Tenant.from_profile("company", name="NiaLabs", plan=Plan.PILOT, id="t1")
+    setup = Setup(SALE_TURNS, ConversationType.SALES, tenant=company, speaker_model="gemini")
+    with pytest.raises(PermanentError) as caught:
+        setup.run(SALE_WORDS)
+    assert caught.value.code == "speaker_check_unavailable"
 
 
 def even_split() -> Setup:

@@ -19,6 +19,12 @@
    A support call transferred during the call (Recording.transfer_person_id) has two agents and the customer:
    sabha_asr.transfer finds them and the handover, writes `transfer@v1.json`, and the transcript document maps each
    agent's speaker label to their person (`agents`) with the handover on the original timeline (`handover_ms`).
+   When the uploader asked for the Gemini speaker check (Recording.speaker_model "gemini") and the roles are settled,
+   sabha_asr.speaker_check moves lines Gemini hears from the other side before the transcript is assembled. It reads
+   the preprocess stage's normalised.wav (original timeline), masks each line's PII first (golden rule 8), writes
+   `speaker_check@v1.json`, and adds its cost to the speech cost. Asked for but not configured (no GEMINI_API_KEY),
+   or Gemini failing: the stage fails (`speaker_check_unavailable`, retried, or `speaker_check_failed`), never a
+   transcript without the check (golden rule 7). Meetings and roles waiting for a reviewer are not checked.
    Meetings have no one to find: every voice is a "participant" (method "all_participants"), never reviewed.
 5. Roles still unclear: the transcript is kept (with the best guess, for the reviewer) and NeedsReviewError
    `unclear_roles` stops the pipeline. A guess is never analysed (golden rule 5).
@@ -31,23 +37,29 @@ speakers or the rubric go back for review rather than being guessed around.
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol
 
 from sabha_analytics.rubric import Rubric
 from sabha_asr.assembly import WordTiming, assemble_transcript
 from sabha_asr.pricing import TOKEN_PRICES, cost_inr, token_cost_inr
-from sabha_asr.provider import TokenUsage
+from sabha_asr.provider import ProviderError, TokenUsage
 from sabha_asr.roles import RoleAssignment, RoleTieBreaker, SpeakerRole, assign_roles
+from sabha_asr.speaker_check import MODEL_ID as CHECK_MODEL
+from sabha_asr.speaker_check import WINDOW_MS, WINDOW_TAIL_MS, Verdict, lines_of, relabel
 from sabha_asr.transfer import TransferRoles, assign_transfer_roles, from_confirmed
-from sabha_asr.words import Turn, Word
-from sabha_core.models import SpeakerSpan, Tenant, Transcript
+from sabha_asr.words import Turn, Word, assign_words_to_turns
+from sabha_core.models import SpeakerCheck, SpeakerSpan, Tenant, Transcript
 from sabha_core.profiles import ConversationType
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
+from sabha_llm.redact import redact
 from sabha_workers.rubrics import NoRubric
-from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext
+from sabha_workers.stages.preprocess import Runner, ffmpeg_timeout_s, run_tool
+from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext, TransientError
 
 ALL_PARTICIPANTS = "all_participants"  # roles method for meetings: every voice is a participant
 STRIP_MAX_SPANS = 60  # a list row's strip is about 140px wide; more spans would only blur and bloat the list
@@ -63,6 +75,17 @@ class TranscriptDeps:
     tie_breaker: Callable[[str, str], RoleTieBreaker | None]  # (tenant_id, recording_id) -> tie-breaker or None
     save: Callable[[str, Transcript], None]  # (tenant_id, transcript)
     usd_inr_rate: float | None = None  # rupees for an ASR model priced in dollars (USD_INR_RATE)
+    # The Gemini speaker check (sabha_asr.speaker_check.GeminiSpeakerAsker), None when GEMINI_API_KEY is not set;
+    # the preprocess version whose normalised.wav it listens to; ffmpeg for cutting its windows.
+    speaker_checker: Callable[[], SpeakerAsker | None] = lambda: None
+    preprocess_version: str = "v1"
+    run: Runner = run_tool
+
+
+class SpeakerAsker(Protocol):
+    def __call__(
+        self, wav: bytes, window_start_s: float, numbered: Sequence[tuple[int, float, str]], staff_word: str
+    ) -> tuple[dict[int, Verdict], TokenUsage | None]: ...
 
 
 @dataclass(frozen=True)
@@ -155,6 +178,96 @@ def _asr_cost(model: str, audio_ms: int, asr: AsrOutput, usd_inr_rate: float | N
     return cost_inr(model, audio_ms, usd_inr_rate)
 
 
+STAFF_WORDS = {"sales_rep": "sales rep", "support_agent": "support agent", "receptionist": "receptionist",
+               "teacher": "teacher"}  # fmt: skip
+
+
+def _speaker_check(
+    ctx: StageContext,
+    asr: AsrOutput,
+    deps: TranscriptDeps,
+    word_turns: Sequence[Turn],
+    roles: Mapping[str, str],
+    rubric: Rubric,
+    transfer: TransferRoles | None,
+) -> tuple[list[Turn], SpeakerCheck]:
+    """The Gemini speaker check (module docstring, step 3): the turns to assemble with, and what the check did."""
+    asker = deps.speaker_checker()
+    if asker is None:
+        raise PermanentError("speaker_check_unavailable", "the Gemini speaker check was asked for but GEMINI_API_KEY "
+                             "is not set")  # fmt: skip
+    staff_role = rubric.roles[0]
+    words = list(asr.words)
+    labels = [turn.speaker_label for turn in assign_words_to_turns(words, word_turns)]
+    lines = lines_of(words, labels)
+    starts = [asr.segment_map.compact_to_original(line.start_ms) for line in lines]
+    verdicts: dict[int, Verdict] = {}
+    usage: TokenUsage | None = TokenUsage(0, 0, 0)
+    source = artefact_prefix(ctx.tenant_id, ctx.recording.id, "preprocess", deps.preprocess_version)
+    with tempfile.TemporaryDirectory(prefix="sabha-speakers-") as tmp:
+        audio = Path(tmp) / "normalised.wav"
+        try:
+            ctx.artefacts.download(source + "normalised.wav", audio)
+        except FileNotFoundError as exc:
+            raise PermanentError("missing_input", f"preprocess audio not found: {exc}") from exc
+        for window in range(0, max(starts) + 1, WINDOW_MS):
+            inside = [i for i, start in enumerate(starts) if window <= start < window + WINDOW_MS]
+            if not inside:
+                continue
+            numbered = [(n + 1, starts[i] / 1000, redact(lines[i].text).redacted_text) for n, i in enumerate(inside)]
+            wav = _cut_wav(audio, window, WINDOW_MS + WINDOW_TAIL_MS, deps.run)
+            try:
+                answer, billed = asker(wav, window / 1000, numbered, STAFF_WORDS.get(staff_role, staff_role))
+            except ProviderError as exc:
+                error = TransientError if exc.retryable else PermanentError
+                code = "speaker_check_unavailable" if exc.retryable else "speaker_check_failed"
+                raise error(code, f"{exc.provider}: {exc.reason}") from exc
+            verdicts.update({inside[n - 1]: verdict for n, verdict in answer.items() if 1 <= n <= len(inside)})
+            usage = None if usage is None or billed is None else usage + billed
+    agents = (transfer.agent_1, transfer.agent_2) if transfer and transfer.agent_1 and transfer.agent_2 else None
+    new_labels, changes = relabel(lines, verdicts, labels, roles, staff_role, agents=agents,
+                                  handover_ms=transfer.handover_ms if transfer else None)  # fmt: skip
+    cost = None if usage is None else token_cost_inr(CHECK_MODEL, usage, deps.usd_inr_rate)
+    unsure = sum(1 for v in verdicts.values() if v == "unsure")
+    found = {
+        "version": "speaker_check@v1", "model": CHECK_MODEL, "timeline": "original", "lines": len(lines),
+        "unsure": unsure,
+        "usage": None if usage is None else usage.to_record(), "cost_inr": cost,
+        "changed": [{"start_ms": asr.segment_map.compact_to_original(c.start_ms), "from": roles.get(c.from_label),
+                     "to": roles.get(c.to_label), "from_label": c.from_label, "to_label": c.to_label}
+                    for c in changes],
+    }  # fmt: skip
+    ctx.artefacts.put(ctx.prefix + "speaker_check@v1.json", json.dumps(found, ensure_ascii=False).encode(),
+                      "application/json")  # fmt: skip
+    summary = SpeakerCheck(model=CHECK_MODEL, lines=len(lines), changed=len(changes), unsure=unsure,
+                           cost_inr=None if cost is None else round(cost, 4))  # fmt: skip
+    return _runs(words, new_labels), summary
+
+
+def _runs(words: Sequence[Word], labels: Sequence[str]) -> list[Turn]:
+    """Turns from per-word labels: one turn per run of consecutive words with the same label."""
+    turns: list[Turn] = []
+    for word, label in zip(words, labels, strict=True):
+        end = max(word.end_ms, word.start_ms + 1)
+        if turns and turns[-1].speaker_label == label:
+            turns[-1] = Turn(label, turns[-1].start_ms, max(turns[-1].end_ms, end))
+        else:
+            start = max(word.start_ms, turns[-1].end_ms) if turns else word.start_ms
+            turns.append(Turn(label, start, max(end, start + 1)))
+    return turns
+
+
+def _cut_wav(audio: Path, start_ms: int, length_ms: int, run: Runner) -> bytes:
+    """`length_ms` of 16 kHz mono WAV from `start_ms` (shorter at the end of the recording)."""
+    out = audio.with_name(f"window-{start_ms}.wav")
+    args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-y", "-ss", f"{start_ms / 1000:.3f}",
+            "-t", f"{length_ms / 1000:.3f}", "-i", str(audio), "-ac", "1", "-ar", "16000", str(out)]  # fmt: skip
+    run(args, ffmpeg_timeout_s(length_ms))
+    data = out.read_bytes()
+    out.unlink()
+    return data
+
+
 def _original(compact_ms: int | None, asr: AsrOutput) -> int | None:
     return None if compact_ms is None else asr.segment_map.compact_to_original(compact_ms)
 
@@ -230,12 +343,18 @@ def finish_transcript(
     ctx.artefacts.put(ctx.prefix + "roles@v1.json", assignment.to_json().encode(), "application/json")
 
     roles = assignment.role_by_speaker()
-    transcript = assemble_transcript(asr.words, asr.word_turns or turns, roles, asr.segment_map, asr_model=asr.model,
+    word_turns: Sequence[Turn] = asr.word_turns or turns
+    check: SpeakerCheck | None = None
+    if recording.speaker_model == "gemini" and not meeting and assignment.needs_review_reason is None and asr.words:
+        word_turns, check = _speaker_check(ctx, asr, deps, word_turns, roles, rubric, transfer)
+    transcript = assemble_transcript(asr.words, word_turns, roles, asr.segment_map, asr_model=asr.model,
                                      word_timing=asr.word_timing)  # fmt: skip
     key = ctx.prefix + "transcript@v1.json"
     ctx.artefacts.put(key, json.dumps(transcript, ensure_ascii=False).encode(), "application/json")
     methods = sorted({speaker.method for speaker in assignment.speakers.values()})
     costs = [_asr_cost(model, ms, asr, deps.usd_inr_rate) for model, ms in asr.billed_ms.items()]
+    if check is not None:
+        costs.append(check.cost_inr)
     asr_cost = None if not costs or any(c is None for c in costs) else round(sum(c for c in costs if c), 4)
     deps.save(
         ctx.tenant_id,
@@ -250,6 +369,7 @@ def finish_transcript(
             asr_billed_ms=sum(asr.billed_ms.values()) or None, asr_cost_inr=asr_cost,
             agents=_agents(transfer, recording.person_id, recording.transfer_person_id),
             handover_ms=None if transfer is None else _original(transfer.handover_ms, asr),
+            speaker_check=check,
         )
     )  # fmt: skip
     if assignment.needs_review_reason is not None:

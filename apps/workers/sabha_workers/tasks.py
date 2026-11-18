@@ -30,6 +30,7 @@ from sabha_asr.diarization import DEFAULT_MODEL_DIR as DEFAULT_PYANNOTE_DIR
 from sabha_asr.diarization import Diarizer, PyannoteDiarizer, ScriptedDiarizer
 from sabha_asr.registry import build_transcriber
 from sabha_asr.roles import RoleTieBreaker
+from sabha_asr.speaker_check import GeminiSpeakerAsker
 from sabha_asr.transcriber import Transcriber
 from sabha_core.backup import export_backup
 from sabha_core.models import AudioInfo, LlmCall, Person, ProductInfo, Recording, Transcript, utc_now
@@ -183,6 +184,15 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         transcripts.delete_many({"recording_id": document.recording_id, "version": document.version})
         transcripts.insert_one(document)
 
+    checkers: list[GeminiSpeakerAsker] = []
+
+    def speaker_checker() -> GeminiSpeakerAsker | None:
+        """The Gemini speaker check (sabha_asr.speaker_check), made once; None without GEMINI_API_KEY."""
+        if not checkers and settings.gemini_api_key is not None:
+            checkers.append(GeminiSpeakerAsker(settings.gemini_api_key.get_secret_value(),
+                                               base_url=settings.gemini_base_url))  # fmt: skip
+        return checkers[0] if checkers else None
+
     transcript_deps = TranscriptDeps(
         diarize_version=settings.artefact_version_diarize,
         tenant=lambda tenant_id: own_tenant(db, tenant_id),
@@ -190,6 +200,8 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
         tie_breaker=tie_breaker,
         save=save_transcript,
         usd_inr_rate=settings.usd_inr_rate,
+        speaker_checker=speaker_checker,
+        preprocess_version=settings.artefact_version_preprocess,
     )
 
     def judge(tenant_id: str, recording_id: str) -> GatewayJudge:

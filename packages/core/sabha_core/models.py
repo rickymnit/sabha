@@ -341,6 +341,19 @@ class Recording(TenantDoc):
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
+class SpeakerCheck(BaseModel):
+    """What the Gemini speaker check did to a transcript (sabha_asr.speaker_check): lines asked about, lines moved to
+    the other side, lines Gemini could not tell, and its cost (None when the tokens or the dollar rate are unknown)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: str
+    lines: int = Field(ge=0)
+    changed: int = Field(ge=0)
+    unsure: int = Field(ge=0)
+    cost_inr: float | None = Field(default=None, ge=0)
+
+
 class SpeakerSpan(BaseModel):
     """One stretch of the "who spoke when" strip: the analysed staff member or anyone else, ORIGINAL timeline."""
 
@@ -383,6 +396,9 @@ class Transcript(TenantDoc):
     # first words, on the ORIGINAL timeline. Empty and None on every other call.
     agents: dict[str, str] = Field(default_factory=dict)
     handover_ms: int | None = Field(default=None, ge=0)
+    # The Gemini speaker check, when the uploader asked for it (Recording.speaker_model "gemini"); its cost is also in
+    # asr_cost_inr.
+    speaker_check: SpeakerCheck | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
