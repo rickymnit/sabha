@@ -9,8 +9,8 @@ from typing import Any
 import httpx
 import pytest
 
-from sabha_asr.pricing import cost_inr
-from sabha_asr.provider import AudioChunk, ProviderError
+from sabha_asr.pricing import cost_inr, token_cost_inr
+from sabha_asr.provider import AudioChunk, ProviderError, TokenUsage
 from sabha_asr.providers import aws, deepgram, gemini, groq, openai, qwen
 from sabha_asr.registry import (
     AsrConfigError,
@@ -127,8 +127,15 @@ def test_deepgram_code_switching_words_and_languages() -> None:
     assert cost_inr("deepgram/nova-3", 60_000, 100.0) == pytest.approx(0.52)
 
 
-def gemini_answer(text: str, reason: str = "STOP") -> dict[str, Any]:
-    return {"candidates": [{"finishReason": reason, "content": {"parts": [{"text": json.dumps({"text": text})}]}}]}
+def gemini_answer(text: str, reason: str = "STOP", usage: tuple[int, int, int] | None = None) -> dict[str, Any]:
+    answer: dict[str, Any] = {
+        "candidates": [{"finishReason": reason, "content": {"parts": [{"text": json.dumps({"text": text})}]}}]
+    }
+    if usage is not None:
+        prompt, candidates, thoughts = usage
+        answer["usageMetadata"] = {"promptTokenCount": prompt, "candidatesTokenCount": candidates,
+                                   "thoughtsTokenCount": thoughts}  # fmt: skip
+    return answer
 
 
 def test_gemini_request_answer_and_guard_against_invented_words() -> None:
@@ -165,6 +172,30 @@ def test_gemini_refuses_invented_or_blocked_answers() -> None:
         denied.transcribe([CHUNK])
     assert not err.value.retryable
     assert cost_inr("gemini/gemini-3.8-flash", 3_600_000, 100.0) == pytest.approx(6.75)
+
+
+def test_gemini_reports_the_tokens_it_billed_retries_and_thinking_included() -> None:
+    answers = [gemini_answer("word " * 61, usage=(300, 400, 900)), gemini_answer("ठीक है", usage=(300, 10, 50))]
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(200, json=answers[len(calls) - 1])
+
+    result = gemini.GeminiProvider("k", client=mocked(handler), sleep=no_wait).transcribe([CHUNK])[0]
+    # The refused first answer was billed too: both attempts count. Output includes thinking.
+    assert result.usage == TokenUsage(input_tokens=600, output_tokens=1_360, thinking_tokens=950)
+    no_usage = gemini.GeminiProvider("k", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("ठीक"))),
+                                     sleep=no_wait)  # fmt: skip
+    assert no_usage.transcribe([CHUNK])[0].usage is None  # never a guessed count
+
+
+def test_token_billed_cost_counts_output_and_thinking() -> None:
+    usage = TokenUsage(input_tokens=1_000_000, output_tokens=1_000_000, thinking_tokens=600_000)
+    # Gemini 3.8 Flash: $0.75 per 1M input and $3.75 per 1M output (thinking included), until 2026-12-31.
+    assert token_cost_inr("gemini/gemini-3.8-flash", usage, 100.0) == pytest.approx(450.0)
+    assert token_cost_inr("gemini/gemini-3.8-flash", usage, None) is None  # no rate: never converted with a guess
+    assert token_cost_inr("sarvam/saaras:v4", usage, 100.0) is None  # not billed by tokens
 
 
 @pytest.mark.parametrize(("status", "code", "retryable"), [

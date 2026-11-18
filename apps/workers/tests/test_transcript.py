@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from sabha_asr.provider import TokenUsage
 from sabha_asr.roles import TieBreakRequest
 from sabha_asr.words import Word
 from sabha_core.models import Recording, Tenant, Transcript
@@ -75,16 +76,18 @@ class Setup:
     tie_breaker: Any = None
     confirmed_roles: dict[str, str] | None = None  # a reviewer's answer (ADR 0007)
     transfer: str | None = None  # agent 2 of a support call transferred during the call
+    usd_inr_rate: float | None = None
     tenant: Tenant = field(default_factory=lambda: TENANT)
     saved: list[Transcript] = field(default_factory=list)
     store: Memory = field(default_factory=Memory)
 
-    def run(self, asr_words: list[Word]) -> dict[str, Any]:
+    def run(self, asr_words: list[Word], model: str = "sarvam/saaras:v4", usage: Any = None) -> dict[str, Any]:
         diarization = {"compact": [{"speaker_label": s, "start_ms": a, "end_ms": b} for s, a, b in self.turns]}
         self.store.put("t1/r1/diarize@v1/diarization@v1.json", json.dumps(diarization).encode())
         deps = TranscriptDeps(
             diarize_version="v1", tenant=lambda _: self.tenant, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
             tie_breaker=lambda *_: self.tie_breaker, save=lambda _, doc: self.saved.append(doc),
+            usd_inr_rate=self.usd_inr_rate,
         )  # fmt: skip
         recording = Recording(
             id="r1",
@@ -97,8 +100,10 @@ class Setup:
         ctx = StageContext("t1", recording, "t1/r1/transcribe@v1/", self.store, 1)
         spans = [{"start_ms": 0, "end_ms": 45_000, "language": "hi-IN"},
                  {"start_ms": 45_000, "end_ms": 60_000, "language": "en-IN"}]  # fmt: skip
-        billed = {"sarvam/saaras:v4": 61_000}  # the compact audio plus a chunk overlap
-        return finish_transcript(ctx, AsrOutput(asr_words, "sarvam/saaras:v4", "approximate", spans, MAP, billed), deps)
+        billed = {model: 61_000}  # the compact audio plus a chunk overlap
+        tokens = {} if usage is None else {model: usage}
+        asr = AsrOutput(asr_words, model, "approximate", spans, MAP, billed, usage=tokens)
+        return finish_transcript(ctx, asr, deps)
 
     def transcript(self) -> dict[str, Any]:
         data: dict[str, Any] = json.loads(self.store.get("t1/r1/transcribe@v1/transcript@v1.json"))
@@ -128,6 +133,17 @@ def test_a_clear_teacher_gets_roles_and_an_original_time_transcript() -> None:
     assert doc.language_mix == {"en-IN": 0.25, "hi-IN": 0.75} and doc.word_count == len(LECTURE)
     assert (doc.asr_billed_ms, doc.asr_cost_inr) == (61_000, 0.4982)  # Rs 0.49/min, Sarvam's published price
     assert meta["speakers"] == 2 and meta["rubric"] == "teaching.school.v0.1"
+
+
+def test_a_token_billed_transcript_costs_the_tokens_it_billed_or_is_unknown() -> None:
+    setup = Setup([("S0", 0, 50_000), ("S1", 50_500, 52_000), ("S0", 52_500, 60_000)])
+    setup.usd_inr_rate = 100.0
+    usage = TokenUsage(input_tokens=1_600, output_tokens=1_800, thinking_tokens=1_100)
+    setup.run(LECTURE, "gemini/gemini-3.8-flash", usage)
+    # $0.75 per 1M in and $3.75 per 1M out: (1600 * 0.75 + 1800 * 3.75) / 1e6 = $0.00795, at Rs 100 per dollar.
+    assert setup.saved[-1].asr_cost_inr == pytest.approx(0.795)
+    setup.run(LECTURE, "gemini/gemini-3.8-flash")  # an answer without its tokens: unknown, never the audio price
+    assert setup.saved[-1].asr_cost_inr is None
 
 
 def even_split() -> Setup:

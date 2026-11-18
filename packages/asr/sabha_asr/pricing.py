@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from sabha_asr.provider import TokenUsage
+
 Currency = Literal["INR", "USD"]
 
 _OPENAI = "https://developers.openai.com/api/docs/pricing (Transcription, estimated cost, checked 2026-11-13)"
@@ -29,11 +31,37 @@ _GROQ = ("https://console.groq.com/docs/speech-to-text (whisper-large-v3 0.111 U
 _DEEPGRAM = ("https://deepgram.com/pricing (Nova-3 pre-recorded, pay as you go: multilingual 0.0052 USD per minute, "
              "billed per second, no minimum; checked 2026-11-16)")  # fmt: skip
 
-# Gemini bills tokens: audio is 25 tokens per second (1,500 per minute). Only the audio sent is priced here; the
-# written answer (output tokens) costs extra and is not counted, so these are lower bounds.
+# Gemini bills tokens: audio is 25 tokens per second (1,500 per minute). PRICES holds the audio only (a lower bound,
+# for estimates before anything is sent); TOKEN_PRICES prices what a call was actually billed, output included.
 _GEMINI = ("https://aistudio.google.com/docs/pricing (paid standard, checked 2026-11-16: gemini-3.8-flash input 0.75 "
            "USD per 1M tokens until 2026-12-31, then 1.50; gemini-3.5-flash-lite audio input 0.30 USD per 1M; "
            "25 audio tokens per second; output tokens not counted)")  # fmt: skip
+
+
+_GEMINI_TOKENS = (
+    "https://aistudio.google.com/docs/pricing (paid standard, checked 2026-11-18: gemini-3.8-flash input 0.75 and "
+    "output 3.75 USD per 1M tokens through 2026-12-31, then 1.50 and 7.50; gemini-3.5-flash-lite input 0.30 and "
+    "output 2.50; output includes thinking tokens)"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class TokenPrice:
+    """Dollars per million tokens in and out (thinking billed as output)."""
+
+    input_per_million: float
+    output_per_million: float
+    currency: Currency
+    source: str
+
+    def cost(self, usage: TokenUsage) -> float:
+        return (usage.input_tokens * self.input_per_million + usage.output_tokens * self.output_per_million) / 1e6
+
+
+TOKEN_PRICES: dict[str, TokenPrice] = {
+    "gemini/gemini-3.8-flash": TokenPrice(0.75, 3.75, "USD", _GEMINI_TOKENS),  # 1.50 and 7.50 from 2027-01-01
+    "gemini/gemini-3.5-flash-lite": TokenPrice(0.30, 2.50, "USD", _GEMINI_TOKENS),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,3 +107,15 @@ def cost_inr(model_id: str, audio_ms: int, usd_inr_rate: float | None = None) ->
     price = price_for(model_id)
     per_minute = None if price is None else price.inr_per_minute(usd_inr_rate)
     return None if per_minute is None else per_minute * audio_ms / 60_000
+
+
+def token_cost_inr(model_id: str, usage: TokenUsage, usd_inr_rate: float | None = None) -> float | None:
+    """What `usage` cost in rupees for a token-billed model, or None (not token-billed, or a dollar price without
+    `usd_inr_rate`)."""
+    price = TOKEN_PRICES.get(model_id)
+    if price is None:
+        return None
+    native = price.cost(usage)
+    if price.currency == "INR":
+        return native
+    return None if usd_inr_rate is None else native * usd_inr_rate

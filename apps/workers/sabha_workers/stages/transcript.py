@@ -37,7 +37,8 @@ from typing import Any
 
 from sabha_analytics.rubric import Rubric
 from sabha_asr.assembly import WordTiming, assemble_transcript
-from sabha_asr.pricing import cost_inr
+from sabha_asr.pricing import TOKEN_PRICES, cost_inr, token_cost_inr
+from sabha_asr.provider import TokenUsage
 from sabha_asr.roles import RoleAssignment, RoleTieBreaker, SpeakerRole, assign_roles
 from sabha_asr.transfer import TransferRoles, assign_transfer_roles, from_confirmed
 from sabha_asr.words import Turn, Word
@@ -74,6 +75,9 @@ class AsrOutput:
     billed_ms: Mapping[str, int] = field(default_factory=dict)  # audio sent per ASR model id, overlaps included
     # The turns words are given to speakers by (sabha_asr.chunking.chunk_turns); None: the diarization turns.
     word_turns: Sequence[Turn] | None = None
+    # Token-billed models (Gemini): the tokens every answer reported (transcribe.billed_tokens); a token-billed model
+    # missing here has an unknown cost.
+    usage: Mapping[str, TokenUsage] = field(default_factory=dict)
 
 
 def language_mix(spans: Sequence[dict[str, Any]]) -> dict[str, float]:
@@ -140,6 +144,15 @@ def confirmed_assignment(confirmed: dict[str, str], turns: Sequence[Turn], roles
             "unclear_roles", f"the confirmed roles {confirmed} do not fit speakers {sorted(labels)} and roles {roles}"
         )
     return RoleAssignment({label: SpeakerRole(role, 1.0, "reviewer") for label, role in confirmed.items()})
+
+
+def _asr_cost(model: str, audio_ms: int, asr: AsrOutput, usd_inr_rate: float | None) -> float | None:
+    """A token-billed model's cost from the tokens it billed (None when they are not all known); any other model's
+    from the audio sent."""
+    if model in TOKEN_PRICES:
+        usage = asr.usage.get(model)
+        return None if usage is None else token_cost_inr(model, usage, usd_inr_rate)
+    return cost_inr(model, audio_ms, usd_inr_rate)
 
 
 def _original(compact_ms: int | None, asr: AsrOutput) -> int | None:
@@ -222,7 +235,7 @@ def finish_transcript(
     key = ctx.prefix + "transcript@v1.json"
     ctx.artefacts.put(key, json.dumps(transcript, ensure_ascii=False).encode(), "application/json")
     methods = sorted({speaker.method for speaker in assignment.speakers.values()})
-    costs = [cost_inr(model, ms, deps.usd_inr_rate) for model, ms in asr.billed_ms.items()]
+    costs = [_asr_cost(model, ms, asr, deps.usd_inr_rate) for model, ms in asr.billed_ms.items()]
     asr_cost = None if not costs or any(c is None for c in costs) else round(sum(c for c in costs if c), 4)
     deps.save(
         ctx.tenant_id,

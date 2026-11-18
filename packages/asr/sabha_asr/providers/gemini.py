@@ -7,6 +7,10 @@ answer {"text": ...}. Gemini is a general model, not a speech recogniser, so INS
 summarising and completing sentences, and asks for an empty text when nobody speaks. There are no word times: the
 text is spread across the chunk (word_timing "approximate", like Sarvam's phrases).
 
+Billing is by tokens: the answer's `usageMetadata` (prompt tokens in; answer and thinking tokens out, thinking billed
+as output) is kept on the chunk's result (`ChunkResult.usage`), summed over both attempts when the guard below asks
+again, since both were billed. sabha_asr.pricing.token_cost_inr turns it into money.
+
 Guard: an answer with more than MAX_WORDS_PER_S words per second of audio cannot have been spoken (fast speech is
 about 3 to 4); it is asked once more, and a second such answer fails the chunk rather than put invented words in a
 transcript (golden rule 5).
@@ -29,7 +33,7 @@ from typing import Any
 import httpx
 
 from sabha_asr.assembly import WordTiming
-from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, spread_words
+from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, TokenUsage, spread_words
 from sabha_asr.providers import _http
 
 NAME = "gemini"
@@ -121,8 +125,10 @@ class GeminiProvider:
     def _transcribe_one(self, chunk: AudioChunk) -> ChunkResult:
         if chunk.duration_ms > MAX_CHUNK_MS:
             raise ValueError(f"chunk {chunk.chunk_id!r} is {chunk.duration_ms} ms; the limit is {MAX_CHUNK_MS} ms")
+        usage: TokenUsage | None = None
         for attempt in (1, 2):
-            text = self._ask(chunk)
+            text, billed = self._ask(chunk)
+            usage = billed if usage is None else (None if billed is None else usage + billed)
             if plausible(text, chunk.duration_ms):
                 break
             log.warning("answer has more words than the audio could hold", extra={"chunk_id": chunk.chunk_id,
@@ -135,9 +141,10 @@ class GeminiProvider:
             text=" ".join(word.text for word in words),
             words=tuple(words),
             languages=(LanguageSpan(0, chunk.duration_ms, None),),
+            usage=usage,
         )
 
-    def _ask(self, chunk: AudioChunk) -> str:
+    def _ask(self, chunk: AudioChunk) -> tuple[str, TokenUsage | None]:
         body = self.body(chunk)
 
         def request() -> httpx.Response:
@@ -147,7 +154,19 @@ class GeminiProvider:
                               chunk_id=chunk.chunk_id)  # fmt: skip
         if response.status_code != 200:
             raise _http.error_for(NAME, response, _NOT_RETRYABLE)
-        return parse(_http.json_body(NAME, response))
+        answer = _http.json_body(NAME, response)
+        return parse(answer), usage_of(answer)
+
+
+def usage_of(body: Any) -> TokenUsage | None:
+    """The tokens an answer was billed for, from `usageMetadata`; None when the answer does not say."""
+    meta = body.get("usageMetadata") if isinstance(body, dict) else None
+    if not isinstance(meta, dict) or not isinstance(meta.get("promptTokenCount"), int):
+        return None
+    answer, thinking = meta.get("candidatesTokenCount", 0), meta.get("thoughtsTokenCount", 0)
+    if not isinstance(answer, int) or not isinstance(thinking, int):
+        return None
+    return TokenUsage(meta["promptTokenCount"], answer + thinking, thinking)
 
 
 def parse(body: Any) -> str:

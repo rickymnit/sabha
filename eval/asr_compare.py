@@ -47,8 +47,8 @@ from textnorm import tokens
 from wer import Counts, align, corpus_counts
 
 from sabha_asr.chunking import Chunk, compact_joins, merge_chunk_words, plan_chunks, speaker_cuts
-from sabha_asr.pricing import price_for
-from sabha_asr.provider import AsrProvider, ChunkResult, ProviderError
+from sabha_asr.pricing import TOKEN_PRICES, price_for, token_cost_inr
+from sabha_asr.provider import AsrProvider, ChunkResult, ProviderError, TokenUsage
 from sabha_asr.registry import build_provider, model_id_for, parse_spec
 from sabha_asr.words import Turn, Word
 from sabha_core.models import Recording
@@ -73,6 +73,7 @@ class ModelRun:
     sent_ms: int = 0
     compute_ms: int = 0
     error: str | None = None
+    usage: TokenUsage | None = None  # token-billed models: what every answer reported billing (None: not known)
 
 
 @dataclass
@@ -158,6 +159,7 @@ def run_model(provider: AsrProvider, call: Call, compact: Path, out: Path, worke
             cached = [[Word.from_record(w) for w in words] for words in saved["words"]]
             merged = merge_chunk_words(zip(call.chunks, cached, strict=True))
             run.words_by_chunk, run.compute_ms = by_chunk(call.chunks, merged), saved["compute_ms"]
+            run.usage = TokenUsage.from_record(saved.get("usage"))
             return run
     audio = [_cut(compact, chunk) for chunk in call.chunks]
     batches = [audio[i : i + BATCH] for i in range(0, len(audio), BATCH)]
@@ -175,9 +177,13 @@ def run_model(provider: AsrProvider, call: Call, compact: Path, out: Path, worke
         return run
     run.compute_ms = sum(ms for _, ms in answered)
     words = [list(r.words) for batch, _ in answered for r in batch]
+    usages = [r.usage for batch, _ in answered for r in batch]
+    if usages and all(u is not None for u in usages):
+        run.usage = sum((u for u in usages if u is not None), TokenUsage(0, 0, 0))
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps({"model": provider.model_id, "plan": plan, "compute_ms": run.compute_ms,
-                                 "words": [[w.to_record() for w in ws] for ws in words]},
+                                 "words": [[w.to_record() for w in ws] for ws in words],
+                                 "usage": None if run.usage is None else run.usage.to_record()},
                                 ensure_ascii=False), encoding="utf-8")  # fmt: skip
     run.words_by_chunk = by_chunk(call.chunks, merge_chunk_words(zip(call.chunks, words, strict=True)))
     return run
@@ -236,6 +242,14 @@ def summarise(model_id: str, calls: Sequence[Call], rate: float | None) -> Model
     native = None if price is None else price.per_minute * minutes
     inr_minute = None if price is None else price.inr_per_minute(rate)
     cost_inr = None if inr_minute is None else inr_minute * minutes
+    tokens = TOKEN_PRICES.get(model_id)
+    if tokens is not None:  # billed by tokens: what the answers reported, output and thinking included
+        usages = [r.usage for _, r in done]
+        known = bool(usages) and all(u is not None for u in usages)
+        total = sum((u for u in usages if u is not None), TokenUsage(0, 0, 0))
+        native = tokens.cost(total) if known else None
+        cost_inr = token_cost_inr(model_id, total, rate) if known else None
+        inr_minute = None if cost_inr is None or not minutes else cost_inr / minutes
     raw = translit = None
     sarvam = next((m for m in calls[0].runs if m.startswith(SARVAM + "/")), None) if calls else None
     if model_id != sarvam and sarvam is not None:
@@ -244,14 +258,17 @@ def summarise(model_id: str, calls: Sequence[Call], rate: float | None) -> Model
             raw = corpus_counts(difference(a, b, transliterated=False) for a, b in pairs).wer
             translit = corpus_counts(difference(a, b, transliterated=True) for a, b in pairs).wer
     symbol = {"INR": "₹", "USD": "$"}
+    currency = tokens.currency if tokens else price.currency if price else None
     return ModelSummary(
         model_id=model_id, calls=len(done), failed=[f"{c.recording.id}: {r.error}" for c, r in runs if r.error],
         sent_minutes=round(minutes, 2), compute_s=round(compute_ms / 1000, 1),
         price="no per-minute price (own machine)" if model_id.startswith("whisper/") else
-        ("not published or not checked" if price is None else f"{symbol[price.currency]}{price.per_minute:g} / min"),
-        price_source=price.source if price else None,
+        (f"{symbol[tokens.currency]}{tokens.input_per_million:g} in, {symbol[tokens.currency]}"
+         f"{tokens.output_per_million:g} out per 1M tokens" if tokens else
+         "not published or not checked" if price is None else f"{symbol[price.currency]}{price.per_minute:g} / min"),
+        price_source=tokens.source if tokens else price.source if price else None,
         cost_inr=None if cost_inr is None else round(cost_inr, 2),
-        cost_native=None if native is None or price is None else f"{symbol[price.currency]}{native:.4f}",
+        cost_native=None if native is None or currency is None else f"{symbol[currency]}{native:.4f}",
         inr_per_audio_hour=None if inr_minute is None else round(inr_minute * 60, 2),
         real_time_factor=round(compute_ms / sent_ms, 3) if sent_ms and compute_ms else None,
         difference_raw=raw, difference_translit=translit,

@@ -55,6 +55,31 @@ class ChunkResult:
     text: str
     words: tuple[Word, ...]
     languages: tuple[LanguageSpan, ...]
+    # Token-billed providers (Gemini): what the provider reported it billed for this chunk, retries included. None
+    # for providers billed by audio length, or when the provider did not say (never a guessed count).
+    usage: TokenUsage | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TokenUsage:
+    """Tokens a provider billed. `output_tokens` includes `thinking_tokens` (billed as output)."""
+
+    input_tokens: int
+    output_tokens: int
+    thinking_tokens: int = 0
+
+    def __add__(self, other: TokenUsage) -> TokenUsage:
+        return TokenUsage(self.input_tokens + other.input_tokens, self.output_tokens + other.output_tokens,
+                          self.thinking_tokens + other.thinking_tokens)  # fmt: skip
+
+    def to_record(self) -> dict[str, int]:
+        return {"input_tokens": self.input_tokens, "output_tokens": self.output_tokens,
+                "thinking_tokens": self.thinking_tokens}  # fmt: skip
+
+    @classmethod
+    def from_record(cls, record: dict[str, int] | None) -> TokenUsage | None:
+        return None if record is None else cls(record["input_tokens"], record["output_tokens"],
+                                               record.get("thinking_tokens", 0))  # fmt: skip
 
 
 class ProviderError(Exception):

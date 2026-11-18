@@ -60,7 +60,7 @@ from sabha_asr.chunking import (
     retime_over_speech,
     speaker_cuts,
 )
-from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError
+from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, TokenUsage
 from sabha_asr.transcriber import Transcriber
 from sabha_asr.words import Turn, Word
 from sabha_core.storage import artefact_prefix
@@ -95,7 +95,8 @@ class Part:
             "compute_ms": self.compute_ms, "fallback_reason": self.fallback_reason,
             "results": [
                 {"chunk_id": r.chunk_id, "text": r.text, "words": [w.to_record() for w in r.words],
-                 "languages": [[s.start_ms, s.end_ms, s.language] for s in r.languages]}
+                 "languages": [[s.start_ms, s.end_ms, s.language] for s in r.languages],
+                 **({"usage": r.usage.to_record()} if r.usage else {})}
                 for r in self.results
             ],
         }).encode()  # fmt: skip
@@ -107,6 +108,7 @@ class Part:
             ChunkResult(
                 r["chunk_id"], r["text"], tuple(Word.from_record(w) for w in r["words"]),
                 tuple(LanguageSpan(s, e, lang) for s, e, lang in r["languages"]),
+                TokenUsage.from_record(r.get("usage")),
             )
             for r in data["results"]
         ]  # fmt: skip
@@ -115,6 +117,22 @@ class Part:
             raise ValueError(f"saved part has an unknown word_timing {timing!r}")
         return cls(data["provider"], data["model_id"], timing, data["compute_ms"],
                    data["fallback_reason"], results)  # fmt: skip
+
+
+def billed_tokens(parts: Sequence[Part]) -> dict[str, TokenUsage]:
+    """Tokens billed per model, for models whose every answer reported them (a part saved before usage was kept, or
+    an answer without it, leaves the model out: its cost is then unknown, never guessed)."""
+    totals: dict[str, TokenUsage] = {}
+    incomplete: set[str] = set()
+    for part in parts:
+        for result in part.results:
+            if result.usage is None:
+                incomplete.add(part.model_id)
+            else:
+                totals[part.model_id] = (
+                    totals[part.model_id] + result.usage if part.model_id in totals else result.usage
+                )
+    return {model: usage for model, usage in totals.items() if model not in incomplete}
 
 
 def plan_key(chunks: Sequence[Chunk], speed: float = 1.0) -> str:
@@ -180,7 +198,7 @@ def _slow_down(result: ChunkResult, chunk: Chunk, speed: float) -> ChunkResult:
 
     words = tuple(Word(w.text, back(w.start_ms), back(w.end_ms), w.confidence) for w in result.words)
     languages = tuple(LanguageSpan(back(s.start_ms), back(s.end_ms), s.language) for s in result.languages)
-    return ChunkResult(result.chunk_id, result.text, words, languages)
+    return ChunkResult(result.chunk_id, result.text, words, languages, result.usage)
 
 
 LONG_CHUNK_MS = 5_000
@@ -420,7 +438,7 @@ def make_work(
             billed[part.model_id] = billed.get(part.model_id, 0) + sum(sent_ms(c, speed) for c in sent)
         diarized_turns = [Turn(t["speaker_label"], t["start_ms"], t["end_ms"]) for t in turns]
         asr_output = AsrOutput(words, "+".join(models), parts[0].word_timing, languages, segment_map, billed,
-                               word_turns=chunk_turns(chunks, diarized_turns))  # fmt: skip
+                               word_turns=chunk_turns(chunks, diarized_turns), usage=billed_tokens(parts))  # fmt: skip
         return {**meta, **finish_transcript(ctx, asr_output, transcript)}
 
     return work
