@@ -355,6 +355,35 @@ def test_staff_cannot_name_agent_2(api: Api, support: dict[str, Any]) -> None:
     problem(api.create("staff-a", {**support, "transfer_person_id": "p-other"}), 403, "person_not_allowed")
 
 
+# --- How many voices, and how they are told apart (owner 2026-11-18) ---
+
+
+def test_the_uploader_can_say_how_many_speakers_and_ask_for_the_gemini_check(api: Api, support: dict[str, Any]) -> None:
+    rid = api.create("staff-a", {**support, "speaker_count": 4, "speaker_model": "gemini"}).json()["recording_id"]
+    doc = api.db.recordings.find_one({"_id": rid})
+    assert doc is not None and (doc["speaker_count"], doc["speaker_model"]) == (4, "gemini")
+    plain = api.db.recordings.find_one({"_id": api.create("owner-a", LESSON).json()["recording_id"]})
+    assert plain is not None and (plain["speaker_count"], plain["speaker_model"]) == (None, "pyannote")
+
+
+@pytest.mark.parametrize("change", [{"speaker_count": 1}, {"speaker_count": 11}, {"speaker_model": "deepgram"}])
+def test_speaker_choices_outside_the_options_are_refused(
+    api: Api, support: dict[str, Any], change: dict[str, Any]
+) -> None:
+    problem(api.create("owner-a", {**support, **change}), 422, "validation_error")
+
+
+def test_a_transferred_call_has_three_speakers(api: Api, support: dict[str, Any]) -> None:
+    body = {**support, "transfer_person_id": "p-other"}
+    problem(api.create("owner-a", {**body, "speaker_count": 2}), 422, "transfer_not_allowed")
+    assert api.create("owner-a", {**body, "speaker_count": 3}).status_code == 201
+
+
+def test_a_transcript_file_has_no_voices_to_count(api: Api) -> None:
+    body = {**LESSON, "file_name": "meet.txt", "content_type": "text/plain", "size_bytes": 100, "speaker_count": 3}
+    problem(api.create("owner-a", body), 422, "speakers_not_allowed")
+
+
 @pytest.mark.parametrize(
     ("file_name", "content_type"),
     [("lesson.exe", "application/octet-stream"), ("lesson.mp3", "video/mp4"), ("lesson", "audio/mpeg")],

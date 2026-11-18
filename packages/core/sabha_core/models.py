@@ -257,6 +257,10 @@ class CostEstimate(BaseModel):
 
 
 Interaction = Literal["call", "meeting"]
+SpeakerModel = Literal["pyannote", "gemini"]
+SPEAKER_COUNT_MIN, SPEAKER_COUNT_MAX = 2, 10
+TRANSFERRED_SPEAKERS = 3
+"""A support call transferred during the call: agent 1, agent 2 and the customer (sabha_asr.transfer)."""
 CLIENT_NAME_MAX = 120
 
 
@@ -329,6 +333,11 @@ class Recording(TenantDoc):
     # Support calls transferred during the call (owner 2026-11-18): agent 1 (person_id) hands the caller to agent 2,
     # this person, in the same recording. Both agents are analysed, each on their own part.
     transfer_person_id: str | None = None
+    # How the voices are told apart (owner 2026-11-18, chosen at upload by anyone who uploads): how many speakers the
+    # diarizer is asked for (None: the type's default, sabha_workers.stages.diarize.speaker_count), and whether
+    # Gemini then checks who said each line (sabha_asr.speaker_check) on top of pyannote.
+    speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
+    speaker_model: SpeakerModel = "pyannote"
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

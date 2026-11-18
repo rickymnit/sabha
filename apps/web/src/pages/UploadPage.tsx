@@ -264,6 +264,10 @@ export function UploadPage() {
   // Support calls handed to a second agent during the call (owner 2026-11-18). Managers and admins mark it.
   const [transferred, setTransferred] = useState<"no" | "yes">("no");
   const [transferId, setTransferId] = useState("");
+  // How many voices and how they are told apart (owner 2026-11-18), for everyone who uploads. Support calls default
+  // to 2 (one agent, one customer); a transferred call always has 3.
+  const [speakerChoice, setSpeakerChoice] = useState<string | null>(null);
+  const [speakerModel, setSpeakerModel] = useState<"pyannote" | "gemini">("pyannote");
   const [consentOnFile, setConsentOnFile] = useState(() => rememberedConsent() !== "");
   const [consentRef, setConsentRef] = useState(rememberedConsent);
 
@@ -280,6 +284,10 @@ export function UploadPage() {
   const canTransfer = type === "support" && !staffSelf;
   const transferPerson = canTransfer && transferred === "yes" && transferId !== chosenPerson ? transferId : "";
   const transferMissing = canTransfer && transferred === "yes" && transferPerson === "";
+  const transferring = canTransfer && transferred === "yes";
+  const speakers = transferring ? "3" : (speakerChoice ?? (type === "support" ? "2" : "auto"));
+  const speakerCount = speakers === "auto" ? null : Number(speakers);
+  const callType = type === "support" || type === "sales";
   const canStart = summary.ready > 0 && !running && chosenPerson !== "" && !consentMissing && !transferMissing;
   const things = summary.ready === 1 ? labels.recording.toLowerCase() : labels.recording_plural.toLowerCase();
 
@@ -307,6 +315,8 @@ export function UploadPage() {
         clientName: type === "sales" ? clientName : null,
         asrModel,
         transferPersonId: transferPerson || null,
+        speakerCount: isTranscript(item.file) ? null : speakerCount,
+        speakerModel: isTranscript(item.file) ? "pyannote" : speakerModel,
         onProgress: (sent, total) =>
           dispatch({ type: "set", key: item.key, state: { kind: "uploading", sent, total } }),
       });
@@ -554,6 +564,40 @@ export function UploadPage() {
               )}
             </>
           )}
+          <Select
+            label="Number of speakers"
+            value={speakers}
+            disabled={running || transferring}
+            onChange={(e) => setSpeakerChoice(e.target.value)}
+            hint={
+              transferring
+                ? "A transferred call has 3: both agents and the customer."
+                : callType && speakers === "2"
+                  ? `One is the ${labels.person.toLowerCase()} and the other is the customer.`
+                  : "Count every voice in the recording. Automatic lets Sabha decide."
+            }
+          >
+            <option value="auto">Automatic</option>
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={String(n)}>
+                {n}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Telling the speakers apart"
+            value={speakerModel}
+            disabled={running}
+            onChange={(e) => setSpeakerModel(e.target.value === "gemini" ? "gemini" : "pyannote")}
+            hint={
+              speakerModel === "gemini"
+                ? "Gemini listens again and fixes who said which line. Adds about ₹9–11 per hour of audio."
+                : "Sabha separates the voices by how they sound."
+            }
+          >
+            <option value="pyannote">Standard (pyannote)</option>
+            <option value="gemini">Standard + Gemini check</option>
+          </Select>
           {personUnits.length > 1 && (
             <Select
               label={`${unitWords(labels).group} and ${unitWords(labels).sub.toLowerCase()}`}

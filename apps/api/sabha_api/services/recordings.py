@@ -50,12 +50,16 @@ from sabha_api.errors import ApiError, ConflictError, ForbiddenError, NotFoundEr
 from sabha_asr.registry import AsrConfigError, chosen_spec
 from sabha_core.models import (
     CLIENT_NAME_MAX,
+    SPEAKER_COUNT_MAX,
+    SPEAKER_COUNT_MIN,
+    TRANSFERRED_SPEAKERS,
     AuditEntry,
     CostEstimate,
     Interaction,
     OutboxEvent,
     Person,
     Recording,
+    SpeakerModel,
     Tenant,
     Unit,
     new_id,
@@ -105,6 +109,9 @@ class RecordingIn(BaseModel):
     asr_model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
     # Support audio only: the agent the call was transferred to during the call (agent 2); person_id is agent 1.
     transfer_person_id: str | None = None
+    # Audio only: how many speakers (None: the type's default) and whether Gemini checks who said each line.
+    speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
+    speaker_model: SpeakerModel = "pyannote"
 
     @field_validator("content_type")
     @classmethod
@@ -153,6 +160,10 @@ class InteractionNotAllowedError(ApiError):
 
 class TransferNotAllowedError(ApiError):
     status, code, title = 422, "transfer_not_allowed", "Transfer not allowed"
+
+
+class SpeakersNotAllowedError(ApiError):
+    status, code, title = 422, "speakers_not_allowed", "Speaker choices need audio"
 
 
 class UnsupportedFormatError(ApiError):
@@ -316,6 +327,8 @@ async def _transfer_agent(
         return None
     if body.type is not ConversationType.SUPPORT or transcript:
         raise TransferNotAllowedError("Only support call recordings can be marked as transferred.")
+    if body.speaker_count not in (None, TRANSFERRED_SPEAKERS):
+        raise TransferNotAllowedError("A transferred call has three speakers: two agents and the customer.")
     if agent_1 is None or body.transfer_person_id == agent_1.id:
         raise TransferNotAllowedError("Choose the agent who took the call first and a different agent it went to.")
     if principal.role is Role.STAFF:
@@ -366,6 +379,8 @@ async def create(
     if body.unit_id is not None and await units.find_one({"_id": body.unit_id}) is None:
         raise UnknownUnitError("This unit does not exist in your organisation.")
     transfer_person_id = await _transfer_agent(principal, body, person, transcript, people)
+    if transcript and (body.speaker_count is not None or body.speaker_model != "pyannote"):
+        raise SpeakersNotAllowedError("A transcript file has no voices to count or tell apart.")
 
     asr_choice = None
     if body.asr_model is not None and not transcript:  # a transcript file has no audio to transcribe
@@ -400,6 +415,8 @@ async def create(
         client_name=body.client_name,
         asr_choice=asr_choice,
         transfer_person_id=transfer_person_id,
+        speaker_count=body.speaker_count,
+        speaker_model=body.speaker_model,
     )
     try:
         async with transactions.run() as session:
@@ -417,6 +434,8 @@ async def create(
                     "source": recording.source,
                     **({"asr_model": asr_choice} if asr_choice else {}),
                     **({"transfer_person_id": transfer_person_id} if transfer_person_id else {}),
+                    **({"speaker_count": body.speaker_count} if body.speaker_count else {}),
+                    **({"speaker_model": body.speaker_model} if body.speaker_model != "pyannote" else {}),
                 },
                 session=session,
             )

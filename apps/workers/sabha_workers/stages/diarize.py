@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from sabha_asr.diarization import Diarizer, Turn
-from sabha_core.models import Recording
+from sabha_core.models import TRANSFERRED_SPEAKERS, Recording
 from sabha_core.profiles import ConversationType
 from sabha_core.storage import artefact_prefix
 from sabha_core.timemap import SegmentMap
@@ -48,12 +48,13 @@ MIN_TURN_MS = 250
 """Shorter turns are flicker, not talk (module docstring, step 2). An unmeasured starting value (eval/roles.py)."""
 SPEAKER_COUNTS = {ConversationType.SUPPORT: 2}
 """Conversation types with a known number of speakers; others are left to the diarizer."""
-TRANSFERRED_SPEAKERS = 3
-"""A transferred support call: agent 1, agent 2 and the customer (module docstring, step 2)."""
 
 
 def speaker_count(recording: Recording) -> int | None:
-    """How many speakers the diarizer is asked for exactly; None leaves it free."""
+    """How many speakers the diarizer is asked for exactly; None leaves it free. The uploader's count wins
+    (Recording.speaker_count, owner 2026-11-18), then a transferred call's 3, then the type's default."""
+    if recording.speaker_count is not None:
+        return recording.speaker_count
     if recording.type is ConversationType.SUPPORT and recording.transfer_person_id:
         return TRANSFERRED_SPEAKERS
     return SPEAKER_COUNTS.get(recording.type)

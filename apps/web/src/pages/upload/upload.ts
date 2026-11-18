@@ -40,6 +40,9 @@ export interface UploadInput {
   asrModel?: string | null;
   /** Support calls transferred during the call: the agent who took over (agent 2); personId is agent 1. */
   transferPersonId?: string | null;
+  /** Audio only: how many voices (null: the type's default) and whether Gemini checks who said each line. */
+  speakerCount?: number | null;
+  speakerModel?: "pyannote" | "gemini";
   /** Bytes uploaded so far, after each part. */
   onProgress?: (sent: number, total: number) => void;
   /** For tests: fetch for the part PUTs, and a pause between retries. */
@@ -116,6 +119,8 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       ...(input.clientName?.trim() ? { client_name: input.clientName.trim() } : {}),
       ...(input.asrModel ? { asr_model: input.asrModel } : {}),
       ...(input.transferPersonId ? { transfer_person_id: input.transferPersonId } : {}),
+      ...(input.speakerCount ? { speaker_count: input.speakerCount } : {}),
+      ...(input.speakerModel && input.speakerModel !== "pyannote" ? { speaker_model: input.speakerModel } : {}),
     },
   });
   const etags = new Map<number, string>();

@@ -20,7 +20,7 @@ from sabha_core.repo import SyncTenantRepo
 from sabha_core.settings import Settings
 from sabha_core.state import RecordingStatus
 from sabha_core.timemap import Segment, SegmentMap, build_segment_map
-from sabha_workers.stages.diarize import make_work, to_original
+from sabha_workers.stages.diarize import make_work, speaker_count, to_original
 from sabha_workers.stages.runner import DONE_MARKER, S3Artefacts, StageRunner, StageSpec
 
 S = RecordingStatus
@@ -179,6 +179,17 @@ def test_a_transferred_support_call_asks_for_exactly_three_speakers(stage: Stage
     assert [(c["min_speakers"], c["max_speakers"]) for c in diarizer.calls] == [(3, 3)]
     output = json.loads(stage.artefacts.get(f"t1/{rid}/diarize@v1/diarization@v1.json"))
     assert output["speakers"] == ["S0", "S1", "S2"]
+
+
+def test_the_uploaders_speaker_count_wins_over_the_types_default() -> None:
+    def rec(**kw: Any) -> Recording:
+        return Recording(type=kw.pop("kind", ConversationType.SUPPORT), consent_ref="c", person_id="p1", **kw)
+
+    assert speaker_count(rec()) == 2  # support's default
+    assert speaker_count(rec(kind=ConversationType.TEACHING)) is None  # left to the diarizer
+    assert speaker_count(rec(speaker_count=4)) == 4
+    assert speaker_count(rec(kind=ConversationType.TEACHING, speaker_count=3)) == 3
+    assert speaker_count(rec(transfer_person_id="p2")) == 3
 
 
 @pytest.mark.integration
