@@ -369,6 +369,11 @@ class Transcript(TenantDoc):
     asr_billed_ms: int | None = Field(default=None, ge=0)
     asr_cost_inr: float | None = Field(default=None, ge=0)
     rubric_id: str = Field(min_length=1)
+    # A support call transferred during the call (sabha_asr.transfer, owner 2026-11-18): speaker label -> the person
+    # id of agent 1 (Recording.person_id) and agent 2 (Recording.transfer_person_id), and the handover, agent 2's
+    # first words, on the ORIGINAL timeline. Empty and None on every other call.
+    agents: dict[str, str] = Field(default_factory=dict)
+    handover_ms: int | None = Field(default=None, ge=0)
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

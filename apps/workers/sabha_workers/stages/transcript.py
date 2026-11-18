@@ -16,6 +16,9 @@
 4. Assembles `transcript@v1.json` with sabha_asr.assembly: utterances with role, speaker label, text and times on
    the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it, with the
    list rows' "who spoke when" strip (`speaker_strip`).
+   A support call transferred during the call (Recording.transfer_person_id) has two agents and the customer:
+   sabha_asr.transfer finds them and the handover, writes `transfer@v1.json`, and the transcript document maps each
+   agent's speaker label to their person (`agents`) with the handover on the original timeline (`handover_ms`).
    Meetings have no one to find: every voice is a "participant" (method "all_participants"), never reviewed.
 5. Roles still unclear: the transcript is kept (with the best guess, for the reviewer) and NeedsReviewError
    `unclear_roles` stops the pipeline. A guess is never analysed (golden rule 5).
@@ -36,6 +39,7 @@ from sabha_analytics.rubric import Rubric
 from sabha_asr.assembly import WordTiming, assemble_transcript
 from sabha_asr.pricing import cost_inr
 from sabha_asr.roles import RoleAssignment, RoleTieBreaker, SpeakerRole, assign_roles
+from sabha_asr.transfer import TransferRoles, assign_transfer_roles, from_confirmed
 from sabha_asr.words import Turn, Word
 from sabha_core.models import SpeakerSpan, Tenant, Transcript
 from sabha_core.profiles import ConversationType
@@ -138,6 +142,17 @@ def confirmed_assignment(confirmed: dict[str, str], turns: Sequence[Turn], roles
     return RoleAssignment({label: SpeakerRole(role, 1.0, "reviewer") for label, role in confirmed.items()})
 
 
+def _original(compact_ms: int | None, asr: AsrOutput) -> int | None:
+    return None if compact_ms is None else asr.segment_map.compact_to_original(compact_ms)
+
+
+def _agents(transfer: TransferRoles | None, agent_1: str | None, agent_2: str | None) -> dict[str, str]:
+    """Speaker label -> person id for both agents of a transferred call; empty when they are not known."""
+    if transfer is None or transfer.agent_1 is None or transfer.agent_2 is None or not agent_1 or not agent_2:
+        return {}
+    return {transfer.agent_1: agent_1, transfer.agent_2: agent_2}
+
+
 def finish_transcript(
     ctx: StageContext, asr: AsrOutput, deps: TranscriptDeps, turns: Sequence[Turn] | None = None
 ) -> dict[str, Any]:
@@ -162,13 +177,28 @@ def finish_transcript(
     if len(rubric.roles) < (1 if meeting else 2):
         raise PermanentError("no_rubric", f"rubric {rubric.id} names too few roles")
 
+    transfer: TransferRoles | None = None
+    names = [tenant.name, *tenant.name_variants]
     if meeting:  # everyone is a participant and the meeting is analysed: nobody to find, nothing to review
         labels = sorted({turn.speaker_label for turn in turns})
         assignment = RoleAssignment({label: SpeakerRole(rubric.roles[0], 1.0, ALL_PARTICIPANTS) for label in labels})
+    elif recording.transfer_person_id and recording.type is ConversationType.SUPPORT:
+        if recording.confirmed_roles is not None:
+            transfer = from_confirmed(recording.confirmed_roles, turns, rubric.roles[:2])
+            if transfer is None:
+                raise NeedsReviewError("unclear_roles", f"the confirmed roles {recording.confirmed_roles} do not fit "
+                                       "a transferred call: two agents and one customer")  # fmt: skip
+        else:
+            transfer = assign_transfer_roles(asr.word_turns or turns, asr.words, rubric.roles[:2], names)
+            ctx.artefacts.put(ctx.prefix + "roles_auto@v1.json", transfer.assignment.to_json().encode(),
+                              "application/json")  # fmt: skip
+        assignment = transfer.assignment
+        record = {**transfer.to_record(), "handover_original_ms": _original(transfer.handover_ms, asr)}
+        ctx.artefacts.put(ctx.prefix + "transfer@v1.json", json.dumps(record, ensure_ascii=False).encode(),
+                          "application/json")  # fmt: skip
     elif recording.confirmed_roles is not None:
         assignment = confirmed_assignment(recording.confirmed_roles, turns, (rubric.roles[0], rubric.roles[1]))
     else:
-        names = [tenant.name, *tenant.name_variants]
         assignment = assign_roles(
             asr.word_turns or turns, asr.words, recording.type.value, rubric.roles[:2], tenant_name_variants=names,
             tie_breaker=deps.tie_breaker(ctx.tenant_id, recording.id),
@@ -205,6 +235,8 @@ def finish_transcript(
                                         recording.duration_ms),
             roles_need_review=assignment.needs_review_reason is not None,
             asr_billed_ms=sum(asr.billed_ms.values()) or None, asr_cost_inr=asr_cost,
+            agents=_agents(transfer, recording.person_id, recording.transfer_person_id),
+            handover_ms=None if transfer is None else _original(transfer.handover_ms, asr),
         )
     )  # fmt: skip
     if assignment.needs_review_reason is not None:

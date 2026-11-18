@@ -74,6 +74,7 @@ class Setup:
     kind: ConversationType = ConversationType.TEACHING
     tie_breaker: Any = None
     confirmed_roles: dict[str, str] | None = None  # a reviewer's answer (ADR 0007)
+    transfer: str | None = None  # agent 2 of a support call transferred during the call
     tenant: Tenant = field(default_factory=lambda: TENANT)
     saved: list[Transcript] = field(default_factory=list)
     store: Memory = field(default_factory=Memory)
@@ -85,7 +86,14 @@ class Setup:
             diarize_version="v1", tenant=lambda _: self.tenant, rubric=lambda t, k: rubric_for(t, k, RUBRICS),
             tie_breaker=lambda *_: self.tie_breaker, save=lambda _, doc: self.saved.append(doc),
         )  # fmt: skip
-        recording = Recording(id="r1", tenant_id="t1", type=self.kind, confirmed_roles=self.confirmed_roles)
+        recording = Recording(
+            id="r1",
+            tenant_id="t1",
+            type=self.kind,
+            confirmed_roles=self.confirmed_roles,
+            person_id="p-anil" if self.transfer else None,
+            transfer_person_id=self.transfer,
+        )
         ctx = StageContext("t1", recording, "t1/r1/transcribe@v1/", self.store, 1)
         spans = [{"start_ms": 0, "end_ms": 45_000, "language": "hi-IN"},
                  {"start_ms": 45_000, "end_ms": 60_000, "language": "en-IN"}]  # fmt: skip
@@ -165,6 +173,47 @@ def test_confirmed_roles_that_do_not_fit_send_it_back_for_review(confirmed: dict
     with pytest.raises(NeedsReviewError) as caught:
         setup.run(LECTURE)
     assert caught.value.code == "unclear_roles"
+
+
+# --- A support call transferred during the call (sabha_asr.transfer) ---
+
+COMPANY = Tenant.from_profile("company", name="SchoolLog", plan=Plan.PILOT, id="t1")
+# Agent 1 (S1) with the customer (S0), agent 2 (S2) from compact 35000; compact 30000 is the join (original 40000).
+TRANSFER_TURNS = [("S1", 0, 5_000), ("S0", 5_000, 15_000), ("S1", 15_000, 28_000), ("S2", 35_000, 45_000),
+                  ("S0", 45_000, 52_000), ("S2", 52_000, 60_000)]  # fmt: skip
+TRANSFER_WORDS = words((0, 5_000, "namaskar SchoolLog support se Anil bol raha hoon"),
+                       (5_000, 15_000, "sir login nahi ho raha verify nahi ho raha"),
+                       (15_000, 28_000, "aap apna anydesk id bataiye main check kar leta hoon"),
+                       (35_000, 45_000, "anydesk id bataiye main check kar leta hoon"),
+                       (45_000, 52_000, "ji 1267146230"),
+                       (52_000, 60_000, "main aapko call back kar dunga"))  # fmt: skip
+
+
+def test_a_transferred_call_names_both_agents_and_the_handover_on_the_original_timeline() -> None:
+    setup = Setup(TRANSFER_TURNS, ConversationType.SUPPORT, tenant=COMPANY, transfer="p-senior")
+    setup.tie_breaker = lambda _: pytest.fail("the tie-breaker is not asked about a transferred call")
+    meta = setup.run(TRANSFER_WORDS)
+    (doc,) = setup.saved
+    assert doc.roles == {"S0": "customer", "S1": "support_agent", "S2": "support_agent"}
+    assert doc.agents == {"S1": "p-anil", "S2": "p-senior"} and doc.roles_need_review is False
+    assert doc.handover_ms == 45_000  # compact 35000 is original 45000
+    found = json.loads(setup.store.get("t1/r1/transcribe@v1/transfer@v1.json"))
+    assert (found["agent_1"], found["agent_2"], found["customer"]) == ("S1", "S2", "S0")
+    assert found["handover_ms"] == 35_000 and found["handover_original_ms"] == 45_000
+    assert meta["roles_method"] == "transfer"
+
+
+def test_a_transfer_a_reviewer_confirmed_takes_the_first_agent_as_agent_1() -> None:
+    setup = Setup(TRANSFER_TURNS, ConversationType.SUPPORT, tenant=COMPANY, transfer="p-senior")
+    setup.confirmed_roles = {"S0": "customer", "S1": "support_agent", "S2": "support_agent"}
+    setup.run(TRANSFER_WORDS)
+    (doc,) = setup.saved
+    assert doc.agents == {"S1": "p-anil", "S2": "p-senior"} and doc.handover_ms == 45_000
+    assert doc.roles_method == "reviewer"
+    setup = Setup(TRANSFER_TURNS, ConversationType.SUPPORT, tenant=COMPANY, transfer="p-senior")
+    setup.confirmed_roles = {"S0": "customer", "S1": "support_agent", "S2": "customer"}  # one agent only
+    with pytest.raises(NeedsReviewError):
+        setup.run(TRANSFER_WORDS)
 
 
 def test_in_a_meeting_every_voice_is_a_participant_and_nothing_goes_to_review() -> None:
