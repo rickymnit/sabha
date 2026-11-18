@@ -103,6 +103,8 @@ class RecordingIn(BaseModel):
     # Owners and admins only: the speech-to-text model for this audio, "provider:model" from GET /v1/speech-models
     # (owner 2026-11-13). Left out, the configured model is used.
     asr_model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
+    # Support audio only: the agent the call was transferred to during the call (agent 2); person_id is agent 1.
+    transfer_person_id: str | None = None
 
     @field_validator("content_type")
     @classmethod
@@ -147,6 +149,10 @@ class TypeNotEnabledError(ApiError):
 
 class InteractionNotAllowedError(ApiError):
     status, code, title = 422, "interaction_not_allowed", "Only sales recordings are calls or meetings"
+
+
+class TransferNotAllowedError(ApiError):
+    status, code, title = 422, "transfer_not_allowed", "Transfer not allowed"
 
 
 class UnsupportedFormatError(ApiError):
@@ -298,6 +304,30 @@ async def _person_for(principal: Principal, person_id: str | None, people: Tenan
     return person
 
 
+async def _transfer_agent(
+    principal: Principal,
+    body: RecordingIn,
+    agent_1: Person | None,
+    transcript: bool,
+    people: TenantRepo[Person],
+) -> str | None:
+    """Agent 2 of a support call transferred during the call, checked like agent 1 is (None: not transferred)."""
+    if body.transfer_person_id is None:
+        return None
+    if body.type is not ConversationType.SUPPORT or transcript:
+        raise TransferNotAllowedError("Only support call recordings can be marked as transferred.")
+    if agent_1 is None or body.transfer_person_id == agent_1.id:
+        raise TransferNotAllowedError("Choose the agent who took the call first and a different agent it went to.")
+    if principal.role is Role.STAFF:
+        raise PersonNotAllowedError("Ask your manager or administrator to upload a transferred call.")
+    agent_2 = await people.find_one({"_id": body.transfer_person_id})
+    if agent_2 is None:
+        raise UnknownPersonError("This person does not exist in your organisation.")
+    if principal.role in UNIT_SCOPED and agent_2.unit_id not in principal.unit_ids:
+        raise PersonNotAllowedError("You can upload only for people in your units.")
+    return agent_2.id
+
+
 async def create(
     principal: Principal,
     body: RecordingIn,
@@ -335,6 +365,7 @@ async def create(
         raise PersonNotAllowedError("You can upload only for your units.")
     if body.unit_id is not None and await units.find_one({"_id": body.unit_id}) is None:
         raise UnknownUnitError("This unit does not exist in your organisation.")
+    transfer_person_id = await _transfer_agent(principal, body, person, transcript, people)
 
     asr_choice = None
     if body.asr_model is not None and not transcript:  # a transcript file has no audio to transcribe
@@ -368,6 +399,7 @@ async def create(
         interaction=(body.interaction or "meeting") if sales else None,
         client_name=body.client_name,
         asr_choice=asr_choice,
+        transfer_person_id=transfer_person_id,
     )
     try:
         async with transactions.run() as session:
@@ -384,6 +416,7 @@ async def create(
                     "size_bytes": body.size_bytes,
                     "source": recording.source,
                     **({"asr_model": asr_choice} if asr_choice else {}),
+                    **({"transfer_person_id": transfer_person_id} if transfer_person_id else {}),
                 },
                 session=session,
             )

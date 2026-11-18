@@ -326,6 +326,9 @@ class Recording(TenantDoc):
     # Speech-to-text model chosen at upload by an owner or admin ("openai:gpt-transcribe", sabha_asr.registry
     # CHOICES; owner 2026-11-13). None: the configured ASR_PROVIDER when the recording is transcribed.
     asr_choice: str | None = Field(default=None, max_length=100)
+    # Support calls transferred during the call (owner 2026-11-18): agent 1 (person_id) hands the caller to agent 2,
+    # this person, in the same recording. Both agents are analysed, each on their own part.
+    transfer_person_id: str | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 

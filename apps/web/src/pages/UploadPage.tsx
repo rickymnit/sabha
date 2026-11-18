@@ -261,6 +261,9 @@ export function UploadPage() {
   const [personId, setPersonId] = useState("");
   const [interaction, setInteraction] = useState<"call" | "meeting">("meeting");
   const [clientName, setClientName] = useState("");
+  // Support calls handed to a second agent during the call (owner 2026-11-18). Managers and admins mark it.
+  const [transferred, setTransferred] = useState<"no" | "yes">("no");
+  const [transferId, setTransferId] = useState("");
   const [consentOnFile, setConsentOnFile] = useState(() => rememberedConsent() !== "");
   const [consentRef, setConsentRef] = useState(rememberedConsent);
 
@@ -274,7 +277,10 @@ export function UploadPage() {
   const summary = summarise(items);
   const consent = consentOnFile ? consentRef.trim() : "";
   const consentMissing = consentOnFile && consent === "";
-  const canStart = summary.ready > 0 && !running && chosenPerson !== "" && !consentMissing;
+  const canTransfer = type === "support" && !staffSelf;
+  const transferPerson = canTransfer && transferred === "yes" && transferId !== chosenPerson ? transferId : "";
+  const transferMissing = canTransfer && transferred === "yes" && transferPerson === "";
+  const canStart = summary.ready > 0 && !running && chosenPerson !== "" && !consentMissing && !transferMissing;
   const things = summary.ready === 1 ? labels.recording.toLowerCase() : labels.recording_plural.toLowerCase();
 
   const add = (files: FileList | null) => {
@@ -300,6 +306,7 @@ export function UploadPage() {
         interaction: type === "sales" ? interaction : null,
         clientName: type === "sales" ? clientName : null,
         asrModel,
+        transferPersonId: transferPerson || null,
         onProgress: (sent, total) =>
           dispatch({ type: "set", key: item.key, state: { kind: "uploading", sent, total } }),
       });
@@ -515,6 +522,38 @@ export function UploadPage() {
               ))}
             </Select>
           )}
+          {canTransfer && (
+            <>
+              <ChoiceCards
+                legend="Did another agent take over the call?"
+                value={transferred}
+                onChange={setTransferred}
+                disabled={running}
+                options={[
+                  { value: "no", label: "No" },
+                  { value: "yes", label: "Yes, it was transferred" },
+                ]}
+              />
+              {transferred === "yes" && (
+                <Select
+                  label="Transferred to"
+                  value={transferPerson}
+                  disabled={running || people.isPending}
+                  onChange={(e) => setTransferId(e.target.value)}
+                  hint="Each agent is scored on their own part of the call, and on the handover."
+                >
+                  <option value="">Choose an agent</option>
+                  {people.data
+                    ?.filter((p) => p.id !== chosenPerson)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </Select>
+              )}
+            </>
+          )}
           {personUnits.length > 1 && (
             <Select
               label={`${unitWords(labels).group} and ${unitWords(labels).sub.toLowerCase()}`}
@@ -591,9 +630,11 @@ export function UploadPage() {
                 ? "Add files to begin."
                 : !chosenPerson
                   ? `Choose a ${labels.person.toLowerCase()} to continue.`
-                  : !consentOnFile
-                    ? "These will wait for consent before processing."
-                    : "Sabha starts on each file as soon as it is uploaded."}
+                  : transferMissing
+                    ? "Choose the agent who took over the call."
+                    : !consentOnFile
+                      ? "These will wait for consent before processing."
+                      : "Sabha starts on each file as soon as it is uploaded."}
             </p>
           </div>
         </Panel>

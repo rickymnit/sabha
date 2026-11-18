@@ -38,6 +38,8 @@ export interface UploadInput {
   clientName?: string | null;
   /** Owners and admins: the speech-to-text model ("provider:model"); the organisation's default when left out. */
   asrModel?: string | null;
+  /** Support calls transferred during the call: the agent who took over (agent 2); personId is agent 1. */
+  transferPersonId?: string | null;
   /** Bytes uploaded so far, after each part. */
   onProgress?: (sent: number, total: number) => void;
   /** For tests: fetch for the part PUTs, and a pause between retries. */
@@ -113,6 +115,7 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       ...(input.interaction ? { interaction: input.interaction } : {}),
       ...(input.clientName?.trim() ? { client_name: input.clientName.trim() } : {}),
       ...(input.asrModel ? { asr_model: input.asrModel } : {}),
+      ...(input.transferPersonId ? { transfer_person_id: input.transferPersonId } : {}),
     },
   });
   const etags = new Map<number, string>();

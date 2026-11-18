@@ -312,6 +312,49 @@ def test_a_sales_recording_is_a_call_or_a_meeting_with_an_optional_client(api: A
     problem(api.create("owner-a", {**LESSON, "interaction": "call"}), 422, "interaction_not_allowed")
 
 
+# --- Transferred support calls: agent 1 hands the caller to agent 2 in the same recording ---
+
+
+@pytest.fixture
+def support(api: Api) -> dict[str, Any]:
+    api.db.tenants.update_one({"_id": "tenant-a"}, {"$addToSet": {"enabled_types": "support"}})
+    return {**LESSON, "type": "support", "file_name": "call.mp3", "person_id": "p-staff-a"}
+
+
+def test_a_support_call_can_name_the_agent_it_was_transferred_to(api: Api, support: dict[str, Any]) -> None:
+    response = api.create("owner-a", {**support, "transfer_person_id": "p-other"})
+    assert response.status_code == 201, response.text
+    doc = api.db.recordings.find_one({"_id": response.json()["recording_id"]})
+    assert doc is not None and (doc["person_id"], doc["transfer_person_id"]) == ("p-staff-a", "p-other")
+    entry = api.db.audit_log.find_one({"target_id": doc["_id"], "action": "recording.create"})
+    assert entry is not None and entry["meta"]["transfer_person_id"] == "p-other"
+    plain = api.db.recordings.find_one({"_id": api.create("owner-a", support).json()["recording_id"]})
+    assert plain is not None and plain["transfer_person_id"] is None
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"type": "teaching"},  # only support calls are transferred
+        {"transfer_person_id": "p-staff-a"},  # agent 2 is not agent 1
+        {"person_id": None},  # no agent 1
+        {"file_name": "call.txt", "content_type": "text/plain", "size_bytes": 100},  # a transcript has no voices
+    ],
+)
+def test_a_transfer_needs_a_support_audio_call_and_two_different_agents(
+    api: Api, support: dict[str, Any], change: dict[str, Any]
+) -> None:
+    problem(api.create("owner-a", {**support, "transfer_person_id": "p-other", **change}), 422, "transfer_not_allowed")
+
+
+def test_agent_2_must_belong_to_the_tenant(api: Api, support: dict[str, Any]) -> None:
+    problem(api.create("owner-a", {**support, "transfer_person_id": "p-b"}), 422, "unknown_person")
+
+
+def test_staff_cannot_name_agent_2(api: Api, support: dict[str, Any]) -> None:
+    problem(api.create("staff-a", {**support, "transfer_person_id": "p-other"}), 403, "person_not_allowed")
+
+
 @pytest.mark.parametrize(
     ("file_name", "content_type"),
     [("lesson.exe", "application/octet-stream"), ("lesson.mp3", "video/mp4"), ("lesson", "audio/mpeg")],
