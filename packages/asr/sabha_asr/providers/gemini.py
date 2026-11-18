@@ -15,12 +15,13 @@ Guard: an answer with more than MAX_WORDS_PER_S words per second of audio cannot
 about 3 to 4); it is asked once more, and a second such answer fails the chunk rather than put invented words in a
 transcript (golden rule 5).
 
-Models (https://aistudio.google.com/docs/pricing, checked 2026-11-16 and 2026-11-18): `gemini-2.5-flash-lite`
-(default, owner 2026-11-18: cheapest, no retirement announced), `gemini-3.8-flash`, `gemini-3.5-flash-lite` and
-`gemini-2.5-flash`. Audio is 25 tokens per second.
+Models (https://aistudio.google.com/docs/pricing, checked 2026-11-16 and 2026-11-18): `gemini-3.1-flash-lite`
+(default, owner 2026-11-18; Google retires it on 2027-05-07), `gemini-3.8-flash`, `gemini-3.5-flash-lite`,
+`gemini-2.5-flash` and `gemini-2.5-flash-lite` (the last two refused to new accounts, ours included). Audio is 25
+tokens per second.
 
-Thinking: 2.5 Flash and 2.5 Flash-Lite are asked to think not at all (THINKING; thinking is billed as output and was
-88% of a 3.8 Flash call's cost on 2026-11-18). The other models keep Google's default for now.
+Thinking: 3.1 Flash-Lite, 2.5 Flash and 2.5 Flash-Lite are asked to think not at all (THINKING; thinking is billed
+as output and was 88% of a 3.8 Flash call's cost on 2026-11-18). The other models keep Google's default for now.
 
 Model check: Google retires 2.5 Flash and, from 2026-12-01, answers its requests with 3.5 Flash-Lite. An answer whose
 `modelVersion` is not the model asked for is refused (golden rule 7: never a silent swap of model).
@@ -44,7 +45,7 @@ from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderEr
 from sabha_asr.providers import _http
 
 NAME = "gemini"
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 MAX_CHUNK_MS = 29_500  # the pipeline's chunks stay under 30 s for every provider
 DEFAULT_TIMEOUT_S = 90.0
@@ -52,6 +53,7 @@ MAX_WORDS_PER_S = 6.0
 THINKING: dict[str, dict[str, Any]] = {
     "gemini-2.5-flash": {"thinkingBudget": 0},
     "gemini-2.5-flash-lite": {"thinkingBudget": 0},
+    "gemini-3.1-flash-lite": {"thinkingLevel": "minimal"},  # no thinking tokens (tried 2026-11-18)
 }
 """Per model, the thinkingConfig sent (module docstring); a model not listed gets Google's default."""
 _NOT_RETRYABLE = frozenset({"PERMISSION_DENIED", "UNAUTHENTICATED", "INVALID_ARGUMENT", "FAILED_PRECONDITION"})

@@ -42,7 +42,8 @@ _GEMINI_TOKENS = (
     "https://aistudio.google.com/docs/pricing (paid standard, checked 2026-11-18: gemini-3.8-flash input 0.75 and "
     "output 3.75 USD per 1M tokens through 2026-12-31, then 1.50 and 7.50; gemini-3.5-flash-lite input 0.30 and "
     "output 2.50; gemini-2.5-flash (deprecated, routed to 3.5-flash-lite from 2026-12-01) audio input 1.00 and output "
-    "2.50; gemini-2.5-flash-lite audio input 0.30 and output 0.40, no shutdown announced; output includes thinking "
+    "2.50; gemini-2.5-flash-lite audio input 0.30 and output 0.40; gemini-3.1-flash-lite audio input 0.50 and "
+    "output 1.50, shutdown 2027-05-07; output includes thinking "
     "tokens)"
 )
 
@@ -66,6 +67,7 @@ TOKEN_PRICES: dict[str, TokenPrice] = {
     # Audio in costs 1.00 (text 0.30); all input is priced as audio, so a little high, never low.
     "gemini/gemini-2.5-flash": TokenPrice(1.00, 2.50, "USD", _GEMINI_TOKENS),
     "gemini/gemini-2.5-flash-lite": TokenPrice(0.30, 0.40, "USD", _GEMINI_TOKENS),  # audio in 0.30 (text 0.10)
+    "gemini/gemini-3.1-flash-lite": TokenPrice(0.50, 1.50, "USD", _GEMINI_TOKENS),  # audio in 0.50 (text 0.25)
 }
 
 
@@ -99,6 +101,7 @@ PRICES: dict[str, AsrPrice] = {
     "gemini/gemini-3.8-flash": AsrPrice(1500 * 0.75 / 1e6, "USD", _GEMINI),  # 1.50 per 1M from 2027-01-01
     "gemini/gemini-3.5-flash-lite": AsrPrice(1500 * 0.30 / 1e6, "USD", _GEMINI),
     "gemini/gemini-2.5-flash": AsrPrice(1500 * 1.00 / 1e6, "USD", _GEMINI),
+    "gemini/gemini-3.1-flash-lite": AsrPrice(1500 * 0.50 / 1e6, "USD", _GEMINI),
     "gemini/gemini-2.5-flash-lite": AsrPrice(
         1500 * 0.30 / 1e6, "USD", _GEMINI
     ),  # audio only: an estimate before sending

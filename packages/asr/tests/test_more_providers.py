@@ -150,14 +150,13 @@ def test_gemini_request_answer_and_guard_against_invented_words() -> None:
     first = p.transcribe([CHUNK])[0]
     sent = json.loads(seen[0].content)
     assert seen[0].url == (
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
     )
     assert seen[0].headers["x-goog-api-key"] == "k" and sent["generationConfig"]["temperature"] == 0
     assert "Never translate" in sent["contents"][0]["parts"][1]["text"]
     assert [w.text for w in first.words] == ["एक", "device", "की", "बात"] and p.word_timing == "approximate"
-    assert sent["generationConfig"]["thinkingConfig"] == {
-        "thinkingBudget": 0
-    }  # 2.5 Flash-Lite, the default: no thinking
+    # 3.1 Flash-Lite, the default: no thinking
+    assert sent["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "minimal"}
     # 61 words in 10 s cannot have been spoken: asked again, and the second answer is used
     assert [w.text for w in p.transcribe([CHUNK])[0].words] == ["ठीक", "है"] and len(seen) == 3
 
