@@ -190,6 +190,28 @@ def test_gemini_reports_the_tokens_it_billed_retries_and_thinking_included() -> 
     assert no_usage.transcribe([CHUNK])[0].usage is None  # never a guessed count
 
 
+def test_gemini_2_5_flash_thinks_nothing_and_must_answer_itself() -> None:
+    seen: list[httpx.Request] = []
+    answers = [{**gemini_answer("ठीक है"), "modelVersion": "gemini-2.5-flash"},
+               {**gemini_answer("ठीक है"), "modelVersion": "gemini-3.5-flash-lite"}]  # fmt: skip
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=answers[len(seen) - 1])
+
+    p = gemini.GeminiProvider("k", model="gemini-2.5-flash", client=mocked(handler), sleep=no_wait)
+    assert [w.text for w in p.transcribe([CHUNK])[0].words] == ["ठीक", "है"]
+    assert json.loads(seen[0].content)["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert seen[0].url.path.endswith("/gemini-2.5-flash:generateContent")
+    # Google routes retired 2.5 Flash to 3.5 Flash-Lite from 2026-12-01: refused, never a silent swap.
+    with pytest.raises(ProviderError, match=r"answered by gemini-3\.5-flash-lite"):
+        p.transcribe([CHUNK])
+    # Other Gemini models keep their own thinking settings.
+    three = gemini.GeminiProvider("k", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("x"))))
+    assert "thinkingConfig" not in three.body(CHUNK)["generationConfig"]
+    assert token_cost_inr("gemini/gemini-2.5-flash", TokenUsage(1_000_000, 1_000_000), 100.0) == pytest.approx(350.0)
+
+
 def test_token_billed_cost_counts_output_and_thinking() -> None:
     usage = TokenUsage(input_tokens=1_000_000, output_tokens=1_000_000, thinking_tokens=600_000)
     # Gemini 3.8 Flash: $0.75 per 1M input and $3.75 per 1M output (thinking included), until 2026-12-31.

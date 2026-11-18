@@ -15,8 +15,14 @@ Guard: an answer with more than MAX_WORDS_PER_S words per second of audio cannot
 about 3 to 4); it is asked once more, and a second such answer fails the chunk rather than put invented words in a
 transcript (golden rule 5).
 
-Models (https://aistudio.google.com/docs/pricing, checked 2026-11-16): `gemini-3.8-flash` (default) and
-`gemini-3.5-flash-lite`. Audio is 25 tokens per second.
+Models (https://aistudio.google.com/docs/pricing, checked 2026-11-16 and 2026-11-18): `gemini-3.8-flash` (default),
+`gemini-3.5-flash-lite` and `gemini-2.5-flash` (owner 2026-11-18). Audio is 25 tokens per second.
+
+Thinking: 2.5 Flash is asked to think not at all (THINKING; thinking is billed as output and was 88% of a 3.8 Flash
+call's cost on 2026-11-18). The other models keep Google's default for now.
+
+Model check: Google retires 2.5 Flash and, from 2026-12-01, answers its requests with 3.5 Flash-Lite. An answer whose
+`modelVersion` is not the model asked for is refused (golden rule 7: never a silent swap of model).
 
 Errors: see sabha_asr.providers._http (Google's code is `error.status`). A bad key or a blocked answer is never retried.
 """
@@ -42,6 +48,8 @@ DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 MAX_CHUNK_MS = 29_500  # the pipeline's chunks stay under 30 s for every provider
 DEFAULT_TIMEOUT_S = 90.0
 MAX_WORDS_PER_S = 6.0
+THINKING: dict[str, dict[str, Any]] = {"gemini-2.5-flash": {"thinkingBudget": 0}}
+"""Per model, the thinkingConfig sent (module docstring); a model not listed gets Google's default."""
 _NOT_RETRYABLE = frozenset({"PERMISSION_DENIED", "UNAUTHENTICATED", "INVALID_ARGUMENT", "FAILED_PRECONDITION"})
 
 INSTRUCTION = """Transcribe this audio exactly as it is spoken. It is part of a phone call or meeting in India, in \
@@ -105,8 +113,7 @@ class GeminiProvider:
     def transcribe(self, chunks: Sequence[AudioChunk]) -> list[ChunkResult]:
         return [self._transcribe_one(chunk) for chunk in chunks]
 
-    @staticmethod
-    def body(chunk: AudioChunk) -> dict[str, Any]:
+    def body(self, chunk: AudioChunk) -> dict[str, Any]:
         audio = base64.b64encode(chunk.wav).decode("ascii")
         return {
             "contents": [
@@ -119,6 +126,7 @@ class GeminiProvider:
                 "temperature": 0,
                 "responseMimeType": "application/json",
                 "responseSchema": ANSWER_SCHEMA,
+                **({"thinkingConfig": THINKING[self._model]} if self._model in THINKING else {}),
             },
         }
 
@@ -155,6 +163,9 @@ class GeminiProvider:
         if response.status_code != 200:
             raise _http.error_for(NAME, response, _NOT_RETRYABLE)
         answer = _http.json_body(NAME, response)
+        version = answer.get("modelVersion") if isinstance(answer, dict) else None
+        if isinstance(version, str) and not version.startswith(self._model):
+            raise ProviderError(NAME, f"answered by {version}, not {self._model}", retryable=False)
         return parse(answer), usage_of(answer)
 
 

@@ -41,7 +41,8 @@ _GEMINI = ("https://aistudio.google.com/docs/pricing (paid standard, checked 202
 _GEMINI_TOKENS = (
     "https://aistudio.google.com/docs/pricing (paid standard, checked 2026-11-18: gemini-3.8-flash input 0.75 and "
     "output 3.75 USD per 1M tokens through 2026-12-31, then 1.50 and 7.50; gemini-3.5-flash-lite input 0.30 and "
-    "output 2.50; output includes thinking tokens)"
+    "output 2.50; gemini-2.5-flash (deprecated, routed to 3.5-flash-lite from 2026-12-01) audio input 1.00 and output "
+    "2.50; output includes thinking tokens)"
 )
 
 
@@ -61,6 +62,8 @@ class TokenPrice:
 TOKEN_PRICES: dict[str, TokenPrice] = {
     "gemini/gemini-3.8-flash": TokenPrice(0.75, 3.75, "USD", _GEMINI_TOKENS),  # 1.50 and 7.50 from 2027-01-01
     "gemini/gemini-3.5-flash-lite": TokenPrice(0.30, 2.50, "USD", _GEMINI_TOKENS),
+    # Audio in costs 1.00 (text 0.30); all input is priced as audio, so a little high, never low.
+    "gemini/gemini-2.5-flash": TokenPrice(1.00, 2.50, "USD", _GEMINI_TOKENS),
 }
 
 
@@ -93,6 +96,7 @@ PRICES: dict[str, AsrPrice] = {
     "deepgram/nova-3": AsrPrice(0.0052, "USD", _DEEPGRAM),  # code-switching ("multi"), the way we call it
     "gemini/gemini-3.8-flash": AsrPrice(1500 * 0.75 / 1e6, "USD", _GEMINI),  # 1.50 per 1M from 2027-01-01
     "gemini/gemini-3.5-flash-lite": AsrPrice(1500 * 0.30 / 1e6, "USD", _GEMINI),
+    "gemini/gemini-2.5-flash": AsrPrice(1500 * 1.00 / 1e6, "USD", _GEMINI),  # audio only: an estimate before sending
     "aws/transcribe@ap-south-1": AsrPrice(0.0001 * 60, "USD", _AWS),  # other regions: not checked, so None
 }
 
