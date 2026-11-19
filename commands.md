@@ -86,8 +86,10 @@ Edit `.env` (`nano .env`). Every setting is explained in `.env.example`. The one
 | Setting | Value |
 | --- | --- |
 | `APP_ENV` | `local` |
-| `OPENAI_API_KEY` | Your OpenAI key (analysis) |
-| `SARVAM_API_KEY` | Your Sarvam key (speech recognition) |
+| `OPENAI_API_KEY` | Your OpenAI key (analysis; also OpenAI speech recognition) |
+| `SARVAM_API_KEY` | Your Sarvam key (speech recognition, the default) |
+| `GEMINI_API_KEY` | Your Gemini key: Gemini speech recognition and the Gemini speaker check |
+| `DEEPGRAM_API_KEY`, `GROQ_API_KEY` | Optional: Deepgram and Groq Whisper speech recognition. A model without its key shows "not set up" on the upload page |
 | `HF_TOKEN` | Hugging Face token (only for `make setup-speech`) |
 | `USD_INR_RATE` | Optional: shows LLM cost in rupees |
 
@@ -255,9 +257,18 @@ Show the storage console login:
 grep -E '^\s*S3_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)=' .env
 ```
 
-**Processing a recording:** sign in → Upload → choose the file, teacher and class → tick consent → Upload. The status
-moves through uploaded → preprocessing → diarizing → transcribing → analyzing → completed. On this laptop,
-diarisation takes about as long as the speech in the recording (a 20-minute lesson: about 20 minutes).
+**Processing a recording:** sign in → Upload → choose the files → for each, the type and the person (and class) →
+tick consent → Upload. For audio you can also set:
+
+- **Number of speakers:** Automatic, or 2 to 10. Support calls start at 2 (one agent, one customer).
+- **Telling the speakers apart:** Standard (pyannote), or Standard + Gemini check, which fixes lines given to the
+  wrong person and costs about ₹10.8 per audio hour ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)).
+- **Support calls: "Did a colleague help on this call?"** Yes asks for 3 speakers; every score still goes to the
+  agent ([ADR 0015](docs/adr/0015-colleague-helped-calls.md)). Anyone but staff can also name the colleague.
+- **Transcription model** (owners and admins only): Sarvam is the usual one.
+
+The status moves through uploaded → preprocessing → diarizing → transcribing → analyzing → completed. On this
+laptop, diarisation takes about as long as the speech in the recording (a 20-minute lesson: about 20 minutes).
 
 **Retry a failed recording:** open it (Recordings → the failed one) → Retry. Only owners and admins see the button.
 It reruns only the stage that failed; earlier stages are not repeated. Retry, don't upload the same file again:
@@ -295,8 +306,10 @@ re-sends it after 30 minutes without a heartbeat).
 
 ## 7. Restart after changing code
 
-The API and the web app reload by themselves. **The workers, relay and beat do not**: after any change to
-`packages/` or `apps/workers/`, or after `git pull`, restart them. If you skip this, workers run old code, and a
+The web app reloads by itself. The API reloads by itself only for changes in `apps/api` and `packages/core`; after a
+change in `packages/asr`, `packages/llm` or `packages/analytics` (for example the upload page's model list), restart
+it too. **The workers, relay and beat never reload**: after any change to `packages/` or `apps/workers/`, or after
+`git pull`, restart them. If you skip this, workers run old code, and a
 recording can fail the same way on every retry (for example `unexpected_ValidationError ... Extra inputs are not
 permitted`).
 
@@ -310,8 +323,15 @@ nohup make beat    > /tmp/sabha-logs/beat.log    2>&1 &
 nohup make relay   > /tmp/sabha-logs/relay.log   2>&1 &
 ```
 
-Terminals (option A): Ctrl+C in the workers, beat and relay terminals, then run `make workers`, `make beat` and
-`make relay` again.
+Restart the API (background):
+
+```bash
+pkill -f 'uvicorn sabha_api'; sleep 2
+nohup make api > /tmp/sabha-logs/api.log 2>&1 &
+```
+
+Terminals (option A): Ctrl+C in the workers, beat and relay terminals (and the API's, if needed), then run
+`make workers`, `make beat` and `make relay` (and `make api`) again.
 
 After `git pull` or a dependency change, first run:
 
@@ -355,8 +375,14 @@ db.dlq.find({replayed_at: null}, {recording_id: 1, stage: 1, error_code: 1, erro
 // LLM calls and cost for one recording
 db.llm_calls.find({recording_id: "<recording id>"}, {task: 1, model: 1, status: 1, error_code: 1, tokens_in: 1, tokens_out: 1, cost_usd: 1, created_at: 1})
 
-// Speech recognition cost per recording (rupees)
-db.transcripts.find({}, {recording_id: 1, asr_billed_ms: 1, asr_cost_inr: 1})
+// Speech recognition cost per recording (rupees; includes the Gemini speaker check when it ran)
+db.transcripts.find({}, {recording_id: 1, asr_model: 1, asr_billed_ms: 1, asr_cost_inr: 1})
+
+// What the Gemini speaker check did (lines asked about, moved, unsure, cost)
+db.transcripts.find({speaker_check: {$ne: null}}, {recording_id: 1, speaker_check: 1})
+
+// The choices made at upload for the 10 newest recordings
+db.recordings.find({}, {file_name: 1, asr_choice: 1, speaker_count: 1, speaker_model: 1, transferred: 1, transfer_person_id: 1}).sort({created_at: -1}).limit(10)
 
 // Recordings that look stuck (still processing after 1 hour)
 db.recordings.find({status: {$in: ["PREPROCESSING", "DIARIZING", "TRANSCRIBING", "ANALYZING"]}, status_changed_at: {$lt: new Date(Date.now() - 3600e3)}}, {status: 1, status_changed_at: 1})
@@ -395,16 +421,23 @@ uv run python scripts/admin/hash_password.py          # hash for LOGIN_PASSWORD_
 uv run python scripts/admin/create_tenant.py --name "Green Valley School" --profile school --plan pilot \
     --owner-email principal@example.com --owner-name "Asha Rao" --audio-hours 100
 uv run python scripts/admin/set_plan.py --tenant <tenant id> --plan starter --audio-hours 100
+uv run python scripts/admin/enable_type.py --type support --profile company --dry-run   # switch a conversation type on for existing workspaces
 
 uv run python scripts/admin/backfill.py --dry-run     # see what would be filled in; then run without --dry-run
 uv run python scripts/admin/expire_audio.py --dry-run # see what audio retention would delete; then without it
 uv run python scripts/admin/restore_drill.py          # restore the latest backup into a scratch database and check it
 ```
 
-Try speech recognition alone (sends the audio to Sarvam and is billed):
+Try speech recognition alone (sends the audio to the provider in `ASR_PROVIDER`, Sarvam by default, and is billed):
 
 ```bash
 uv run sabha-asr-transcribe <file.wav>                # 16 kHz mono WAV
+```
+
+Compare speech models on calls already transcribed (billed per model; report in `eval/reports/asr-compare-<date>/`):
+
+```bash
+uv run python eval/asr_compare.py --tenant demo-company --models gemini:gemini-3.8-flash,deepgram:nova-3 --latest 3
 ```
 
 Each script explains its options at the top of its file, for example `head -30 scripts/admin/set_plan.py`.
@@ -429,7 +462,9 @@ Each script explains its options at the top of its file, for example `head -30 s
 | Failed: `analysis_failed ... HTTP 429 credit_balance_exhausted` | The OpenAI account has no credit left | Add credit in the OpenAI billing page, then Retry (nothing before analysis runs again) |
 | Failed: `unexpected_ValidationError ... Extra inputs are not permitted` | Workers are running old code | [Restart the workers](#7-restart-after-changing-code), then Retry |
 | Failed: `asr_failed` with 403 | The Sarvam key is invalid or out of credit | Fix `SARVAM_API_KEY` in `.env`, restart workers, then Retry |
-| Needs review: `unclear_roles` | It could not tell who is the teacher | Reviews → open it → choose the speaker |
+| Needs review: `unclear_roles` | It could not tell which speaker is the staff member (teacher, agent, rep) | Reviews → open it → choose the speaker |
+| Upload page: a model shows "not set up" | Its key is missing from `.env` | Add the key, restart the API and the workers |
+| Upload page: a model you expect is missing, or an old one still shows | The API is running old code | Restart the API ([7](#7-restart-after-changing-code)) |
 | Failed: `asr_failed` with 404 "no longer available" from Gemini | Google refuses that Gemini model to our account (2.5 Flash and 2.5 Flash-Lite, since 2026-11-18) | Choose another model at upload ([ADR 0012](docs/adr/0012-more-asr-providers.md), addendum 2026-11-19), then upload again |
 | Failed: `speaker_check_failed` (or stuck retrying `speaker_check_unavailable`) | `GEMINI_API_KEY` missing or Gemini failed; no transcript is made without the check that was asked for | Set the key in `.env`, restart workers, then Retry, or upload with "Standard" speaker separation ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)) |
 | Worker killed, or WSL freezes during diarisation | Not enough memory | Close other programs; give WSL more memory in `C:\Users\<you>\.wslconfig` (`[wsl2]` then `memory=6GB`), then `wsl --shutdown` from Windows |
