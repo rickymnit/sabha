@@ -11,7 +11,7 @@ Rules:
   or a meeting transcript as .txt (text/plain, at most TRANSCRIPT_MAX_BYTES): `source` "transcript" (ADR 0009).
 - At most UPLOAD_MAX_BYTES, 1 GiB by default (422 `file_too_large`).
 - Person and unit must exist in the tenant (422 `unknown_person` / `unknown_unit`).
-- Who may upload for whom (tests/security/permissions.yaml, decided 2026-10-19): staff only their own recordings
+- Who may upload for whom (docs/security/permissions.yaml, decided 2026-10-19): staff only their own recordings
   (the person defaults to the one linked to their user; 403 `person_not_allowed`, or `no_linked_person` if none is
   linked); managers and reviewers only for people and units they are assigned to (403 `person_not_allowed`);
   owners and admins for anyone in the tenant.

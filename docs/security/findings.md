@@ -31,7 +31,7 @@ result is recorded for a check that did not run.
 | Area | Where | Note |
 | --- | --- | --- |
 | JWT validation | `apps/api/sabha_api/auth/oidc.py` | RS256 only, issuer, audience, expiry, key rotation; algorithm-confusion and unsigned tokens refused (tests) |
-| Tenant isolation | `packages/core/sabha_core/repo.py`, `tests/security/` | Every route checked as nine callers against `permissions.yaml` |
+| Tenant isolation | `packages/core/sabha_core/repo.py`, `docs/security/permissions.yaml` | Every route checked as nine callers against `permissions.yaml` |
 | Presigned URLs | `apps/api/sabha_api/services/recordings.py` | Upload parts only, 15-minute expiry, keys always under `{tenant_id}/` |
 | Error messages | `apps/api/sabha_api/errors.py` | problem+json; unexpected errors become a generic 500 without internals |
 

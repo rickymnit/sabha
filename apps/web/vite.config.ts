@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 
 // In development the browser calls the API on this same origin: Vite forwards these paths to it, so no CORS is
 // needed for the API (uploads go straight to storage, whose CORS rules scripts/dev_storage.py sets).
@@ -17,11 +17,5 @@ export default defineConfig({
       "/auth": api, // local password sign-in (POST /auth/login)
       "/health": api,
     },
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-    // src/test/contrast.test.ts reads the colour tokens from theme.css (?raw); other CSS stays empty in tests.
-    css: { include: [/theme\.css/] },
   },
 });

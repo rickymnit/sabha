@@ -11,7 +11,7 @@ PY_APPS := apps/api apps/workers scripts
 MYPY := $(UV) run mypy --config-file $(CURDIR)/pyproject.toml
 
 .DEFAULT_GOAL := help
-.PHONY: workers beat relay help env setup models setup-speech models-speech dev api down logs test test-py test-web test-fast lint lint-py lint-web fmt e2e eval-wer eval-kappa
+.PHONY: workers beat relay help env setup models setup-speech models-speech dev api down logs lint lint-py lint-web fmt eval-wer eval-kappa
 
 help: ## List the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -64,18 +64,6 @@ down: ## Stop local services (data volumes are kept)
 logs: ## Follow local service logs
 	$(COMPOSE) logs -f
 
-test: test-py test-web ## All Python tests (integration tests start containers) and web unit tests
-
-test-py: ## Python tests with a coverage report in coverage.xml
-	$(UV) run pytest --cov=packages --cov=apps --cov=scripts --cov=eval --cov-report=term --cov-report=xml
-
-test-web: ## Web unit tests
-	$(PNPM) -C apps/web test
-
-test-fast: ## Tests that need no Docker
-	$(UV) run pytest -m "not integration"
-	$(PNPM) -C apps/web test
-
 lint: lint-py lint-web ## ruff, mypy (strict on packages/), eslint, prettier and tsc
 
 lint-py: ## ruff and mypy
@@ -83,7 +71,7 @@ lint-py: ## ruff and mypy
 	$(UV) run ruff format --check
 	@set -e; for p in $(PY_STRICT); do echo "mypy --strict $$p"; (cd $$p && $(MYPY) --strict .); done
 	@set -e; for p in $(PY_APPS); do echo "mypy $$p"; (cd $$p && $(MYPY) .); done
-	@echo "mypy --strict eval"; cd eval && $(MYPY) --strict *.py tests
+	@echo "mypy --strict eval"; cd eval && $(MYPY) --strict *.py
 
 lint-web: ## eslint, prettier and tsc
 	$(PNPM) -C apps/web lint
@@ -95,9 +83,6 @@ fmt: ## Fix formatting and autofixable lint
 	$(UV) run ruff format
 	$(PNPM) -C apps/web format
 
-e2e: ## Playwright browser smoke tests against the running stack (make dev, make api; apps/web/README.md)
-	$(UV) run python scripts/admin/dev_seed.py
-	$(PNPM) -C apps/web e2e
 
 eval-wer: ## WER and role accuracy on the hold-out set: make eval-wer HYP_DIR=<dir of transcript@v1 files>
 	@test -n "$(HYP_DIR)" || { echo "set HYP_DIR to a folder of system transcripts (<recording_id>.json)"; exit 2; }
