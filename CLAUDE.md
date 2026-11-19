@@ -45,7 +45,7 @@ Read this file fully before any task. If a request conflicts with a rule below, 
 | Storage | S3 (`ap-south-1`) in staging/prod, RustFS locally (see `docs/adr/0003-local-object-storage.md`); boto3 |
 | Audio | ffmpeg/ffprobe, Silero VAD, pyannote or NeMo Sortformer, ASR via `packages/asr` |
 | LLM | `packages/llm` gateway (routing, budgets, retries, caching), Langfuse tracing, Presidio redaction |
-| Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router, Vitest, Playwright |
+| Web | React 18 + TypeScript + Vite, Tailwind, TanStack Query, React Router |
 | Auth | OIDC with Auth0 (`docs/adr/0002-auth.md`); JWT validated in the API; roles and tenants from our own records |
 | Infra | Docker Compose (dev, staging, prod pilot), Terraform for AWS; no CI (ADR 0010) |
 | Observability | OpenTelemetry, Prometheus, Grafana, Sentry, structured JSON logs |
@@ -94,27 +94,25 @@ dictionary (`person`, `recording`, `unit`, ...). Never hard-code "Teacher" or "L
 
 ```
 make dev          # docker compose up: mongo (replica set), redis, rustfs, api, workers, web
-make test         # all Python tests (testcontainers) + web unit tests
 make lint         # ruff, mypy, eslint, tsc
-make e2e          # Playwright against the dev stack
 make eval-wer     # eval/wer.py on the frozen gold set
 make eval-kappa   # eval/kappa.py on the calibration hold-out split
 ```
 
 ## How to work in this repo
 
-- **Plan first.** For any task bigger than a small fix, propose a plan (files, functions, tests) and wait for
+- **Plan first.** For any task bigger than a small fix, propose a plan (files, functions) and wait for
   approval before writing code.
 - **Small diffs.** One concern per change. Keep each PR reviewable in under 15 minutes.
-- **Tests with every change.** Unit tests for logic; integration tests with testcontainers for anything touching
-  MongoDB, Redis or storage. Critical paths (tenant isolation, grounding, idempotency, state machine) need
-  tests written before the implementation.
+- **No automated tests** (removed by the owner on 2026-11-19, `docs/adr/0016-no-automated-tests.md`). Check each
+  change with `make lint` and in the running app; take extra care with critical paths (tenant isolation,
+  grounding, idempotency, state machine). Add every new route to `docs/security/permissions.yaml`.
 - **No new dependencies without saying why** and noting it in the PR description.
 - **Record decisions** that change architecture as an ADR in `docs/adr/NNNN-title.md`.
-- **Never** weaken a test to make it pass, mock away the tenant check, or add `# type: ignore` without a reason.
+- **Never** bypass the tenant check or add `# type: ignore` without a reason.
 - **When unsure** about a product rule, ask rather than guess.
 
 ## Definition of done
 
-Merged to main with `make lint` and `make test` passing locally, deployed to staging, visible in the Friday demo, and documented
+Merged to main with `make lint` passing locally and checked in the running app, deployed to staging, visible in the Friday demo, and documented
 (README, runbook or ADR) where someone else would need it.

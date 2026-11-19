@@ -7,12 +7,16 @@ claim is backed by a timestamped quote.
 One multi-tenant product serves schools, colleges and companies. An organisation profile changes labels, default
 rubrics and rules, never code. The 8-week pilot covers **teaching and reception in schools**.
 
-> **Status (18 November 2026).** The pipeline runs end to end on a developer machine: upload in the web app (or a
+> **Status (19 November 2026).** The pipeline runs end to end on a developer machine: upload in the web app (or a
 > meeting recorded in the browser), preprocessing, silence detection, speaker diarisation, speech recognition, LLM
 > scoring (OpenAI `gpt-6-luna`) with verified quotes, and the report. Speech recognition can use Sarvam AI (the
-> default), Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe or a self-hosted Whisper; owners and admins pick
-> the model at upload, and `eval/asr_compare.py` compares models on calls already transcribed
+> default), Gemini (3.8 Flash, 3.1 Flash-Lite, Flash-Lite), Deepgram, OpenAI, Groq or a self-hosted Whisper; owners
+> and admins pick the model at upload, and `eval/asr_compare.py` compares models on calls already transcribed
 > ([ADR 0012](docs/adr/0012-more-asr-providers.md)). Transcripts are written only in English, Hindi and Hinglish.
+> Whoever uploads can set the number of speakers and ask Gemini to check who said each line
+> ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)), and mark a support call a colleague helped
+> on, which stays the first agent's ([ADR 0015](docs/adr/0015-colleague-helped-calls.md)). There are no automated
+> tests since 19 November ([ADR 0016](docs/adr/0016-no-automated-tests.md)).
 > Meeting transcripts from Google Meet can be uploaded instead of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)).
 > The web app covers conversations, people with their classes and sections, overview, reviews and disputes,
 > re-analysis, sharing, live status, rubrics, approved product information, settings, activity (audit log), cost per
@@ -29,7 +33,9 @@ rubrics and rules, never code. The 8-week pilot covers **teaching and reception 
 ```
 upload ─► preprocess ─► diarize ─► transcribe ─► analyze ─► report
          (normalise,    (who spoke  (ASR, roles,   (metrics in code,
-          VAD)           when)       transcript)    LLM judgement, grounding)
+          VAD)           when)       optional       LLM judgement, grounding)
+                                     Gemini check,
+                                     transcript)
 ```
 
 1. A client uploads audio **directly to object storage** with presigned multipart URLs. The API only authorises
@@ -69,7 +75,7 @@ The full list is in [`CLAUDE.md`](CLAUDE.md). In short:
 - Linux, macOS or WSL 2, with `make`
 - [uv](https://docs.astral.sh/uv/) (installs and manages Python 3.12)
 - Node.js 22 and pnpm 10 (`corepack enable` picks the pinned pnpm version)
-- Docker with Compose v2, for local services and integration tests
+- Docker with Compose v2, for local services
 
 ### First run
 
@@ -104,13 +110,12 @@ password instead of the list, set `LOGIN_USERNAME`, `LOGIN_PASSWORD_HASH` (from
 `uv run python scripts/admin/hash_password.py`) and `LOGIN_AS` in `.env` with `DEV_LOGIN=false`, and
 `VITE_AUTH_MODE=password` in `apps/web/.env.local` (local only; [ADR 0002](docs/adr/0002-auth.md) addendum).
 
-In development the web app also serves demo pages on mock data, with no sign-in: `/dev/components`,
-`/dev/transcript`, `/dev/report`, `/dev/reviews` and `/dev/overview`.
-
 Speech recognition uses Sarvam AI by default ([ADR 0006](docs/adr/0006-asr-sarvam.md)). Other providers are
 `gemini`, `deepgram`, `openai`, `groq`, `qwen`, `aws` and `whisper` ([ADR 0012](docs/adr/0012-more-asr-providers.md)).
 Choose one with `ASR_PROVIDER` and `ASR_MODEL` in `.env` (each needs its own key, see [`.env.example`](.env.example))
-and restart the workers; owners and admins can also pick the model per upload. To try one alone, run
+and restart the workers. Owners and admins can also pick the model per upload; that list leaves out Qwen and Amazon
+Transcribe (kept for comparisons only). The upload page also asks the number of speakers and whether Gemini should
+check who said each line, which needs `GEMINI_API_KEY` ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)). To try one alone, run
 `uv run sabha-asr-transcribe <file.wav>` on a 16 kHz mono WAV file. To compare models on calls already transcribed
 with Sarvam:
 
@@ -140,12 +145,9 @@ Stop the services with `make down`. Data volumes are kept.
 | `make api` | Run the API with reload on http://localhost:8000 (needs `make dev` and the OIDC values in `.env`) |
 | `make workers` / `make relay` / `make beat` | Run the Celery workers, the outbox relay and the scheduler |
 | `make setup-speech` | Install the diarisation extra (pyannote, CPU PyTorch) and fetch its model |
-| `make test` | All Python tests (integration tests start containers via testcontainers) and web unit tests |
-| `make test-fast` | Tests that need no Docker |
 | `make lint` | ruff, mypy (`--strict` on `packages/`), eslint, prettier and tsc |
 | `make fmt` | Fix formatting and autofixable lint issues |
 | `make logs` | Follow local service logs |
-| `make e2e` | Playwright browser smoke tests against the running stack |
 | `make eval-wer HYP_DIR=<dir>` | Word error rate and role accuracy of system transcripts against the hold-out gold set |
 | `make eval-kappa RUBRIC=<yaml> AI_DIR=<dir> SCORES="<files>"` | AI-human agreement and grounding on the calibration hold-out set |
 
@@ -172,15 +174,14 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 | [`apps/workers`](apps/workers) | Celery workers: pipeline stages in `stages/`, outbox relay, notifications, cleanup and the fair GPU scheduler |
 | [`apps/web`](apps/web) | React 18 + TypeScript + Vite app. Design tokens and components are in `src/design/` |
 | [`packages/core`](packages/core) | `sabha_core`: settings, tenant-scoped repository, models, state machine, time mapping, profiles |
-| [`packages/asr`](packages/asr) | `sabha_asr`: providers (Sarvam AI, Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe, Whisper), published prices, chunking, batching, speaker roles and transcript assembly |
+| [`packages/asr`](packages/asr) | `sabha_asr`: providers (Sarvam AI, Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe, Whisper), published prices, chunking, batching, speaker roles, colleague-helped calls, the Gemini speaker check and transcript assembly |
 | [`packages/llm`](packages/llm) | `sabha_llm`: the gateway (routing, budgets, retries, cost accounting in `llm_calls`) and PII redaction |
 | [`packages/analytics`](packages/analytics) | `sabha_analytics`: rubric loading, metrics, scoring, grounding and synthesis |
 | [`rubrics`](rubrics) | Versioned rubric files: `<type>.<segment>.v<major>.<minor>.yaml` |
 | [`eval`](eval) | Gold-set tooling and evaluation scripts. The only source of quality numbers |
 | [`infra`](infra) | Docker Compose files, Label Studio for annotators, and Terraform (to come) |
-| [`docs`](docs) | ADRs, setup guides, design references, prompts per week, school guides, rater kit, rubric review sheets, legal drafts |
+| [`docs`](docs) | ADRs, runbook, setup guides, design references, the permission matrix, prompts per week, school guides, rater kit, rubric review sheets, legal drafts ([index](docs/README.md)) |
 | [`scripts`](scripts) | Developer helpers (environment check, local bucket setup, synthetic audio) and admin scripts in `scripts/admin/` (see below) |
-| [`tests`](tests) | Cross-package security tests: tenant isolation and raw collection access |
 
 ## Stack
 
@@ -200,12 +201,12 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 
 | Area | State |
 | --- | --- |
-| Monorepo, tooling, local services, settings (P1.1, P0.5) | Done. GitHub Actions removed on 2026-11-02 ([ADR 0010](docs/adr/0010-no-github-actions.md)) |
+| Monorepo, tooling, local services, settings (P1.1, P0.5) | Done. GitHub Actions removed on 2026-11-02 ([ADR 0010](docs/adr/0010-no-github-actions.md)); all automated tests removed on 2026-11-19 ([ADR 0016](docs/adr/0016-no-automated-tests.md)) |
 | API: errors, request ids, health, rate limits, quotas, permission matrix for every route (P1.4, P7.2, P7.4) | Done |
 | Sign-in: Auth0 token checks, web sign-in with PKCE, users, invites, `/v1/me` (P1.5) | Done. The Auth0 tenant itself is set up in week 8; local dev sign-in meanwhile |
-| Tenant-scoped repository, models, indexes, isolation tests (P1.6) | Done |
-| Uploads: presigned multipart, complete, checksum, duplicates (P2.1, P2.2) | Done |
-| Outbox and relay, Celery queues, retries, dead-letter queue, state machine (P2.3, P2.4, P2.5) | Done |
+  | Tenant-scoped repository, models, indexes (P1.6) | Done |
+  | Uploads: presigned multipart, complete, checksum, duplicates (P2.1, P2.2) | Done |
+  | Outbox and relay, Celery queues, retries, dead-letter queue, state machine (P2.3, P2.4, P2.5) | Done |
 | Preprocess (ffmpeg), silence detection (Silero VAD), diarisation (pyannote, CPU) (P3.2, P3.3, P3.4a) | Done |
 | Speech recognition through Sarvam AI, speaker roles, transcript (P3.1, P3.5 to P3.7) | Done |
 | LLM gateway, PII redaction, scoring, grounding, synthesis, analyze stage (P5.1, P5.2, P5.4 to P5.7) | Done |
@@ -217,7 +218,9 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Approved product information: owners and admins add, edit and retire entries in Settings; coaching uses only these; a wrong product statement lowers the score | Done ([ADR 0013](docs/adr/0013-said-well-and-badly.md)). At most 40 active entries per workspace |
 | What the agent said well and badly: a plus and drawback list per call, visible to managers | Done ([ADR 0013](docs/adr/0013-said-well-and-badly.md)) |
 | Pages that answer first: Overview, the conversations list and the report open with one sentence and three cards, people and scores in words, names instead of file names; dark mode | Done (2026-11-12 to 11-13) |
-| Speech recognition from more providers: Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe, Whisper; model chosen at upload; "Transcribed by" column for owners and admins; transcripts only in English, Hindi and Hinglish | Done ([ADR 0012](docs/adr/0012-more-asr-providers.md)). Qwen and Amazon Transcribe not yet tried on real calls |
+| Speech recognition from more providers: Gemini, Deepgram, OpenAI, Groq, Qwen, Amazon Transcribe, Whisper; model chosen at upload; "Transcribed by" column for owners and admins; transcripts only in English, Hindi and Hinglish | Done ([ADR 0012](docs/adr/0012-more-asr-providers.md)). Gemini billed and priced by tokens. Upload list since 2026-11-19: Sarvam, OpenAI, Groq (2), Deepgram, Gemini 3.8 Flash, 3.1 Flash-Lite and Flash-Lite, Whisper; Qwen and Amazon Transcribe for comparisons only |
+| Number of speakers and the Gemini speaker check, chosen at upload by whoever uploads | Done ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)). Gemini 3.8 Flash, low thinking. Fixed the Roshan call's opening; not yet measured on hand-labelled calls |
+| Support calls a colleague helped on: 3 speakers, both agent voices scored as the first agent's | Done ([ADR 0015](docs/adr/0015-colleague-helped-calls.md)). Per-agent scoring dropped by the owner |
 | Comparing speech models on our own calls (`eval/asr_compare.py`) | Done. Run on 3 NiaLabs calls (2026-11-17): Gemini 3.8 Flash, Deepgram Nova-3 and Sarvam shortlisted. Measures difference from Sarvam, not accuracy |
 | Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done |
 | UI v2 redesign (`docs/design/v2/`) | Done: tokens, sidebar, Overview, Recordings (tabs with counts, filters by type, class, person, date and score, bulk re-analyse and share, Retry or Close, CSV export) and the report (coaching steps, two-lane timeline with zoom, rubric levels, transcript alongside; pressing a time button again pauses the audio, and a third press carries on), and My progress, the home page for staff (teachers, sales reps, support agents): their own numbers, newest report with the manager's note, the three rubric points to work on, processing and recent recordings. Upload in the same style (type colours and what each is scored on, status dots per file, audio hours for owners and admins, "Upload more"). Reviews as one queue (disputes and paused recordings, filters for disputes, speakers and the rest, "2 of 5 decided") beside the decision: the AI score and its reasoning next to the proposed score, quotes and named times that play, and Accept (no note needed), Keep or Set a different score (note needed); "who is the speaker?" in the same place. The sales report: overall on a Weak to Strong scale with what went well and what to fix first, "Where the points were lost" (rubric points sorted by (5 - score) x weight, the two biggest marked Fix first), the deal at a glance with every quote behind "Show evidence", the agreed next step and talk and listen beside the transcript |
@@ -228,7 +231,7 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Disputes: raise, queue, decide, email; the reviewer's score replaces the AI's (P6.7) | Done |
 | Re-analysis of one or many recordings, every version kept (P2.8) | Done. Choosing a rubric version is in the API only |
 | Live status over server-sent events (P2.6) | Done |
-| Settings, rubrics pages, role views, accessibility checks, browser tests per role (P1.7, P6.8) | Done. Rubric editing waits for calibration |
+| Settings, rubrics pages, role views (P1.7, P6.8) | Done. Rubric editing waits for calibration |
 | Plans and audio-hour allowances, upload pause at the limit, cost in rupees per recording (P6.2, P7.2) | Done. Rate limiter and the 80 % warning email remain |
 | Audit log and Activity page, retry or close a failed recording (P1.8, P7.8) | Done. Pause per tenant and usage export remain |
 | Audio retention, erasure on request, nightly database export and restore drill (P7.3) | Done locally. Atlas backup and bucket lifecycle come with AWS |
@@ -250,7 +253,8 @@ that cost ideas can be weighed against facts. Every figure below comes from our 
 | --- | --- | --- |
 | LLM: OpenAI `gpt-6-luna` | Token | $0.10 per million input tokens, $0.50 per million output, cached input $0.01, cache writes $0.125 (OpenAI model page, 2026-10-24). Every call is recorded with tokens and cost in `llm_calls` |
 | Speech recognition: Sarvam AI REST API (`saaras:v4`), the default | Minute of audio sent | ₹0.49 per minute pay as you go; ₹0.45, ₹0.41 and ₹0.38 on the Pro, Growth and Business plans (sarvam.ai/api-pricing, 2026-10-28; in [`sabha_asr/pricing.py`](packages/asr/sabha_asr/pricing.py)). Audio goes in chunks of at most 30 s, after silence is removed |
-| Speech recognition: other providers | Minute or token of audio | Per hour of audio at ₹96.5 per dollar, from published prices in `sabha_asr/pricing.py`: Gemini 3.8 Flash ₹6.51 for audio input only (output tokens not recorded yet; doubles from 2027-01-01), Deepgram Nova-3 ₹30.11, OpenAI `gpt-transcribe` ₹26.06, Groq Whisper Large v3 ₹10.71, Qwen ₹12.16, Amazon Transcribe (Mumbai) ₹34.74 |
+| Speech recognition: other providers | Minute or token of audio | Per hour of audio at ₹96.5 per dollar, from published prices in `sabha_asr/pricing.py`: Deepgram Nova-3 ₹30.11, OpenAI `gpt-transcribe` ₹26.06, Groq Whisper Large v3 ₹10.71, Qwen ₹12.16, Amazon Transcribe (Mumbai) ₹34.74. Gemini is billed by tokens (audio in, text and thinking out), and every call's tokens are stored. Measured: Gemini 3.8 Flash with low thinking about ₹13.3 per hour (174 s of a call, 2026-11-19; its input price doubles from 2027-01-01), Gemini 3.1 Flash-Lite about ₹11.0 (2026-11-18) |
+| Gemini speaker check (when chosen at upload) | Token | Gemini 3.8 Flash, low thinking: ₹2.16 for a 12-minute call, about ₹10.8 per audio hour (2026-11-18). Added to the recording's speech-recognition cost |
 | Diarisation: pyannote on CPU | Compute time | Open model, no licence fee. The slowest stage by far (see below) |
 | Preprocessing and VAD: ffmpeg, Silero | Compute time | Open source, runs on CPU |
 | Hosting: AWS `ap-south-1` (S3 with 3 buckets, servers for API, workers, Redis), MongoDB Atlas Mumbai | Month | Not priced yet. Must stay in India (golden rule 12) |
@@ -311,9 +315,10 @@ quality figures come only from evaluation on real, human-rated recordings. The f
 - Is a GPU (for diarisation, and later NeMo Sortformer) cheaper per recording hour than CPU, at pilot volume?
 - Should diarisation run on a cheaper or spot machine, since reports are not needed in real time?
 - Is Gemini 3.8 Flash as accurate as Sarvam? The 2026-11-17 comparison on 3 NiaLabs calls found it differs from
-  Sarvam on 26.4% of words, at about a fifth of the audio price, but takes about 90 s per minute of audio. A
-  hand-corrected gold set is needed before it can become the default, and its full cost per call (with output
-  tokens) is not recorded yet.
+  Sarvam on 26.4% of words, but takes about 90 s per minute of audio. With low thinking it costs about ₹13.3 per
+  audio hour against Sarvam's ₹29.40. A hand-corrected gold set is needed before it can become the default.
+- Does the Gemini speaker check improve speaker labels on most calls, or only on hard openings like the Roshan
+  call's? Needs hand-labelled calls (`eval/roles.py`).
 - Would OpenAI's Batch API or a lower reasoning effort cut LLM cost without hurting agreement with raters?
 - Why does the prompt cache not hit between the two scoring calls, and is caching worth it with `gpt-6-luna`?
 - Audio is kept 90 days by default. How long should artefacts be kept, and when can they move to cheaper S3
@@ -328,7 +333,7 @@ There is no CI: pushes to GitHub run nothing ([ADR 0010](docs/adr/0010-no-github
 locally before pushing:
 
 - `make lint`: ruff, mypy, eslint and tsc.
-- `make test`: Python tests (integration tests against real MongoDB in Docker) and web unit tests.
+- Try the change in the running app: there are no automated tests ([ADR 0016](docs/adr/0016-no-automated-tests.md)).
 - pre-commit runs detect-secrets on every commit.
 
 ## Contributing
@@ -336,8 +341,9 @@ locally before pushing:
 - **Read [`CLAUDE.md`](CLAUDE.md) first.** It holds the rules, conventions and definition of done.
 - **Plan before code** for anything bigger than a small fix. Keep each change to one concern and small enough to
   review in under 15 minutes.
-- **Add tests with every change.** Tenant isolation, grounding, idempotency and the state machine need tests
-  written before the implementation.
+- **Check every change by hand.** There is no test suite ([ADR 0016](docs/adr/0016-no-automated-tests.md)), so
+  changes to tenant isolation, grounding, idempotency, the state machine or permissions need a careful check in the
+  running app. A new route needs its row in [`docs/security/permissions.yaml`](docs/security/permissions.yaml).
 - **Explain dependencies and decisions.** Say why you are adding any new dependency. Record architecture
   decisions as ADRs in [`docs/adr/`](docs/adr).
 - **Put the prompt ID in commit messages,** for example `P2.4: celery queues per stage with DLQ`.

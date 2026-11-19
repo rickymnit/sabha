@@ -10,7 +10,7 @@ cd /root/sabha
 Contents: [Daily quick start](#daily-quick-start) · [First-time setup](#1-first-time-setup-once-per-machine) ·
 [Start](#2-start-everything) · [Check](#3-check-that-everything-is-running) · [Logs](#4-logs) ·
 [Use the app](#5-use-the-app) · [Stop](#6-stop-everything) · [Restart after code changes](#7-restart-after-changing-code) ·
-[Look inside the database](#8-look-inside-the-database-read-only) · [Tests](#9-tests-and-checks) ·
+[Look inside the database](#8-look-inside-the-database-read-only) · [Checks](#9-checks) ·
 [Admin scripts](#10-admin-scripts) · [Troubleshooting](#11-troubleshooting) · [Reset](#12-reset-or-wipe-local-data)
 
 ---
@@ -128,12 +128,11 @@ OIDC_CLIENT_ID=sabha-web
 In `apps/web/.env.local`, remove the `VITE_AUTH_MODE=password` line. After changing `.env`, restart the API; after
 changing `apps/web/.env.local`, restart the web app.
 
-### 1.4 Demo data and browser for tests
+### 1.4 Demo data
 
 ```bash
 make dev                                              # services must be up first
 uv run python scripts/admin/dev_seed.py               # Demo School, NiaLabs, users (safe to repeat)
-pnpm -C apps/web exec playwright install chromium     # only needed for make e2e
 ```
 
 ---
@@ -249,7 +248,6 @@ The logs are JSON lines. For readable output: `tail -f /tmp/sabha-logs/workers.l
 | Website | http://localhost:5180 |
 | API endpoint list (try requests in the browser) | http://localhost:8000/docs |
 | Storage console (RustFS) | http://localhost:9001: username and password are `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` in `.env` |
-| Demo pages on mock data, no sign-in | http://localhost:5180/dev/components, `/dev/transcript`, `/dev/report`, `/dev/reviews`, `/dev/overview` |
 
 Show the storage console login:
 
@@ -369,26 +367,15 @@ Do not edit data by hand in the shell. Use the app or the admin scripts: every d
 
 ---
 
-## 9. Tests and checks
+## 9. Checks
+
+There are no automated tests: they were removed on 2026-11-19 ([ADR 0016](docs/adr/0016-no-automated-tests.md)).
+Check a change with `make lint` and by trying it in the running app.
 
 | Command | What it does | Needs |
 | --- | --- | --- |
-| `make test-fast` | Tests that need no Docker (quick) | Nothing running |
-| `make test` | All Python tests (starts its own test containers) and web unit tests | Docker |
-| `make test-py` | Python tests only, with coverage in `coverage.xml` | Docker |
-| `make test-web` | Web unit tests only | Nothing running |
 | `make lint` | ruff, mypy, eslint, prettier, tsc | Nothing running |
 | `make fmt` | Fix formatting and simple lint issues | Nothing running |
-| `make e2e` | Browser tests in Chromium (reseeds demo data first) | `make dev` and `make api` running |
-
-One Python test file or one test:
-
-```bash
-uv run pytest apps/workers/tests/test_stage_runner.py
-uv run pytest apps/workers/tests/test_stage_runner.py -k retries -v
-```
-
-Failed browser tests leave screenshots and traces in `apps/web/test-results/`.
 
 Evaluation (needs real, human-annotated data):
 
@@ -443,6 +430,8 @@ Each script explains its options at the top of its file, for example `head -30 s
 | Failed: `unexpected_ValidationError ... Extra inputs are not permitted` | Workers are running old code | [Restart the workers](#7-restart-after-changing-code), then Retry |
 | Failed: `asr_failed` with 403 | The Sarvam key is invalid or out of credit | Fix `SARVAM_API_KEY` in `.env`, restart workers, then Retry |
 | Needs review: `unclear_roles` | It could not tell who is the teacher | Reviews → open it → choose the speaker |
+| Failed: `asr_failed` with 404 "no longer available" from Gemini | Google refuses that Gemini model to our account (2.5 Flash and 2.5 Flash-Lite, since 2026-11-18) | Choose another model at upload ([ADR 0012](docs/adr/0012-more-asr-providers.md), addendum 2026-11-19), then upload again |
+| Failed: `speaker_check_failed` (or stuck retrying `speaker_check_unavailable`) | `GEMINI_API_KEY` missing or Gemini failed; no transcript is made without the check that was asked for | Set the key in `.env`, restart workers, then Retry, or upload with "Standard" speaker separation ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)) |
 | Worker killed, or WSL freezes during diarisation | Not enough memory | Close other programs; give WSL more memory in `C:\Users\<you>\.wslconfig` (`[wsl2]` then `memory=6GB`), then `wsl --shutdown` from Windows |
 | Web page blank or old after `git pull` | Web dependencies changed | `pnpm -C apps/web install`, restart the web app |
 | `ModuleNotFoundError` in Python | Python dependencies changed | `uv sync` (and `uv sync --extra speech` for diarisation), then restart |

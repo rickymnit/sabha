@@ -92,3 +92,29 @@ it copied the sample into near-silent pieces. Added under the same residency exc
 
 Which one to use is decided on accuracy against hand-corrected transcripts (eval/wer.py), not on the difference from
 Sarvam.
+
+## Addendum 2026-11-19: the upload list, and what Gemini costs per hour
+
+Gemini bills by tokens: audio in, plus the written answer and any "thinking", both billed as output. Since
+2026-11-18 every Gemini answer's token counts are stored and priced (`TokenUsage`, `TOKEN_PRICES` in
+`sabha_asr/pricing.py`), and Gemini answering with a different model than asked fails the chunk instead of being
+used quietly (golden rule 7).
+
+Measured on NiaLabs calls, at the published prices:
+
+| Model | Thinking | Cost per audio hour | Measured on |
+| --- | --- | --- | --- |
+| Gemini 3.8 Flash | Google's default | about ₹148 (thinking was 88% of it) | 2026-11-18 |
+| Gemini 3.8 Flash | low (no thinking tokens used) | about ₹13.3 | 174 s of the Roshan call, 2026-11-19 |
+| Gemini 3.1 Flash-Lite | minimal | about ₹11.0 | 2026-11-18 |
+
+The upload page's price list counts audio input only for Gemini, so it shows less than these figures.
+
+The upload list (owner):
+
+- **Gemini 3.8 Flash** is back on the list on 2026-11-19, asked to think "low".
+- **Gemini 3.1 Flash-Lite** is Gemini's default model (2026-11-18). Google retires it on 2027-05-07.
+- **Gemini 2.5 Flash and 2.5 Flash-Lite** are not offered: Google refuses both to our account (HTTP 404, "no longer
+  available to new users", 2026-11-18).
+- **Qwen3 ASR Flash and Amazon Transcribe** are off the list on 2026-11-19. Their adapters stay for
+  `eval/asr_compare.py`.

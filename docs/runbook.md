@@ -58,3 +58,20 @@ touches documents still missing them, so it is safe to run again. Run it once on
 
     uv run python scripts/admin/backfill.py --dry-run
     uv run python scripts/admin/backfill.py
+
+## When a speech-to-text model stops working
+
+Providers retire models or refuse them to new accounts without warning. Google refused Gemini 2.5 Flash and 2.5
+Flash-Lite to our account on 2026-11-18 (HTTP 404, "no longer available to new users"), and Google retires
+Gemini 3.1 Flash-Lite on 2027-05-07. Gemini answering with a model other than the one asked for fails the chunk
+instead of being used quietly (golden rule 7).
+
+1. The recording fails with `asr_failed` (or `speaker_check_failed` for the Gemini speaker check). The reason is
+   in the recording's last stage run (`commands.md`, troubleshooting).
+2. Before offering a replacement, call it once with our key on a short real clip, and record its cost per audio
+   hour from the tokens it billed. Do not offer a model only because its price page lists it.
+3. Change the upload list (`CHOICES` in `packages/asr/sabha_asr/registry.py`), Gemini's default model
+   (`DEFAULT_MODELS`) or the speaker check's model (`MODEL` in `packages/asr/sabha_asr/speaker_check.py`), add its
+   price to `pricing.py`, record the change in [ADR 0012](adr/0012-more-asr-providers.md) or
+   [ADR 0014](adr/0014-speaker-count-and-gemini-speaker-check.md), and restart the API and the workers.
+4. Retry the failed recordings.

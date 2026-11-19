@@ -1,8 +1,8 @@
 # Who may call what: the permission matrix for every API route (plan task P7.4).
 #
-# Reviewed by the owner on 2026-10-19. tests/security/test_permission_matrix.py calls every route as every caller
-# and fails on any difference. Every route in the OpenAPI spec must appear here (test_every_route_is_in_the_matrix),
-# so a new route cannot ship without a decision.
+# Reviewed by the owner on 2026-10-19. Until 2026-11-19 a test called every route as every caller against this file;
+# the tests were removed then (docs/adr/0016-no-automated-tests.md), so it is now the written record only. Add every
+# new route here by hand, with the decision of who may call it.
 #
 # Callers. Tenant A has units unit-1 and unit-2. The target recording (for routes with {recording_id}) belongs to
 # tenant A, unit-1, person "Asha" (linked to staff_uploader), and was uploaded by staff_uploader.

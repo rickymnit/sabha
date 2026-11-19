@@ -1,6 +1,6 @@
 # apps/workers
 
-The Celery 5 workers that run the processing pipeline on Redis queues (`cpu.preprocess`, `gpu.speech`, `llm.analyze`, `io.notify`, `billing.meter`) plus the outbox relay. Each task (preprocess, speech, analyze, notify, meter, relay) is idempotent: it checks for its output artefact at `{tenant_id}/{recording_id}/{stage}@{version}/` before doing work, runs with `acks_late=True`, and moves recordings only through the state machine in `sabha_core/state.py`.
+The Celery 5 workers that run the processing pipeline on Redis queues (`cpu.preprocess`, `gpu.speech`, `llm.analyze`, `io.notify`, `billing.meter`), the outbox relay (`make relay`) and the scheduler (`make beat`). Each task (preprocess, speech, analyze, notify, meter, relay) is idempotent: it checks for its output artefact at `{tenant_id}/{recording_id}/{stage}@{version}/` before doing work, runs with `acks_late=True`, and moves recordings only through the state machine in `sabha_core/state.py`.
 
 ## Preprocess (P3.2, P3.3)
 
@@ -37,7 +37,39 @@ The token is used only to download the model. While a recording is processed, th
 folder with the Hugging Face hub offline, and pyannote's own usage telemetry is switched off
 (`docs/security/findings.md` #8).
 
+How many speakers are asked for: the number set at upload, else 3 for a support call a colleague helped on, else
+the type's default (support: 2), else pyannote decides (`speaker_count` in `diarize.py`; ADR 0014, ADR 0015).
+
 Model attribution: speaker diarization uses
 [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) by
 pyannoteAI, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), with
 [pyannote.audio](https://github.com/pyannote/pyannote-audio) (MIT).
+
+## Transcribe and the transcript (P3.5 to P3.7)
+
+`stages/transcribe.py` sends `compact.wav` in chunks to the speech-to-text model chosen at upload
+(`Recording.asr_choice`) or the configured one, and stores each chunk's words (and, for Gemini, the tokens billed).
+`stages/transcript.py` then builds `transcript@v1.json` on the original timeline:
+
+1. Speaker roles from what each speaker does (ADR 0011), or, for a support call a colleague helped on, the two agent
+   voices and the customer (`sabha_asr/transfer.py`, `transfer@v1.json`; ADR 0015). Unclear roles send the
+   recording to review.
+2. If the uploader chose it, the Gemini speaker check (`sabha_asr/speaker_check.py`, `speaker_check@v1.json`;
+   ADR 0014). It needs `GEMINI_API_KEY`; if Gemini fails the stage fails (`speaker_check_unavailable` is retried,
+   `speaker_check_failed` is not).
+3. The speech-to-text cost in rupees (by minute, or by tokens for Gemini, plus the speaker check).
+
+## Analyze (P5.4 to P5.8)
+
+`stages/analyze.py` computes the numbers in code (`sabha_analytics.metrics`), asks the LLM through `sabha_llm`
+(PII masked first) to judge each rubric point with quotes, keeps only quotes the grounding check finds in the
+transcript, and writes the scores, the summary and, for sales and support, the plus and drawback list (ADR 0013).
+
+## Scheduled jobs (`make beat`)
+
+| Task | Every | What it does |
+| --- | --- | --- |
+| `sabha.maintenance.abort_stale_uploads` | hour | Cancels uploads never completed |
+| `sabha.maintenance.requeue_stuck` | 5 minutes | Sends again any stage whose worker died |
+| `sabha.maintenance.expire_audio` | day | Deletes audio past the workspace's retention (`docs/runbook.md`) |
+| `sabha.maintenance.backup` | day | Exports the database to the backups bucket (`docs/runbook.md`) |

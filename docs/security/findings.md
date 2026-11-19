@@ -5,6 +5,10 @@ when" for P7.6 is that no high-severity finding is open. Checks that need stagin
 bucket policies, IAM, trivy on published images) are listed under "Not run yet" until they have been run; no
 result is recorded for a check that did not run.
 
+The automated tests named in some rows below were removed on 2026-11-19
+([ADR 0016](../adr/0016-no-automated-tests.md)); those checks now need doing by hand. Commits before `ad2408d` still
+hold them.
+
 ## Findings
 
 | # | Date | Check | Finding | Severity | Status | Fix or reason |
@@ -31,8 +35,9 @@ result is recorded for a check that did not run.
 | Area | Where | Note |
 | --- | --- | --- |
 | JWT validation | `apps/api/sabha_api/auth/oidc.py` | RS256 only, issuer, audience, expiry, key rotation; algorithm-confusion and unsigned tokens refused (tests) |
-| Tenant isolation | `packages/core/sabha_core/repo.py`, `docs/security/permissions.yaml` | Every route checked as nine callers against `permissions.yaml` |
+| Tenant isolation | `packages/core/sabha_core/repo.py`, `docs/security/permissions.yaml` | Every route was checked as nine callers against `permissions.yaml` until the tests were removed (2026-11-19); now the matrix is a written record only |
 | Presigned URLs | `apps/api/sabha_api/services/recordings.py` | Upload parts only, 15-minute expiry, keys always under `{tenant_id}/` |
+| ffmpeg input | `apps/workers/sabha_workers/stages/preprocess.py` | `-protocol_whitelist file` on every ffmpeg and ffprobe input, so a crafted file cannot make them fetch other addresses |
 | Error messages | `apps/api/sabha_api/errors.py` | problem+json; unexpected errors become a generic 500 without internals |
 
 ## Not run yet
@@ -40,8 +45,7 @@ result is recorded for a check that did not run.
 | Check | Needs |
 | --- | --- |
 | OWASP ZAP baseline scan (authenticated) | Staging (P1.3) |
-| trivy on the published images | The CI `images` job switched on (`PUBLISH_IMAGES`) |
+| trivy on the published images | Published images; there is no CI ([ADR 0010](../adr/0010-no-github-actions.md)), so run it by hand |
 | S3 bucket policies, IAM least privilege | The AWS account and Terraform (P1.3) |
 | SSRF guard for webhook URLs | Webhooks (P2.7, not built yet) |
-| ffmpeg `-protocol_whitelist file` | The preprocess stage (P3.2, not built yet) |
 | Secrets rotation procedure | The runbook (P7.7) |
