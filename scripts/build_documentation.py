@@ -1,10 +1,9 @@
-"""Build docs/documentation.md: every Markdown document in the repo in one file, with a table of contents.
+"""Build docs/documentation.md: the technical documentation in one file, with a table of contents.
 
     uv run python scripts/build_documentation.py
 
 The separate files stay the source: edit them, then run this again. Each file's headings move down one level under
-its part, and relative links are rewritten so they still work from docs/. The LLM prompt templates in
-packages/analytics/prompts/ are code inputs, not documentation, and are left out.
+its part, and relative links are rewritten so they still work from docs/ (see PARTS for what is included).
 """
 
 from __future__ import annotations
@@ -18,9 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "documentation.md"
 
 PARTS: list[tuple[str, list[str]]] = [
-    ("Overview", ["README.md", "docs/README.md"]),
-    ("Rules for every change", ["CLAUDE.md"]),
-    ("Running Sabha", ["commands.md", "docs/runbook.md"]),
+    ("Overview", ["README.md"]),
+    ("Engineering rules", ["CLAUDE.md"]),
+    ("Running and operating", ["commands.md", "docs/runbook.md"]),
     (
         "Components",
         [
@@ -38,9 +37,9 @@ PARTS: list[tuple[str, list[str]]] = [
             "eval/goldset/README.md",
         ],
     ),
-    ("Decisions (ADRs)", sorted(f"docs/adr/{p.name}" for p in (ROOT / "docs" / "adr").glob("*.md"))),
+    ("Architecture decisions (ADRs)", sorted(f"docs/adr/{p.name}" for p in (ROOT / "docs" / "adr").glob("*.md"))),
     (
-        "Reference",
+        "Technical reference",
         [
             "docs/llm-providers.md",
             "docs/webhooks.md",
@@ -51,20 +50,10 @@ PARTS: list[tuple[str, list[str]]] = [
             "docs/setup/cloud-checklist.md",
         ],
     ),
-    (
-        "Quality and evaluation",
-        ["docs/annotation-guidelines.md", "docs/raters/guide.md", "docs/rubrics/review-sheet.md"],
-    ),
-    ("For schools", ["docs/guides/recording-guide.md"]),
-    (
-        "Legal drafts (waiting for the law team)",
-        sorted(f"docs/legal/drafts/{p.name}" for p in (ROOT / "docs" / "legal" / "drafts").glob("*.md")),
-    ),
-    (
-        "Appendix: the 8-week plan (history, kept as written)",
-        ["docs/prompts/README.md", "docs/prompts/library.md"] + [f"docs/prompts/week-{n}.md" for n in range(1, 9)],
-    ),
 ]
+"""Technical documents only. Left out on purpose: guides for raters, annotators and schools, rubric review sheets,
+legal drafts, the 8-week plan prompts (history), docs/README.md (an index of the separate files) and the LLM prompt
+templates in packages/analytics/prompts/ (code inputs)."""
 
 TITLES = {"docs/rubrics/review-sheet.md": "Rubric review sheets (draft v0.1)"}
 """Titles for files whose own first heading is not a usable title."""
@@ -133,8 +122,9 @@ def main() -> None:
             link = posixpath.relpath(source, "docs")
             chapters.append(f'<a id="{anchor(source)}"></a>\n\n## {title}\n\n*Source: [`{source}`]({link})*\n\n{text}')
     header = (
-        "# Sabha documentation\n\n"
-        "Every document in the repository in one file, built on "
+        "# Sabha technical documentation\n\n"
+        "The technical documentation in one file: architecture, components, running and operating, decisions and "
+        "reference. Built on "
         f"{date.today().isoformat()} by `scripts/build_documentation.py`. The separate files are the source: "
         "edit them, not this file, then run `uv run python scripts/build_documentation.py` again.\n"
     )
