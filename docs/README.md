@@ -10,6 +10,7 @@ change the system, it belongs here. Updated 19 November 2026.
 | [`../README.md`](../README.md) | What Sabha is, how to run it, project status and running costs |
 | [`../commands.md`](../commands.md) | Every command to run Sabha by hand on one machine, and troubleshooting |
 | [`../CLAUDE.md`](../CLAUDE.md) | The rules every change must follow |
+| [`documentation.md`](documentation.md) | Every document below in one file, with a table of contents. Rebuild it after editing any doc: `uv run python scripts/build_documentation.py` |
 | [`runbook.md`](runbook.md) | Operating notes: deploying model changes, backups and the restore drill, audio retention, erasure, backfill |
 
 ## Decisions (ADRs)
