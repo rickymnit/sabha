@@ -190,6 +190,7 @@ def test_the_uploaders_speaker_count_wins_over_the_types_default() -> None:
     assert speaker_count(rec(speaker_count=4)) == 4
     assert speaker_count(rec(kind=ConversationType.TEACHING, speaker_count=3)) == 3
     assert speaker_count(rec(transfer_person_id="p2")) == 3
+    assert speaker_count(rec(transferred=True)) == 3  # a colleague helped, nobody named
 
 
 @pytest.mark.integration

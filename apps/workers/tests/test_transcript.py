@@ -75,7 +75,8 @@ class Setup:
     kind: ConversationType = ConversationType.TEACHING
     tie_breaker: Any = None
     confirmed_roles: dict[str, str] | None = None  # a reviewer's answer (ADR 0007)
-    transfer: str | None = None  # agent 2 of a support call transferred during the call
+    transfer: str | None = None  # the colleague who helped, when named
+    transferred: bool = False  # a colleague helped on the call
     usd_inr_rate: float | None = None
     speaker_model: SpeakerModel = "pyannote"
     checker: Any = None  # the Gemini speaker check (fake)
@@ -97,7 +98,8 @@ class Setup:
             tenant_id="t1",
             type=self.kind,
             confirmed_roles=self.confirmed_roles,
-            person_id="p-anil" if self.transfer else None,
+            person_id="p-anil" if self.transfer or self.transferred else None,
+            transferred=self.transferred or self.transfer is not None,
             transfer_person_id=self.transfer,
             speaker_model=self.speaker_model,
         )
@@ -273,6 +275,15 @@ def test_a_transferred_call_names_both_agents_and_the_handover_on_the_original_t
     assert (found["agent_1"], found["agent_2"], found["customer"]) == ("S1", "S2", "S0")
     assert found["handover_ms"] == 35_000 and found["handover_original_ms"] == 45_000
     assert meta["roles_method"] == "transfer"
+
+
+def test_a_call_a_colleague_helped_on_without_naming_them_is_all_agent_1s() -> None:
+    setup = Setup(TRANSFER_TURNS, ConversationType.SUPPORT, tenant=COMPANY, transferred=True)
+    setup.run(TRANSFER_WORDS)
+    (doc,) = setup.saved
+    # Both agent voices are the agent's side (one role), so every metric and score counts them as agent 1's.
+    assert doc.roles == {"S0": "customer", "S1": "support_agent", "S2": "support_agent"}
+    assert doc.agents == {"S1": "p-anil"} and doc.handover_ms == 45_000
 
 
 def test_a_transfer_a_reviewer_confirmed_takes_the_first_agent_as_agent_1() -> None:

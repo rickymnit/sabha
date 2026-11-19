@@ -9,9 +9,9 @@
    agent and one customer (owner's decision, 2026-11-04), so at most 2 speakers are asked for (MAX_SPEAKERS): left
    free, the diarizer split one phone call into 4 voices, and the agent's own words were then given to the customer.
    Exactly 2 are asked for (SPEAKER_COUNTS), not at most 2: with two voices on one phone line the diarizer may
-   otherwise merge them into one. A support call transferred during the call (Recording.transfer_person_id, owner
-   2026-11-18) has two agents and the customer, so exactly 3 are asked for (TRANSFERRED_SPEAKERS): on call 4 that
-   separated agent 1, agent 2 and the customer, where 2 merged the agents into one.
+   otherwise merge them into one. A support call a colleague helped on (Recording.transferred, owner 2026-11-18/19:
+   the agent hands the phone to a colleague beside them) has two agent voices and the customer, so exactly 3 are
+   asked for (TRANSFERRED_SPEAKERS): on call 4 that separated them, where 2 merged the two agent voices into one.
    Turns shorter than MIN_TURN_MS are dropped: the diarizer flickers between speakers inside one word ("good
    afternoon" came back as turns of 0.1, 0.3, 0.1 and 0.05 s alternating), and such a sliver took the words said
    over it to the wrong speaker.
@@ -55,7 +55,7 @@ def speaker_count(recording: Recording) -> int | None:
     (Recording.speaker_count, owner 2026-11-18), then a transferred call's 3, then the type's default."""
     if recording.speaker_count is not None:
         return recording.speaker_count
-    if recording.type is ConversationType.SUPPORT and recording.transfer_person_id:
+    if recording.type is ConversationType.SUPPORT and (recording.transferred or recording.transfer_person_id):
         return TRANSFERRED_SPEAKERS
     return SPEAKER_COUNTS.get(recording.type)
 

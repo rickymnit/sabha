@@ -16,9 +16,11 @@
 4. Assembles `transcript@v1.json` with sabha_asr.assembly: utterances with role, speaker label, text and times on
    the ORIGINAL recording timeline (golden rule 4), and saves a `transcripts` document pointing at it, with the
    list rows' "who spoke when" strip (`speaker_strip`).
-   A support call transferred during the call (Recording.transfer_person_id) has two agents and the customer:
-   sabha_asr.transfer finds them and the handover, writes `transfer@v1.json`, and the transcript document maps each
-   agent's speaker label to their person (`agents`) with the handover on the original timeline (`handover_ms`).
+   A support call a colleague helped on (Recording.transferred) has two agent voices and the customer:
+   sabha_asr.transfer finds them and the handover, writes `transfer@v1.json`, and the transcript document maps agent
+   1's speaker label to agent 1 and, when named, the colleague's to the colleague (`agents`), with the handover on
+   the original timeline (`handover_ms`). Both agent voices get the staff role, so the analysis counts them together
+   as the agent's side, and every score is agent 1's (owner 2026-11-19).
    When the uploader asked for the Gemini speaker check (Recording.speaker_model "gemini") and the roles are settled,
    sabha_asr.speaker_check moves lines Gemini hears from the other side before the transcript is assembled. It reads
    the preprocess stage's normalised.wav (original timeline), masks each line's PII first (golden rule 8), writes
@@ -272,11 +274,14 @@ def _original(compact_ms: int | None, asr: AsrOutput) -> int | None:
     return None if compact_ms is None else asr.segment_map.compact_to_original(compact_ms)
 
 
-def _agents(transfer: TransferRoles | None, agent_1: str | None, agent_2: str | None) -> dict[str, str]:
-    """Speaker label -> person id for both agents of a transferred call; empty when they are not known."""
-    if transfer is None or transfer.agent_1 is None or transfer.agent_2 is None or not agent_1 or not agent_2:
+def _agents(transfer: TransferRoles | None, agent_1: str | None, helper: str | None) -> dict[str, str]:
+    """Speaker label -> person id on a call a colleague helped on: agent 1, and the colleague when named."""
+    if transfer is None or transfer.agent_1 is None or not agent_1:
         return {}
-    return {transfer.agent_1: agent_1, transfer.agent_2: agent_2}
+    found = {transfer.agent_1: agent_1}
+    if transfer.agent_2 is not None and helper:
+        found[transfer.agent_2] = helper
+    return found
 
 
 def finish_transcript(
@@ -308,7 +313,7 @@ def finish_transcript(
     if meeting:  # everyone is a participant and the meeting is analysed: nobody to find, nothing to review
         labels = sorted({turn.speaker_label for turn in turns})
         assignment = RoleAssignment({label: SpeakerRole(rubric.roles[0], 1.0, ALL_PARTICIPANTS) for label in labels})
-    elif recording.transfer_person_id and recording.type is ConversationType.SUPPORT:
+    elif (recording.transferred or recording.transfer_person_id) and recording.type is ConversationType.SUPPORT:
         if recording.confirmed_roles is not None:
             transfer = from_confirmed(recording.confirmed_roles, turns, rubric.roles[:2])
             if transfer is None:

@@ -265,7 +265,7 @@ export function UploadPage() {
   const [transferred, setTransferred] = useState<"no" | "yes">("no");
   const [transferId, setTransferId] = useState("");
   // How many voices and how they are told apart (owner 2026-11-18), for everyone who uploads. Support calls default
-  // to 2 (one agent, one customer); a transferred call always has 3.
+  // to 2 (one agent, one customer); a call a colleague helped on always has 3.
   const [speakerChoice, setSpeakerChoice] = useState<string | null>(null);
   const [speakerModel, setSpeakerModel] = useState<"pyannote" | "gemini">("pyannote");
   const [consentOnFile, setConsentOnFile] = useState(() => rememberedConsent() !== "");
@@ -281,14 +281,15 @@ export function UploadPage() {
   const summary = summarise(items);
   const consent = consentOnFile ? consentRef.trim() : "";
   const consentMissing = consentOnFile && consent === "";
-  const canTransfer = type === "support" && !staffSelf;
-  const transferPerson = canTransfer && transferred === "yes" && transferId !== chosenPerson ? transferId : "";
-  const transferMissing = canTransfer && transferred === "yes" && transferPerson === "";
-  const transferring = canTransfer && transferred === "yes";
+  // A colleague helped on the call (owner 2026-11-19): the agent hands the phone to someone beside them. The call stays
+  // the chosen agent's; naming the colleague is optional, and only for those who can choose people.
+  const transferring = type === "support" && transferred === "yes";
+  const transferPerson = transferring && !staffSelf && transferId !== chosenPerson ? transferId : "";
+  const agentName = people.data?.find((p) => p.id === chosenPerson)?.name;
   const speakers = transferring ? "3" : (speakerChoice ?? (type === "support" ? "2" : "auto"));
   const speakerCount = speakers === "auto" ? null : Number(speakers);
   const callType = type === "support" || type === "sales";
-  const canStart = summary.ready > 0 && !running && chosenPerson !== "" && !consentMissing && !transferMissing;
+  const canStart = summary.ready > 0 && !running && chosenPerson !== "" && !consentMissing;
   const things = summary.ready === 1 ? labels.recording.toLowerCase() : labels.recording_plural.toLowerCase();
 
   const add = (files: FileList | null) => {
@@ -314,6 +315,7 @@ export function UploadPage() {
         interaction: type === "sales" ? interaction : null,
         clientName: type === "sales" ? clientName : null,
         asrModel,
+        transferred: transferring && !isTranscript(item.file),
         transferPersonId: transferPerson || null,
         speakerCount: isTranscript(item.file) ? null : speakerCount,
         speakerModel: isTranscript(item.file) ? "pyannote" : speakerModel,
@@ -532,27 +534,31 @@ export function UploadPage() {
               ))}
             </Select>
           )}
-          {canTransfer && (
+          {type === "support" && (
             <>
               <ChoiceCards
-                legend="Did another agent take over the call?"
+                legend="Did a colleague help on this call?"
                 value={transferred}
                 onChange={setTransferred}
                 disabled={running}
                 options={[
                   { value: "no", label: "No" },
-                  { value: "yes", label: "Yes, it was transferred" },
+                  { value: "yes", label: "Yes, a colleague helped" },
                 ]}
+                hint={
+                  transferring
+                    ? `The call is still ${agentName ? `${agentName}’s` : "the agent’s"}: every score goes to them, and the colleague’s words count as theirs.`
+                    : undefined
+                }
               />
-              {transferred === "yes" && (
+              {transferring && !staffSelf && (
                 <Select
-                  label="Transferred to"
+                  label="Who helped (optional)"
                   value={transferPerson}
                   disabled={running || people.isPending}
                   onChange={(e) => setTransferId(e.target.value)}
-                  hint="Each agent is scored on their own part of the call, and on the handover."
                 >
-                  <option value="">Choose an agent</option>
+                  <option value="">Not named</option>
                   {people.data
                     ?.filter((p) => p.id !== chosenPerson)
                     .map((p) => (
@@ -571,7 +577,7 @@ export function UploadPage() {
             onChange={(e) => setSpeakerChoice(e.target.value)}
             hint={
               transferring
-                ? "A transferred call has 3: both agents and the customer."
+                ? "A call a colleague helped on has 3: the agent, the colleague and the customer."
                 : callType && speakers === "2"
                   ? `One is the ${labels.person.toLowerCase()} and the other is the customer.`
                   : "Count every voice in the recording. Automatic lets Sabha decide."
@@ -674,11 +680,9 @@ export function UploadPage() {
                 ? "Add files to begin."
                 : !chosenPerson
                   ? `Choose a ${labels.person.toLowerCase()} to continue.`
-                  : transferMissing
-                    ? "Choose the agent who took over the call."
-                    : !consentOnFile
-                      ? "These will wait for consent before processing."
-                      : "Sabha starts on each file as soon as it is uploaded."}
+                  : !consentOnFile
+                    ? "These will wait for consent before processing."
+                    : "Sabha starts on each file as soon as it is uploaded."}
             </p>
           </div>
         </Panel>

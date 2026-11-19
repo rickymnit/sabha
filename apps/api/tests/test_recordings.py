@@ -321,38 +321,49 @@ def support(api: Api) -> dict[str, Any]:
     return {**LESSON, "type": "support", "file_name": "call.mp3", "person_id": "p-staff-a"}
 
 
-def test_a_support_call_can_name_the_agent_it_was_transferred_to(api: Api, support: dict[str, Any]) -> None:
-    response = api.create("owner-a", {**support, "transfer_person_id": "p-other"})
-    assert response.status_code == 201, response.text
-    doc = api.db.recordings.find_one({"_id": response.json()["recording_id"]})
+def test_a_call_a_colleague_helped_on_is_marked_and_the_helper_named_only_if_known(
+    api: Api, support: dict[str, Any]
+) -> None:
+    # Owner 2026-11-19: agent 1 hands the phone to a colleague beside them; the call stays agent 1's.
+    own = api.create("staff-a", {**support, "transferred": True})  # an agent marks their own call, naming nobody
+    assert own.status_code == 201, own.text
+    doc = api.db.recordings.find_one({"_id": own.json()["recording_id"]})
+    assert doc is not None and (doc["person_id"], doc["transferred"], doc["transfer_person_id"]) == (
+        "p-staff-a", True, None)  # fmt: skip
+    named = api.create("owner-a", {**support, "transferred": True, "transfer_person_id": "p-other"})
+    doc = api.db.recordings.find_one({"_id": named.json()["recording_id"]})
     assert doc is not None and (doc["person_id"], doc["transfer_person_id"]) == ("p-staff-a", "p-other")
     entry = api.db.audit_log.find_one({"target_id": doc["_id"], "action": "recording.create"})
-    assert entry is not None and entry["meta"]["transfer_person_id"] == "p-other"
+    assert (
+        entry is not None and entry["meta"]["transferred"] is True and entry["meta"]["transfer_person_id"] == "p-other"
+    )
     plain = api.db.recordings.find_one({"_id": api.create("owner-a", support).json()["recording_id"]})
-    assert plain is not None and plain["transfer_person_id"] is None
+    assert plain is not None and (plain["transferred"], plain["transfer_person_id"]) == (False, None)
 
 
 @pytest.mark.parametrize(
     "change",
     [
-        {"type": "teaching"},  # only support calls are transferred
-        {"transfer_person_id": "p-staff-a"},  # agent 2 is not agent 1
-        {"person_id": None},  # no agent 1
+        {"type": "teaching"},  # only support calls
+        {"transfer_person_id": "p-staff-a"},  # the helper is not agent 1
+        {"person_id": None},  # no agent 1, whose call it is
         {"file_name": "call.txt", "content_type": "text/plain", "size_bytes": 100},  # a transcript has no voices
+        {"transferred": False, "transfer_person_id": "p-other"},  # a helper named on a call nobody helped on
     ],
 )
-def test_a_transfer_needs_a_support_audio_call_and_two_different_agents(
+def test_a_helped_call_needs_a_support_audio_call_and_its_agent(
     api: Api, support: dict[str, Any], change: dict[str, Any]
 ) -> None:
-    problem(api.create("owner-a", {**support, "transfer_person_id": "p-other", **change}), 422, "transfer_not_allowed")
+    problem(api.create("owner-a", {**support, "transferred": True, **change}), 422, "transfer_not_allowed")
 
 
-def test_agent_2_must_belong_to_the_tenant(api: Api, support: dict[str, Any]) -> None:
-    problem(api.create("owner-a", {**support, "transfer_person_id": "p-b"}), 422, "unknown_person")
+def test_the_helper_must_belong_to_the_tenant(api: Api, support: dict[str, Any]) -> None:
+    problem(api.create("owner-a", {**support, "transferred": True, "transfer_person_id": "p-b"}), 422, "unknown_person")
 
 
-def test_staff_cannot_name_agent_2(api: Api, support: dict[str, Any]) -> None:
-    problem(api.create("staff-a", {**support, "transfer_person_id": "p-other"}), 403, "person_not_allowed")
+def test_staff_mark_help_but_do_not_name_colleagues(api: Api, support: dict[str, Any]) -> None:
+    body = {**support, "transferred": True, "transfer_person_id": "p-other"}
+    problem(api.create("staff-a", body), 403, "person_not_allowed")
 
 
 # --- How many voices, and how they are told apart (owner 2026-11-18) ---
@@ -374,7 +385,7 @@ def test_speaker_choices_outside_the_options_are_refused(
 
 
 def test_a_transferred_call_has_three_speakers(api: Api, support: dict[str, Any]) -> None:
-    body = {**support, "transfer_person_id": "p-other"}
+    body = {**support, "transferred": True}
     problem(api.create("owner-a", {**body, "speaker_count": 2}), 422, "transfer_not_allowed")
     assert api.create("owner-a", {**body, "speaker_count": 3}).status_code == 201
 

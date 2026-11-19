@@ -107,7 +107,9 @@ class RecordingIn(BaseModel):
     # Owners and admins only: the speech-to-text model for this audio, "provider:model" from GET /v1/speech-models
     # (owner 2026-11-13). Left out, the configured model is used.
     asr_model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
-    # Support audio only: the agent the call was transferred to during the call (agent 2); person_id is agent 1.
+    # Support audio only: a colleague helped on agent 1's (person_id's) phone; the call stays agent 1's. Naming the
+    # colleague is optional, and only for uploaders who may upload for them.
+    transferred: bool = False
     transfer_person_id: str | None = None
     # Audio only: how many speakers (None: the type's default) and whether Gemini checks who said each line.
     speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
@@ -322,17 +324,21 @@ async def _transfer_agent(
     transcript: bool,
     people: TenantRepo[Person],
 ) -> str | None:
-    """Agent 2 of a support call transferred during the call, checked like agent 1 is (None: not transferred)."""
-    if body.transfer_person_id is None:
+    """The colleague who helped on a support call, checked like agent 1 is; None when not named."""
+    if not body.transferred:
+        if body.transfer_person_id is not None:
+            raise TransferNotAllowedError("Mark the call as helped by a colleague before naming them.")
         return None
     if body.type is not ConversationType.SUPPORT or transcript:
         raise TransferNotAllowedError("Only support call recordings can be marked as transferred.")
     if body.speaker_count not in (None, TRANSFERRED_SPEAKERS):
-        raise TransferNotAllowedError("A transferred call has three speakers: two agents and the customer.")
+        raise TransferNotAllowedError("A call a colleague helped on has three speakers: two agents and the customer.")
     if agent_1 is None or body.transfer_person_id == agent_1.id:
-        raise TransferNotAllowedError("Choose the agent who took the call first and a different agent it went to.")
+        raise TransferNotAllowedError("Choose the agent whose call it is; the colleague who helped is someone else.")
+    if body.transfer_person_id is None:
+        return None
     if principal.role is Role.STAFF:
-        raise PersonNotAllowedError("Ask your manager or administrator to upload a transferred call.")
+        raise PersonNotAllowedError("You can mark that a colleague helped, but not name them.")
     agent_2 = await people.find_one({"_id": body.transfer_person_id})
     if agent_2 is None:
         raise UnknownPersonError("This person does not exist in your organisation.")
@@ -414,6 +420,7 @@ async def create(
         interaction=(body.interaction or "meeting") if sales else None,
         client_name=body.client_name,
         asr_choice=asr_choice,
+        transferred=body.transferred,
         transfer_person_id=transfer_person_id,
         speaker_count=body.speaker_count,
         speaker_model=body.speaker_model,
@@ -433,6 +440,7 @@ async def create(
                     "size_bytes": body.size_bytes,
                     "source": recording.source,
                     **({"asr_model": asr_choice} if asr_choice else {}),
+                    **({"transferred": True} if body.transferred else {}),
                     **({"transfer_person_id": transfer_person_id} if transfer_person_id else {}),
                     **({"speaker_count": body.speaker_count} if body.speaker_count else {}),
                     **({"speaker_model": body.speaker_model} if body.speaker_model != "pyannote" else {}),

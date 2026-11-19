@@ -260,7 +260,7 @@ Interaction = Literal["call", "meeting"]
 SpeakerModel = Literal["pyannote", "gemini"]
 SPEAKER_COUNT_MIN, SPEAKER_COUNT_MAX = 2, 10
 TRANSFERRED_SPEAKERS = 3
-"""A support call transferred during the call: agent 1, agent 2 and the customer (sabha_asr.transfer)."""
+"""A support call a colleague helped on: the agent, the colleague and the customer (sabha_asr.transfer)."""
 CLIENT_NAME_MAX = 120
 
 
@@ -330,8 +330,11 @@ class Recording(TenantDoc):
     # Speech-to-text model chosen at upload by an owner or admin ("openai:gpt-transcribe", sabha_asr.registry
     # CHOICES; owner 2026-11-13). None: the configured ASR_PROVIDER when the recording is transcribed.
     asr_choice: str | None = Field(default=None, max_length=100)
-    # Support calls transferred during the call (owner 2026-11-18): agent 1 (person_id) hands the caller to agent 2,
-    # this person, in the same recording. Both agents are analysed, each on their own part.
+    # A support call a colleague helped on (owner 2026-11-18, meaning corrected 2026-11-19): agent 1 (person_id) hands
+    # the phone to a colleague sitting beside them for part of the call. The call stays agent 1's: every score, metric
+    # and coaching note is agent 1's, and the colleague's words count as the agent's side. Three voices are listened
+    # for (sabha_asr.transfer). `transfer_person_id` names the colleague when the uploader knows and may (optional).
+    transferred: bool = False
     transfer_person_id: str | None = None
     # How the voices are told apart (owner 2026-11-18, chosen at upload by anyone who uploads): how many speakers the
     # diarizer is asked for (None: the type's default, sabha_workers.stages.diarize.speaker_count), and whether
@@ -391,9 +394,9 @@ class Transcript(TenantDoc):
     asr_billed_ms: int | None = Field(default=None, ge=0)
     asr_cost_inr: float | None = Field(default=None, ge=0)
     rubric_id: str = Field(min_length=1)
-    # A support call transferred during the call (sabha_asr.transfer, owner 2026-11-18): speaker label -> the person
-    # id of agent 1 (Recording.person_id) and agent 2 (Recording.transfer_person_id), and the handover, agent 2's
-    # first words, on the ORIGINAL timeline. Empty and None on every other call.
+    # A support call a colleague helped on (sabha_asr.transfer, Recording.transferred): speaker label -> the person id
+    # of agent 1 (Recording.person_id) and, when named, the colleague (Recording.transfer_person_id), and the
+    # handover, the colleague's first words, on the ORIGINAL timeline. Empty and None on every other call.
     agents: dict[str, str] = Field(default_factory=dict)
     handover_ms: int | None = Field(default=None, ge=0)
     # The Gemini speaker check, when the uploader asked for it (Recording.speaker_model "gemini"); its cost is also in

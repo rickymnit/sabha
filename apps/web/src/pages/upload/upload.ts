@@ -38,7 +38,8 @@ export interface UploadInput {
   clientName?: string | null;
   /** Owners and admins: the speech-to-text model ("provider:model"); the organisation's default when left out. */
   asrModel?: string | null;
-  /** Support calls transferred during the call: the agent who took over (agent 2); personId is agent 1. */
+  /** Support calls a colleague helped on (the call stays personId's), and the colleague when named. */
+  transferred?: boolean;
   transferPersonId?: string | null;
   /** Audio only: how many voices (null: the type's default) and whether Gemini checks who said each line. */
   speakerCount?: number | null;
@@ -118,7 +119,8 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       ...(input.interaction ? { interaction: input.interaction } : {}),
       ...(input.clientName?.trim() ? { client_name: input.clientName.trim() } : {}),
       ...(input.asrModel ? { asr_model: input.asrModel } : {}),
-      ...(input.transferPersonId ? { transfer_person_id: input.transferPersonId } : {}),
+      ...(input.transferred ? { transferred: true } : {}),
+      ...(input.transferred && input.transferPersonId ? { transfer_person_id: input.transferPersonId } : {}),
       ...(input.speakerCount ? { speaker_count: input.speakerCount } : {}),
       ...(input.speakerModel && input.speakerModel !== "pyannote" ? { speaker_model: input.speakerModel } : {}),
     },

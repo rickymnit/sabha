@@ -1,7 +1,8 @@
-"""Speaker roles on a support call transferred during the call: agent 1, agent 2 and the customer.
+"""Speaker roles on a support call a colleague helped on: agent 1, the colleague (agent 2) and the customer.
 
-Owner's decision (2026-11-18): a support call can be handed from agent 1 to a more experienced agent 2 during the
-call, in the same recording (Recording.transfer_person_id), and the diarizer is then asked for exactly three voices.
+Owner's decision (2026-11-18, meaning corrected 2026-11-19): agent 1 can hand the phone to a colleague sitting beside
+them for part of the call (Recording.transferred), and the diarizer is then asked for exactly three voices. The call
+stays agent 1's: both agent voices get the staff role, so every score and metric is agent 1's.
 Call 4 (NiaLabs demo) is a warm transfer: agent 1 talks with the customer, briefs agent 2 while the customer waits,
 and leaves; agent 2 carries on with the customer. `assign_transfer_roles` works in three steps:
 
