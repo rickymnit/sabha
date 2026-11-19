@@ -187,9 +187,9 @@ def test_the_gemini_check_moves_lines_it_hears_from_the_other_side_and_costs_its
     assert start_s == 0 and staff_word == "sales rep" and numbered[0][1] == 1.0  # original time: compact 0 is 1000
     assert "9876543210" not in json.dumps(numbered, ensure_ascii=False)  # masked before it leaves (golden rule 8)
     assert doc.speaker_check is not None and (doc.speaker_check.changed, doc.speaker_check.lines) == (2, 5)
-    # 3.1 Flash-Lite, $0.50 per 1M in, $1.50 out: 20000 and 100 tokens = $0.01015 = Rs 1.015, added to speech cost.
-    assert doc.speaker_check.cost_inr == pytest.approx(1.015)
-    assert doc.asr_cost_inr == pytest.approx(0.4982 + 1.015)
+    # 3.8 Flash, $0.75 per 1M in, $3.75 out: 20000 and 100 tokens = $0.015375 = Rs 1.5375, added to speech cost.
+    assert doc.speaker_check.cost_inr == pytest.approx(1.5375)
+    assert doc.asr_cost_inr == pytest.approx(0.4982 + 1.5375)
     found = json.loads(setup.store.get("t1/r1/transcribe@v1/speaker_check@v1.json"))
     assert [c["to"] for c in found["changed"]] == ["sales_rep", "sales_rep"]
 
