@@ -229,7 +229,7 @@ def test_owners_and_admins_may_choose_the_speech_to_text_model(api: Api) -> None
     models = {m["id"]: m for m in listed.json()}
     assert listed.json()[0]["id"] == "sarvam:saaras:v4" and models["sarvam:saaras:v4"]["default"]
     assert models["sarvam:saaras:v4"]["inr_per_hour"] == 29.4  # Rs 0.49/min, published
-    assert models["openai:gpt-transcribe"]["available"] and not models["qwen:qwen3-asr-flash"]["available"]
+    assert models["openai:gpt-transcribe"]["available"] and not models["deepgram:nova-3"]["available"]
 
     # The estimate and the recording use the chosen model: $0.0045/min x Rs 90 x 10 min = Rs 4.05
     created = api.create("owner-a", {**LESSON, "asr_model": "openai", "expected_duration_ms": 600_000})

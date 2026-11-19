@@ -21,7 +21,8 @@ Models (https://aistudio.google.com/docs/pricing, checked 2026-11-16 and 2026-11
 tokens per second.
 
 Thinking: 3.1 Flash-Lite, 2.5 Flash and 2.5 Flash-Lite are asked to think not at all (THINKING; thinking is billed
-as output and was 88% of a 3.8 Flash call's cost on 2026-11-18). The other models keep Google's default for now.
+as output and was 88% of a 3.8 Flash call's cost on 2026-11-18). 3.8 Flash thinks "low": on 174 s of the Roshan
+call (2026-11-19) it used no thinking tokens and cost about Rs 13.3 per audio hour. Others keep Google's default.
 
 Model check: Google retires 2.5 Flash and, from 2026-12-01, answers its requests with 3.5 Flash-Lite. An answer whose
 `modelVersion` is not the model asked for is refused (golden rule 7: never a silent swap of model).
@@ -53,6 +54,7 @@ MAX_WORDS_PER_S = 6.0
 THINKING: dict[str, dict[str, Any]] = {
     "gemini-2.5-flash": {"thinkingBudget": 0},
     "gemini-2.5-flash-lite": {"thinkingBudget": 0},
+    "gemini-3.8-flash": {"thinkingLevel": "low"},  # default thinking cost about Rs 148 per audio hour (2026-11-18)
     "gemini-3.1-flash-lite": {"thinkingLevel": "minimal"},  # no thinking tokens (tried 2026-11-18)
 }
 """Per model, the thinkingConfig sent (module docstring); a model not listed gets Google's default."""

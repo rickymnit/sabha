@@ -214,7 +214,7 @@ def test_gemini_2_5_flash_thinks_nothing_and_must_answer_itself() -> None:
     three = gemini.GeminiProvider(
         "k", model="gemini-3.8-flash", client=mocked(lambda r: httpx.Response(200, json=gemini_answer("x")))
     )
-    assert "thinkingConfig" not in three.body(CHUNK)["generationConfig"]
+    assert three.body(CHUNK)["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}  # no thinking tokens
     assert token_cost_inr("gemini/gemini-2.5-flash", TokenUsage(1_000_000, 1_000_000), 100.0) == pytest.approx(350.0)
 
 
@@ -328,10 +328,10 @@ def test_upload_choices_and_what_a_chosen_model_builds() -> None:
     s = settings(asr_provider="sarvam", sarvam_api_key="k", openai_api_key="k", asr_fallbacks="openai")
     offered = {c.spec: c for c in choices(s)}
     assert next(iter(offered)) == "sarvam:saaras:v4" and offered["sarvam:saaras:v4"].default
-    assert offered["openai:gpt-transcribe"].available and not offered["qwen:qwen3-asr-flash"].available
+    assert offered["openai:gpt-transcribe"].available and not offered["deepgram:nova-3"].available
     assert chosen_spec("openai", s) == "openai:gpt-transcribe"  # a bare provider means its default model
     with pytest.raises(AsrConfigError, match="not set up"):
-        chosen_spec("qwen:qwen3-asr-flash", s)  # listed, but no DASHSCOPE_API_KEY
+        chosen_spec("deepgram:nova-3", s)  # listed, but no DEEPGRAM_API_KEY
     with pytest.raises(AsrConfigError, match="not one of"):
         chosen_spec("openai:gpt-9", s)
     assert "openai:gpt-4o-mini-transcribe" not in offered  # writes Hindi in other scripts (registry CHOICES)

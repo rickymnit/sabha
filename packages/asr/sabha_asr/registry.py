@@ -196,21 +196,20 @@ class Choice:
 
 # The models offered on the upload page: provider, model, name. Not gpt-4o-mini-transcribe: on a Hindi support call it
 # wrote 18 of 44 pieces in Urdu or Telugu script even when told the language is Hindi (owner's rule, 2026-11-13:
-# transcripts only in English, Hindi and Hinglish). It stays usable in eval/asr_compare.py.
+# transcripts only in English, Hindi and Hinglish). It stays usable in eval/asr_compare.py. Qwen3 ASR Flash and Amazon
+# Transcribe are off the list too (owner 2026-11-19); their adapters stay for eval/asr_compare.py.
 CHOICES: tuple[tuple[str, str, str], ...] = (
     ("sarvam", "saaras:v4", "Sarvam Saaras v4"),
     ("openai", "gpt-transcribe", "OpenAI Transcribe"),
-    ("qwen", "qwen3-asr-flash", "Qwen3 ASR Flash"),
     ("groq", "whisper-large-v3", "Whisper Large v3 (Groq)"),
     ("groq", "whisper-large-v3-turbo", "Whisper Turbo (Groq)"),
     ("deepgram", "nova-3", "Deepgram Nova-3 (Hindi and English)"),
+    ("gemini", "gemini-3.8-flash", "Gemini 3.8 Flash"),  # back on the list (owner 2026-11-19), low thinking
     ("gemini", "gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite"),
     # gemini-2.5-flash-lite is not offered: Google refuses it to new accounts (404, 2026-11-18), ours included.
-    # gemini-3.8-flash is not offered (owner 2026-11-18): about Rs 148 per audio hour with its default thinking.
     # gemini-2.5-flash is not offered: Google refuses it to accounts created after its retirement began ("no longer
     # available to new users", HTTP 404, 2026-11-18), and ours is one.
     ("gemini", "gemini-3.5-flash-lite", "Gemini Flash-Lite"),
-    ("aws", "transcribe", "Amazon (Mumbai)"),
     ("whisper", "large-v3-turbo", "Whisper (own server)"),
 )
 
