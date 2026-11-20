@@ -22,17 +22,34 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Request
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import BadRequestError, ConflictError, ForbiddenError
+from sabha_api.services.recordings import AsrModelUnavailableError, TransferNotAllowedError
 from sabha_api.services.results import visible_recording
-from sabha_core.models import Analysis, AuditEntry, Dispute, OutboxEvent, Person, Recording, Tenant, Transcript, utc_now
+from sabha_asr.registry import AsrConfigError, chosen_spec
+from sabha_core.models import (
+    SPEAKER_COUNT_MAX,
+    SPEAKER_COUNT_MIN,
+    TRANSFERRED_SPEAKERS,
+    Analysis,
+    AuditEntry,
+    Dispute,
+    OutboxEvent,
+    Person,
+    Recording,
+    SpeakerModel,
+    Tenant,
+    Transcript,
+    utc_now,
+)
 from sabha_core.outbox import record_transition_async
 from sabha_core.profiles import ConversationType, get_profile
 from sabha_core.repo import TenantRepo
+from sabha_core.settings import Settings
 from sabha_core.state import ConcurrentTransition, RecordingStatus
 
 ROUTE = "POST /v1/recordings/{recording_id}/reanalyze"
@@ -57,9 +74,28 @@ class UnknownRubricError(BadRequestError):
     code, title = "unknown_rubric", "Unknown rubric"
 
 
+class SpeechIn(BaseModel):
+    """Transcribe again with these models before scoring (ADR 0018); the same choices as at upload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    asr_model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = Field(
+        default=None, description="'provider:model' from GET /v1/speech-models; left out, the configured model"
+    )
+    speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
+    speaker_model: SpeakerModel = "pyannote"
+
+
 class ReanalyzeIn(BaseModel):
     reason: Reason
     rubric_id: str | None = Field(default=None, description="Another rubric version of the same type")
+    speech: SpeechIn | None = Field(
+        default=None, description="Transcribe again with other models; left out, scores only"
+    )
+
+
+class NoAudioError(ConflictError):
+    code, title = "no_audio", "There is no audio to transcribe again"
 
 
 class ReanalyzeOut(BaseModel):
@@ -100,19 +136,22 @@ def check_rubric(rubric_id: str, conversation_type: ConversationType, rubrics_di
 async def _start(
     principal: Principal, recording: Recording, reason: str, rubric_id: str | None, request: Request, *,
     recordings: TenantRepo[Recording], disputes: TenantRepo[Dispute], outbox: TenantRepo[OutboxEvent],
-    entries: TenantRepo[AuditEntry], transactions: Transactions,
+    entries: TenantRepo[AuditEntry], transactions: Transactions, redo: SpeechRedo | None = None,
 ) -> ReanalyzeOut:  # fmt: skip
     run = recording.analysis_run + 1
     meta: dict[str, Any] = {"reanalysis": True, "analysis_run": run, "reason": reason, "rubric_id": rubric_id}
+    target, fields = RecordingStatus.ANALYZING, {"analysis_run": run, "rubric_id": rubric_id}
+    if redo is not None:
+        target, fields = redo.target, fields | redo.fields
+        meta |= redo.meta
     closed = {"status": "closed", "resolution_note": CLOSED_NOTE, "resolved_by": principal.user_id,
               "resolved_by_role": principal.role.value, "resolved_at": utc_now()}  # fmt: skip
     try:
         async with transactions.run() as session:
             await recordings.update_one({"_id": recording.id, "status": RecordingStatus.COMPLETED.value},
-                                        {"$set": {"analysis_run": run, "rubric_id": rubric_id}},
-                                        session=session)  # fmt: skip
-            await record_transition_async(recordings, outbox, recording.id, RecordingStatus.COMPLETED,
-                                          RecordingStatus.ANALYZING, reason="reanalysis", meta=meta, reanalysis=True,
+                                        {"$set": fields}, session=session)  # fmt: skip
+            await record_transition_async(recordings, outbox, recording.id, RecordingStatus.COMPLETED, target,
+                                          reason="reanalysis", meta=meta, reanalysis=True,
                                           session=session)  # fmt: skip
             await disputes.update_many({"recording_id": recording.id, "status": "open"}, {"$set": closed},
                                        session=session)  # fmt: skip
@@ -120,24 +159,66 @@ async def _start(
                         target_id=recording.id, meta=meta, session=session)  # fmt: skip
     except ConcurrentTransition as exc:
         raise NotCompletedError("This recording is no longer finished: it may be re-analysing already.") from exc
-    return ReanalyzeOut(recording_id=recording.id, status=RecordingStatus.ANALYZING.value, analysis_run=run)
+    return ReanalyzeOut(recording_id=recording.id, status=target.value, analysis_run=run)
+
+
+class SpeechRedo(BaseModel):
+    """Where a re-analysis with other speech models starts, and what changes on the recording (ADR 0018)."""
+
+    target: RecordingStatus
+    fields: dict[str, Any]
+    meta: dict[str, Any]
+
+
+def speech_redo(recording: Recording, speech: SpeechIn, settings: Settings) -> SpeechRedo:
+    """Check a request to transcribe again and work out its start: speaker separation again when the number of
+    speakers changes (its labels change, so confirmed roles and voice names no longer fit), else transcription."""
+    if recording.source != "audio" or recording.audio_deleted_at is not None:
+        raise NoAudioError("This recording's audio is not kept any more, so it can only be scored again.")
+    if recording.transferred and speech.speaker_count not in (None, TRANSFERRED_SPEAKERS):
+        raise TransferNotAllowedError("A call a colleague helped on has three speakers: two agents and the customer.")
+    asr_choice = None
+    if speech.asr_model is not None:
+        try:
+            asr_choice = chosen_spec(speech.asr_model, settings)
+        except AsrConfigError as exc:
+            raise AsrModelUnavailableError(str(exc)) from exc
+    fields: dict[str, Any] = {
+        "asr_choice": asr_choice,
+        "speaker_count": speech.speaker_count,
+        "speaker_model": speech.speaker_model,
+        "speech_run": recording.speech_run + 1,
+    }
+    target = RecordingStatus.TRANSCRIBING
+    if speech.speaker_count != recording.speaker_count:
+        target = RecordingStatus.DIARIZING
+        fields |= {"diarize_run": recording.diarize_run + 1, "confirmed_roles": None, "voice_names": {}}
+    meta = {"speech": {"asr_model": asr_choice, "speaker_count": speech.speaker_count,
+                       "speaker_model": speech.speaker_model, "from": target.value}}  # fmt: skip
+    return SpeechRedo(target=target, fields=fields, meta=meta)
 
 
 async def reanalyze(
     principal: Principal, recording_id: str, body: ReanalyzeIn, request: Request, *, rubrics_dir: str,
     recordings: TenantRepo[Recording], people: TenantRepo[Person], transcripts: TenantRepo[Transcript],
     disputes: TenantRepo[Dispute], outbox: TenantRepo[OutboxEvent], entries: TenantRepo[AuditEntry],
-    transactions: Transactions,
+    transactions: Transactions, settings: Settings | None = None,
 ) -> ReanalyzeOut:  # fmt: skip
     recording = await visible_recording(principal, recording_id, recordings, people)
     require_allowed(principal)
     if recording.status is not RecordingStatus.COMPLETED:
         raise NotCompletedError("Only a finished recording can be re-analysed.")
     rubric_id = None if body.rubric_id is None else check_rubric(body.rubric_id, recording.type, rubrics_dir)
-    if await transcripts.find_one({"recording_id": recording.id}) is None:
+    redo = None
+    if body.speech is not None:
+        if settings is None:  # pragma: no cover - the router always passes them
+            raise RuntimeError("settings are needed to transcribe again")
+        redo = speech_redo(recording, body.speech, settings)
+    elif await transcripts.find_one({"recording_id": recording.id}) is None:
         raise NoTranscriptError("This recording has no transcript to score again.")
     return await _start(principal, recording, body.reason, rubric_id, request, recordings=recordings,
-                        disputes=disputes, outbox=outbox, entries=entries, transactions=transactions)  # fmt: skip
+                        disputes=disputes, outbox=outbox, entries=entries, transactions=transactions,
+                        redo=redo)  # fmt: skip
 
 
 async def reanalyze_many(

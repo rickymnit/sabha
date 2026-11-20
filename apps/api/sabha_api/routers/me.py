@@ -8,13 +8,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from sabha_api.auth import Principal, Role, current_principal
 from sabha_api.auth.directory import Directory, directory
 from sabha_api.deps import tenant_repo
 from sabha_api.errors import NotFoundError
+from sabha_api.services.phone_calls import is_set_up
 from sabha_core.models import Person, Recording, Unit, User
 from sabha_core.repo import TenantRepo
 
@@ -42,6 +43,7 @@ class MeTenant(BaseModel):
     profile: str
     labels: dict[str, str]  # the UI's nouns (CLAUDE.md: never hard-code "Teacher" or "Lesson")
     enabled_types: list[str]
+    phone_calls: bool = False  # calls come in from MyOperator for this organisation (ADR 0017)
     units: list[MeUnit]  # every unit's name, so lists can say "Class 6" rather than an id
 
 
@@ -59,6 +61,7 @@ class Me(BaseModel):
 
 @router.get("/v1/me", response_model=Me)
 async def me(
+    request: Request,
     principal: Annotated[Principal, Depends(current_principal)],
     users: Annotated[TenantRepo[User], Depends(tenant_repo("users", User))],
     found: Annotated[Directory, Depends(directory)],
@@ -87,6 +90,7 @@ async def me(
             profile=tenant.profile,
             labels=tenant.labels.model_dump(),
             enabled_types=[t.value for t in tenant.enabled_types],
+            phone_calls=is_set_up(tenant.id, request.app.state.settings),
             units=[
                 MeUnit(id=u.id, name=u.name, parent_id=u.parent_id) for u in await units.find({}, sort=[("name", 1)])
             ],

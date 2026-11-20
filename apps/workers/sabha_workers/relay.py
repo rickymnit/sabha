@@ -51,6 +51,7 @@ ROUTES: dict[str, tuple[str, ...]] = {
     "recording.needs_review": ("notify",),
     "dispute.resolved": ("notify",),  # emails whoever raised the dispute (P6.7)
     "recording.shared": ("notify",),  # a manager shared the report with the person analysed (UI v2)
+    "phone_call.import": ("phone_call_import",),  # someone asked for a phone call to be analysed (ADR 0017)
 }
 
 

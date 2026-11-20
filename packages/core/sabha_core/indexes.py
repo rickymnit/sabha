@@ -91,6 +91,12 @@ INDEXES: dict[str, list[IndexModel]] = {
     "audit_log": [_ix("tenant_at", (T, ASCENDING), ("at", DESCENDING))],
     "product_info": [_ix("tenant_status_title", (T, ASCENDING), ("status", ASCENDING), ("title", ASCENDING))],
     "deliveries": [_ix("tenant_key", (T, ASCENDING), ("key", ASCENDING), unique=True)],
+    "phone_calls": [  # ADR 0017
+        _ix("tenant_call", (T, ASCENDING), ("call_id", ASCENDING), unique=True),  # one document per call
+        _ix("tenant_started", (T, ASCENDING), ("started_at", DESCENDING), ("_id", DESCENDING)),
+        _ix("tenant_unit_started", (T, ASCENDING), ("unit_id", ASCENDING), ("started_at", DESCENDING)),
+        _ix("tenant_agent", (T, ASCENDING), ("agents.user_id", ASCENDING)),
+    ],
     "dlq": [
         _ix("tenant_created", (T, ASCENDING), ("created_at", DESCENDING)),
         _ix("tenant_recording", (T, ASCENDING), ("recording_id", ASCENDING)),

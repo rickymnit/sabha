@@ -181,6 +181,8 @@ class Person(TenantDoc):
     unit_ids: list[str] = Field(default_factory=list)
     unit_id: str | None = None
     user_id: str | None = None
+    # The phone system's ids for this person (MyOperator user ids, ADR 0017): their calls are matched to them.
+    phone_agent_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _home_unit(self) -> Self:
@@ -314,6 +316,10 @@ class Recording(TenantDoc):
     # Re-analysis (P2.8): which analysis run this is (1 = the first) and, when one was chosen, the rubric to use
     # instead of the tenant's default. The analyze stage writes run n to analyze@<version>-run<n>/.
     analysis_run: int = Field(default=1, ge=1)
+    # Re-analysis with other speech models (ADR 0018): which run of diarization and of transcription is current (1 =
+    # the first). Run n > 1 writes to diarize@<version>-run<n> / transcribe@<version>-run<n>; later stages read these.
+    diarize_run: int = Field(default=1, ge=1)
+    speech_run: int = Field(default=1, ge=1)
     rubric_id: str | None = None
     # Cost display (owner's request, 2026-10-28): the estimate made at upload, frozen.
     cost_estimate: CostEstimate | None = None
@@ -341,6 +347,9 @@ class Recording(TenantDoc):
     # Gemini then checks who said each line (sabha_asr.speaker_check) on top of pyannote.
     speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
     speaker_model: SpeakerModel = "pyannote"
+    # A phone call brought in from the phone system (ADR 0017): the PhoneCall it came from. Its audio is fetched by
+    # a worker (sabha_workers.phone_calls), not uploaded by a browser.
+    phone_call_id: str | None = None
     created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
@@ -376,6 +385,7 @@ class Transcript(TenantDoc):
 
     recording_id: str = Field(min_length=1)
     version: str = Field(min_length=1)  # "transcript@v1"
+    run: int = Field(default=1, ge=1)  # Recording.speech_run that made it (ADR 0018); the newest run is current
     storage_key: str = Field(min_length=1)
     asr_model: str = Field(min_length=1)
     word_timing: Literal["word", "approximate"]
@@ -526,6 +536,45 @@ class StageRun(TenantDoc):
     error_code: str | None = None
     error_detail: str | None = Field(default=None, max_length=2000)
     meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class PhoneAgent(BaseModel):
+    """Someone who answered a phone call, as the phone system names them."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str = Field(min_length=1)  # the phone system's user id
+    name: str
+    extension: str | None = None
+
+
+class PhoneCall(TenantDoc):
+    """An answered, recorded call in the organisation's phone system (MyOperator, ADR 0017).
+
+    Calls are copied in by a timed job (sabha_workers.phone_calls) as call details only: the audio stays with the
+    phone system until someone asks for the call to be analysed. Then a Recording is made from it (`recording_id`)
+    and a worker copies the audio into the audio bucket. The customer's number is kept only as its last four digits.
+    """
+
+    provider: Literal["myoperator"] = "myoperator"
+    call_id: str = Field(min_length=1)  # the phone system's id for the call
+    direction: Literal["incoming", "outgoing"]
+    started_at: UtcDatetime
+    ended_at: UtcDatetime | None = None
+    duration_s: int = Field(ge=0)
+    department: str | None = None
+    customer: str  # the customer's number masked to its last four digits, e.g. "••••4821"
+    agents: list[PhoneAgent] = Field(default_factory=list)  # who answered, in order; the first owns the call
+    recording_file: str = Field(min_length=1)  # the phone system's name for the recording file
+    # The person the first agent is matched to (Person.phone_agent_ids), and their home unit (for managers).
+    person_id: str | None = None
+    unit_id: str | None = None
+    recording_id: str | None = None  # set once someone asked for the call to be analysed
+    analyse_requested_by: str | None = None  # user id
+    analyse_requested_at: UtcDatetime | None = None
+    import_error: str | None = None  # why the audio could not be fetched, in plain words; None when fine
+    synced_at: UtcDatetime = Field(default_factory=utc_now)
+    created_at: UtcDatetime = Field(default_factory=utc_now)
 
 
 PRODUCT_INFO_TITLE_MAX = 120

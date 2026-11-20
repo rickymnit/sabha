@@ -18,6 +18,8 @@ export interface Me {
     /** The UI's nouns (CLAUDE.md: never hard-code "Teacher" or "Lesson"). */
     labels: Labels & Record<string, string>;
     enabled_types: ConversationType[];
+    /** Calls come in from MyOperator for this organisation (ADR 0017): shows the Phone calls page. */
+    phone_calls?: boolean;
     /** Every unit's name, so lists can say "Class 6" rather than an id. */
     /** parent_id: the unit it sits under (a section's class); null for a top-level unit. */
     units: { id: string; name: string; parent_id?: string | null }[];
@@ -96,6 +98,11 @@ export interface RecordingDetail extends RecordingItem {
   removed_silence: TimeRange[];
   /** Meetings: names people gave the anonymous voices ("S1" -> "Riya"). */
   voice_names: Record<string, string>;
+  /** The speech choices the current transcript was made with (null model: the usual one). */
+  asr_choice?: string | null;
+  speaker_count?: number | null;
+  speaker_model?: "pyannote" | "gemini";
+  transferred?: boolean;
 }
 
 export interface TranscriptResponse {
@@ -472,4 +479,45 @@ export interface SpeechModel {
   available: boolean; // set up on this server
   default: boolean;
   inr_per_hour: number | null;
+}
+
+/** A call answered by the organisation's phone system (MyOperator, ADR 0017). */
+export interface PhoneCallItem {
+  id: string;
+  started_at: string;
+  duration_s: number;
+  direction: "incoming" | "outgoing";
+  department: string | null;
+  /** The customer's number, last four digits only ("••••4821"). */
+  customer: string;
+  /** Who answered, in order; the first owns the call. */
+  agents: { user_id: string; name: string; extension: string | null }[];
+  /** The Sabha person the first agent is matched to. */
+  person: { id: string; name: string } | null;
+  /** The recording made when someone pressed Analyse. */
+  analysis: { recording_id: string; status: ApiStatus; status_reason: string | null } | null;
+  /** Why the audio could not be fetched from MyOperator; null when fine. */
+  import_error: string | null;
+}
+
+export interface PhoneCallPage {
+  items: PhoneCallItem[];
+  next_cursor: string | null;
+}
+
+export interface PhoneAgentOption {
+  user_id: string;
+  name: string;
+  extension: string | null;
+  calls: number;
+  /** How many of their calls someone has asked to analyse. */
+  analysed: number;
+  person: { id: string; name: string } | null;
+}
+
+export interface PhoneCallFilters {
+  agent?: string | null;
+  direction?: "incoming" | "outgoing" | null;
+  analysed?: boolean | null;
+  from?: string | null;
 }

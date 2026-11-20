@@ -11,7 +11,8 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "../api/client";
 import { usePeople, useSpeechModels, useUsage } from "../api/hooks";
-import type { Me, SpeechModel } from "../api/types";
+import type { Me } from "../api/types";
+import { modelLabel, rememberedModel, rememberModel } from "../features/speech/models";
 import {
   Button,
   ChoiceCards,
@@ -81,34 +82,6 @@ function rememberType(type: ConversationType) {
   } catch {
     // Storage blocked: nothing to remember, nothing lost.
   }
-}
-
-const MODEL_KEY = "sabha.upload.asr_model";
-
-/** The speech-to-text model last chosen on this device, if it is still offered and set up; else the default. */
-function rememberedModel(models: readonly SpeechModel[]): string {
-  let last: string | null = null;
-  try {
-    last = localStorage.getItem(MODEL_KEY);
-  } catch {
-    // Storage blocked: the default.
-  }
-  const usable = models.filter((m) => m.available);
-  return (usable.find((m) => m.id === last) ?? usable.find((m) => m.default) ?? usable[0])?.id ?? "";
-}
-
-function rememberModel(id: string) {
-  try {
-    localStorage.setItem(MODEL_KEY, id);
-  } catch {
-    // Storage blocked: nothing to remember, nothing lost.
-  }
-}
-
-/** "Sarvam Saaras v4 · ₹29.40/hour", short enough for the box; "(not set up)" on the ones that cannot be chosen. */
-function modelLabel(m: SpeechModel): string {
-  const price = m.inr_per_hour === null ? "no per-minute charge" : `₹${m.inr_per_hour.toFixed(2)}/hour`;
-  return `${m.name} · ${price}${m.available ? "" : " (not set up)"}`;
 }
 
 const STATUS = {

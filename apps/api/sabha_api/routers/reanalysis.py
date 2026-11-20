@@ -51,7 +51,8 @@ async def reanalyze(
         out = await service.reanalyze(principal, recording_id, body, request,
                                       rubrics_dir=request.app.state.settings.rubrics_dir, recordings=recordings,
                                       people=people, transcripts=transcripts, disputes=disputes, outbox=outbox,
-                                      entries=entries, transactions=txn)  # fmt: skip
+                                      entries=entries, transactions=txn,
+                                      settings=request.app.state.settings)  # fmt: skip
         return 200, out.model_dump(mode="json")
 
     route = service.ROUTE.replace("{recording_id}", recording_id)

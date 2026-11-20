@@ -144,20 +144,24 @@ async def recording_cost(
     people: TenantRepo[Person], transcripts: TenantRepo[Transcript], llm_calls: TenantRepo[LlmCall],
 ) -> CostOut:  # fmt: skip
     recording = await visible_recording(principal, recording_id, recordings, people)
-    found = await transcripts.find({"recording_id": recording.id}, sort=[("created_at", -1)], limit=1)
-    transcript = found[0] if found else None
+    # Every transcription run was paid for (ADR 0018): the cost and audio sent add up over runs; the newest names the
+    # model. A run without a price makes the total unknown rather than too low (golden rule 6).
+    runs = await transcripts.find({"recording_id": recording.id}, sort=[("run", -1), ("created_at", -1)])
+    transcript = runs[0] if runs else None
+    run_costs = [t.asr_cost_inr for t in runs]
+    asr_total = None if not runs or any(c is None for c in run_costs) else sum(c or 0 for c in run_costs)
+    billed_ms = sum(t.asr_billed_ms or 0 for t in runs)
     calls = await llm_calls.find({"recording_id": recording.id})
     priced = [c.cost_usd for c in calls if c.cost_usd is not None]
     unpriced = len(calls) - len(priced)
     llm_usd = sum(priced) if calls and not unpriced else None  # a partly priced total would understate the cost
     rate = settings.usd_inr_rate
     llm_inr = llm_usd * rate if llm_usd is not None and rate else None
-    asr_inr = transcript.asr_cost_inr if transcript else None
+    asr_inr = asr_total
     total = asr_inr + llm_inr if asr_inr is not None and llm_inr is not None else None
     minutes = recording.duration_ms / 60_000 if recording.duration_ms else None
     actual = Actual(
-        asr_audio_minutes=round(transcript.asr_billed_ms / 60_000, 2) if transcript and transcript.asr_billed_ms
-        else None,
+        asr_audio_minutes=round(billed_ms / 60_000, 2) if billed_ms else None,
         asr_inr=_r(asr_inr), llm_calls=len(calls), llm_unpriced_calls=unpriced, llm_usd=_r(llm_usd),
         llm_inr=_r(llm_inr), total_inr=_r(total), inr_per_minute=_r(total / minutes) if total is not None and minutes
         else None,

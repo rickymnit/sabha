@@ -1,6 +1,6 @@
 # Sabha technical documentation
 
-The technical documentation in one file: architecture, components, running and operating, decisions and reference. Built on 2026-11-19 by `scripts/build_documentation.py`. The separate files are the source: edit them, not this file, then run `uv run python scripts/build_documentation.py` again.
+The technical documentation in one file: architecture, components, running and operating, decisions and reference. Built on 2026-11-20 by `scripts/build_documentation.py`. The separate files are the source: edit them, not this file, then run `uv run python scripts/build_documentation.py` again.
 
 ## Contents
 
@@ -40,6 +40,8 @@ The technical documentation in one file: architecture, components, running and o
    - [ADR 0014: Number of speakers and the Gemini speaker check, chosen at upload](#doc-docs-adr-0014-speaker-count-and-gemini-speaker-check-md)
    - [ADR 0015: Support calls a colleague helped on stay the first agent's](#doc-docs-adr-0015-colleague-helped-calls-md)
    - [ADR 0016: Automated tests removed](#doc-docs-adr-0016-no-automated-tests-md)
+   - [ADR 0017: Phone calls from MyOperator](#doc-docs-adr-0017-myoperator-phone-calls-md)
+   - [ADR 0018: Re-analysis with other speech models, and model choice on Analyse](#doc-docs-adr-0018-reanalysis-with-other-speech-models-md)
 6. [Technical reference](#part-6)
    - [LLM providers](#doc-docs-llm-providers-md)
    - [Sabha webhooks](#doc-docs-webhooks-md)
@@ -78,6 +80,8 @@ rubrics and rules, never code. The 8-week pilot covers **teaching and reception 
 > ([ADR 0014](#doc-docs-adr-0014-speaker-count-and-gemini-speaker-check-md)), and mark a support call a colleague helped
 > on, which stays the first agent's ([ADR 0015](#doc-docs-adr-0015-colleague-helped-calls-md)). There are no automated
 > tests since 19 November ([ADR 0016](#doc-docs-adr-0016-no-automated-tests-md)).
+> Phone calls answered on MyOperator come in by themselves every 10 minutes: a Phone calls page lists them for owners,
+> admins and managers, plays any call, and analyses the ones someone picks, with the speech models chosen in a window ([ADR 0017](#doc-docs-adr-0017-myoperator-phone-calls-md), [ADR 0018](#doc-docs-adr-0018-reanalysis-with-other-speech-models-md)).
 > Meeting transcripts from Google Meet can be uploaded instead of audio ([ADR 0009](#doc-docs-adr-0009-transcript-upload-md)).
 > The web app covers conversations, people with their classes and sections, overview, reviews and disputes,
 > re-analysis, sharing, live status, rubrics, approved product information, settings, activity (audit log), cost per
@@ -221,6 +225,7 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 | --- | --- |
 | `create_tenant.py` | Create a workspace from a profile (school, college or company) and invite its first owner. There is no self-sign-up |
 | `dev_seed.py` | Local only: "Demo School" and the demo company "NiaLabs", one user per role |
+| `link_phone_agents.py` | Link every MyOperator agent to a person, adding missing people to a unit (ADR 0017) |
 | `set_plan.py` | Change a workspace's plan or monthly audio-hour allowance |
 | `hash_password.py` | Make the password hash for the local password sign-in |
 | `backfill.py` | Fill in fields added after recordings were processed (speaker strips, speech time, reception tickets) |
@@ -286,11 +291,12 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done |
 | UI v2 redesign (`docs/design/v2/`) | Done: tokens, sidebar, Overview, Recordings (tabs with counts, filters by type, class, person, date and score, bulk re-analyse and share, Retry or Close, CSV export) and the report (coaching steps, two-lane timeline with zoom, rubric levels, transcript alongside; pressing a time button again pauses the audio, and a third press carries on), and My progress, the home page for staff (teachers, sales reps, support agents): their own numbers, newest report with the manager's note, the three rubric points to work on, processing and recent recordings. Upload in the same style (type colours and what each is scored on, status dots per file, audio hours for owners and admins, "Upload more"). Reviews as one queue (disputes and paused recordings, filters for disputes, speakers and the rest, "2 of 5 decided") beside the decision: the AI score and its reasoning next to the proposed score, quotes and named times that play, and Accept (no note needed), Keep or Set a different score (note needed); "who is the speaker?" in the same place. The sales report: overall on a Weak to Strong scale with what went well and what to fix first, "Where the points were lost" (rubric points sorted by (5 - score) x weight, the two biggest marked Fix first), the deal at a glance with every quote behind "Show evidence", the agreed next step and talk and listen beside the transcript |
 | Sharing a report with the person analysed | Done. Emails them a link and shows the manager's note; it does not change who may see the report (owner's decision, 2026-11-03) |
+| Phone calls from MyOperator: answered, recorded calls copied in every 10 minutes (call details only); play any call; Analyse fetches its audio and runs the usual analysis; agents matched to people once ([ADR 0017](#doc-docs-adr-0017-myoperator-phone-calls-md)) | Done for NiaLabs (2026-11-20). One workspace, set in `.env` |
 | Meeting transcripts uploaded instead of audio ([ADR 0009](#doc-docs-adr-0009-transcript-upload-md)) | Done. Google Meet `.txt`; times are approximate, to about a minute |
 | Classes and sections (two-level units), teachers with the class-sections they teach | Done (owners and admins) |
 | Reviews: queue, "who is the speaker?", resolve ([ADR 0007](#doc-docs-adr-0007-review-outcomes-md)) | Done |
 | Disputes: raise, queue, decide, email; the reviewer's score replaces the AI's (P6.7) | Done |
-| Re-analysis of one or many recordings, every version kept (P2.8) | Done. Choosing a rubric version is in the API only |
+| Re-analysis of one or many recordings, every version kept (P2.8) | Done. One recording can also be transcribed again with other speech models ([ADR 0018](#doc-docs-adr-0018-reanalysis-with-other-speech-models-md)). Choosing a rubric version is in the API only |
 | Live status over server-sent events (P2.6) | Done |
 | Settings, rubrics pages, role views (P1.7, P6.8) | Done. Rubric editing waits for calibration |
 | Plans and audio-hour allowances, upload pause at the limit, cost in rupees per recording (P6.2, P7.2) | Done. Rate limiter and the 80 % warning email remain |
@@ -491,7 +497,7 @@ docs/                adr/, runbook.md, prompts/, design/, guides for raters and 
 
 Collections: `tenants, units, users, people, recordings, stage_runs, transcripts, rubrics, analyses, scores,
 disputes, usage_events, outbox, audit_log`, plus `identities` (login links, ADR 0002), `idempotency_keys`
-(create replays, 24 h TTL), `llm_calls` (LLM usage, P5.1), `dlq` (failed pipeline jobs, P2.4), `deliveries` (emails and webhooks sent, P2.7), `product_info` (approved product information for coaching) and `relay_state`. The full list with indexes is `sabha_core/indexes.py`.
+(create replays, 24 h TTL), `llm_calls` (LLM usage, P5.1), `dlq` (failed pipeline jobs, P2.4), `deliveries` (emails and webhooks sent, P2.7), `product_info` (approved product information for coaching), `phone_calls` (MyOperator calls, ADR 0017) and `relay_state`. The full list with indexes is `sabha_core/indexes.py`.
 
 Recording status (state machine in `sabha_core/state.py`, the ONLY place transitions are defined):
 `CREATED → UPLOADED → PREPROCESSING → DIARIZING → TRANSCRIBING → ANALYZING → COMPLETED`,
@@ -818,6 +824,20 @@ tick consent → Upload. For audio you can also set:
 The status moves through uploaded → preprocessing → diarizing → transcribing → analyzing → completed. On this
 laptop, diarisation takes about as long as the speech in the recording (a 20-minute lesson: about 20 minutes).
 
+**Phone calls from MyOperator** (NiaLabs; [ADR 0017](#doc-docs-adr-0017-myoperator-phone-calls-md)): needs
+`MYOPERATOR_API_TOKEN` and `MYOPERATOR_TENANT_ID` in `.env`, and `make beat` running, which fetches new calls every
+10 minutes. Sign in as an owner, admin or manager → Phone calls → Play to listen, Analyse to choose the models and score a call. The first
+time one of an agent's calls is analysed, choose who the agent is (or add them as a new team member); their other
+calls then start with one click. Fetch new calls now, without waiting:
+
+```bash
+uv run celery -A sabha_workers.worker call sabha.phone_calls.sync --queue io.notify
+```
+
+**Re-analyse with other models:** open a finished recording → ⋯ → Re-analyse → "Transcribe again with other
+models" (owners and admins; [ADR 0018](#doc-docs-adr-0018-reanalysis-with-other-speech-models-md)). It pays for
+speech-to-text again; "Scores only" does not.
+
 **Retry a failed recording:** open it (Recordings → the failed one) → Retry. Only owners and admins see the button.
 It reruns only the stage that failed; earlier stages are not repeated. Retry, don't upload the same file again:
 a new upload repeats every stage, including the slow diarisation and the paid speech recognition.
@@ -929,6 +949,9 @@ db.transcripts.find({}, {recording_id: 1, asr_model: 1, asr_billed_ms: 1, asr_co
 // What the Gemini speaker check did (lines asked about, moved, unsure, cost)
 db.transcripts.find({speaker_check: {$ne: null}}, {recording_id: 1, speaker_check: 1})
 
+// Phone calls copied from MyOperator, and which ones were sent for analysis
+db.phone_calls.countDocuments({}); db.phone_calls.find({recording_id: {$ne: null}}, {started_at: 1, "agents.name": 1, recording_id: 1, import_error: 1}).sort({started_at: -1}).limit(10)
+
 // The choices made at upload for the 10 newest recordings
 db.recordings.find({}, {file_name: 1, asr_choice: 1, speaker_count: 1, speaker_model: 1, transferred: 1, transfer_person_id: 1}).sort({created_at: -1}).limit(10)
 
@@ -971,6 +994,7 @@ uv run python scripts/admin/create_tenant.py --name "Green Valley School" --prof
 uv run python scripts/admin/set_plan.py --tenant <tenant id> --plan starter --audio-hours 100
 uv run python scripts/admin/enable_type.py --type support --profile company --dry-run   # switch a conversation type on for existing workspaces
 
+uv run python scripts/admin/link_phone_agents.py --tenant demo-company --unit "Support team" --dry-run  # MyOperator agents -> people
 uv run python scripts/admin/backfill.py --dry-run     # see what would be filled in; then run without --dry-run
 uv run python scripts/admin/expire_audio.py --dry-run # see what audio retention would delete; then without it
 uv run python scripts/admin/restore_drill.py          # restore the latest backup into a scratch database and check it
@@ -1011,6 +1035,8 @@ Each script explains its options at the top of its file, for example `head -30 s
 | Failed: `unexpected_ValidationError ... Extra inputs are not permitted` | Workers are running old code | [Restart the workers](#7-restart-after-changing-code), then Retry |
 | Failed: `asr_failed` with 403 | The Sarvam key is invalid or out of credit | Fix `SARVAM_API_KEY` in `.env`, restart workers, then Retry |
 | Needs review: `unclear_roles` | It could not tell which speaker is the staff member (teacher, agent, rep) | Reviews → open it → choose the speaker |
+| No Phone calls in the menu | `MYOPERATOR_API_TOKEN` or `MYOPERATOR_TENANT_ID` missing, or you are in another workspace or role | Set both in `.env`, restart the API, workers and beat; sign in as an owner, admin or manager of that workspace |
+| Phone calls: "Couldn't fetch the recording" | MyOperator did not answer, or the call has no recording any more | Press Try again; check `tail -f /tmp/sabha-logs/workers.log` for `phone call audio could not be fetched` |
 | Upload page: a model shows "not set up" | Its key is missing from `.env` | Add the key, restart the API and the workers |
 | Upload page: a model you expect is missing, or an old one still shows | The API is running old code | Restart the API ([7](#7-restart-after-changing-code)) |
 | Failed: `asr_failed` with 404 "no longer available" from Gemini | Google refuses that Gemini model to our account (2.5 Flash and 2.5 Flash-Lite, since 2026-11-18) | Choose another model at upload ([ADR 0012](#doc-docs-adr-0012-more-asr-providers-md), addendum 2026-11-19), then upload again |
@@ -2601,6 +2627,108 @@ On 2026-11-19 the owner decided to delete all test files, after being told this 
   changes the lock files and is a separate step.
 - All deleted tests are in git history (before commit `ad2408d`) and can be restored with `git checkout`.
 
+<a id="doc-docs-adr-0017-myoperator-phone-calls-md"></a>
+
+## ADR 0017: Phone calls from MyOperator
+
+*Source: [`docs/adr/0017-myoperator-phone-calls.md`](adr/0017-myoperator-phone-calls.md)*
+
+- **Status:** Accepted
+- **Date:** 2026-11-20
+
+### Context
+
+NiaLabs takes its support and sales calls on MyOperator, which records every answered call. The manager asked for
+those recordings to come into Sabha without anyone downloading and uploading files. MyOperator's API (Postman
+collection "MyOperator API Document", checked 2026-11-20 against the live account) offers:
+
+- Search Logs, `POST /search/search`: call logs newest first, with `from`/`to` in Unix seconds, `log_from` as the
+  offset and at most 100 per page. Each log has the call id (`allcaller_id`), direction (`event` 1 incoming, 2
+  outgoing), answered or missed (`status` 1 or 2), times, department, the customer's number, the recording's file
+  name, and each leg's agent (`received_by`: user id, name, extension) with its `action` (received, missed,
+  transferred).
+- Recording link, `GET /recordings/link?file=`: a link to the MP3 (8 kHz mono, about 32 kbps), valid for 24 hours.
+  The files are in an S3 bucket in `ap-south-1`, so the audio is stored in India.
+- The token goes in the request as `token`, not in a header.
+
+On 2026-11-20 the account had 659 calls in 7 days, and 1,663 answered, recorded calls in 30 days across 9 agents.
+
+### Decision
+
+Decided by the owner on 2026-11-20.
+
+1. **Call details are copied in; audio only when asked.** A timed job (`sabha.phone_calls.sync`, every 10 minutes
+   under `make beat`) copies answered, recorded calls into `phone_calls`, one document per call id. The first run
+   goes back `MYOPERATOR_BACKFILL_DAYS` (30). The customer's number is kept as its last four digits only.
+2. **Only the calls someone picks are analysed.** The Phone calls page has an Analyse button on every call. It makes
+   a Recording (support or sales; `phone_call_id` links it to the call) and writes a `phone_call.import` event in the
+   same transaction. The relay starts `sabha.phone_call_import`, which fetches a fresh link, downloads the MP3 into
+   the audio bucket and moves the recording CREATED -> UPLOADED, so the pipeline runs as for an upload. The API never
+   touches the audio (golden rule 2). If the download fails, the call says so and Analyse tries the same recording
+   again.
+3. **Consent:** every recording made from a call carries `MYOPERATOR_CONSENT_REF`, "MyOperator call-recording
+   notice" (golden rule 9).
+4. **Who:** owners and admins see every call; managers see the calls of people in their units; reviewers and staff
+   do not see the page. Playing a call is audited as `phone_call.play`.
+5. **Agents are matched to people once.** The first time one of an agent's calls is analysed, the person choosing
+   says who the agent is in Sabha (owners and admins may add them as a new person in a unit). The match is kept on
+   the person (`Person.phone_agent_ids`) and applied to all the agent's calls, which then also become visible to
+   that unit's managers. A call with a second agent who answered is marked as one a colleague helped on (ADR 0015).
+6. **One workspace, set in the environment.** `MYOPERATOR_API_TOKEN` and `MYOPERATOR_TENANT_ID` name the token and
+   the workspace (NiaLabs, `demo-company`). Storing tokens per workspace in the database waits until a second
+   customer needs it.
+7. **Webhooks are not used.** MyOperator's webhooks need no authentication on our side, so anyone who found the
+   address could send fake calls; reading calls with our own token is safer. A webhook could later trigger an early
+   fetch.
+
+### Consequences
+
+- New: collection `phone_calls`, routes under `/v1/phone-calls` (in `docs/security/permissions.yaml`),
+  `Person.phone_agent_ids`, `Recording.phone_call_id`. Restart the workers and relay before the API when deploying
+  (docs/runbook.md).
+- Audio is copied only for analysed calls, so storage grows with use, not with call volume. Speech-to-text and the
+  LLM are paid per analysed call, as for uploads.
+- MyOperator links expire after 24 hours, so playback always asks for a fresh one.
+- Logs mask `token=` in URLs (sabha_core.logging), since MyOperator's token travels in the query string.
+- API and webhook access needs MyOperator's SUV or Enterprise AI plan.
+
+<a id="doc-docs-adr-0018-reanalysis-with-other-speech-models-md"></a>
+
+## ADR 0018: Re-analysis with other speech models, and model choice on Analyse
+
+*Source: [`docs/adr/0018-reanalysis-with-other-speech-models.md`](adr/0018-reanalysis-with-other-speech-models.md)*
+
+- **Status:** Accepted
+- **Date:** 2026-11-20
+
+### Context
+
+Re-analysis (P2.8) only scored a finished recording again from its transcript. The owner wants to choose the speech
+models when a phone call is analysed (ADR 0017) and when a conversation is re-analysed, and to compare the results.
+
+### Decision
+
+1. **Analyse on a phone call opens a window first:** analyse as support or sales, who the agent is (only when not
+   linked yet), and the upload page's speech choices: transcription model (owners and admins), number of speakers,
+   Standard or Standard + Gemini check, and for support calls whether a colleague helped (ticked when MyOperator shows
+   two agents). The scoring model is shown, not chosen: one is set up.
+2. **Re-analysing one conversation offers "Scores only" or "Transcribe again with other models".** The second goes
+   COMPLETED -> DIARIZING when the number of speakers changes (confirmed roles and voice names are cleared, as the
+   speaker labels change), otherwise COMPLETED -> TRANSCRIBING. Both transitions are allowed only with
+   `reanalysis=True` and only for audio recordings whose audio is still kept. Owners and admins only, as before.
+   Re-analysing several at once stays scores only.
+3. **Runs, not overwrites.** `Recording.diarize_run` and `speech_run` number the runs like `analysis_run`; run n > 1
+   writes to `diarize@v1-run<n>` / `transcribe@v1-run<n>` (golden rule 3). The transcribe stage reads the current
+   diarize run, analysis the current transcribe run. Each run keeps its Transcript document (`run`); readers use the
+   newest. The cost card adds the speech-to-text cost of every run, since each was paid for.
+
+### Consequences
+
+- A redo pays for speech-to-text again (and the Gemini check if chosen) and takes about as long as the first time.
+  Changing only the speaker check still transcribes again.
+- Earlier reports stay as earlier versions; open disputes are closed, as for any re-analysis.
+- Restart workers and relay before the API when deploying (new Recording and Transcript fields; docs/runbook.md).
+
 <a id="part-6"></a>
 
 # Part 6. Technical reference
@@ -3326,6 +3454,57 @@ routes:
     owner: 200
     other_tenant: 404
     others: 403
+
+  # Phone calls from MyOperator (ADR 0017, owner's decision 2026-11-20): owners and admins see every call; managers
+  # the calls of people in their units; everyone else 403. Only the workspace in MYOPERATOR_TENANT_ID has phone
+  # calls: any other workspace (other_tenant here) gets 404 phone_calls_not_set_up.
+  GET /v1/phone-calls:
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200  # filtered to their units' calls
+    manager_other_unit: 200
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
+
+  GET /v1/phone-calls/agents:
+    # Who answered the calls the caller may see, and who each is matched to in Sabha.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 200
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
+
+  GET /v1/phone-calls/{call_id}/audio:
+    # A 24-hour link to the recording at MyOperator; the target call is answered by Asha (unit-1). Audited as
+    # phone_call.play.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # not their unit
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
+
+  POST /v1/phone-calls/{call_id}/analyse:
+    # Make a recording of the call and fetch its audio; a fresh call of Asha's per call. Audited.
+    anonymous: 401
+    owner: 201
+    admin: 201
+    manager_unit: 201  # only for people in their units
+    manager_other_unit: 404
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
 ```
 
 <a id="doc-docs-design-tokens-md"></a>

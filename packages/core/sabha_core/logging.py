@@ -8,7 +8,9 @@ Secrets are never logged:
 - an `extra` field whose name looks like a secret (password, token, api key, authorization, cookie, ...) is masked,
   at any depth;
 - `SecretStr` values print masked;
-- `user:password@` in any URL, in the message or in a field, is masked.
+- `user:password@` in any URL, in the message or in a field, is masked;
+- query values whose name looks like a secret (`?token=...`, `&key=...`) are masked: some APIs (MyOperator,
+  ADR 0017) take their token in the URL, and HTTP clients log request URLs.
 """
 
 from __future__ import annotations
@@ -35,6 +37,9 @@ _SECRET_NAME = re.compile(
     r"(?i)(password|passwd|secret|token|api_?key|access_?key|private_?key|authorization|cookie|credential|dsn)"
 )
 _URL_CREDENTIALS = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://[^/\s:@]*:)[^@\s/]*@")
+_QUERY_SECRET = re.compile(
+    r"(?i)([?&](?:[a-z0-9_]*(?:token|secret|password|api_?key|access_?key|signature)|key|sig)=)[^&#\s\"']*"
+)
 
 # Attributes every LogRecord has; anything else on a record came from `extra=`.
 _STANDARD_ATTRS = frozenset(vars(logging.LogRecord("", 0, "", 0, "", None, None))) | {"message", "asctime"}
@@ -47,7 +52,7 @@ def scrub(value: Any, key: str | None = None) -> Any:
     if isinstance(value, SecretStr):
         return MASK
     if isinstance(value, str):
-        return _URL_CREDENTIALS.sub(rf"\1{MASK}@", value)
+        return _QUERY_SECRET.sub(rf"\1{MASK}", _URL_CREDENTIALS.sub(rf"\1{MASK}@", value))
     if isinstance(value, dict):
         return {str(k): scrub(v, str(k)) for k, v in value.items()}
     if isinstance(value, list | tuple | set | frozenset):

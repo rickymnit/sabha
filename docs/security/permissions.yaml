@@ -494,3 +494,54 @@ routes:
     owner: 200
     other_tenant: 404
     others: 403
+
+  # Phone calls from MyOperator (ADR 0017, owner's decision 2026-11-20): owners and admins see every call; managers
+  # the calls of people in their units; everyone else 403. Only the workspace in MYOPERATOR_TENANT_ID has phone
+  # calls: any other workspace (other_tenant here) gets 404 phone_calls_not_set_up.
+  GET /v1/phone-calls:
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200  # filtered to their units' calls
+    manager_other_unit: 200
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
+
+  GET /v1/phone-calls/agents:
+    # Who answered the calls the caller may see, and who each is matched to in Sabha.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 200
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
+
+  GET /v1/phone-calls/{call_id}/audio:
+    # A 24-hour link to the recording at MyOperator; the target call is answered by Asha (unit-1). Audited as
+    # phone_call.play.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    manager_unit: 200
+    manager_other_unit: 404  # not their unit
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404
+
+  POST /v1/phone-calls/{call_id}/analyse:
+    # Make a recording of the call and fetch its audio; a fresh call of Asha's per call. Audited.
+    anonymous: 401
+    owner: 201
+    admin: 201
+    manager_unit: 201  # only for people in their units
+    manager_other_unit: 404
+    reviewer_unit: 403
+    staff_uploader: 403
+    staff_colleague: 403
+    other_tenant: 404

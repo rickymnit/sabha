@@ -270,6 +270,20 @@ tick consent → Upload. For audio you can also set:
 The status moves through uploaded → preprocessing → diarizing → transcribing → analyzing → completed. On this
 laptop, diarisation takes about as long as the speech in the recording (a 20-minute lesson: about 20 minutes).
 
+**Phone calls from MyOperator** (NiaLabs; [ADR 0017](docs/adr/0017-myoperator-phone-calls.md)): needs
+`MYOPERATOR_API_TOKEN` and `MYOPERATOR_TENANT_ID` in `.env`, and `make beat` running, which fetches new calls every
+10 minutes. Sign in as an owner, admin or manager → Phone calls → Play to listen, Analyse to choose the models and score a call. The first
+time one of an agent's calls is analysed, choose who the agent is (or add them as a new team member); their other
+calls then start with one click. Fetch new calls now, without waiting:
+
+```bash
+uv run celery -A sabha_workers.worker call sabha.phone_calls.sync --queue io.notify
+```
+
+**Re-analyse with other models:** open a finished recording → ⋯ → Re-analyse → "Transcribe again with other
+models" (owners and admins; [ADR 0018](docs/adr/0018-reanalysis-with-other-speech-models.md)). It pays for
+speech-to-text again; "Scores only" does not.
+
 **Retry a failed recording:** open it (Recordings → the failed one) → Retry. Only owners and admins see the button.
 It reruns only the stage that failed; earlier stages are not repeated. Retry, don't upload the same file again:
 a new upload repeats every stage, including the slow diarisation and the paid speech recognition.
@@ -381,6 +395,9 @@ db.transcripts.find({}, {recording_id: 1, asr_model: 1, asr_billed_ms: 1, asr_co
 // What the Gemini speaker check did (lines asked about, moved, unsure, cost)
 db.transcripts.find({speaker_check: {$ne: null}}, {recording_id: 1, speaker_check: 1})
 
+// Phone calls copied from MyOperator, and which ones were sent for analysis
+db.phone_calls.countDocuments({}); db.phone_calls.find({recording_id: {$ne: null}}, {started_at: 1, "agents.name": 1, recording_id: 1, import_error: 1}).sort({started_at: -1}).limit(10)
+
 // The choices made at upload for the 10 newest recordings
 db.recordings.find({}, {file_name: 1, asr_choice: 1, speaker_count: 1, speaker_model: 1, transferred: 1, transfer_person_id: 1}).sort({created_at: -1}).limit(10)
 
@@ -423,6 +440,7 @@ uv run python scripts/admin/create_tenant.py --name "Green Valley School" --prof
 uv run python scripts/admin/set_plan.py --tenant <tenant id> --plan starter --audio-hours 100
 uv run python scripts/admin/enable_type.py --type support --profile company --dry-run   # switch a conversation type on for existing workspaces
 
+uv run python scripts/admin/link_phone_agents.py --tenant demo-company --unit "Support team" --dry-run  # MyOperator agents -> people
 uv run python scripts/admin/backfill.py --dry-run     # see what would be filled in; then run without --dry-run
 uv run python scripts/admin/expire_audio.py --dry-run # see what audio retention would delete; then without it
 uv run python scripts/admin/restore_drill.py          # restore the latest backup into a scratch database and check it
@@ -463,6 +481,8 @@ Each script explains its options at the top of its file, for example `head -30 s
 | Failed: `unexpected_ValidationError ... Extra inputs are not permitted` | Workers are running old code | [Restart the workers](#7-restart-after-changing-code), then Retry |
 | Failed: `asr_failed` with 403 | The Sarvam key is invalid or out of credit | Fix `SARVAM_API_KEY` in `.env`, restart workers, then Retry |
 | Needs review: `unclear_roles` | It could not tell which speaker is the staff member (teacher, agent, rep) | Reviews → open it → choose the speaker |
+| No Phone calls in the menu | `MYOPERATOR_API_TOKEN` or `MYOPERATOR_TENANT_ID` missing, or you are in another workspace or role | Set both in `.env`, restart the API, workers and beat; sign in as an owner, admin or manager of that workspace |
+| Phone calls: "Couldn't fetch the recording" | MyOperator did not answer, or the call has no recording any more | Press Try again; check `tail -f /tmp/sabha-logs/workers.log` for `phone call audio could not be fetched` |
 | Upload page: a model shows "not set up" | Its key is missing from `.env` | Add the key, restart the API and the workers |
 | Upload page: a model you expect is missing, or an old one still shows | The API is running old code | Restart the API ([7](#7-restart-after-changing-code)) |
 | Failed: `asr_failed` with 404 "no longer available" from Gemini | Google refuses that Gemini model to our account (2.5 Flash and 2.5 Flash-Lite, since 2026-11-18) | Choose another model at upload ([ADR 0012](docs/adr/0012-more-asr-providers.md), addendum 2026-11-19), then upload again |

@@ -131,7 +131,8 @@ def make_work(deps: AnalyzeDeps) -> Work:
         started = utc_now()
         rerun = recording.analysis_run > 1
         pre = artefact_prefix(ctx.tenant_id, recording.id, "preprocess", deps.preprocess_version)
-        asr = artefact_prefix(ctx.tenant_id, recording.id, "transcribe", deps.transcribe_version)
+        asr = artefact_prefix(ctx.tenant_id, recording.id, "transcribe",
+                              run_version(deps.transcribe_version, recording.speech_run))  # fmt: skip
         document = _get_json(ctx, asr + "transcript@v1.json")
         imported = recording.source == "transcript"  # ADR 0009: its one-segment map is in the transcribe folder
         segment_map = SegmentMap.from_json(json.dumps(_get_json(ctx, (asr if imported else pre) + "segments@v1.json")))

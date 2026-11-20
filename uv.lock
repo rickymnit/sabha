@@ -2436,6 +2436,7 @@ source = { editable = "apps/workers" }
 dependencies = [
     { name = "boto3" },
     { name = "celery", extra = ["redis"] },
+    { name = "httpx" },
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "redis" },
@@ -2449,6 +2450,7 @@ dependencies = [
 requires-dist = [
     { name = "boto3", specifier = ">=1.35" },
     { name = "celery", extras = ["redis"], specifier = ">=5.5" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "onnxruntime", specifier = ">=1.30,<1.31" },
     { name = "redis", specifier = ">=5.0" },

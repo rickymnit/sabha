@@ -8,7 +8,7 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppLoading } from "./AppLoading";
 import { Home } from "./Home";
 import { Layout } from "./Layout";
-import { ADMINS, RESOLVERS } from "./nav";
+import { ADMINS, PHONE_CALL_ROLES, RESOLVERS } from "./nav";
 import { RequireSession } from "./RequireSession";
 import { RoleGate } from "./RoleGate";
 
@@ -105,6 +105,16 @@ export const routes: RouteObject[] = [
           {
             path: "/rubrics/:id",
             ...page(() => import("../pages/RubricsPage").then((m) => ({ Component: m.RubricsPage }))),
+          },
+          {
+            // Owners, admins and managers: phone calls from MyOperator (ADR 0017).
+            element: <RoleGate roles={PHONE_CALL_ROLES} />,
+            children: [
+              {
+                path: "/phone-calls",
+                ...page(() => import("../pages/PhoneCallsPage").then((m) => ({ Component: m.PhoneCallsPage }))),
+              },
+            ],
           },
           {
             // Owners and admins: the audit log (P1.8).

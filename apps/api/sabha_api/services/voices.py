@@ -16,7 +16,7 @@ from pydantic import BaseModel, StringConstraints
 from sabha_api.audit import audit
 from sabha_api.auth import Principal
 from sabha_api.errors import BadRequestError, ConflictError, NotFoundError
-from sabha_api.services.results import visible_recording
+from sabha_api.services.results import latest_transcript, visible_recording
 from sabha_core.models import AuditEntry, Person, Recording, Transcript
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import TenantRepo
@@ -48,7 +48,7 @@ async def name_voices(
     recording = await visible_recording(principal, recording_id, recordings, people)
     if recording.type is not ConversationType.MEETING:
         raise NotAMeetingError("Voices can be named only in a meeting.")
-    transcript = await transcripts.find_one({"recording_id": recording.id})
+    transcript = await latest_transcript(transcripts, recording.id)
     if transcript is None:
         raise NotFoundError("This meeting has no transcript yet.")
     unknown = sorted(set(body.names) - set(transcript.roles))

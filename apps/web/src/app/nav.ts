@@ -17,6 +17,8 @@ export interface NavEntry {
 const EVERYONE: Role[] = ["owner", "admin", "manager", "reviewer", "staff"];
 /** Who manages the organisation: settings and the plan's usage. */
 export const ADMINS: Role[] = ["owner", "admin"];
+/** Who sees the phone calls from MyOperator (ADR 0017, owner's decision 2026-11-20). */
+export const PHONE_CALL_ROLES: Role[] = ["owner", "admin", "manager"];
 /** Who resolves reviews (ADR 0007): never staff, not even for their own recordings. */
 export const RESOLVERS: Role[] = ["owner", "admin", "manager", "reviewer"];
 
@@ -63,6 +65,17 @@ export function navItems(me: Me): NavEntry[] {
       roles: EVERYONE,
       match: (path) => path === "/recordings" || path.startsWith("/recordings/"),
     },
+    ...(me.tenant.phone_calls
+      ? [
+          {
+            to: "/phone-calls",
+            label: "Phone calls",
+            icon: "phone" as const,
+            roles: PHONE_CALL_ROLES, // only where calls come in from MyOperator (ADR 0017)
+            match: (path: string) => path === "/phone-calls",
+          },
+        ]
+      : []),
     {
       to: "/reviews",
       label: "Reviews",

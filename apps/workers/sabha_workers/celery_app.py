@@ -37,6 +37,8 @@ TASK_QUEUES: dict[str, str] = {
     "sabha.maintenance.requeue_stuck": IO_NOTIFY,
     "sabha.maintenance.expire_audio": IO_NOTIFY,  # nightly audio retention (P7.3)
     "sabha.maintenance.backup": IO_NOTIFY,  # nightly database export (P7.3)
+    "sabha.phone_calls.sync": IO_NOTIFY,  # copy in MyOperator call details (ADR 0017)
+    "sabha.phone_call_import": IO_NOTIFY,  # fetch one call's audio when someone asked for it to be analysed
 }
 
 
@@ -67,6 +69,8 @@ def create_app(settings: Settings) -> Celery:
             "requeue-stuck": {"task": "sabha.maintenance.requeue_stuck", "schedule": 300.0},
             "expire-audio": {"task": "sabha.maintenance.expire_audio", "schedule": 86_400.0},  # P7.3, daily
             "backup": {"task": "sabha.maintenance.backup", "schedule": 86_400.0},  # P7.3, daily
+            # ADR 0017; the task does nothing unless MYOPERATOR_API_TOKEN is set
+            "phone-calls-sync": {"task": "sabha.phone_calls.sync", "schedule": float(settings.myoperator_sync_every_s)},
         },
     )
     return app

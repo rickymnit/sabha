@@ -248,6 +248,12 @@ class PersonRef(BaseModel):
     name: str
 
 
+async def latest_transcript(transcripts: TenantRepo[Transcript], recording_id: str) -> Transcript | None:
+    """The recording's current transcript: the newest run's (ADR 0018). Older documents have no run: run 1."""
+    found = await transcripts.find({"recording_id": recording_id}, sort=[("run", -1), ("created_at", -1)], limit=1)
+    return found[0] if found else None
+
+
 def recording_title(file_name: str | None, recording_id: str) -> str:
     """What people call the recording: its file name without the extension ("Class 7B.mp3" -> "Class 7B")."""
     if not file_name:
@@ -471,7 +477,7 @@ async def count_recordings(
 async def transcript_for(
     recording: Recording, settings: Settings, transcripts: TenantRepo[Transcript], reader: ArtefactReader
 ) -> TranscriptOut:
-    doc = await transcripts.find_one({"recording_id": recording.id})
+    doc = await latest_transcript(transcripts, recording.id)
     content = None if doc is None else await reader.json(doc.storage_key)
     if doc is None or content is None:
         raise NotFoundError("This recording has no transcript yet.")
@@ -757,6 +763,12 @@ class RecordingDetail(RecordingOut):
     voice_names: dict[str, str]  # meetings: names given to the anonymous voices ("S1" -> "Riya")
     share_note: str | None = None  # the note a manager sent with the report (UI v2 sharing)
     shared_by_name: str | None = None
+    # The speech choices the current transcript was made with (ADR 0012, 0014, 0015), so re-analysis starts from them
+    # (ADR 0018). asr_choice None: the configured model.
+    asr_choice: str | None = None
+    speaker_count: int | None = None
+    speaker_model: str = "pyannote"
+    transferred: bool = False
 
 
 def silence_gaps(segment_map: SegmentMap, duration_ms: int | None) -> list[Range]:
@@ -775,7 +787,7 @@ async def recording_detail(
     transcripts: TenantRepo[Transcript], reader: ArtefactReader, shared_by_name: str | None = None,
 ) -> RecordingDetail:  # fmt: skip
     unit = await units.find_one({"_id": recording.unit_id}) if recording.unit_id else None
-    transcript = await transcripts.find_one({"recording_id": recording.id})
+    transcript = await latest_transcript(transcripts, recording.id)
     languages = sorted({LANGUAGE_NAMES.get(code.split("-")[0], code) for code in (transcript.language_mix if transcript
                         else {}) if code != "unknown"})  # fmt: skip
     pre = artefact_prefix(recording.tenant_id, recording.id, "preprocess", settings.artefact_version_preprocess)
@@ -785,7 +797,8 @@ async def recording_detail(
         **base.model_dump(exclude={"recorded_at"}), type_label=recording.type.value.capitalize(),
         share_note=recording.share_note if recording.shared_at else None, shared_by_name=shared_by_name,
         unit_name=unit.name if unit else None, recorded_at=recording.recorded_at or recording.created_at,
-        voice_names=recording.voice_names,
+        voice_names=recording.voice_names, asr_choice=recording.asr_choice, speaker_count=recording.speaker_count,
+        speaker_model=recording.speaker_model, transferred=recording.transferred,
         speech_ms=None if segment_map is None else segment_map.compact_length_ms, languages=languages,
         removed_silence=[] if segment_map is None else silence_gaps(segment_map, recording.duration_ms),
     )  # fmt: skip

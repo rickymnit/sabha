@@ -16,6 +16,7 @@ import {
   useRaiseDispute,
   useReanalyse,
   useRecording,
+  useSpeechModels,
   useRubric,
   useTranscript,
 } from "../api/hooks";
@@ -52,6 +53,10 @@ export function RecordingPage() {
   const toast = useToast();
   const isAdmin = me.user.role === "owner" || me.user.role === "admin";
   const processing = useProcessing(id, isAdmin && recording.isSuccess);
+  // Transcribing again with other models (ADR 0018): only while the audio is kept.
+  const current = recording.data;
+  const canRedoSpeech = Boolean(current && (current.source ?? "audio") === "audio" && !current.audio_deleted_at);
+  const speechModels = useSpeechModels(isAdmin && reanalysing && canRedoSpeech);
   const retry = useFailedRecordingAction(id, "retry");
   const abandon = useFailedRecordingAction(id, "abandon");
   const [deciding, setDeciding] = useState<"retry" | "abandon" | null>(null);
@@ -247,8 +252,23 @@ export function RecordingPage() {
       {reanalysing && (
         <ReanalyseDialog
           recordingWord={recordingWord}
-          onSubmit={async (reason) => {
-            await reanalyse.mutateAsync(reason);
+          speech={
+            canRedoSpeech && current
+              ? {
+                  initial: {
+                    asrModel: current.asr_choice ?? "",
+                    speakers: current.speaker_count ? String(current.speaker_count) : "auto",
+                    speakerModel: current.speaker_model ?? "pyannote",
+                    transferred: current.transferred ?? false,
+                  },
+                  models: speechModels.data,
+                  support: current.type === "support",
+                  personWord: me.tenant.labels.person.toLowerCase(),
+                }
+              : undefined
+          }
+          onSubmit={async (reason, speech) => {
+            await reanalyse.mutateAsync({ reason, speech });
             toast.show({
               tone: "success",
               title: "Re-analysis started",

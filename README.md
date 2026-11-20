@@ -17,6 +17,8 @@ rubrics and rules, never code. The 8-week pilot covers **teaching and reception 
 > ([ADR 0014](docs/adr/0014-speaker-count-and-gemini-speaker-check.md)), and mark a support call a colleague helped
 > on, which stays the first agent's ([ADR 0015](docs/adr/0015-colleague-helped-calls.md)). There are no automated
 > tests since 19 November ([ADR 0016](docs/adr/0016-no-automated-tests.md)).
+> Phone calls answered on MyOperator come in by themselves every 10 minutes: a Phone calls page lists them for owners,
+> admins and managers, plays any call, and analyses the ones someone picks, with the speech models chosen in a window ([ADR 0017](docs/adr/0017-myoperator-phone-calls.md), [ADR 0018](docs/adr/0018-reanalysis-with-other-speech-models.md)).
 > Meeting transcripts from Google Meet can be uploaded instead of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)).
 > The web app covers conversations, people with their classes and sections, overview, reviews and disputes,
 > re-analysis, sharing, live status, rubrics, approved product information, settings, activity (audit log), cost per
@@ -160,6 +162,7 @@ Run from the repo root with `uv run python scripts/admin/<script>`. `backfill.py
 | --- | --- |
 | `create_tenant.py` | Create a workspace from a profile (school, college or company) and invite its first owner. There is no self-sign-up |
 | `dev_seed.py` | Local only: "Demo School" and the demo company "NiaLabs", one user per role |
+| `link_phone_agents.py` | Link every MyOperator agent to a person, adding missing people to a unit (ADR 0017) |
 | `set_plan.py` | Change a workspace's plan or monthly audio-hour allowance |
 | `hash_password.py` | Make the password hash for the local password sign-in |
 | `backfill.py` | Fill in fields added after recordings were processed (speaker strips, speech time, reception tickets) |
@@ -225,11 +228,12 @@ Prompt IDs (for example `P2.4`) match the plan and appear in commit messages.
 | Read API and web app on real data: recordings, report, upload, people, overview, inbox, search (P5.7b, P6.2, P6.4b, P6.6) | Done |
 | UI v2 redesign (`docs/design/v2/`) | Done: tokens, sidebar, Overview, Recordings (tabs with counts, filters by type, class, person, date and score, bulk re-analyse and share, Retry or Close, CSV export) and the report (coaching steps, two-lane timeline with zoom, rubric levels, transcript alongside; pressing a time button again pauses the audio, and a third press carries on), and My progress, the home page for staff (teachers, sales reps, support agents): their own numbers, newest report with the manager's note, the three rubric points to work on, processing and recent recordings. Upload in the same style (type colours and what each is scored on, status dots per file, audio hours for owners and admins, "Upload more"). Reviews as one queue (disputes and paused recordings, filters for disputes, speakers and the rest, "2 of 5 decided") beside the decision: the AI score and its reasoning next to the proposed score, quotes and named times that play, and Accept (no note needed), Keep or Set a different score (note needed); "who is the speaker?" in the same place. The sales report: overall on a Weak to Strong scale with what went well and what to fix first, "Where the points were lost" (rubric points sorted by (5 - score) x weight, the two biggest marked Fix first), the deal at a glance with every quote behind "Show evidence", the agreed next step and talk and listen beside the transcript |
 | Sharing a report with the person analysed | Done. Emails them a link and shows the manager's note; it does not change who may see the report (owner's decision, 2026-11-03) |
+| Phone calls from MyOperator: answered, recorded calls copied in every 10 minutes (call details only); play any call; Analyse fetches its audio and runs the usual analysis; agents matched to people once ([ADR 0017](docs/adr/0017-myoperator-phone-calls.md)) | Done for NiaLabs (2026-11-20). One workspace, set in `.env` |
 | Meeting transcripts uploaded instead of audio ([ADR 0009](docs/adr/0009-transcript-upload.md)) | Done. Google Meet `.txt`; times are approximate, to about a minute |
 | Classes and sections (two-level units), teachers with the class-sections they teach | Done (owners and admins) |
 | Reviews: queue, "who is the speaker?", resolve ([ADR 0007](docs/adr/0007-review-outcomes.md)) | Done |
 | Disputes: raise, queue, decide, email; the reviewer's score replaces the AI's (P6.7) | Done |
-| Re-analysis of one or many recordings, every version kept (P2.8) | Done. Choosing a rubric version is in the API only |
+| Re-analysis of one or many recordings, every version kept (P2.8) | Done. One recording can also be transcribed again with other speech models ([ADR 0018](docs/adr/0018-reanalysis-with-other-speech-models.md)). Choosing a rubric version is in the API only |
 | Live status over server-sent events (P2.6) | Done |
 | Settings, rubrics pages, role views (P1.7, P6.8) | Done. Rubric editing waits for calibration |
 | Plans and audio-hour allowances, upload pause at the limit, cost in rupees per recording (P6.2, P7.2) | Done. Rate limiter and the 80 % warning email remain |

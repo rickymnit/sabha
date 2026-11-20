@@ -23,6 +23,9 @@ import {
   type DevUser,
   type Inbox,
   type Me,
+  type PhoneAgentOption,
+  type PhoneCallFilters,
+  type PhoneCallPage,
   type PersonItem,
   type ProcessingInfo,
   type PersonSummary,
@@ -368,10 +371,16 @@ export function useReanalyse(recordingId: string) {
   const { token } = useSession();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (reason: string) =>
+    /** `speech`: transcribe again with these models first (ADR 0018); left out, scores only. */
+    mutationFn: ({ reason, speech }: { reason: string; speech?: Record<string, unknown> }) =>
       apiFetch<{ recording_id: string; status: ApiStatus; analysis_run: number }>(
         `/v1/recordings/${encodeURIComponent(recordingId)}/reanalyze`,
-        { method: "POST", token, body: { reason }, headers: { "Idempotency-Key": crypto.randomUUID() } },
+        {
+          method: "POST",
+          token,
+          body: { reason, ...(speech ? { speech } : {}) },
+          headers: { "Idempotency-Key": crypto.randomUUID() },
+        },
       ),
     onSuccess: async () => {
       await Promise.all(
@@ -722,4 +731,90 @@ export function useSpeechModels(enabled: boolean): UseQueryResult<SpeechModel[],
     enabled: enabled && Boolean(token),
     staleTime: 5 * 60_000,
   });
+}
+
+// --- Phone calls from MyOperator (ADR 0017) ---
+
+/** GET /v1/phone-calls: answered, recorded calls, newest first. Refreshes while an analysis is under way. */
+export function usePhoneCalls(filters: PhoneCallFilters = {}, pageSize = 50) {
+  const { token } = useSession();
+  const { agent = null, direction = null, analysed = null, from = null } = filters;
+  return useInfiniteQuery({
+    queryKey: ["phone-calls", pageSize, agent, direction, analysed, from, token],
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(pageSize) });
+      if (pageParam) params.set("cursor", pageParam);
+      if (agent) params.set("agent", agent);
+      if (direction) params.set("direction", direction);
+      if (analysed !== null) params.set("analysed", String(analysed));
+      if (from) params.set("from", from);
+      return apiFetch<PhoneCallPage>(`/v1/phone-calls?${params}`, { token });
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor,
+    enabled: Boolean(token),
+    refetchInterval: (query) => {
+      const busy = query.state.data?.pages.some((page) =>
+        page.items.some((call) => call.analysis && !call.import_error && IN_PROGRESS.has(call.analysis.status)),
+      );
+      return busy ? REFRESH_MS : false;
+    },
+  });
+}
+
+/** GET /v1/phone-calls/agents: who answered, with how many calls and who they are in Sabha. */
+export function usePhoneAgents(): UseQueryResult<PhoneAgentOption[], ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["phone-agents", token],
+    queryFn: () => apiFetch<PhoneAgentOption[]>("/v1/phone-calls/agents", { token }),
+    enabled: Boolean(token),
+    staleTime: 60_000,
+  });
+}
+
+/** GET /v1/phone-calls/{id}/audio: a link to the call's recording at MyOperator (audited as a play). */
+export function usePhoneCallAudio() {
+  const { token } = useSession();
+  return useMutation({
+    mutationFn: (callId: string) =>
+      apiFetch<{ url: string }>(`/v1/phone-calls/${encodeURIComponent(callId)}/audio`, { token }),
+  });
+}
+
+/** POST /v1/phone-calls/{id}/analyse: make a recording of the call and start its analysis. */
+export function useAnalysePhoneCall() {
+  const { token } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ callId, type, personId, newPerson, speech }: AnalyseCallRequest) =>
+      apiFetch<{ recording_id: string; status: ApiStatus }>(`/v1/phone-calls/${encodeURIComponent(callId)}/analyse`, {
+        method: "POST",
+        token,
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: {
+          type,
+          ...(personId ? { person_id: personId } : {}),
+          ...(newPerson ? { new_person: newPerson } : {}),
+          ...speech,
+        },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["phone-calls"] });
+      void queryClient.invalidateQueries({ queryKey: ["phone-agents"] });
+      void queryClient.invalidateQueries({ queryKey: ["recordings"] });
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
+    },
+  });
+}
+
+export interface AnalyseCallRequest {
+  callId: string;
+  type: "support" | "sales";
+  /** A person already in Sabha; left out, the person the agent is already matched to. */
+  personId?: string;
+  /** Owners and admins: add the agent to Sabha as a new person in this unit. */
+  newPerson?: { name: string; unit_id: string };
+  /** The speech choices in the API's names (features/speech/models: speechFields). */
+  speech?: Record<string, unknown>;
 }

@@ -56,7 +56,7 @@ from sabha_asr.transfer import TransferRoles, assign_transfer_roles, from_confir
 from sabha_asr.words import Turn, Word, assign_words_to_turns
 from sabha_core.models import SpeakerCheck, SpeakerSpan, Tenant, Transcript
 from sabha_core.profiles import ConversationType
-from sabha_core.storage import artefact_prefix
+from sabha_core.storage import artefact_prefix, run_version
 from sabha_core.timemap import SegmentMap
 from sabha_llm.redact import redact
 from sabha_workers.rubrics import NoRubric
@@ -290,7 +290,8 @@ def finish_transcript(
     """Steps 1-5 above. `turns` are given for an imported transcript (ADR 0009), which has no diarization."""
     recording = ctx.recording
     if turns is None:
-        source = artefact_prefix(ctx.tenant_id, recording.id, "diarize", deps.diarize_version)
+        source = artefact_prefix(ctx.tenant_id, recording.id, "diarize",
+                                 run_version(deps.diarize_version, recording.diarize_run))  # fmt: skip
         try:
             diarization = json.loads(ctx.artefacts.get(source + "diarization@v1.json"))
         except FileNotFoundError as exc:
@@ -364,7 +365,8 @@ def finish_transcript(
     deps.save(
         ctx.tenant_id,
         Transcript(
-            recording_id=recording.id, version=transcript["version"], storage_key=key, asr_model=asr.model,
+            recording_id=recording.id, version=transcript["version"], run=recording.speech_run, storage_key=key,
+            asr_model=asr.model,
             word_timing=asr.word_timing, word_count=transcript["word_count"],
             utterance_count=len(transcript["utterances"]), language_mix=language_mix(asr.languages),
             roles=roles, roles_method=",".join(methods), rubric_id=rubric.id, role_choices=list(rubric.roles[:2]),

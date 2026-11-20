@@ -63,7 +63,7 @@ from sabha_asr.chunking import (
 from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, TokenUsage
 from sabha_asr.transcriber import Transcriber
 from sabha_asr.words import Turn, Word
-from sabha_core.storage import artefact_prefix
+from sabha_core.storage import artefact_prefix, run_version
 from sabha_core.timemap import SegmentMap
 from sabha_workers.stages.preprocess import Runner, ffmpeg_timeout_s, run_tool
 from sabha_workers.stages.runner import NeedsReviewError, PermanentError, StageContext, TransientError, Work
@@ -300,7 +300,8 @@ def make_work(
 
     def work(ctx: StageContext) -> dict[str, Any]:
         source = artefact_prefix(ctx.tenant_id, ctx.recording.id, "preprocess", preprocess_version)
-        diarized = artefact_prefix(ctx.tenant_id, ctx.recording.id, "diarize", transcript.diarize_version)
+        diarized = artefact_prefix(ctx.tenant_id, ctx.recording.id, "diarize",
+                                   run_version(transcript.diarize_version, ctx.recording.diarize_run))  # fmt: skip
         asr = transcriber(ctx.recording.asr_choice)
         # In compact time: a chunk planned `speed` times longer is sent no longer than the provider's limit.
         max_chunk_ms = int(min(p.max_chunk_ms for p in (asr.primary, *asr.fallbacks)) * speed)

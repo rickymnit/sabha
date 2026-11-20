@@ -141,6 +141,16 @@ class Settings(BaseSettings):
     usd_inr_rate: float | None = Field(default=None, gt=0)
     usd_inr_source: str | None = None
 
+    # Phone calls from MyOperator (ADR 0017). Calls are copied into one workspace, MYOPERATOR_TENANT_ID; with the token
+    # or workspace unset nothing is fetched and the Phone calls page stays hidden. The consent reference is stored on
+    # every recording made from a call (golden rule 9): the organisation's call-recording notice.
+    myoperator_api_token: SecretStr | None = None
+    myoperator_tenant_id: str | None = None
+    myoperator_base_url: str = "https://developers.myoperator.co"
+    myoperator_consent_ref: str = Field(default="MyOperator call-recording notice", min_length=1, max_length=200)
+    myoperator_backfill_days: int = Field(default=30, ge=1, le=365)  # how far back the first fetch goes
+    myoperator_sync_every_s: int = Field(default=600, ge=60)
+
     # Observability
     otel_exporter_otlp_endpoint: str | None = None  # tracing is off when unset
     sentry_dsn: SecretStr | None = None
@@ -260,6 +270,7 @@ class Settings(BaseSettings):
         "groq_base_url",
         "deepgram_base_url",
         "gemini_base_url",
+        "myoperator_base_url",
         "web_base_url",
     )
     @classmethod
@@ -334,6 +345,8 @@ class Settings(BaseSettings):
             raise ValueError("ASR_FALLBACKS lists a provider twice")
         if "sarvam" in (self.asr_provider, *self.asr_fallbacks) and self.sarvam_api_key is None:
             raise ValueError("SARVAM_API_KEY is required when Sarvam is the ASR provider or a fallback")
+        if (self.myoperator_api_token is None) != (self.myoperator_tenant_id is None):
+            raise ValueError("set both MYOPERATOR_API_TOKEN and MYOPERATOR_TENANT_ID, or neither")
         if (self.aws_transcribe_access_key_id is None) != (self.aws_transcribe_secret_access_key is None):
             raise ValueError("set both AWS_TRANSCRIBE_ACCESS_KEY_ID and AWS_TRANSCRIBE_SECRET_ACCESS_KEY, or neither")
         return self

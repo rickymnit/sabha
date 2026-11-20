@@ -24,7 +24,13 @@ from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import BadRequestError, ConflictError, ForbiddenError, NotFoundError
-from sabha_api.services.results import ArtefactReader, RecordingPage, list_recordings, visible_recording
+from sabha_api.services.results import (
+    ArtefactReader,
+    RecordingPage,
+    latest_transcript,
+    list_recordings,
+    visible_recording,
+)
 from sabha_core.models import Analysis, AuditEntry, OutboxEvent, Person, Recording, Transcript
 from sabha_core.outbox import record_transition_async
 from sabha_core.repo import TenantRepo
@@ -94,7 +100,7 @@ async def speakers(
 ) -> SpeakersOut:  # fmt: skip
     require_resolver(principal)
     recording = await visible_recording(principal, recording_id, recordings, people)
-    doc = await transcripts.find_one({"recording_id": recording.id})
+    doc = await latest_transcript(transcripts, recording.id)
     content = None if doc is None else await reader.json(doc.storage_key)
     if doc is None or content is None:
         raise NotFoundError("This recording has no transcript yet.")
@@ -145,7 +151,7 @@ async def resolve(
     else:
         if recording.status_reason != UNCLEAR_ROLES:
             raise NotARolesReviewError("Only a recording whose speakers were unclear can have its roles confirmed.")
-        doc = await transcripts.find_one({"recording_id": recording.id})
+        doc = await latest_transcript(transcripts, recording.id)
         if doc is None or len(doc.role_choices or set(doc.roles.values())) < 2:
             raise NotFoundError("This recording has no transcript with roles to confirm.")
         if body.staff_speaker not in doc.roles:

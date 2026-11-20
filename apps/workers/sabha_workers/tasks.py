@@ -45,6 +45,7 @@ from sabha_workers.dispatch import CeleryDispatcher
 from sabha_workers.maintenance import requeue_stuck
 from sabha_workers.notifications.notify import notify as send_notifications
 from sabha_workers.notifications.ses import EmailSender, RetryableSendError, SesSender
+from sabha_workers.phone_calls import MyOperatorClient, MyOperatorError, import_audio, record_failure, sync_calls
 from sabha_workers.retention import expire_audio
 from sabha_workers.rubrics import rubric_for
 from sabha_workers.stages import analyze, diarize, imported, preprocess, transcribe
@@ -59,9 +60,9 @@ S = RecordingStatus
 
 SPECS: dict[str, StageSpec] = {
     "preprocess": StageSpec("preprocess", working=S.PREPROCESSING, done_to=S.DIARIZING, entry_from=S.UPLOADED),
-    "diarize": StageSpec("diarize", working=S.DIARIZING, done_to=S.TRANSCRIBING),
-    "transcribe": StageSpec("transcribe", working=S.TRANSCRIBING, done_to=S.ANALYZING),
-    "analyze": StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED, per_run=True),
+    "diarize": StageSpec("diarize", working=S.DIARIZING, done_to=S.TRANSCRIBING, run_field="diarize_run"),
+    "transcribe": StageSpec("transcribe", working=S.TRANSCRIBING, done_to=S.ANALYZING, run_field="speech_run"),
+    "analyze": StageSpec("analyze", working=S.ANALYZING, done_to=S.COMPLETED, per_run=True, run_field="analysis_run"),
 }
 # An imported transcript (ADR 0009): the upload's event starts it like any recording, but it goes straight from
 # UPLOADED to the transcribe stage, which reads the file (sabha_workers.stages.imported) instead of the speech.
@@ -77,6 +78,14 @@ def not_built(stage: str) -> Work:
 
 
 NOTIFY_MAX_RETRIES = 8  # SES throttling or outage: waits double from 1 min, capped at 1 h
+PHONE_IMPORT_MAX_RETRIES = 6  # MyOperator unreachable: waits double from 30 s, capped at 30 min
+
+
+def myoperator(settings: Settings) -> MyOperatorClient | None:
+    """The MyOperator client, or None when phone calls are not set up (ADR 0017)."""
+    if settings.myoperator_api_token is None:
+        return None
+    return MyOperatorClient(settings.myoperator_api_token.get_secret_value(), settings.myoperator_base_url)
 
 
 @dataclass(frozen=True)
@@ -181,7 +190,8 @@ def works(db: Database[dict[str, Any]], s3: Any, settings: Settings) -> dict[str
 
     def save_transcript(tenant_id: str, document: Transcript) -> None:
         transcripts = SyncTenantRepo(db, "transcripts", tenant_id, Transcript)
-        transcripts.delete_many({"recording_id": document.recording_id, "version": document.version})
+        run: Any = {"$in": [1, None]} if document.run == 1 else document.run  # documents from before runs: run 1
+        transcripts.delete_many({"recording_id": document.recording_id, "version": document.version, "run": run})
         transcripts.insert_one(document)
 
     checkers: list[GeminiSpeakerAsker] = []
@@ -317,6 +327,40 @@ def register(app: Celery) -> None:
         rt = runtime()
         manifest = export_backup(rt.db, rt.s3, rt.settings.s3_bucket_backups, now=utc_now())
         return sum(c["count"] for c in manifest["collections"].values())
+
+    @app.task(name="sabha.phone_calls.sync", acks_late=True)
+    def phone_calls_sync() -> str:
+        """Copy in new MyOperator calls (ADR 0017). Overlapping runs are harmless: one document per call."""
+        rt = runtime()
+        client, tenant_id = myoperator(rt.settings), rt.settings.myoperator_tenant_id
+        if client is None or tenant_id is None:
+            return "not_configured"
+        try:
+            result = sync_calls(rt.db, client, tenant_id, now=utc_now(),
+                                backfill_days=rt.settings.myoperator_backfill_days)  # fmt: skip
+        except MyOperatorError as exc:  # the next run tries again
+            log.warning("phone call sync failed", extra={"reason": str(exc)})
+            return "failed"
+        return f"read={result.read} kept={result.kept}"
+
+    @app.task(bind=True, name="sabha.phone_call_import", acks_late=True, max_retries=PHONE_IMPORT_MAX_RETRIES)
+    def phone_call_import(self: Task, tenant_id: str, recording_id: str, event_id: str | None = None) -> str:
+        """Fetch a phone call's audio into storage and start its pipeline (ADR 0017)."""
+        rt = runtime()
+        client = myoperator(rt.settings)
+        if client is None:
+            record_failure(rt.db, tenant_id=tenant_id, recording_id=recording_id,
+                           reason="Phone calls are not set up on this server.")  # fmt: skip
+            return "not_configured"
+        try:
+            return import_audio(rt.db, rt.s3, client, bucket=rt.settings.s3_bucket_audio, tenant_id=tenant_id,
+                                recording_id=recording_id, max_bytes=rt.settings.upload_max_bytes)  # fmt: skip
+        except MyOperatorError as exc:
+            if exc.retryable and self.request.retries < PHONE_IMPORT_MAX_RETRIES:
+                raise self.retry(exc=exc, countdown=min(1800, 30 * 2**self.request.retries)) from exc
+            record_failure(rt.db, tenant_id=tenant_id, recording_id=recording_id,
+                           reason=f"The recording could not be fetched from MyOperator: {exc}")  # fmt: skip
+            return "failed"
 
     @app.task(name="sabha.maintenance.requeue_stuck", acks_late=True)
     def requeue() -> int:

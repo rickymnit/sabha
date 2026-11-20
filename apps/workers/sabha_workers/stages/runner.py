@@ -77,6 +77,9 @@ class StageSpec:
     done_to: RecordingStatus  # the status once it has finished
     entry_from: RecordingStatus | None = None  # moved from here into `working` when the stage starts
     per_run: bool = False  # re-run by re-analysis (P2.8): run n > 1 writes to <version>-run<n>
+    # The Recording field that numbers this stage's runs (analysis_run, diarize_run or speech_run, ADR 0018): run n > 1
+    # writes to <version>-run<n>, so a re-run never overwrites or skips on an earlier run's outputs (golden rule 3).
+    run_field: Literal["analysis_run", "diarize_run", "speech_run"] | None = None
     imported: bool = False  # the entry step is an imported transcript skipping the audio stages (ADR 0009)
 
 
@@ -212,8 +215,8 @@ class StageRunner:
         runs = self._repo("stage_runs", tenant_id, StageRun)
         version = self._versions[spec.name]
         rerun = spec.per_run and recording.analysis_run > 1
-        if rerun:
-            version = run_version(version, recording.analysis_run)
+        if spec.run_field is not None:
+            version = run_version(version, getattr(recording, spec.run_field))
         run = start_stage_run(runs, recording_id, spec.name, version, worker=self._worker, now=self._now())
         prefix = artefact_prefix(tenant_id, recording_id, spec.name, version)
         try:

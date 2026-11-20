@@ -3,7 +3,10 @@
     CREATED -> UPLOADED -> PREPROCESSING -> DIARIZING -> TRANSCRIBING -> ANALYZING -> COMPLETED
 
 Each worker stage (PREPROCESSING, DIARIZING, TRANSCRIBING, ANALYZING) can also move to FAILED or NEEDS_REVIEW.
-COMPLETED -> ANALYZING is allowed only for re-analysis, and only when the caller says so (`reanalysis=True`).
+COMPLETED -> ANALYZING is allowed only for re-analysis, and only when the caller says so (`reanalysis=True`). A
+re-analysis with other speech models (ADR 0018) goes COMPLETED -> DIARIZING (another number of speakers) or
+COMPLETED -> TRANSCRIBING (another transcription model or speaker check), also only with `reanalysis=True`, and only
+for audio recordings: the update requires the recording's source to be "audio" (an imported transcript has none).
 NEEDS_REVIEW has two ways out, both a reviewer's decision and allowed only with `review=True` (ADR 0007):
 NEEDS_REVIEW -> TRANSCRIBING once the speaker roles are confirmed (the transcript is rebuilt with them, then
 scored), and NEEDS_REVIEW -> FAILED when the reviewer closes the recording as not usable. FAILED is left only by
@@ -74,8 +77,15 @@ ALLOWED_TRANSITIONS: Mapping[RecordingStatus, frozenset[RecordingStatus]] = Mapp
 )
 """Every transition allowed without flags, as {from: {to, ...}}. Read-only."""
 
-REANALYSIS_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset({(_S.COMPLETED, _S.ANALYZING)})
-"""Transitions allowed only for re-analysis (`reanalysis=True`), as (from, to) pairs."""
+REANALYSIS_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset(
+    {(_S.COMPLETED, _S.ANALYZING), (_S.COMPLETED, _S.DIARIZING), (_S.COMPLETED, _S.TRANSCRIBING)}
+)
+"""Transitions allowed only for re-analysis (`reanalysis=True`), as (from, to) pairs. The two into the speech stages
+re-run them with other models (ADR 0018) and need an audio recording."""
+
+SPEECH_REDO_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset(
+    {(_S.COMPLETED, _S.DIARIZING), (_S.COMPLETED, _S.TRANSCRIBING)}
+)
 
 REVIEW_TRANSITIONS: frozenset[tuple[RecordingStatus, RecordingStatus]] = frozenset(
     {(_S.NEEDS_REVIEW, _S.TRANSCRIBING), (_S.NEEDS_REVIEW, _S.FAILED)}
@@ -160,7 +170,8 @@ def check_transition(
 ) -> None:  # fmt: skip
     """Raise InvalidTransition unless the table allows `from_status -> to_status`; otherwise return None.
 
-    `reanalysis=True` allows COMPLETED -> ANALYZING and nothing else; `review=True` allows only REVIEW_TRANSITIONS.
+    `reanalysis=True` allows only REANALYSIS_TRANSITIONS (out of COMPLETED); `review=True` allows only
+    REVIEW_TRANSITIONS.
     Plain strings (as stored in MongoDB) are accepted; an unknown status raises ValueError.
     """
     source, target = RecordingStatus(from_status), RecordingStatus(to_status)
@@ -217,6 +228,8 @@ def _plan(
     filter: dict[str, Any] = {"_id": recording_id, "status": source.value}
     if (source, target) in IMPORT_TRANSITIONS:
         filter["source"] = TRANSCRIPT_SOURCE
+    if (source, target) in SPEECH_REDO_TRANSITIONS:
+        filter["source"] = "audio"
     if target not in _NO_CONSENT_NEEDED:
         filter["consent_ref"] = {"$type": "string", "$ne": ""}
     update = {"$set": {"status": target.value, "status_reason": reason, "status_changed_at": at}}
@@ -244,6 +257,8 @@ def _refusal(
         return ConcurrentTransition(f"recording {recording_id!r} is {recording.status}, not {source}")
     if (source, target) in IMPORT_TRANSITIONS and recording.source != TRANSCRIPT_SOURCE:
         return InvalidTransition(source, target, f"recording {recording_id!r} is not an imported transcript")
+    if (source, target) in SPEECH_REDO_TRANSITIONS and recording.source != "audio":
+        return InvalidTransition(source, target, f"recording {recording_id!r} has no audio to transcribe again")
     return ConsentRequired(f"recording {recording_id!r} has no consent_ref; it cannot move past UPLOADED")
 
 

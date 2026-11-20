@@ -13,6 +13,7 @@ dependencies = [
     "celery[redis]>=5.5",
     "onnxruntime>=1.30,<1.31",
     "numpy>=2.0",
+    "httpx>=0.28",  # MyOperator (ADR 0017); already installed through sabha-asr
 ]
 
 [build-system]
