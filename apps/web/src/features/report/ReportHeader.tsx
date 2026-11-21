@@ -80,6 +80,13 @@ export function ReportHeader({
                 <time dateTime={recording.recorded_at}>{formatIst(recording.recorded_at)}</time>
                 <span className="sr-only"> India Standard Time</span>
               </Detail>
+              {recording.support_call && (
+                <Detail term="Call">
+                  {recording.support_call === "ticket_callback"
+                    ? "Support called back about a ticket"
+                    : "Customer called"}
+                </Detail>
+              )}
               <Detail term="Length">
                 {length.join(", ")}
                 {recording.languages.length ? ` (${joinList(recording.languages)})` : ""}

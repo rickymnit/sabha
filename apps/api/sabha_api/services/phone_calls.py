@@ -50,6 +50,7 @@ from sabha_core.models import (
     PhoneCall,
     Recording,
     SpeakerModel,
+    SupportCall,
     Tenant,
     Unit,
     new_id,
@@ -350,6 +351,9 @@ class AnalyseIn(BaseModel):
     speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
     speaker_model: SpeakerModel = "pyannote"
     transferred: bool | None = None
+    # Support calls only (owner 2026-11-21): left out, from the call's direction (incoming: the customer called;
+    # outgoing: support called back about a ticket).
+    support_call: SupportCall | None = None
 
     @model_validator(mode="after")
     def _one_person(self) -> Self:
@@ -436,6 +440,9 @@ async def analyse(
         raise TransferNotAllowedError("Only support calls can be marked as helped by a colleague.")
     if transferred and body.speaker_count not in (None, TRANSFERRED_SPEAKERS):
         raise TransferNotAllowedError("A call a colleague helped on has three speakers: two agents and the customer.")
+    support_call: SupportCall | None = None
+    if support:
+        support_call = body.support_call or ("ticket_callback" if call.direction == "outgoing" else "customer_called")
     asr_choice = None
     if body.asr_model is not None:
         if principal.role not in EVERY_CALL:
@@ -467,6 +474,7 @@ async def analyse(
         cost_estimate=cost_estimate,
         interaction="call" if body.type is ConversationType.SALES else None,
         transferred=transferred,
+        support_call=support_call,
         asr_choice=asr_choice,
         speaker_count=body.speaker_count,
         speaker_model=body.speaker_model,

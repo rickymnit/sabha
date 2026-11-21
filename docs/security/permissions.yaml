@@ -374,6 +374,15 @@ routes:
     other_tenant: 200
     others: 403
 
+  GET /v1/models-usage:
+    # The last 30 days of AI model use and cost for this organisation, and provider credit left (Models & usage
+    # page): owners and admins. Balances are for the server's API keys.
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403
+
   GET /v1/usage:
     # This month's audio hours against the plan (the sidebar's plan block): owners and admins. other_tenant sees its
     # own tenant's.

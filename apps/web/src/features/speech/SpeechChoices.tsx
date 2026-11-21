@@ -42,6 +42,24 @@ export function SpeechChoices({ value, onChange, models, support, personWord, di
           ))}
         </Select>
       )}
+      {support && value.supportCall && (
+        <Select
+          label="Who called?"
+          value={value.supportCall}
+          disabled={disabled}
+          onChange={(e) =>
+            set({ supportCall: e.target.value === "ticket_callback" ? "ticket_callback" : "customer_called" })
+          }
+          hint={
+            value.supportCall === "ticket_callback"
+              ? "The problem is known from the ticket, so it is judged on following it up and closing it."
+              : "The customer rang with a problem."
+          }
+        >
+          <option value="customer_called">The customer called support</option>
+          <option value="ticket_callback">Support called back about a ticket</option>
+        </Select>
+      )}
       {support && (
         <Select
           label="Did a colleague help on this call?"

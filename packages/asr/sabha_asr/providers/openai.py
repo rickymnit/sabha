@@ -35,6 +35,7 @@ import httpx
 from sabha_asr.assembly import WordTiming
 from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, spread_words
 from sabha_asr.providers import _http
+from sabha_asr.vocabulary import hint_sentence
 from sabha_asr.words import Word
 
 NAME = "openai"
@@ -108,6 +109,8 @@ class OpenAIProvider:
             form["languages[]"] = [hint] if hint and hint != "unknown" else list(EXPECTED_LANGUAGES)
         else:
             form["language"] = hint if hint and hint != "unknown" else DEFAULT_HINT
+        if chunk.hints:  # the organisation's words (ADR 0019); Groq's Whisper takes the same field
+            form["prompt"] = hint_sentence(chunk.hints)
         if self._model in self.WORD_TIMESTAMP_MODELS:
             form |= {"response_format": "verbose_json", "timestamp_granularities[]": ["word"]}
         return form

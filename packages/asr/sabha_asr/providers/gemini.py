@@ -44,6 +44,7 @@ import httpx
 from sabha_asr.assembly import WordTiming
 from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, TokenUsage, spread_words
 from sabha_asr.providers import _http
+from sabha_asr.vocabulary import hint_sentence
 
 NAME = "gemini"
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
@@ -76,6 +77,11 @@ fillers.
 ANSWER_SCHEMA = {"type": "OBJECT", "properties": {"text": {"type": "STRING"}}, "required": ["text"]}
 
 log = logging.getLogger("sabha.asr.gemini")
+
+
+def instruction(chunk: AudioChunk) -> str:
+    """The instruction, with the organisation's words at the end when it has any (ADR 0019)."""
+    return f"{INSTRUCTION}\n\n{hint_sentence(chunk.hints)}" if chunk.hints else INSTRUCTION
 
 
 class GeminiProvider:
@@ -127,7 +133,7 @@ class GeminiProvider:
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"inline_data": {"mime_type": "audio/wav", "data": audio}}, {"text": INSTRUCTION}],
+                    "parts": [{"inline_data": {"mime_type": "audio/wav", "data": audio}}, {"text": instruction(chunk)}],
                 }
             ],
             "generationConfig": {

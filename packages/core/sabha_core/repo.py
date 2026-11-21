@@ -449,7 +449,7 @@ class OwnTenantRepo:
     only, and changes only SETTINGS_FIELDS. Plan, profile, region and retention change through Sabha's admin
     scripts, never from the tenant's own settings."""
 
-    SETTINGS_FIELDS = frozenset({"name", "labels", "enabled_types"})
+    SETTINGS_FIELDS = frozenset({"name", "labels", "enabled_types", "vocabulary"})
 
     def __init__(self, db: AsyncDatabase[dict[str, Any]], tenant_id: str) -> None:
         self._tenant_id = _check_tenant_id(tenant_id)

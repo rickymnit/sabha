@@ -48,6 +48,7 @@ import {
   type ProductInfoItem,
   type ProductInfoList,
   type SpeechModel,
+  type ModelsUsage,
 } from "./types";
 
 export const REFRESH_MS = 5_000;
@@ -532,6 +533,17 @@ export function useUsage(enabled: boolean): UseQueryResult<UsageSummary, ApiErro
     queryKey: ["usage", token],
     queryFn: () => apiFetch<UsageSummary>("/v1/usage", { token }),
     enabled: enabled && Boolean(token),
+  });
+}
+
+/** The Models & usage page: AI model use and cost over 30 days, and provider credit (owners and admins). */
+export function useModelsUsage(): UseQueryResult<ModelsUsage, ApiError> {
+  const { token } = useSession();
+  return useQuery({
+    queryKey: ["models-usage", token],
+    queryFn: () => apiFetch<ModelsUsage>("/v1/models-usage", { token }),
+    enabled: Boolean(token),
+    staleTime: 60_000,
   });
 }
 

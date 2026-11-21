@@ -82,7 +82,8 @@ class DeepgramProvider:
 
     def params(self, chunk: AudioChunk) -> tuple[tuple[str, str], ...]:
         """Code-switching unless this chunk or ASR_LANGUAGE names one language ("hi-IN" is sent as "hi")."""
-        query = (("model", self._model), ("punctuate", "true"))
+        terms = tuple(("keyterm", term) for term in chunk.hints)  # Nova-3 key term prompting (ADR 0019)
+        query = (("model", self._model), ("punctuate", "true"), *terms)
         hint = (chunk.language or self._language).split("-")[0]
         if hint and hint != "unknown":
             return (*query, ("language", hint))

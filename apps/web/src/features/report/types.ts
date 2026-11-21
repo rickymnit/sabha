@@ -351,6 +351,8 @@ export interface ReportRecording {
   languages: string[];
   /** Silence the VAD removed (golden rule 4), on the original timeline; drawn grey on the timeline. */
   removed_silence: TimeRange[];
+  /** Support calls: who called (owner 2026-11-21). */
+  support_call?: "customer_called" | "ticket_callback" | null;
 }
 
 /** The tenant's words for its own nouns (sabha_core/profiles.py Labels). Never hard-code "Teacher" or "Lesson". */

@@ -121,6 +121,10 @@ export const routes: RouteObject[] = [
             element: <RoleGate roles={ADMINS} />,
             children: [
               {
+                path: "/models-usage",
+                ...page(() => import("../pages/ModelsUsagePage").then((m) => ({ Component: m.ModelsUsagePage }))),
+              },
+              {
                 path: "/activity",
                 ...page(() => import("../pages/ActivityPage").then((m) => ({ Component: m.ActivityPage }))),
               },

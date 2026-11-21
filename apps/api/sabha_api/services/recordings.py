@@ -60,6 +60,7 @@ from sabha_core.models import (
     Person,
     Recording,
     SpeakerModel,
+    SupportCall,
     Tenant,
     Unit,
     new_id,
@@ -111,6 +112,9 @@ class RecordingIn(BaseModel):
     # colleague is optional, and only for uploaders who may upload for them.
     transferred: bool = False
     transfer_person_id: str | None = None
+    # Support only (owner 2026-11-21): the customer called, or support called back about a ticket. Left out: the
+    # customer called.
+    support_call: SupportCall | None = None
     # Audio only: how many speakers (None: the type's default) and whether Gemini checks who said each line.
     speaker_count: int | None = Field(default=None, ge=SPEAKER_COUNT_MIN, le=SPEAKER_COUNT_MAX)
     speaker_model: SpeakerModel = "pyannote"
@@ -421,6 +425,7 @@ async def create(
         client_name=body.client_name,
         asr_choice=asr_choice,
         transferred=body.transferred,
+        support_call=(body.support_call or "customer_called") if body.type is ConversationType.SUPPORT else None,
         transfer_person_id=transfer_person_id,
         speaker_count=body.speaker_count,
         speaker_model=body.speaker_model,

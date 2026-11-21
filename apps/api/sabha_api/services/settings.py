@@ -24,7 +24,7 @@ from sabha_api.audit import audit
 from sabha_api.auth import Principal, Role
 from sabha_api.deps import Transactions
 from sabha_api.errors import ApiError, NotFoundError
-from sabha_core.models import AuditEntry, Tenant
+from sabha_core.models import AuditEntry, Tenant, VocabularyTerm
 from sabha_core.profiles import ConversationType, Labels, get_profile
 from sabha_core.quota import MAX_TYPES
 from sabha_core.repo import OwnTenantRepo, TenantRepo
@@ -71,6 +71,8 @@ class SettingsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Name | None = None
+    # The organisation's words for speech-to-text (ADR 0019): the whole list, replacing the current one.
+    vocabulary: list[VocabularyTerm] | None = Field(default=None, max_length=200)
     labels: LabelsIn | None = None
     enabled_types: list[ConversationType] | None = Field(default=None, min_length=1)
 
@@ -97,6 +99,7 @@ class SettingsOut(BaseModel):
     types: list[TypeOut]
     max_types: int
     retention_days: int  # audio is deleted after this many days (P7.3); read-only, set by Sabha
+    vocabulary: list[VocabularyTerm]
 
 
 def available_types(tenant: Tenant) -> set[ConversationType]:
@@ -115,6 +118,7 @@ def settings_out(tenant: Tenant) -> SettingsOut:
         types=[TypeOut(type=t, enabled=t in tenant.enabled_types, available=t in available) for t in ConversationType],
         max_types=MAX_TYPES[tenant.plan],
         retention_days=tenant.retention_days,
+        vocabulary=tenant.vocabulary,
     )
 
 
@@ -165,6 +169,11 @@ def _changes(tenant: Tenant, body: SettingsIn) -> tuple[dict[str, Any], dict[str
         if words:
             before["labels"] = {k: current[k] for k in words}
             after["labels"] = words
+    if body.vocabulary is not None:
+        cleaned = _clean_vocabulary(body.vocabulary)
+        if cleaned != [t.model_dump() for t in tenant.vocabulary]:
+            before["vocabulary"] = [t.model_dump() for t in tenant.vocabulary]
+            after["vocabulary"] = cleaned
     if body.enabled_types is not None:
         types = [t for t in ConversationType if t in body.enabled_types]  # the setup screen's order
         if types != tenant.enabled_types:
@@ -172,6 +181,25 @@ def _changes(tenant: Tenant, body: SettingsIn) -> tuple[dict[str, Any], dict[str
             before["enabled_types"] = [t.value for t in tenant.enabled_types]
             after["enabled_types"] = [t.value for t in types]
     return before, after
+
+
+def _clean_vocabulary(terms: list[VocabularyTerm]) -> list[dict[str, Any]]:
+    """Trimmed, blanks and repeats dropped (a term listed twice keeps its first entry, with both spellings)."""
+    out: dict[str, dict[str, Any]] = {}
+    for t in terms:
+        term = " ".join(t.term.split())
+        if not term:
+            continue
+        entry = out.setdefault(term.casefold(), {"term": term, "sounds_like": []})
+        for spelling in t.sounds_like:
+            s = " ".join(spelling.split())
+            if (
+                s
+                and s.casefold() != term.casefold()
+                and s.casefold() not in {x.casefold() for x in entry["sounds_like"]}
+            ):
+                entry["sounds_like"].append(s)
+    return list(out.values())
 
 
 def _check_types(tenant: Tenant, types: list[ConversationType]) -> None:

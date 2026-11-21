@@ -38,7 +38,12 @@ export interface SpeechValue {
   speakerModel: "pyannote" | "gemini";
   /** Support calls: a colleague helped (three speakers). */
   transferred: boolean;
+  /** Support calls, when the choice is offered (Analyse): who called (owner 2026-11-21). */
+  supportCall?: SupportCall;
 }
+
+/** The customer called support, or support called back about a ticket raised in the software. */
+export type SupportCall = "customer_called" | "ticket_callback";
 
 /** The request fields for these choices (the API's names), leaving out what is the default. */
 export function speechFields(value: SpeechValue, support: boolean, chooseModel: boolean) {
@@ -49,5 +54,6 @@ export function speechFields(value: SpeechValue, support: boolean, chooseModel: 
     ...(count !== null ? { speaker_count: count } : {}),
     ...(value.speakerModel !== "pyannote" ? { speaker_model: value.speakerModel } : {}),
     ...(support ? { transferred: helped } : {}),
+    ...(support && value.supportCall ? { support_call: value.supportCall } : {}),
   };
 }

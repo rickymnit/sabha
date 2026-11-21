@@ -1,0 +1,139 @@
+# Support rubric for businesses, v0.4: DRAFT for the owner's review.
+#
+# Changes from v0.3 (owner's feedback, 2026-11-21: after listening to the calls, good support calls that deserved
+# about 3.5-4 were scored 2.5-2.8; the anchors asked for every behaviour at once). The bar for each level is lower;
+# the dimensions, weights, not-applicable rules and outputs are unchanged:
+# - A 4 is a competent call: the agent finds the right problem, fixes it or hands it on clearly, and stays polite.
+#   A 5 adds the extras (repeating the problem back, checking understanding, a reference number).
+# - problem_understood: checking the problem on the customer's screen (remote access such as AnyDesk) or asking for
+#   the details needed to find it counts as finding out what is wrong; a clear description from the customer needs
+#   only a confirming question.
+# - troubleshooting: fixing it for the customer over remote access counts as guided steps; checking the result at
+#   the end is enough for a 4, checking after each step is for a 5.
+# - empathy_and_clarity: polite and patient is a 4; acknowledging the trouble in words is for a 5.
+# - resolution_and_ownership: the customer agreeing it works ("haan, ho gaya") is a 4; a next step needs who and when
+#   for a 4, a reference number only for a 5.
+# - Two kinds of support call (owner, 2026-11-21): the customer calls support, or support calls the customer back
+#   about a ticket raised in the software. On a call-back the problem is known from the ticket, so naming it and
+#   confirming the details counts as finding out what is wrong, and closing the ticket with the customer's agreement
+#   counts as resolving it. The judge is told which kind of call it is (sabha_analytics.scoring.SUPPORT_SITUATIONS).
+#
+# Owner's decisions (2026-11-04): support PHONE calls about the company's own products, one support agent and one
+# customer per recording. The report shows the agent's scores and a case card (product, problem, steps tried,
+# outcome, promised follow-up), every item backed by a quote. No client material was given: the dimensions follow
+# common support-call practice and are for review.
+#
+# Rules (as for every rubric):
+# - Anchors describe only what the agent says that a rater can point to in the transcript or audio. No guesses about
+#   intentions, feelings or whether the product is really fixed after the call.
+# - Customers are never scored. What they say appears only as evidence of what the agent did, and in the case card.
+# - Raters may not know the products. Until the business gives raters a product sheet, steps are judged on what is
+#   heard: specific vs vague, one at a time vs all at once, checked vs assumed.
+# - Example utterances are illustrative Hinglish. All names, numbers and products in them are fictional.
+#   "[company]" stands in for the business's own name and "[product]" for what the customer is calling about.
+# - min_quotes: how many timestamped transcript quotes the judge must cite for the score.
+
+id: support.company.v0.4
+segment: company
+version: "0.4"
+roles: [support_agent, customer]  # support_agent is the person analysed; customer is context only
+
+dimensions:
+  - key: problem_understood
+    name: Problem understood
+    weight: 0.30
+    definition: "The agent finds out what is wrong before fixing it: asks about the problem (what happens, where, any error) or checks it on the customer's screen, and works on the problem the customer described. On a call-back about a ticket, naming the ticket's problem and confirming the details with the customer counts."
+    min_quotes: 1
+    not_applicable_when: "The customer brings no problem to diagnose: the call is to schedule, confirm or reschedule something (a training, a visit, a demo), or a question answered directly, such as about an order, a bill, a price or a warranty."
+    anchors:
+      1: "The agent suggests a fix without asking anything or looking at the problem, or works on a different problem from the one described."
+      2: "The agent asks almost nothing and jumps to a general fix ('restart kar lijiye') that does not fit the problem described."
+      3: "The agent asks at least one question about the problem or looks at it on the screen, but misses a detail needed to fix it and has to come back to it."
+      4: "The agent asks the questions needed to find the problem, or checks it on the customer's screen, and works on the right problem."
+      5: "The agent asks the questions needed (what happens, where, any error, what was already tried) or checks it on screen, and repeats the problem back or confirms it with the customer before fixing it."
+    examples:
+      1: "Ek kaam kijiye, restart kar dijiye, theek ho jayega."
+      5: "Kab se aa raha hai yeh? Screen pe koi error likha aata hai? Aur aapne abhi tak kya try kiya hai? ... Toh do din se app login ke baad band ho jata hai, aur reinstall se bhi theek nahi hua. Sahi samjha maine?"
+
+  - key: troubleshooting
+    name: Guided troubleshooting
+    weight: 0.30
+    definition: "The agent fixes the problem step by step, either by guiding the customer with specific steps or by doing it over remote access, and checks that it works."
+    min_quotes: 2
+    not_applicable_when: "The call needs no troubleshooting: it is to schedule, confirm or reschedule something (a training, a visit, a demo), or a question answered directly, such as about an order, a bill, a price or a warranty."
+    anchors:
+      1: "The agent gives no steps, steps that contradict each other, or only guesses ('shayad') without trying anything."
+      2: "The agent gives only vague steps ('settings mein jaake dekh lijiye') and does not check whether anything worked."
+      3: "The agent gives specific steps or makes the fix remotely, but does not check with the customer that it worked."
+      4: "The agent gives specific steps or makes the fix remotely, and checks with the customer that it worked."
+      5: "The agent gives specific steps one at a time (or makes the fix remotely while saying what is being done), checks the result, and says plainly when something needs more than the call (a visit, another team)."
+    examples:
+      1: "Shayad network ka issue hai, ya phone ka, pata nahi. Sab settings check kar lijiye."
+      5: "Pehle Settings mein jaiye, phir Apps... mil gaya? Ab [product] pe tap karke 'Clear cache' dabaiye. Ho gaya? Ab app kholiye, login karke batayiye kya dikh raha hai. Yeh isliye kyunki purana data login rok raha ho sakta hai."
+
+  - key: empathy_and_clarity
+    name: Empathy and clarity
+    weight: 0.15
+    definition: "The agent stays polite and patient, lets the customer speak, and explains in plain words without blaming the customer."
+    min_quotes: 2
+    anchors:
+      1: "The agent blames the customer ('aapne galat kiya hoga'), uses rude or dismissive words, or keeps interrupting."
+      2: "The agent is curt or impatient more than once, or keeps using technical words the customer does not follow."
+      3: "The agent is polite on the whole but has a curt moment, or interrupts the customer more than once."
+      4: "The agent is polite and patient throughout ('ji', 'aap', 'please'), lets the customer finish, and explains in plain words."
+      5: "The agent is polite and patient throughout, explains in plain words, acknowledges the customer's trouble in words, and checks the customer has understood ('yeh clear hai?')."
+    examples:
+      1: "Aapne hi kuch galat dabaya hoga. Main bata chuka hoon, wahi kijiye."
+      5: "Ji, do din se kaam nahi ho pa raha, yeh sach mein pareshani wali baat hai. Main step by step saath chalti hoon. ... Yeh clear hai, ya main dobara batau?"
+
+
+  - key: resolution_and_ownership
+    name: Resolution and ownership
+    weight: 0.25
+    definition: "The call ends with the problem solved and the customer agreeing, or with a clear next step: who will act and when. On a call-back about a ticket, closing the ticket with the customer's agreement counts as solved."
+    min_quotes: 1
+    anchors:
+      1: "The call ends with the problem neither solved nor passed on, and no next step given."
+      2: "The agent gives only a vague next step ('team dekh legi', 'call aa jayega') with no person or time."
+      3: "The agent says the problem is solved without the customer agreeing, or names a next step but not when it will happen."
+      4: "The customer agrees the problem is solved ('haan, ho gaya'), or the agent says who will act next and when."
+      5: "The customer agrees the problem is solved, or the agent says who will act and when and gives a reference number, and the agent tells the customer what to do if it comes back or nothing happens."
+    examples:
+      1: "Theek hai, dekh lenge. Aur kuch?"
+      5: "Aapki complaint number SR-2231 hai. Kal 12 baje tak technician aapko call karega visit ke liye. Agar kal shaam tak call na aaye, toh isi number pe yeh complaint number bataiye, main khud escalate karungi."
+
+# Numbers computed in code from the transcript and audio (CLAUDE.md golden rule 5), shown next to the scores and
+# never produced by the LLM. No targets or thresholds are set.
+computed_metrics:
+  - call_duration_s                # length of the call, in seconds
+  - support_agent_talk_share       # share of speech time spoken by the agent
+  - customer_talk_share            # share of speech time spoken by the customer
+  - support_agent_question_count   # number of questions the agent asks
+  - silence_share                  # share of the call with no speech (includes holds)
+  - longest_silence_s              # longest stretch with no speech, such as a hold, in seconds
+  - hold_gap_count                 # number of holds; the gap length is defined and documented in the metrics code
+
+output:
+  - summary      # what the call was about and how it ended
+  - strengths
+  - gaps
+  - suggestions
+  - product      # case card: which product the call is about, with a quote
+  - problem      # case card: the customer's problem in a sentence, with a quote
+  - steps_tried  # case card: steps tried during the call (or before it, by the customer), each with a quote
+  - outcome      # case card: one value from output_values.outcome, with a quote
+  - follow_up    # case card: what was promised next, who does it and the date or time said, or null
+
+# Allowed values: a draft for the owner's review. The outcome is judged only from what was said on the call, and
+# "unclear" is always allowed.
+output_values:
+  outcome:
+    - solved        # the customer confirms on the call that the problem is gone or the question answered
+    - follow_up     # a next step is promised (callback, visit, replacement, refund) and the case stays with support
+    - escalated     # the case is passed to another team or a senior person
+    - not_solved    # the call ends with the problem still there and nothing promised
+    - unclear       # too little was said to tell
+
+# Scores from this rubric stay hidden from users until agreement between the model and human raters, measured by
+# eval/kappa.py on real annotated recordings, reaches this value. No agreement has been measured yet.
+visibility_gate: {metric: cohens_kappa, min: 0.60}

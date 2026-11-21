@@ -79,11 +79,28 @@ class TenantDoc(Document):
     tenant_id: str = ""
 
 
+SupportCall = Literal["customer_called", "ticket_callback"]
+"""Which kind of support call (Recording.support_call)."""
+
+
+class VocabularyTerm(BaseModel):
+    """A word of the organisation that speech-to-text gets wrong (ADR 0019): how it is written, and how it comes out
+    wrong ("schoolo", "arp"). The term is given to the speech model as a hint, and the wrong spellings are replaced
+    by it in the transcript, whole words only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    term: str = Field(min_length=1, max_length=60)
+    sounds_like: list[str] = Field(default_factory=list, max_length=20)
+
+
 class Tenant(Document):
     name: str = Field(min_length=1)
     # Other ways the name is said or transcribed, for recognising a greeting or a sales rep's introduction: the
     # speech recogniser often writes English names in Devanagari ("ब्राइट पाथ सॉफ्टवेयर" for "Brightpath Software").
     name_variants: list[str] = Field(default_factory=list)
+    # The organisation's own words for speech-to-text (ADR 0019), edited in Settings.
+    vocabulary: list[VocabularyTerm] = Field(default_factory=list, max_length=200)
     profile: ProfileName
     enabled_types: list[ConversationType] = Field(min_length=1)
     labels: Labels
@@ -342,6 +359,10 @@ class Recording(TenantDoc):
     # for (sabha_asr.transfer). `transfer_person_id` names the colleague when the uploader knows and may (optional).
     transferred: bool = False
     transfer_person_id: str | None = None
+    # Which kind of support call (owner 2026-11-21): the customer called support, or support called the customer back
+    # about a ticket raised in the software, so the problem is known before the call. Phone calls default from
+    # MyOperator's direction (incoming, outgoing); the Analyse window and upload can change it. Only for support.
+    support_call: SupportCall | None = None
     # How the voices are told apart (owner 2026-11-18, chosen at upload by anyone who uploads): how many speakers the
     # diarizer is asked for (None: the type's default, sabha_workers.stages.diarize.speaker_count), and whether
     # Gemini then checks who said each line (sabha_asr.speaker_check) on top of pyannote.

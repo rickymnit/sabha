@@ -8,6 +8,7 @@ import { useOutletContext } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import { useSettings, useUpdateSettings } from "../api/hooks";
+import { VocabularyPanel } from "../features/vocabulary/VocabularyPanel";
 import type { Me, SettingsChange, TenantSettings } from "../api/types";
 import {
   Button,
@@ -127,7 +128,13 @@ export function SettingsPage() {
           </SkeletonGroup>
         </Panel>
       ) : (
-        <SettingsForm settings={settings.data} />
+        <>
+          <SettingsForm settings={settings.data} />
+          <VocabularyPanel
+            key={JSON.stringify(settings.data.vocabulary ?? [])}
+            vocabulary={settings.data.vocabulary ?? []}
+          />
+        </>
       )}
       <ClassesPanel me={me} />
       <ProductInfoPanel />

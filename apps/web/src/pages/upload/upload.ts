@@ -41,6 +41,8 @@ export interface UploadInput {
   /** Support calls a colleague helped on (the call stays personId's), and the colleague when named. */
   transferred?: boolean;
   transferPersonId?: string | null;
+  /** Support only: who called (owner 2026-11-21). */
+  supportCall?: "customer_called" | "ticket_callback" | null;
   /** Audio only: how many voices (null: the type's default) and whether Gemini checks who said each line. */
   speakerCount?: number | null;
   speakerModel?: "pyannote" | "gemini";
@@ -121,6 +123,7 @@ export async function uploadRecording(input: UploadInput): Promise<UploadOutcome
       ...(input.asrModel ? { asr_model: input.asrModel } : {}),
       ...(input.transferred ? { transferred: true } : {}),
       ...(input.transferred && input.transferPersonId ? { transfer_person_id: input.transferPersonId } : {}),
+      ...(input.supportCall ? { support_call: input.supportCall } : {}),
       ...(input.speakerCount ? { speaker_count: input.speakerCount } : {}),
       ...(input.speakerModel && input.speakerModel !== "pyannote" ? { speaker_model: input.speakerModel } : {}),
     },

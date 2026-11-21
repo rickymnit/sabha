@@ -769,6 +769,7 @@ class RecordingDetail(RecordingOut):
     speaker_count: int | None = None
     speaker_model: str = "pyannote"
     transferred: bool = False
+    support_call: str | None = None
 
 
 def silence_gaps(segment_map: SegmentMap, duration_ms: int | None) -> list[Range]:
@@ -798,7 +799,7 @@ async def recording_detail(
         share_note=recording.share_note if recording.shared_at else None, shared_by_name=shared_by_name,
         unit_name=unit.name if unit else None, recorded_at=recording.recorded_at or recording.created_at,
         voice_names=recording.voice_names, asr_choice=recording.asr_choice, speaker_count=recording.speaker_count,
-        speaker_model=recording.speaker_model, transferred=recording.transferred,
+        speaker_model=recording.speaker_model, transferred=recording.transferred, support_call=recording.support_call,
         speech_ms=None if segment_map is None else segment_map.compact_length_ms, languages=languages,
         removed_silence=[] if segment_map is None else silence_gaps(segment_map, recording.duration_ms),
     )  # fmt: skip

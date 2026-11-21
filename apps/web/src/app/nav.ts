@@ -112,6 +112,13 @@ export function navItems(me: Me): NavEntry[] {
       match: (path) => path === "/activity",
     },
     {
+      to: "/models-usage",
+      label: "Models & usage",
+      icon: "spark",
+      roles: ADMINS,
+      match: (path) => path === "/models-usage",
+    },
+    {
       to: "/settings",
       label: "Settings",
       icon: "settings",

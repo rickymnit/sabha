@@ -62,6 +62,7 @@ from sabha_asr.chunking import (
 )
 from sabha_asr.provider import AudioChunk, ChunkResult, LanguageSpan, ProviderError, TokenUsage
 from sabha_asr.transcriber import Transcriber
+from sabha_asr.vocabulary import fix_words, hints, terms_of
 from sabha_asr.words import Turn, Word
 from sabha_core.storage import artefact_prefix, run_version
 from sabha_core.timemap import SegmentMap
@@ -303,6 +304,9 @@ def make_work(
         diarized = artefact_prefix(ctx.tenant_id, ctx.recording.id, "diarize",
                                    run_version(transcript.diarize_version, ctx.recording.diarize_run))  # fmt: skip
         asr = transcriber(ctx.recording.asr_choice)
+        tenant = transcript.tenant(ctx.tenant_id)
+        terms = terms_of(tenant.vocabulary if tenant is not None else ())
+        word_hints = hints(terms)
         # In compact time: a chunk planned `speed` times longer is sent no longer than the provider's limit.
         max_chunk_ms = int(min(p.max_chunk_ms for p in (asr.primary, *asr.fallbacks)) * speed)
         with tempfile.TemporaryDirectory(prefix="sabha-transcribe-") as tmp:
@@ -322,7 +326,7 @@ def make_work(
             key = plan_key(chunks, speed)
 
             def ask(batch: Sequence[Chunk], language: str | None) -> Part:
-                audio = [replace(_cut(compact, chunk), language=language) for chunk in batch]
+                audio = [replace(_cut(compact, chunk), language=language, hints=word_hints) for chunk in batch]
                 if speed != 1.0:
                     audio = [_speed_up(a, c, speed, Path(tmp), run) for a, c in zip(audio, batch, strict=True)]
                 try:
@@ -390,6 +394,7 @@ def make_work(
         )
         if not words:
             raise NeedsReviewError(NO_TRANSCRIPT, "speech was found but the ASR returned no words")
+        words, vocabulary_fixes = fix_words(words, terms)  # the organisation's words (ADR 0019)
         providers = sorted({p.provider for p in parts})
         models = sorted({p.model_id for p in parts})
         fallbacks = sorted({p.fallback_reason for p in parts if p.fallback_reason})
@@ -404,6 +409,7 @@ def make_work(
             "fallback_reasons": fallbacks,
             "chunks": len(chunks),
             "words": [w.to_record() for w in words],
+            "vocabulary_fixes": vocabulary_fixes,
             "languages": languages,
         }
         ctx.artefacts.put(ctx.prefix + "asr@v1.json", json.dumps(document, ensure_ascii=False).encode(),
@@ -426,6 +432,7 @@ def make_work(
             "still_other_script": len(still),
             "fallback": bool(fallbacks),
             "words": len(words),
+            "vocabulary_fixes": vocabulary_fixes,
         }
         log.info("transcribed", extra={"recording_id": ctx.recording.id, **meta})
         # What each model was sent, overlaps included: what the provider bills (by audio duration).

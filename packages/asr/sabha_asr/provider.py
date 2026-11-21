@@ -32,6 +32,7 @@ class AudioChunk:
     wav: bytes
     duration_ms: int
     language: str | None = None  # a hint for this chunk only, e.g. "hi-IN"
+    hints: tuple[str, ...] = ()  # the organisation's words the speech model should expect (ADR 0019)
 
     def __post_init__(self) -> None:
         if not self.chunk_id:

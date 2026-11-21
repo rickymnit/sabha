@@ -26,6 +26,7 @@ export function reportRecording(detail: RecordingDetail): ReportRecording {
     speech_ms: detail.speech_ms,
     languages: detail.languages,
     removed_silence: detail.removed_silence,
+    support_call: detail.support_call ?? null,
   };
 }
 

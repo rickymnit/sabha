@@ -1,6 +1,6 @@
 # Sabha technical documentation
 
-The technical documentation in one file: architecture, components, running and operating, decisions and reference. Built on 2026-11-20 by `scripts/build_documentation.py`. The separate files are the source: edit them, not this file, then run `uv run python scripts/build_documentation.py` again.
+The technical documentation in one file: architecture, components, running and operating, decisions and reference. Built on 2026-11-21 by `scripts/build_documentation.py`. The separate files are the source: edit them, not this file, then run `uv run python scripts/build_documentation.py` again.
 
 ## Contents
 
@@ -42,6 +42,7 @@ The technical documentation in one file: architecture, components, running and o
    - [ADR 0016: Automated tests removed](#doc-docs-adr-0016-no-automated-tests-md)
    - [ADR 0017: Phone calls from MyOperator](#doc-docs-adr-0017-myoperator-phone-calls-md)
    - [ADR 0018: Re-analysis with other speech models, and model choice on Analyse](#doc-docs-adr-0018-reanalysis-with-other-speech-models-md)
+   - [ADR 0019: The organisation's words in speech-to-text](#doc-docs-adr-0019-organisation-vocabulary-md)
 6. [Technical reference](#part-6)
    - [LLM providers](#doc-docs-llm-providers-md)
    - [Sabha webhooks](#doc-docs-webhooks-md)
@@ -2729,6 +2730,44 @@ models when a phone call is analysed (ADR 0017) and when a conversation is re-an
 - Earlier reports stay as earlier versions; open disputes are closed, as for any re-analysis.
 - Restart workers and relay before the API when deploying (new Recording and Transcript fields; docs/runbook.md).
 
+<a id="doc-docs-adr-0019-organisation-vocabulary-md"></a>
+
+## ADR 0019: The organisation's words in speech-to-text
+
+*Source: [`docs/adr/0019-organisation-vocabulary.md`](adr/0019-organisation-vocabulary.md)*
+
+Date: 2026-11-21. Status: accepted.
+
+### Context
+
+Speech-to-text does not know a company's own words. On Schoollog ERP calls "Schoollog" comes back as "schoolo",
+"schoollo" or "school log", and "ERP" as "arp". Wrong words make transcripts hard to read, break role detection
+(the company name is how a greeting is recognised) and make coaching quote the agent wrongly.
+
+### Decision
+
+Each tenant has a word list, `Tenant.vocabulary`: terms (as they are written) with the wrong spellings heard so far
+(`sounds_like`). Owners and admins edit it in Settings, "Words Sabha should know" (PATCH /v1/settings, audited as
+settings.update; no new route).
+
+1. **Hints.** The transcribe stage gives the terms (at most 50) to the speech model on every chunk
+   (`AudioChunk.hints`): Deepgram Nova-3 `keyterm`, the OpenAI and Groq `prompt`, and a line at the end of Gemini's
+   instruction. Sarvam, Qwen, AWS and local Whisper get no hints.
+2. **Fixes.** After the chunks are merged, `sabha_asr.vocabulary.fix_words` replaces each wrong spelling with its term,
+   for every provider: whole words only, ignoring case and punctuation, longest spelling first, up to 5 words per
+   spelling ("school log" -> "Schoollog"; "sharp" is not touched by "arp"). The term in another case is put in the
+   term's case. The term's words share the replaced words' time; confidence is the lowest of them. The count is
+   `vocabulary_fixes` in asr@v1.json and the stage log.
+
+Roles, the transcript, grounding and scoring all read the fixed words, so quotes are checked against what users see.
+
+### Consequences
+
+- Only conversations transcribed after a change use it; earlier ones change when re-analysed.
+- A wrong spelling that is also a real word in the calls (for example "tally" as a verb) would be replaced; keep the
+  list to spellings that only mean the term.
+- The original provider words are not kept beside the fixed ones; the per-chunk provider output (`parts`) still is.
+
 <a id="part-6"></a>
 
 # Part 6. Technical reference
@@ -3328,6 +3367,15 @@ routes:
   PATCH /v1/settings:
     # Body: rename the person label. other_tenant renames its own tenant's (apps/api/tests/test_settings.py checks
     # tenant A is untouched).
+    anonymous: 401
+    owner: 200
+    admin: 200
+    other_tenant: 200
+    others: 403
+
+  GET /v1/models-usage:
+    # The last 30 days of AI model use and cost for this organisation, and provider credit left (Models & usage
+    # page): owners and admins. Balances are for the server's API keys.
     anonymous: 401
     owner: 200
     admin: 200

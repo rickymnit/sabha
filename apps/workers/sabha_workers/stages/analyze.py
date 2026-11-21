@@ -44,7 +44,7 @@ from sabha_analytics.next_time import ProductFact
 from sabha_analytics.phases import DEFAULT_PHASES
 from sabha_analytics.report import analyse
 from sabha_analytics.rubric import Rubric
-from sabha_analytics.scoring import JudgeModel
+from sabha_analytics.scoring import SUPPORT_SITUATIONS, JudgeModel
 from sabha_core.models import Analysis, Person, Score, Tenant, utc_now
 from sabha_core.profiles import ConversationType
 from sabha_core.repo import SyncTenantRepo
@@ -169,6 +169,9 @@ def make_work(deps: AnalyzeDeps) -> Work:
                 next_time=coaching,
                 # Sales and support judge product statements against it too (owner, 2026-11-13).
                 product_info=deps.product_info(ctx.tenant_id) if coaching or recording.type in CHECKED_TYPES else (),
+                # The kind of support call (owner 2026-11-21): a call-back about a ticket already knows the problem.
+                situation=SUPPORT_SITUATIONS.get(recording.support_call or "", "")
+                if recording.type is ConversationType.SUPPORT else "",
             )  # fmt: skip
         except (ProviderError, BudgetUnavailableError) as exc:
             retryable = isinstance(exc, BudgetUnavailableError) or exc.retryable

@@ -300,6 +300,7 @@ def synthesise(
     analysed_roles: Collection[str],
     rubric_roles: Sequence[str] = ("teacher", "students"),
     prompts_dir: Path = PROMPTS_DIR,
+    situation: str = "",
 ) -> SynthesisOutcome:
     """Ask for the summary, strengths, gaps and suggestions from verified results only (module docstring).
     `rubric_roles`: the rubric's (analysed, others) roles, which the system prompt names."""
@@ -312,7 +313,7 @@ def synthesise(
         return SynthesisOutcome(None, 0, ("no_moments",), (), ())
     system_prompt = load_prompt("synthesis.system", prompts_dir)
     request_prompt = load_prompt("synthesis.request", prompts_dir)
-    system = system_prompt.render(**prompt_roles(rubric_id, rubric_roles))
+    system = system_prompt.render(**prompt_roles(rubric_id, rubric_roles, situation))
     prefix = request_prompt.render(
         rubric_id=rubric_id,
         rubric_version=rubric_version,

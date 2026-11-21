@@ -314,6 +314,7 @@ def analyse(
     support: bool = False,
     next_time: bool = False,
     product_info: Sequence[ProductFact] = (),
+    situation: str = "",
 ) -> AnalysisResult:
     """Score, compute the overall score, synthesise when there is one, and assemble the report.
 
@@ -349,7 +350,8 @@ def analyse(
     outcomes = outcome_values(rubric.output_values) if support else None
     checked = sales or support  # product statements judged against the approved information
     facts = render_product_info(tuple(product_info)[:MAX_PRODUCT_INFO]) if checked and product_info else ""
-    scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model, product_info=facts)
+    scoring = score_dimensions(rubric=rubric, transcript=transcript, metrics=metrics, model=model, product_info=facts,
+                               situation=situation)  # fmt: skip
     overall = compute_overall(scoring.dimensions)
     synthesis = None
     if overall.score is not None:
@@ -362,6 +364,7 @@ def analyse(
             model=model,
             analysed_roles=analysed_roles,
             rubric_roles=tuple(rubric.roles),
+            situation=situation,
         )
     phases = segment_phases(transcript, model=model, phase_names=phase_names) if phase_names else None
     ticket = (

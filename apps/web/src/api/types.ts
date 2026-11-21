@@ -103,6 +103,8 @@ export interface RecordingDetail extends RecordingItem {
   speaker_count?: number | null;
   speaker_model?: "pyannote" | "gemini";
   transferred?: boolean;
+  /** Support calls: who called (owner 2026-11-21). */
+  support_call?: "customer_called" | "ticket_callback" | null;
 }
 
 export interface TranscriptResponse {
@@ -288,6 +290,14 @@ export interface TenantSettings {
   max_types: number;
   /** Audio is deleted after this many days (P7.3); read-only. */
   retention_days: number;
+  /** The organisation's words for speech-to-text (ADR 0019). */
+  vocabulary: VocabularyTerm[];
+}
+
+/** A word speech-to-text gets wrong, and how it comes out ("Schoollog": "schoolo", "school log"). */
+export interface VocabularyTerm {
+  term: string;
+  sounds_like: string[];
 }
 
 /** PATCH /v1/settings: only what changes. */
@@ -295,6 +305,7 @@ export interface SettingsChange {
   name?: string;
   labels?: Partial<Labels>;
   enabled_types?: ConversationType[];
+  vocabulary?: VocabularyTerm[];
 }
 
 /** GET /v1/usage (services/usage.py): this month's audio hours (owners and admins). */
@@ -520,4 +531,39 @@ export interface PhoneCallFilters {
   direction?: "incoming" | "outgoing" | null;
   analysed?: boolean | null;
   from?: string | null;
+}
+
+/** GET /v1/models-usage: the last 30 days of AI model use, and provider credit where it is reported. */
+export interface ModelUsage {
+  kind: "speech" | "llm";
+  provider: string;
+  model: string;
+  runs: number;
+  minutes: number | null;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  inr: number | null;
+  errors: number;
+}
+
+export interface ProviderBalance {
+  provider: string;
+  name: string;
+  console_url: string;
+  configured: boolean;
+  amount: number | null;
+  currency: string | null;
+  note: string | null;
+}
+
+export interface ModelsUsage {
+  since: string;
+  days: number;
+  usd_inr_rate: number | null;
+  total_inr: number | null;
+  speech_inr: number | null;
+  llm_inr: number | null;
+  models: ModelUsage[];
+  daily: { day: string; speech_inr: number; llm_inr: number }[];
+  balances: ProviderBalance[];
 }

@@ -236,6 +236,7 @@ export function UploadPage() {
   const [clientName, setClientName] = useState("");
   // Support calls handed to a second agent during the call (owner 2026-11-18). Managers and admins mark it.
   const [transferred, setTransferred] = useState<"no" | "yes">("no");
+  const [supportCall, setSupportCall] = useState<"customer_called" | "ticket_callback">("customer_called");
   const [transferId, setTransferId] = useState("");
   // How many voices and how they are told apart (owner 2026-11-18), for everyone who uploads. Support calls default
   // to 2 (one agent, one customer); a call a colleague helped on always has 3.
@@ -289,6 +290,7 @@ export function UploadPage() {
         clientName: type === "sales" ? clientName : null,
         asrModel,
         transferred: transferring && !isTranscript(item.file),
+        supportCall: type === "support" ? supportCall : null,
         transferPersonId: transferPerson || null,
         speakerCount: isTranscript(item.file) ? null : speakerCount,
         speakerModel: isTranscript(item.file) ? "pyannote" : speakerModel,
@@ -509,6 +511,16 @@ export function UploadPage() {
           )}
           {type === "support" && (
             <>
+              <ChoiceCards
+                legend="Who called?"
+                value={supportCall}
+                onChange={setSupportCall}
+                disabled={running}
+                options={[
+                  { value: "customer_called", label: "The customer called support" },
+                  { value: "ticket_callback", label: "Support called back about a ticket" },
+                ]}
+              />
               <ChoiceCards
                 legend="Did a colleague help on this call?"
                 value={transferred}

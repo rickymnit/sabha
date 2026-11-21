@@ -140,8 +140,21 @@ def conversation_kind(rubric_id: str, roles: Sequence[str]) -> str:
     return CONVERSATION_KINDS.get(kind, "conversation")
 
 
-def prompt_roles(rubric_id: str, roles: Sequence[str]) -> dict[str, str]:
-    """$conversation, $staff_role and $people_rule for the system prompts, from the rubric."""
+# What the judge is told about the kind of support call (owner 2026-11-21, Recording.support_call).
+SUPPORT_SITUATIONS = {
+    "customer_called": "On this call the customer called support with a problem.",
+    "ticket_callback": (
+        "On this call the support agent called the customer back about a ticket the customer raised in the software, "
+        "so the problem is already known from the ticket. The agent does not have to discover the problem from "
+        "scratch: naming the ticket or problem and confirming the details with the customer counts as finding out "
+        "what is wrong. Closing the ticket with the customer's agreement counts as a resolution."
+    ),
+}
+
+
+def prompt_roles(rubric_id: str, roles: Sequence[str], situation: str = "") -> dict[str, str]:
+    """$conversation, $staff_role and $people_rule for the system prompts, from the rubric. `situation` is added to
+    the people rule: what kind of call this is (SUPPORT_SITUATIONS)."""
     staff = (roles[0] if roles else "staff member").replace("_", " ")
     if len(roles) > 1:
         others = roles[1].replace("_", " ")
@@ -155,6 +168,8 @@ def prompt_roles(rubric_id: str, roles: Sequence[str]) -> dict[str, str]:
             "The meeting is judged as a whole. Never score, rank, praise or criticise an individual participant; "
             "speak of the meeting or the team."
         )
+    if situation:
+        rule = f"{rule} {situation}"
     return {"conversation": conversation_kind(rubric_id, roles), "staff_role": staff, "people_rule": rule}
 
 
@@ -800,6 +815,7 @@ def score_dimensions(
     model: JudgeModel,
     prompts_dir: Path = PROMPTS_DIR,
     product_info: str = "",
+    situation: str = "",
 ) -> ScoringOutcome:
     """Score every rubric dimension with grounded evidence (module docstring). Raises PromptNotRedacted, and lets
     gateway errors propagate: a failed call fails the stage visibly rather than producing a partial report.
@@ -819,7 +835,7 @@ def score_dimensions(
         product_info=PRODUCT_INFO_SECTION.format(entries=product_info) if product_info else "",
         transcript=transcript.render(),
     )
-    system = prompts.system.render(**prompt_roles(rubric.id, rubric.roles))
+    system = prompts.system.render(**prompt_roles(rubric.id, rubric.roles, situation))
     calls: list[CallRecord] = []
     results: dict[str, DimensionResult] = {}
 

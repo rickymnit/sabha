@@ -10,8 +10,8 @@ units and one active user per role, each linked to the dev issuer as subject "de
 "Sign in as..." list shows them. The two staff members are also people (Asha in Class 6, Ravi in Class 7), so
 recordings can be uploaded for them. Everything is made up; never point this at a real database.
 
-It also seeds "NiaLabs" (tenant demo-company, company profile): the pilot's biometric attendance company, whose sales
-reps record sales calls and meetings, team meetings, and walk-in visitors at its front desk (Pooja, the
+It also seeds "Schoollog ERP" (tenant demo-company, company profile; formerly NiaLabs): the pilot company, whose
+sales reps record sales calls and meetings, team meetings, and walk-in visitors at its front desk (Pooja, the
 receptionist). The people in it are made up.
 
 And "E2E School" (tenant e2e-school) for the browser tests (apps/web/e2e): an owner and a teacher whose
@@ -44,7 +44,7 @@ USERS = [  # (subject suffix, name, job title, role, units, person id)
     ("asha", "Asha Rao", "Teacher, Class 6", Role.STAFF, ["unit-6"], "p-asha"),
     ("ravi", "Ravi Kumar", "Teacher, Class 7", Role.STAFF, ["unit-7"], "p-ravi"),
 ]
-COMPANY_TENANT_ID, COMPANY_NAME = "demo-company", "NiaLabs"
+COMPANY_TENANT_ID, COMPANY_NAME = "demo-company", "Schoollog ERP"
 COMPANY_UNITS = {"team-north": "North team", "team-south": "South team", "front-desk": "Front desk"}
 COMPANY_USERS = [  # (subject suffix, name, job title, role, units, person id)
     ("kabir", "Kabir Mehta", "Founder and CEO", Role.OWNER, [], None),
@@ -55,7 +55,18 @@ COMPANY_USERS = [  # (subject suffix, name, job title, role, units, person id)
 ]
 COMPANY_TYPES = [ConversationType.RECEPTION, ConversationType.SALES, ConversationType.MEETING, ConversationType.SUPPORT]
 # How the speech recogniser writes the name when it is said inside Hindi speech.
-COMPANY_NAME_VARIANTS = ["Nialabs", "Nia Labs", "नियालैब्स", "निया लैब्स", "निया लैब"]
+COMPANY_NAME_VARIANTS = [
+    "Schoollog",
+    "School log",
+    "Schoollog ERP",
+    "स्कूललॉग",
+    "स्कूल लॉग",
+    "Nialabs",
+    "Nia Labs",
+    "नियालैब्स",
+    "निया लैब्स",
+    "निया लैब",
+]
 E2E_TENANT_ID, E2E_TENANT_NAME = "e2e-school", "E2E School"
 E2E_UNITS = {"unit-e2e": "Test class"}
 E2E_USERS = [
@@ -143,7 +154,7 @@ def main() -> int:
         return 2
     client: MongoClient[dict[str, Any]] = MongoClient(settings.mongo_uri.get_secret_value())
     written = seed(client[settings.mongo_db], settings.oidc_issuer)
-    print(f"Demo School, NiaLabs and E2E School ready ({written} documents written). Sign in at the web "
+    print(f"Demo School, Schoollog ERP and E2E School ready ({written} documents written). Sign in at the web "
           "app as any of: " + ", ".join(f"dev-{u[0]}" for u in (*USERS, *COMPANY_USERS)))  # fmt: skip
     return 0
 

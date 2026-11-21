@@ -485,6 +485,8 @@ function AnalyseDialog({
     speakers: "2",
     speakerModel: "pyannote",
     transferred: helpers,
+    // Outgoing calls are mostly call-backs about a ticket (owner 2026-11-21); the choice can be changed.
+    supportCall: call.direction === "outgoing" ? "ticket_callback" : "customer_called",
   });
   const [error, setError] = useState<string | null>(null);
   const adding = personId === NEW;
